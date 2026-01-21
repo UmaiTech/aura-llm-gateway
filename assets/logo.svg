@@ -1,119 +1,68 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Main gradient for the aura glow -->
-    <radialGradient id="auraGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" style="stop-color:#818CF8;stop-opacity:0.4" />
-      <stop offset="50%" style="stop-color:#6366F1;stop-opacity:0.2" />
+    <!-- Gradients using the approved color scheme -->
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:0.6" />
+      <stop offset="40%" style="stop-color:#818CF8;stop-opacity:0.3" />
       <stop offset="100%" style="stop-color:#4F46E5;stop-opacity:0" />
     </radialGradient>
 
-    <!-- Primary gradient for main shapes -->
     <linearGradient id="primaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#818CF8;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#818CF8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366F1;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="deepGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#4F46E5;stop-opacity:1" />
     </linearGradient>
 
-    <!-- Accent gradient for routing paths -->
-    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:0.9" />
-      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:0.9" />
-    </linearGradient>
-
-    <!-- Glow filter -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+    <!-- Glow filters -->
+    <filter id="strongGlow">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
       <feMerge>
         <feMergeNode in="coloredBlur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
 
-    <!-- Soft shadow -->
-    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
-      <feOffset dx="0" dy="4" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.3"/>
-      </feComponentTransfer>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
       <feMerge>
-        <feMergeNode/>
+        <feMergeNode in="coloredBlur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
   </defs>
 
-  <!-- Outer glow (aura effect) -->
-  <circle cx="256" cy="256" r="200" fill="url(#auraGlow)" opacity="0.6"/>
+  <!-- Outer aura glow -->
+  <circle cx="256" cy="256" r="220" fill="url(#coreGlow)" opacity="0.8"/>
 
-  <!-- Main hexagonal container with shadow -->
-  <g filter="url(#softShadow)">
-    <path d="M 256 80 L 356 143.3 L 356 268.7 L 256 332 L 156 268.7 L 156 143.3 Z"
-          fill="url(#primaryGradient)"
-          opacity="0.15"
-          stroke="url(#primaryGradient)"
-          stroke-width="2"/>
+  <!-- Gateway core - concentric circles representing layers -->
+  <g filter="url(#softGlow)">
+    <!-- Outer ring -->
+    <circle cx="256" cy="256" r="100" fill="none" stroke="url(#primaryGradient)" stroke-width="3" opacity="0.4"/>
+
+    <!-- Middle ring -->
+    <circle cx="256" cy="256" r="75" fill="none" stroke="url(#primaryGradient)" stroke-width="4" opacity="0.6"/>
+
+    <!-- Inner core -->
+    <circle cx="256" cy="256" r="50" fill="url(#deepGradient)" opacity="0.3"/>
+    <circle cx="256" cy="256" r="50" fill="none" stroke="url(#primaryGradient)" stroke-width="5"/>
   </g>
 
-  <!-- Routing visualization - Left side (inputs) -->
-  <g opacity="0.8">
-    <!-- Top input flow -->
-    <path d="M 80 180 L 140 180 Q 156 180 156 196 L 156 210"
-          stroke="url(#accentGradient)"
-          stroke-width="3"
-          fill="none"
-          stroke-linecap="round"/>
-    <circle cx="80" cy="180" r="6" fill="#A78BFA"/>
-
-    <!-- Middle input flow -->
-    <path d="M 60 256 L 140 256 L 156 256"
-          stroke="url(#accentGradient)"
-          stroke-width="3"
-          fill="none"
-          stroke-linecap="round"/>
-    <circle cx="60" cy="256" r="6" fill="#A78BFA"/>
-
-    <!-- Bottom input flow -->
-    <path d="M 80 332 L 140 332 Q 156 332 156 316 L 156 302"
-          stroke="url(#accentGradient)"
-          stroke-width="3"
-          fill="none"
-          stroke-linecap="round"/>
-    <circle cx="80" cy="332" r="6" fill="#A78BFA"/>
-  </g>
-
-  <!-- Central "A" lettermark with glow -->
-  <g filter="url(#glow)">
-    <path d="M 200 300 L 256 160 L 312 300 L 288 300 L 278 270 L 234 270 L 224 300 Z M 244 246 L 268 246 L 256 200 Z"
+  <!-- Central "A" lettermark with strong glow -->
+  <g filter="url(#strongGlow)">
+    <path d="M 226 286 L 256 206 L 286 286 L 274 286 L 269 271 L 243 271 L 238 286 Z M 248 258 L 264 258 L 256 230 Z"
           fill="#FFFFFF"
           opacity="0.95"/>
   </g>
 
-  <!-- Routing visualization - Right side (unified output) -->
-  <g opacity="0.9">
-    <!-- Single output flow with arrow -->
-    <path d="M 356 256 L 420 256"
-          stroke="url(#primaryGradient)"
-          stroke-width="4"
-          fill="none"
-          stroke-linecap="round"/>
-    <path d="M 410 246 L 432 256 L 410 266 Z"
-          fill="#6366F1"/>
-    <circle cx="432" cy="256" r="8" fill="#6366F1" opacity="0.3"/>
-    <circle cx="432" cy="256" r="5" fill="#818CF8"/>
-  </g>
-
-  <!-- Connection nodes at hexagon edges -->
-  <circle cx="156" cy="210" r="4" fill="#FFFFFF" opacity="0.6"/>
-  <circle cx="156" cy="256" r="4" fill="#FFFFFF" opacity="0.6"/>
-  <circle cx="156" cy="302" r="4" fill="#FFFFFF" opacity="0.6"/>
-  <circle cx="356" cy="256" r="4" fill="#FFFFFF" opacity="0.8"/>
-
-  <!-- Subtle data flow particles (decorative) -->
-  <g opacity="0.4">
-    <circle cx="120" cy="180" r="2" fill="#A78BFA"/>
-    <circle cx="100" cy="256" r="2" fill="#A78BFA"/>
-    <circle cx="120" cy="332" r="2" fill="#A78BFA"/>
-    <circle cx="390" cy="256" r="2" fill="#818CF8"/>
+  <!-- Subtle energy field lines radiating from center -->
+  <g opacity="0.15">
+    <circle cx="256" cy="256" r="120" fill="none" stroke="url(#primaryGradient)" stroke-width="1"/>
+    <circle cx="256" cy="256" r="140" fill="none" stroke="url(#primaryGradient)" stroke-width="1"/>
+    <circle cx="256" cy="256" r="160" fill="none" stroke="url(#primaryGradient)" stroke-width="1"/>
   </g>
 </svg>
