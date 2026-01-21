@@ -14,10 +14,19 @@ ignore = [
     "RUSTSEC-2023-0071",
 ]
 
-# Licenses configuration disabled due to cargo-deny format changes
-# See: https://github.com/EmbarkStudios/cargo-deny/pull/611
-# [licenses]
-# confidence-threshold = 0.8
+[licenses]
+# We allow common permissive open-source licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+]
+
+# Confidence threshold for license detection
+confidence-threshold = 0.8
 
 [bans]
 # Lint level for when multiple versions of the same crate are detected
