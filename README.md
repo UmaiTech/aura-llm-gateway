@@ -83,10 +83,12 @@ git commit --no-verify -m "your message"
 
 ### Configuration
 
-Set environment variables for your provider API keys:
+Configuration can be provided via environment variables, YAML files, or both. Environment variables always take precedence over file configuration.
+
+#### Environment Variables
 
 ```bash
-# Required
+# Server
 export AURA_HOST=0.0.0.0
 export AURA_PORT=8080
 
@@ -99,9 +101,29 @@ export GOOGLE_API_KEY=...
 export DATABASE_URL=postgres://user:pass@localhost/aura
 export REDIS_URL=redis://localhost:6379
 
-# Optional - Logging
+# Optional - Logging & Admin
 export RUST_LOG=info,aura_proxy=debug
+export AURA_ADMIN_KEY=your-admin-key
 ```
+
+#### YAML Configuration (Kubernetes/Helm)
+
+For production deployments, use a YAML config file with secrets injected via environment variables:
+
+```yaml
+# config.yaml
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+logging:
+  level: "info"
+
+# API keys injected via env vars from K8s Secrets
+providers: {}
+```
+
+See [`config.example.yaml`](config.example.yaml) for a full example with all options documented.
 
 ## Development
 
@@ -199,7 +221,7 @@ make fmt-check
 **Current Phase**: Foundation (Milestone 1)
 
 - [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
-- [ ] PR #2: Configuration System
+- [x] **PR #2: Configuration System** - Environment + YAML config with validation
 - [ ] PR #3: Open Responses API Types
 - [ ] PR #4: Basic Axum Server
 

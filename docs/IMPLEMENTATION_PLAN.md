@@ -89,29 +89,33 @@ aura-llm-gateway/
 ---
 
 ### PR #2: Configuration System
-**Rust Concepts:** Environment variables, `Arc<T>` for shared state, builder pattern
+**Rust Concepts:** Environment variables, `Arc<T>` for shared state, builder pattern, serde serialization
+
+**Status:** ✅ **COMPLETED**
 
 **Tasks:**
-- [ ] Add `config` and `dotenvy` dependencies to `aura-core`
-- [ ] Create `Config` struct with environment-based loading
-- [ ] Implement `Default` trait for development defaults
-- [ ] Create `AppState` struct with `Arc<Config>`
-- [ ] Add configuration validation
+- [x] Add `dotenvy` and `serde_yaml` dependencies to `aura-core`
+- [x] Create `Config` struct with environment-based loading
+- [x] Implement `Default` trait for development defaults
+- [x] Create `AppState` struct with `Arc<Config>`
+- [x] Add configuration validation
+- [x] Add YAML configuration file support for Kubernetes/Helm deployments
 
 **Files:**
 - `crates/aura-core/src/config.rs`
 - `crates/aura-core/src/state.rs`
+- `config.example.yaml`
 
 **Key Code:**
 ```rust
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    pub host: String,
-    pub port: u16,
-    pub openai_api_key: Option<String>,
-    pub anthropic_api_key: Option<String>,
-    pub google_api_key: Option<String>,
-    pub log_level: String,
+    pub server: ServerConfig,      // host, port
+    pub providers: ProviderConfig, // openai_api_key, anthropic_api_key, google_api_key
+    pub logging: LoggingConfig,    // level
+    pub database: DatabaseConfig,  // url
+    pub redis: RedisConfig,        // url
+    pub admin: AdminConfig,        // key
 }
 
 pub struct AppState {
@@ -120,8 +124,20 @@ pub struct AppState {
 ```
 
 **Acceptance Criteria:**
-- Config loads from environment variables
-- Missing required vars return clear error messages
+- ✅ Config loads from environment variables
+- ✅ Config loads from YAML files (`Config::from_file()`)
+- ✅ Environment variables override file config (`Config::from_file_with_env()`)
+- ✅ Missing required vars return clear error messages
+- ✅ Validation ensures at least one provider API key is configured
+
+**Implementation Notes:**
+- Restructured Config into nested sections for cleaner YAML representation
+- Added `serde_yaml` for YAML parsing/serialization
+- Environment variables take precedence over file config (ideal for K8s Secrets)
+- Added `ConfigBuilder` for programmatic construction
+- Added `to_yaml_masked()` for safe logging of configuration
+- Created `config.example.yaml` with full documentation
+- 21 unit tests + 5 doc tests
 
 ---
 
