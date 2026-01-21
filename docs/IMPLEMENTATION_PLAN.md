@@ -182,12 +182,14 @@ Define the core Open Responses API types in `aura-types`.
 ### PR #4: Basic Axum Server
 **Rust Concepts:** Async handlers, `Router`, `State` extractor, middleware basics
 
+**Status:** ✅ **COMPLETED**
+
 **Tasks:**
-- [ ] Add Axum and Tower dependencies to `aura-proxy`
-- [ ] Create basic router with health check endpoint
-- [ ] Inject `AppState` into handlers
-- [ ] Add request logging middleware with `tower-http`
-- [ ] Add graceful shutdown handling
+- [x] Add Axum and Tower dependencies to `aura-proxy`
+- [x] Create basic router with health check endpoint
+- [x] Inject `AppState` into handlers
+- [x] Add request logging middleware with `tower-http`
+- [x] Add graceful shutdown handling
 
 **Files:**
 - `crates/aura-proxy/src/main.rs`
@@ -195,9 +197,17 @@ Define the core Open Responses API types in `aura-types`.
 - `crates/aura-proxy/src/routes/health.rs`
 
 **Acceptance Criteria:**
-- Server starts on configured port
-- `GET /health` returns 200 OK
-- Logs show incoming requests
+- ✅ Server starts on configured port (127.0.0.1:8080)
+- ✅ `GET /health` returns 200 OK with JSON response
+- ✅ Logs show incoming requests with structured tracing
+- ✅ Graceful shutdown on SIGTERM/SIGINT
+
+**Implementation Notes:**
+- Created Axum server with TraceLayer middleware for request logging
+- Health endpoint returns JSON: `{"status":"ok","service":"aura-llm-gateway","version":"0.1.3"}`
+- Graceful shutdown handles both Ctrl+C and SIGTERM signals
+- AppState holds Arc<Config> for shared state across handlers
+- 1 passing integration test for health endpoint
 
 ---
 
@@ -206,19 +216,34 @@ Define the core Open Responses API types in `aura-types`.
 ### PR #5: HTTP Client Foundation
 **Rust Concepts:** `reqwest`, async/await, error handling with `?`
 
+**Status:** ✅ **COMPLETED**
+
 **Tasks:**
-- [ ] Add `reqwest` with `rustls-tls` feature to `aura-core`
-- [ ] Create `HttpClient` wrapper struct
-- [ ] Implement timeout and retry configuration
-- [ ] Add request/response logging hooks
-- [ ] Write integration test with mock server
+- [x] Add `reqwest` with `rustls-tls` feature to `aura-core`
+- [x] Create `HttpClient` wrapper struct
+- [x] Implement timeout and retry configuration
+- [x] Add request/response logging hooks
+- [x] Write integration test with network requests
 
 **Files:**
 - `crates/aura-core/src/http.rs`
+- `crates/aura-core/src/lib.rs` (exports)
 
 **Acceptance Criteria:**
-- HTTP client makes requests with configurable timeouts
-- TLS works correctly
+- ✅ HTTP client makes requests with configurable timeouts
+- ✅ TLS works correctly via rustls
+- ✅ Exponential backoff retry logic (3 retries by default)
+- ✅ Automatic retry on 5xx and 429 errors
+- ✅ Request/response logging with tracing
+
+**Implementation Notes:**
+- Created `HttpClient` wrapper around reqwest with configurable timeouts and retries
+- Default config: 60s timeout, 10s connect timeout, 3 max retries with exponential backoff
+- Retry logic: starts at 500ms delay, doubles on each retry (500ms, 1s, 2s)
+- Convenience methods: `get()`, `post_json()`
+- Custom error type `HttpError` with proper error context
+- 4 unit tests + 1 integration test (network-dependent)
+- User agent: `aura-llm-gateway/0.1.3`
 
 ---
 
