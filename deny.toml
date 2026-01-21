@@ -15,8 +15,8 @@ ignore = [
 ]
 
 [licenses]
-# Accepted licenses for the project
-accepted = [
+# Allowed licenses for the project
+allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
