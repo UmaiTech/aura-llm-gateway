@@ -15,9 +15,9 @@ updates:
       prefix: "chore(deps)"
       include: "scope"
     reviewers:
-      - "umaitech/backend"
+      - "UmaiTech/ai-core"
     assignees:
-      - "umaitech/backend"
+      - "UmaiTech/ai-core"
     ignore:
       # Ignore patch updates for stable dependencies
       - dependency-name: "*"
