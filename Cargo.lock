@@ -60,7 +60,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "aura-core"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "async-trait",
  "aura-db",
@@ -77,7 +77,7 @@ dependencies = [
 
 [[package]]
 name = "aura-db"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "aura-types",
  "serde",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "aura-proxy"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "aura-core",
@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "aura-types"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "cargo-husky",
  "chrono",
