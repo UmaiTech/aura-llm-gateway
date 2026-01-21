@@ -1,0 +1,53 @@
+# Aura LLM Gateway Configuration
+# Copy this file to config.yaml and customize for your deployment
+#
+# Configuration priority (highest to lowest):
+# 1. Environment variables
+# 2. This YAML file
+# 3. Default values
+#
+# For Kubernetes deployments:
+# - Mount this file from a ConfigMap
+# - Inject secrets (API keys) via environment variables from Secrets
+
+server:
+  # Host address to bind the server to
+  host: "0.0.0.0"
+  # Port number for the server
+  port: 8080
+
+# Provider API keys
+# NOTE: For production, prefer environment variables for sensitive values:
+#   OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
+providers:
+  # OpenAI API key (optional)
+  # openai_api_key: "sk-..."
+
+  # Anthropic API key (optional)
+  # anthropic_api_key: "sk-ant-..."
+
+  # Google API key (optional)
+  # google_api_key: "..."
+
+logging:
+  # Log level: trace, debug, info, warn, error
+  # Can also use complex filters: "info,aura_proxy=debug"
+  level: "info"
+
+database:
+  # PostgreSQL connection URL (required for persistence features)
+  # NOTE: For production, use DATABASE_URL environment variable
+  # url: "postgres://user:pass@localhost/aura"
+  url: null
+
+redis:
+  # Redis connection URL (required for rate limiting and caching)
+  # NOTE: For production, use REDIS_URL environment variable
+  # url: "redis://localhost:6379"
+  url: null
+
+admin:
+  # Admin API key for administrative endpoints
+  # NOTE: For production, use AURA_ADMIN_KEY environment variable
+  # key: "admin-secret-key"
+  key: null

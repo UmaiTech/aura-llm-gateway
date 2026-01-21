@@ -100,8 +100,8 @@ mod tests {
 
         let state = AppState::new(config);
 
-        assert_eq!(state.config.host, "localhost");
-        assert_eq!(state.config.port, 9000);
+        assert_eq!(state.config.server.host, "localhost");
+        assert_eq!(state.config.server.port, 9000);
         assert!(state.config.has_openai());
     }
 
@@ -128,8 +128,8 @@ mod tests {
     fn test_app_state_default() {
         let state = AppState::default();
 
-        assert_eq!(state.config.host, "0.0.0.0");
-        assert_eq!(state.config.port, 8080);
+        assert_eq!(state.config.server.host, "0.0.0.0");
+        assert_eq!(state.config.server.port, 8080);
     }
 
     #[test]
@@ -141,6 +141,6 @@ mod tests {
 
         let state = AppStateBuilder::new(config).build();
 
-        assert_eq!(state.config.host, "127.0.0.1");
+        assert_eq!(state.config.server.host, "127.0.0.1");
     }
 }

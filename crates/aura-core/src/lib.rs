@@ -6,7 +6,10 @@
 pub mod config;
 pub mod state;
 
-pub use config::{Config, ConfigBuilder, ConfigError};
+pub use config::{
+    AdminConfig, Config, ConfigBuilder, ConfigError, DatabaseConfig, LoggingConfig, ProviderConfig,
+    RedisConfig, ServerConfig,
+};
 pub use state::{AppState, AppStateBuilder};
 
 /// Returns the crate version
