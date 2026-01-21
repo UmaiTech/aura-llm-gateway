@@ -1,6 +1,6 @@
 .PHONY: help build test lint fmt clean run dev install check audit release \
 	docker-build docker-run docker-compose-up docker-compose-down docker-compose-down-v \
-	docker-compose-logs docker-compose-ps docker-dev-up docker-dev-down docker-dev-down-v docker-dev-logs
+	docker-compose-logs docker-compose-ps docker-deps
 
 # Default target
 .DEFAULT_GOAL := help
@@ -146,18 +146,8 @@ docker-compose-logs: ## Follow docker-compose logs
 docker-compose-ps: ## Show running containers
 	docker compose ps
 
-# Docker development (dependencies only)
-docker-dev-up: ## Start only dependencies (PostgreSQL, Redis) for local dev
-	docker compose -f docker-compose.dev.yml up -d
-
-docker-dev-down: ## Stop development dependencies
-	docker compose -f docker-compose.dev.yml down
-
-docker-dev-down-v: ## Stop dev dependencies and remove volumes
-	docker compose -f docker-compose.dev.yml down -v
-
-docker-dev-logs: ## Follow development dependencies logs
-	docker compose -f docker-compose.dev.yml logs -f
+docker-deps: ## Start only dependencies (PostgreSQL, Redis) for local dev
+	docker compose up postgres redis -d
 
 # Cleanup
 clean: ## Clean build artifacts

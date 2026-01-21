@@ -223,23 +223,21 @@ make fmt-check
 For containerized development and deployment:
 
 ```bash
+# Start only dependencies (for local development with cargo run)
+make docker-deps
+# or: docker compose up postgres redis -d
+
 # Start all services (PostgreSQL, Redis, and the gateway)
 make docker-compose-up
-# or: docker compose up -d
 
 # View logs
 make docker-compose-logs
-# or: docker compose logs -f
 
 # Stop all services
 make docker-compose-down
-# or: docker compose down
 
 # Build Docker image only
 make docker-build
-
-# Run the gateway container (requires running PostgreSQL/Redis)
-make docker-run
 ```
 
 The `docker-compose.yml` includes:

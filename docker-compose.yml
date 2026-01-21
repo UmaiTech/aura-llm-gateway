@@ -2,10 +2,11 @@
 # Use for local development and testing
 #
 # Usage:
-#   docker compose up -d        # Start all services
-#   docker compose logs -f      # View logs
-#   docker compose down         # Stop all services
-#   docker compose down -v      # Stop and remove volumes
+#   docker compose up -d              # Start all services
+#   docker compose up postgres redis -d  # Start only dependencies (for local dev)
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop all services
+#   docker compose down -v            # Stop and remove volumes
 
 services:
   # Aura LLM Gateway
