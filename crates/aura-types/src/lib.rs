@@ -135,7 +135,7 @@ mod tests {
         let response = Response::in_progress("resp_123", "gpt-4");
 
         // Simulate streaming sequence
-        let events = vec![
+        let events = [
             StreamEvent::response_created(response.clone()),
             StreamEvent::response_in_progress(response.clone()),
             StreamEvent::output_item_added(0, Item::Message(MessageItem::assistant("msg_1", ""))),
