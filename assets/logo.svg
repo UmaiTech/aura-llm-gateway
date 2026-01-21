@@ -1,0 +1,31 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60A5FA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366F1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#blueGradient)" opacity="0.1"/>
+
+  <!-- Three input arrows converging (representing multiple LLM providers) -->
+  <path d="M 10 35 L 35 35 L 35 30 L 45 38 L 35 46 L 35 41 L 10 41 Z" fill="url(#accentGradient)" opacity="0.8"/>
+  <path d="M 10 61 L 35 61 L 35 56 L 45 64 L 35 72 L 35 67 L 10 67 Z" fill="url(#accentGradient)" opacity="0.8"/>
+  <path d="M 10 87 L 35 87 L 35 82 L 45 90 L 35 98 L 35 93 L 10 93 Z" fill="url(#accentGradient)" opacity="0.8"/>
+
+  <!-- Central "A" shape (representing Aura gateway) -->
+  <path d="M 50 85 L 64 45 L 78 85 L 70 85 L 67 75 L 61 75 L 58 85 Z M 63 68 L 65 68 L 64 55 Z"
+        fill="url(#blueGradient)" stroke="#3B82F6" stroke-width="2"/>
+
+  <!-- Single output arrow (unified response) -->
+  <path d="M 83 61 L 108 61 L 108 56 L 118 64 L 108 72 L 108 67 L 83 67 Z" fill="url(#blueGradient)"/>
+
+  <!-- Decorative connection nodes -->
+  <circle cx="45" cy="64" r="3" fill="#6366F1"/>
+  <circle cx="83" cy="64" r="3" fill="#3B82F6"/>
+</svg>

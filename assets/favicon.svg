@@ -1,0 +1,19 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="favicon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60A5FA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="url(#favicon-gradient)"/>
+
+  <!-- Simplified "A" with gateway elements -->
+  <path d="M 12 23 L 16 11 L 20 23 L 18 23 L 17.2 20 L 14.8 20 L 14 23 Z M 15.5 18 L 16.5 18 L 16 15 Z"
+        fill="white" opacity="0.95"/>
+
+  <!-- Flow indicators (left and right) -->
+  <path d="M 6 15 L 9 15 L 9 17 L 6 17 Z" fill="white" opacity="0.7"/>
+  <path d="M 23 15 L 26 15 L 26 17 L 23 17 Z" fill="white" opacity="0.9"/>
+</svg>
