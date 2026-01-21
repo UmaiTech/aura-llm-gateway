@@ -1,0 +1,51 @@
+# Aura LLM Gateway - Development Docker Compose
+# Runs only the dependencies (PostgreSQL and Redis) for local development
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d    # Start dependencies
+#   cargo run -p aura-proxy                            # Run the app locally
+#   docker compose -f docker-compose.dev.yml down      # Stop dependencies
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: aura-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=aura
+      - POSTGRES_PASSWORD=aura
+      - POSTGRES_DB=aura
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aura -d aura"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aura-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local

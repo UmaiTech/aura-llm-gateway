@@ -1,4 +1,6 @@
-.PHONY: help build test lint fmt clean run dev install check audit release docker-build docker-run
+.PHONY: help build test lint fmt clean run dev install check audit release \
+	docker-build docker-run docker-compose-up docker-compose-down docker-compose-down-v \
+	docker-compose-logs docker-compose-ps docker-dev-up docker-dev-down docker-dev-down-v docker-dev-logs
 
 # Default target
 .DEFAULT_GOAL := help
@@ -7,7 +9,7 @@
 CARGO := cargo
 CARGO_FLAGS :=
 RUST_LOG ?= info,aura_proxy=debug
-DATABASE_URL ?= postgres://postgres:postgres@localhost:5432/aura
+DATABASE_URL ?= postgres://aura:aura@localhost:5432/aura
 REDIS_URL ?= redis://localhost:6379
 
 help: ## Show this help message
@@ -129,14 +131,33 @@ docker-build: ## Build Docker image
 docker-run: ## Run Docker container
 	docker run -p 8080:8080 --env-file .env aura-llm-gateway:latest
 
-docker-compose-up: ## Start all services with docker-compose
-	docker-compose up -d
+docker-compose-up: ## Start all services (app + deps)
+	docker compose up -d
 
 docker-compose-down: ## Stop all services
-	docker-compose down
+	docker compose down
+
+docker-compose-down-v: ## Stop all services and remove volumes
+	docker compose down -v
 
 docker-compose-logs: ## Follow docker-compose logs
-	docker-compose logs -f
+	docker compose logs -f
+
+docker-compose-ps: ## Show running containers
+	docker compose ps
+
+# Docker development (dependencies only)
+docker-dev-up: ## Start only dependencies (PostgreSQL, Redis) for local dev
+	docker compose -f docker-compose.dev.yml up -d
+
+docker-dev-down: ## Stop development dependencies
+	docker compose -f docker-compose.dev.yml down
+
+docker-dev-down-v: ## Stop dev dependencies and remove volumes
+	docker compose -f docker-compose.dev.yml down -v
+
+docker-dev-logs: ## Follow development dependencies logs
+	docker compose -f docker-compose.dev.yml logs -f
 
 # Cleanup
 clean: ## Clean build artifacts

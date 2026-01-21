@@ -1,0 +1,94 @@
+# Aura LLM Gateway - Docker Compose
+# Use for local development and testing
+#
+# Usage:
+#   docker compose up -d        # Start all services
+#   docker compose logs -f      # View logs
+#   docker compose down         # Stop all services
+#   docker compose down -v      # Stop and remove volumes
+
+services:
+  # Aura LLM Gateway
+  aura-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aura-proxy
+    ports:
+      - "8080:8080"
+    environment:
+      - AURA_HOST=0.0.0.0
+      - AURA_PORT=8080
+      - RUST_LOG=info,aura_proxy=debug
+      - DATABASE_URL=postgres://aura:aura@postgres:5432/aura
+      - REDIS_URL=redis://redis:6379
+      # Provider API keys - set these in .env file or environment
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - AURA_ADMIN_KEY=${AURA_ADMIN_KEY:-admin-dev-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - aura-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: aura-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=aura
+      - POSTGRES_PASSWORD=aura
+      - POSTGRES_DB=aura
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aura -d aura"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - aura-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aura-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - aura-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  aura-network:
+    driver: bridge

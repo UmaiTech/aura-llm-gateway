@@ -1,11 +1,12 @@
 # Aura LLM Gateway
 
-[![CI](https://github.com/UmaiTech/aura-llm-gateway/workflows/CI/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/UmaiTech/aura-llm-gateway/workflows/Security%20Audit/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
+[![CI](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
+[![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/releases)
 [![codecov](https://codecov.io/gh/UmaiTech/aura-llm-gateway/branch/main/graph/badge.svg)](https://codecov.io/gh/UmaiTech/aura-llm-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust Version](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](Dockerfile)
 
 A high-performance, production-ready LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
 
@@ -42,9 +43,10 @@ aura-llm-gateway/
 
 ### Prerequisites
 
-- Rust 1.70+ (2021 edition)
+- Rust 1.75+ (2021 edition)
 - PostgreSQL 14+ (optional, for persistence)
-- Redis 6+ (optional, for caching/rate limiting)
+- Redis 7+ (optional, for caching/rate limiting)
+- Docker & Docker Compose (optional, for containerized deployment)
 
 ### Installation
 
@@ -215,6 +217,35 @@ make fmt
 # Check formatting
 make fmt-check
 ```
+
+### Docker
+
+For containerized development and deployment:
+
+```bash
+# Start all services (PostgreSQL, Redis, and the gateway)
+make docker-compose-up
+# or: docker compose up -d
+
+# View logs
+make docker-compose-logs
+# or: docker compose logs -f
+
+# Stop all services
+make docker-compose-down
+# or: docker compose down
+
+# Build Docker image only
+make docker-build
+
+# Run the gateway container (requires running PostgreSQL/Redis)
+make docker-run
+```
+
+The `docker-compose.yml` includes:
+- **aura-proxy**: The LLM gateway service
+- **postgres**: PostgreSQL 16 database for persistence
+- **redis**: Redis 7 for caching and rate limiting
 
 ## Project Status
 
