@@ -4,12 +4,14 @@
 //! including provider implementations, routing, caching, and load balancing.
 
 pub mod config;
+pub mod http;
 pub mod state;
 
 pub use config::{
     AdminConfig, Config, ConfigBuilder, ConfigError, DatabaseConfig, LoggingConfig, ProviderConfig,
     RedisConfig, ServerConfig,
 };
+pub use http::{HttpClient, HttpClientConfig, HttpError};
 pub use state::{AppState, AppStateBuilder};
 
 /// Returns the crate version
