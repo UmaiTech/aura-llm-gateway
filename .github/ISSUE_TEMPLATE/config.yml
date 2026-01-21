@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or Discussion
+    url: https://github.com/umaitech/aura-llm-gateway/discussions
+    about: Ask questions or discuss ideas with the community
+  - name: Documentation
+    url: https://github.com/umaitech/aura-llm-gateway/tree/main/docs
+    about: Check out our documentation

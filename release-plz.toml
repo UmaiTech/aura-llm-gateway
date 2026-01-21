@@ -1,0 +1,29 @@
+# release-plz configuration
+# https://release-plz.ieni.dev/docs/config
+
+[workspace]
+# Git tag format for releases
+git_tag_name = "v{{ version }}"
+# Enable GitHub releases
+git_release_enable = true
+# Changelog update strategy
+changelog_update = true
+# Changelog configuration
+changelog_config = "cliff.toml"
+
+# Automatically determine version from conventional commits
+# This will create a PR with version bumps and changelog
+pr_labels = ["release"]
+
+# Individual package configuration
+[[package]]
+name = "aura-types"
+
+[[package]]
+name = "aura-db"
+
+[[package]]
+name = "aura-core"
+
+[[package]]
+name = "aura-proxy"

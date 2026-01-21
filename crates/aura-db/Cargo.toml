@@ -1,0 +1,18 @@
+[package]
+name = "aura-db"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+aura-types.workspace = true
+
+tokio.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

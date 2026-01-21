@@ -1,0 +1,24 @@
+# CODEOWNERS file
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @UmaiTech/ai-core
+
+# Rust crates
+/crates/ @UmaiTech/ai-core
+
+# CI/CD workflows
+/.github/ @UmaiTech/ai-core
+
+# Documentation
+/docs/ @UmaiTech/ai-core
+README.md @UmaiTech/ai-core
+CLAUDE.md @UmaiTech/ai-core
+
+# Database migrations
+/migrations/ @UmaiTech/ai-core
+
+# Configuration files
+Cargo.toml @UmaiTech/ai-core
+deny.toml @UmaiTech/ai-core
+Makefile @UmaiTech/ai-core

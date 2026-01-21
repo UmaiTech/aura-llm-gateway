@@ -1,0 +1,25 @@
+# Cargo build configuration for Aura LLM Gateway
+
+[build]
+# Use all available CPU cores for compilation
+jobs = -1
+
+[profile.dev]
+# Fast compilation for development
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"
+
+[profile.release]
+# Aggressive optimizations for production
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+
+[profile.test]
+opt-level = 1

@@ -1,0 +1,16 @@
+#!/bin/sh
+# cargo-husky pre-push hook
+# Runs tests before pushing to remote
+
+set -e
+
+echo "🧪 Running pre-push checks..."
+
+# Run all tests
+echo "  → Running tests..."
+cargo test --workspace --all-features || {
+    echo "❌ Tests failed. Fix failing tests before pushing."
+    exit 1
+}
+
+echo "✅ Pre-push checks passed!"

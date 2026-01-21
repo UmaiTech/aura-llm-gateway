@@ -1,0 +1,55 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/aura-types",
+    "crates/aura-db",
+    "crates/aura-core",
+    "crates/aura-proxy",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Umai Tech <team@umai.tech>"]
+license = "MIT"
+repository = "https://github.com/umaitech/aura-llm-gateway"
+
+[workspace.dependencies]
+# Workspace crates
+aura-types = { path = "crates/aura-types" }
+aura-db = { path = "crates/aura-db" }
+aura-core = { path = "crates/aura-core" }
+
+# Async runtime
+tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
+
+# Web framework
+axum = { version = "0.7", features = ["macros", "json"] }
+tower = { version = "0.5", features = ["util", "timeout", "limit"] }
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"], default-features = false }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Tracing and logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utilities
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+
+# Development tools
+cargo-husky = { version = "1", features = ["user-hooks"] }
