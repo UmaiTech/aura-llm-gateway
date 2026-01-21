@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+
+# Rust build artifacts
+target
+**/*.rs.bk
+
+# Documentation
+*.md
+!README.md
+docs
+
+# CI/CD
+.github
+
+# Local development
+.env
+.env.*
+!.env.example
+
+# Testing
+tests
+**/*_test.rs
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Misc
+Makefile
+*.log
+coverage
+*.profraw
+*.profdata

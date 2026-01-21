@@ -31,8 +31,6 @@ footer = """
 [git]
 # Parse conventional commits
 conventional_commits = true
-# Filter out commits
-filter_commits = false
 # Process each line of a commit as an individual commit
 split_commits = false
 # Regex for parsing and grouping commits
