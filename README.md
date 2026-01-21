@@ -8,6 +8,10 @@
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](Dockerfile)
 
+<p align="center">
+  <img src="assets/logo-horizontal.svg" alt="Aura LLM Gateway" height="80"/>
+</p>
+
 A high-performance, production-ready LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
 
 ## Overview

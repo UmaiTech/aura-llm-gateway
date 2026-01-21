@@ -16,14 +16,19 @@ changelog_config = "cliff.toml"
 pr_labels = ["release"]
 
 # Individual package configuration
+# publish = false prevents publishing to crates.io
 [[package]]
 name = "aura-types"
+publish = false
 
 [[package]]
 name = "aura-db"
+publish = false
 
 [[package]]
 name = "aura-core"
+publish = false
 
 [[package]]
 name = "aura-proxy"
+publish = false
