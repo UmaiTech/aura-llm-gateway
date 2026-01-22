@@ -150,7 +150,7 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 
 The cost is calculated as:
 
-```
+```text
 cost = (input_tokens / 1M) * input_price
      + (output_tokens / 1M) * output_price
      + (cached_tokens / 1M) * cached_price  (if applicable)
@@ -163,7 +163,7 @@ For a request using `gpt-4o-mini` with:
 - 1,000 input tokens
 - 500 output tokens
 
-```
+```text
 cost = (1000 / 1,000,000) * $0.15 + (500 / 1,000,000) * $0.60
      = $0.00015 + $0.0003
      = $0.00045

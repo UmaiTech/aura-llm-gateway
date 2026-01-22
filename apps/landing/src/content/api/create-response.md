@@ -9,7 +9,7 @@ Create a model response with optional streaming and tool use.
 
 ## Endpoint
 
-```
+```http
 POST /v1/responses
 ```
 

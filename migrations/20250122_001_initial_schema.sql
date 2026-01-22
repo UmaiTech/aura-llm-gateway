@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS model_pricing (
 );
 
 -- Create index for model lookups
-CREATE INDEX idx_model_pricing_model_id ON model_pricing(model_id);
-CREATE INDEX idx_model_pricing_provider_id ON model_pricing(provider_id);
+CREATE INDEX IF NOT EXISTS idx_model_pricing_model_id ON model_pricing(model_id);
+CREATE INDEX IF NOT EXISTS idx_model_pricing_provider_id ON model_pricing(provider_id);
 
 -- Conversations (optional - for stateful chat)
 CREATE TABLE IF NOT EXISTS conversations (
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS conversations (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_conversations_user_id ON conversations(user_id);
-CREATE INDEX idx_conversations_created_at ON conversations(created_at);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at);
 
 -- Messages within conversations
 CREATE TABLE IF NOT EXISTS messages (
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX idx_messages_created_at ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 
 -- Request logs for analytics and debugging
 CREATE TABLE IF NOT EXISTS request_logs (
@@ -87,10 +87,10 @@ CREATE TABLE IF NOT EXISTS request_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_request_logs_response_id ON request_logs(response_id);
-CREATE INDEX idx_request_logs_user_id ON request_logs(user_id);
-CREATE INDEX idx_request_logs_provider_name ON request_logs(provider_name);
-CREATE INDEX idx_request_logs_created_at ON request_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_request_logs_response_id ON request_logs(response_id);
+CREATE INDEX IF NOT EXISTS idx_request_logs_user_id ON request_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_request_logs_provider_name ON request_logs(provider_name);
+CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at);
 
 -- Insert default providers
 INSERT INTO providers (name, display_name, api_base_url, is_enabled) VALUES
@@ -151,11 +151,14 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS update_providers_updated_at ON providers;
 CREATE TRIGGER update_providers_updated_at BEFORE UPDATE ON providers
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_model_pricing_updated_at ON model_pricing;
 CREATE TRIGGER update_model_pricing_updated_at BEFORE UPDATE ON model_pricing
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_conversations_updated_at ON conversations;
 CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -20,6 +20,9 @@ const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
 /// Supported OpenAI models
 const SUPPORTED_MODELS: &[&str] = &[
+    "gpt-5.2",
+    "gpt-5",
+    "gpt-5-mini",
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4-turbo",

@@ -27,7 +27,7 @@ curl -X POST http://localhost:8080/v1/responses \
 
 Streaming responses use the SSE format:
 
-```
+```text
 event: response.in_progress
 data: {"type":"response.in_progress","response":{...}}
 
@@ -216,7 +216,7 @@ for line in response.iter_lines():
 
 Streaming connections include periodic keep-alive comments to prevent timeouts:
 
-```
+```text
 : keep-alive
 ```
 

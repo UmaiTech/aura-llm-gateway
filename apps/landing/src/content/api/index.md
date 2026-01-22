@@ -9,7 +9,7 @@ Aura implements the [Open Responses API](https://www.openresponses.org/specifica
 
 ## Base URL
 
-```
+```text
 http://localhost:8080
 ```
 

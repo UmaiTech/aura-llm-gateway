@@ -63,17 +63,24 @@ const docSections = [
     title: 'API Reference',
     items: [
       { title: 'Overview', path: '/docs/api', icon: Code2 },
-      { title: 'Architecture', path: '/docs/api/architecture', icon: Layers },
+      { title: 'Architecture', path: '/docs/architecture', icon: Layers },
       { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
       { title: 'Streaming', path: '/docs/api/streaming', icon: Zap },
       { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
     ],
   },
   {
+    title: 'Providers',
+    items: [
+      { title: 'OpenAI', path: '/docs/providers/openai', icon: Server },
+      { title: 'Anthropic', path: '/docs/providers/anthropic', icon: Server },
+      { title: 'Google', path: '/docs/providers/google', icon: Server },
+    ],
+  },
+  {
     title: 'Concepts',
     items: [
       { title: 'Open Responses API', path: '/docs/concepts/open-responses', icon: BookOpen },
-      { title: 'Providers', path: '/docs/concepts/providers', icon: Server },
     ],
   },
 ]
