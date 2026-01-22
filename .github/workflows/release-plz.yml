@@ -6,7 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-# Workflow-level permissions (required for release-plz to create branches and PRs)
 permissions:
   contents: write
   pull-requests: write
@@ -17,24 +16,25 @@ jobs:
     runs-on: ubuntu-latest
     # Skip if this is a release commit (tag will be created by create-tag workflow)
     if: "!startsWith(github.event.head_commit.message, 'chore: release')"
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
 
-      - name: Configure git user
+      - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install release-plz
+        uses: taiki-e/install-action@v2
+        with:
+          tool: release-plz
 
       - name: Check for existing release PR or tag
         id: check
@@ -61,11 +61,65 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run release-plz
+      - name: Run release-plz update
         if: steps.check.outputs.skip != 'true'
-        uses: MarcoIeni/release-plz-action@v0.5
+        id: update
+        run: |
+          # Run release-plz update to bump versions and update changelog locally
+          release-plz update 2>&1 | tee release-plz-output.txt || true
+
+          # Check if there are any changes
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "::notice::No changes to release"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+
+            # Get the new version
+            NEW_VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release branch and PR
+        if: steps.check.outputs.skip != 'true' && steps.update.outputs.has_changes == 'true'
+        run: |
+          BRANCH_NAME="release-plz-$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+          VERSION="${{ steps.update.outputs.version }}"
+
+          # Create and checkout new branch
+          git checkout -b "$BRANCH_NAME"
+
+          # Stage all changes
+          git add -A
+
+          # Commit
+          git commit -m "chore: release v${VERSION}"
+
+          # Push branch
+          git push -u origin "$BRANCH_NAME"
+
+          # Create PR with auto-merge
+          PR_URL=$(gh pr create \
+            --title "chore: release v${VERSION}" \
+            --body "## Release v${VERSION}
+
+          This PR was automatically created by release-plz.
+
+          ### Changes
+          - Version bump to ${VERSION}
+          - Changelog updates
+
+          ---
+          *Auto-merge is enabled. This PR will merge automatically once CI passes.*" \
+            --label "release" \
+            --base main)
+
+          echo "Created PR: $PR_URL"
+
+          # Enable auto-merge
+          gh pr merge "$PR_URL" --auto --squash || echo "::warning::Could not enable auto-merge"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup old release branches
         if: always()
