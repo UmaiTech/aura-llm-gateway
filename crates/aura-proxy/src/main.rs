@@ -6,7 +6,7 @@
 mod routes;
 
 use anyhow::Context;
-use aura_core::{OpenAIProvider, Provider};
+use aura_core::{CostCalculator, OpenAIProvider, Provider};
 use axum::Router;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -24,6 +24,8 @@ pub struct AppState {
     providers: Arc<HashMap<String, Arc<dyn Provider>>>,
     /// Model to provider mapping
     model_map: Arc<HashMap<String, String>>,
+    /// Cost calculator for pricing responses
+    cost_calculator: Arc<CostCalculator>,
 }
 
 impl AppState {
@@ -54,6 +56,7 @@ impl AppState {
             config: Arc::new(config),
             providers: Arc::new(providers),
             model_map: Arc::new(model_map),
+            cost_calculator: Arc::new(CostCalculator::new()),
         }
     }
 
@@ -82,6 +85,77 @@ impl AppState {
     /// Get all available models
     pub fn available_models(&self) -> Vec<String> {
         self.model_map.keys().cloned().collect()
+    }
+
+    /// Enrich a Response with cost information based on model pricing
+    pub fn enrich_response(&self, mut response: aura_types::Response) -> aura_types::Response {
+        // Add cost to usage
+        if let Some(ref mut usage) = response.usage {
+            if let Some(cost) = self.cost_calculator.calculate_cost(
+                &response.model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.cached_tokens,
+                usage.reasoning_tokens,
+            ) {
+                usage.set_cost(cost);
+            }
+        }
+
+        // Add Aura-specific metadata
+        let provider_name = self
+            .model_map
+            .get(&response.model)
+            .map(|s| s.as_str())
+            .unwrap_or("unknown");
+
+        let aura_metadata = serde_json::json!({
+            "aura": {
+                "provider": provider_name,
+                "gateway_version": env!("CARGO_PKG_VERSION"),
+            }
+        });
+
+        // Merge with existing metadata or set new
+        response.metadata = Some(match response.metadata {
+            Some(existing) => {
+                if let (
+                    serde_json::Value::Object(mut existing_map),
+                    serde_json::Value::Object(new_map),
+                ) = (existing, aura_metadata)
+                {
+                    for (k, v) in new_map {
+                        existing_map.insert(k, v);
+                    }
+                    serde_json::Value::Object(existing_map)
+                } else {
+                    serde_json::json!({"aura": {"provider": provider_name, "gateway_version": env!("CARGO_PKG_VERSION")}})
+                }
+            }
+            None => aura_metadata,
+        });
+
+        response
+    }
+
+    /// Enrich a Response with cost and timing information
+    pub fn enrich_response_with_latency(
+        &self,
+        response: aura_types::Response,
+        latency_ms: u64,
+    ) -> aura_types::Response {
+        let mut response = self.enrich_response(response);
+
+        // Add latency to aura metadata
+        if let Some(ref mut metadata) = response.metadata {
+            if let Some(aura) = metadata.get_mut("aura") {
+                if let Some(obj) = aura.as_object_mut() {
+                    obj.insert("latency_ms".to_string(), serde_json::json!(latency_ms));
+                }
+            }
+        }
+
+        response
     }
 }
 

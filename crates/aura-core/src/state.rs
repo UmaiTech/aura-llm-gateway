@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use crate::config::Config;
+use crate::cost::CostCalculator;
 
 /// Shared application state for the Aura LLM Gateway
 ///
@@ -34,6 +35,8 @@ use crate::config::Config;
 pub struct AppState {
     /// Application configuration
     pub config: Arc<Config>,
+    /// Cost calculator for pricing responses
+    pub cost_calculator: Arc<CostCalculator>,
 }
 
 impl AppState {
@@ -41,6 +44,7 @@ impl AppState {
     pub fn new(config: Config) -> Self {
         Self {
             config: Arc::new(config),
+            cost_calculator: Arc::new(CostCalculator::new()),
         }
     }
 
@@ -48,18 +52,58 @@ impl AppState {
     ///
     /// Useful when you already have a shared config reference.
     pub fn with_config(config: Arc<Config>) -> Self {
-        Self { config }
+        Self {
+            config,
+            cost_calculator: Arc::new(CostCalculator::new()),
+        }
     }
 
     /// Returns a reference to the configuration
     pub fn config(&self) -> &Config {
         &self.config
     }
+
+    /// Calculate cost for the given model and usage
+    pub fn calculate_cost(
+        &self,
+        model: &str,
+        input_tokens: u32,
+        output_tokens: u32,
+        cached_tokens: Option<u32>,
+        reasoning_tokens: Option<u32>,
+    ) -> Option<f64> {
+        self.cost_calculator.calculate_cost(
+            model,
+            input_tokens,
+            output_tokens,
+            cached_tokens,
+            reasoning_tokens,
+        )
+    }
+
+    /// Enrich a Response with cost information
+    pub fn enrich_response(&self, mut response: aura_types::Response) -> aura_types::Response {
+        if let Some(ref mut usage) = response.usage {
+            if let Some(cost) = self.calculate_cost(
+                &response.model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.cached_tokens,
+                usage.reasoning_tokens,
+            ) {
+                usage.set_cost(cost);
+            }
+        }
+        response
+    }
 }
 
 impl Default for AppState {
     fn default() -> Self {
-        Self::new(Config::default())
+        Self {
+            config: Arc::new(Config::default()),
+            cost_calculator: Arc::new(CostCalculator::new()),
+        }
     }
 }
 
@@ -71,17 +115,30 @@ impl Default for AppState {
 #[derive(Debug)]
 pub struct AppStateBuilder {
     config: Config,
+    cost_calculator: CostCalculator,
 }
 
 impl AppStateBuilder {
     /// Creates a new AppStateBuilder with the given configuration
     pub fn new(config: Config) -> Self {
-        Self { config }
+        Self {
+            config,
+            cost_calculator: CostCalculator::new(),
+        }
+    }
+
+    /// Use a custom cost calculator
+    pub fn cost_calculator(mut self, calculator: CostCalculator) -> Self {
+        self.cost_calculator = calculator;
+        self
     }
 
     /// Builds the AppState
     pub fn build(self) -> AppState {
-        AppState::new(self.config)
+        AppState {
+            config: Arc::new(self.config),
+            cost_calculator: Arc::new(self.cost_calculator),
+        }
     }
 }
 

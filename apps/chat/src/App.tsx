@@ -103,14 +103,15 @@ export default function App() {
           fullContent += event.delta
           updateMessage(assistantMessageId, { content: fullContent })
         } else if (event.type === 'response.completed') {
-          // Extract usage from completed response
-          const responseUsage = (event.response as { usage?: { input_tokens: number; output_tokens: number } })?.usage
+          // Extract usage from completed response (gateway enriches with cost_usd)
+          const responseUsage = (event.response as { usage?: { input_tokens: number; output_tokens: number; cost_usd?: number } })?.usage
           if (responseUsage) {
             usage = {
               inputTokens: responseUsage.input_tokens,
               outputTokens: responseUsage.output_tokens,
               totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
-              cost: calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
+              // Use server-provided cost if available, otherwise fall back to client calculation
+              cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
             }
           }
           updateMessage(assistantMessageId, { isStreaming: false, usage })
@@ -281,14 +282,15 @@ export default function App() {
                       }
                     }
 
-                    // Extract usage
-                    const responseUsage = event.response.usage as { input_tokens?: number; output_tokens?: number } | undefined
+                    // Extract usage (gateway enriches with cost_usd)
+                    const responseUsage = event.response.usage as { input_tokens?: number; output_tokens?: number; cost_usd?: number } | undefined
                     if (responseUsage?.input_tokens !== undefined && responseUsage?.output_tokens !== undefined) {
                       usage = {
                         inputTokens: responseUsage.input_tokens,
                         outputTokens: responseUsage.output_tokens,
                         totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
-                        cost: calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
+                        // Use server-provided cost if available, otherwise fall back to client calculation
+                        cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
                       }
                     }
                   }

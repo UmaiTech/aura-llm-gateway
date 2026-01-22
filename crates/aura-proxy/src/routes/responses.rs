@@ -15,7 +15,7 @@ use axum::{
 use futures_util::StreamExt;
 use serde::Serialize;
 use std::convert::Infallible;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{error, info, instrument};
 
 use crate::AppState;
@@ -103,9 +103,20 @@ async fn create_response(
             ApiError::from_provider_error(&e)
         })?;
 
-        // Convert to SSE stream
-        let sse_stream = stream.map(|result| match result {
+        // Clone state for the stream closure
+        let state_for_stream = state.clone();
+
+        // Convert to SSE stream, enriching ResponseCompleted events with cost
+        let sse_stream = stream.map(move |result| match result {
             Ok(event) => {
+                // Enrich ResponseCompleted events with cost
+                let event = if let StreamEvent::ResponseCompleted { response } = event {
+                    let response = state_for_stream.enrich_response(response);
+                    StreamEvent::ResponseCompleted { response }
+                } else {
+                    event
+                };
+
                 let event_type = event.event_type();
                 let data = serde_json::to_string(&event).unwrap_or_else(|e| {
                     format!(r#"{{"error":"Failed to serialize event: {}"}}"#, e)
@@ -132,13 +143,25 @@ async fn create_response(
 
         Ok(sse.into_response())
     } else {
-        // Non-streaming response
+        // Non-streaming response - track latency
+        let start = Instant::now();
+
         let response = provider.complete(request).await.map_err(|e| {
             error!(error = %e, "Request failed");
             ApiError::from_provider_error(&e)
         })?;
 
-        info!(id = %response.id, status = ?response.status, "Response completed");
+        let latency_ms = start.elapsed().as_millis() as u64;
+
+        // Enrich with cost and latency information
+        let response = state.enrich_response_with_latency(response, latency_ms);
+
+        info!(
+            id = %response.id,
+            status = ?response.status,
+            latency_ms = %latency_ms,
+            "Response completed"
+        );
 
         Ok(Json(response).into_response())
     }
