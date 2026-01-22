@@ -2,86 +2,166 @@ import { useState, useCallback } from 'react'
 import { ChatContainer } from './components/ChatContainer'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
-import { useChat } from './hooks/useChat'
-import type { Model, Conversation } from './lib/types'
-
-const AVAILABLE_MODELS: Model[] = [
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', description: 'Most capable model' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', description: 'Fast and efficient' },
-  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'openai', description: '128K context window' },
-  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai', description: 'Cost effective' },
-  { id: 'o1', name: 'o1', provider: 'openai', description: 'Advanced reasoning' },
-  { id: 'o1-mini', name: 'o1 Mini', provider: 'openai', description: 'Efficient reasoning' },
-]
+import { useChatStore } from './stores/chatStore'
+import { generateId } from './lib/utils'
+import { api, messagesToInput } from './lib/api'
+import type { Model, Message } from './lib/types'
+import { AVAILABLE_MODELS } from './lib/agent'
 
 export default function App() {
-  const [selectedModel, setSelectedModel] = useState<Model>(AVAILABLE_MODELS[0])
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-
-  // Find current conversation (used for future features like title display)
-  const _currentConversation = conversations.find(c => c.id === currentConversationId)
-  void _currentConversation // Suppress unused warning
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const {
-    messages,
-    isLoading,
-    error,
-    sendMessage,
-    stopGeneration,
-    clearMessages,
-  } = useChat({
-    model: selectedModel.id,
-    conversationId: currentConversationId,
-  })
+    conversations,
+    currentConversationId,
+    model,
+    systemPrompt,
+    createConversation,
+    selectConversation,
+    deleteConversation,
+    addMessage,
+    updateMessage,
+    setModel,
+    getCurrentConversation,
+  } = useChatStore()
+
+  const currentConversation = getCurrentConversation()
+  const messages = currentConversation?.messages || []
+
+  // Find selected model object
+  const selectedModel = AVAILABLE_MODELS.find((m) => m.id === model) || AVAILABLE_MODELS[0]
+
+  const handleModelChange = useCallback(
+    (newModel: Model) => {
+      setModel(newModel.id)
+    },
+    [setModel]
+  )
 
   const handleNewConversation = useCallback(() => {
-    const newId = `conv_${Date.now()}`
-    const newConversation: Conversation = {
-      id: newId,
-      title: 'New Chat',
-      createdAt: new Date(),
-      model: selectedModel.id,
-    }
-    setConversations(prev => [newConversation, ...prev])
-    setCurrentConversationId(newId)
-    clearMessages()
-  }, [selectedModel.id, clearMessages])
+    createConversation()
+  }, [createConversation])
 
-  const handleSelectConversation = useCallback((id: string) => {
-    setCurrentConversationId(id)
-    // In a real app, you'd load messages for this conversation
-    clearMessages()
-  }, [clearMessages])
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      selectConversation(id)
+    },
+    [selectConversation]
+  )
 
-  const handleDeleteConversation = useCallback((id: string) => {
-    setConversations(prev => prev.filter(c => c.id !== id))
-    if (currentConversationId === id) {
-      setCurrentConversationId(null)
-      clearMessages()
-    }
-  }, [currentConversationId, clearMessages])
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      deleteConversation(id)
+    },
+    [deleteConversation]
+  )
 
-  const handleSendMessage = useCallback(async (content: string) => {
-    // Create conversation if needed
-    if (!currentConversationId) {
-      handleNewConversation()
-    }
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || isLoading) return
 
-    // Update conversation title with first message
-    if (messages.length === 0) {
-      setConversations(prev =>
-        prev.map(c =>
-          c.id === currentConversationId
-            ? { ...c, title: content.slice(0, 50) + (content.length > 50 ? '...' : '') }
-            : c
-        )
-      )
-    }
+      // Create conversation if needed
+      let conversationId = currentConversationId
+      if (!conversationId) {
+        conversationId = createConversation()
+      }
 
-    await sendMessage(content)
-  }, [currentConversationId, messages.length, sendMessage, handleNewConversation])
+      setError(null)
+      setIsLoading(true)
+
+      // Add user message
+      const userMessage: Message = {
+        id: generateId(),
+        role: 'user',
+        content: content.trim(),
+        createdAt: new Date(),
+      }
+      addMessage(userMessage)
+
+      // Create placeholder for assistant message
+      const assistantMessageId = generateId()
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date(),
+        isStreaming: true,
+      }
+      addMessage(assistantMessage)
+
+      try {
+        // Build conversation history
+        const allMessages = [...messages, userMessage]
+        const input = messagesToInput(allMessages)
+
+        // Stream the response
+        let fullContent = ''
+
+        for await (const event of api.createResponseStream({
+          model,
+          input,
+          instructions: systemPrompt || undefined,
+          stream: true,
+        })) {
+          // Handle different event types
+          if (event.type === 'response.output_text.delta' && event.delta) {
+            fullContent += event.delta
+            updateMessage(assistantMessageId, { content: fullContent })
+          } else if (event.type === 'response.completed') {
+            updateMessage(assistantMessageId, { isStreaming: false })
+          } else if (event.type === 'response.failed' || event.type === 'error') {
+            const errorMessage =
+              event.error?.message ||
+              (event.response as { error?: { message?: string } })?.error?.message ||
+              'Generation failed'
+            throw new Error(errorMessage)
+          }
+        }
+
+        // Ensure streaming flag is removed
+        updateMessage(assistantMessageId, { isStreaming: false })
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'An error occurred'
+        setError(errorMessage)
+
+        // Update the assistant message to show error
+        updateMessage(assistantMessageId, {
+          content: `Error: ${errorMessage}`,
+          isStreaming: false,
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [
+      currentConversationId,
+      createConversation,
+      messages,
+      model,
+      systemPrompt,
+      isLoading,
+      addMessage,
+      updateMessage,
+    ]
+  )
+
+  const handleStopGeneration = useCallback(() => {
+    // TODO: Implement abort controller
+    setIsLoading(false)
+  }, [])
+
+  // Map conversations to sidebar format
+  const sidebarConversations = conversations.map((c) => ({
+    id: c.id,
+    title: c.title,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+    model: c.model,
+    messages: c.messages,
+  }))
 
   return (
     <div className="flex h-screen bg-background">
@@ -89,7 +169,7 @@ export default function App() {
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        conversations={conversations}
+        conversations={sidebarConversations}
         currentConversationId={currentConversationId}
         onNewConversation={handleNewConversation}
         onSelectConversation={handleSelectConversation}
@@ -102,7 +182,7 @@ export default function App() {
         <Header
           model={selectedModel}
           models={AVAILABLE_MODELS}
-          onModelChange={setSelectedModel}
+          onModelChange={handleModelChange}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           sidebarOpen={sidebarOpen}
         />
@@ -113,7 +193,7 @@ export default function App() {
           isLoading={isLoading}
           error={error}
           onSendMessage={handleSendMessage}
-          onStopGeneration={stopGeneration}
+          onStopGeneration={handleStopGeneration}
           model={selectedModel}
         />
       </div>

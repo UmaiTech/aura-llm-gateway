@@ -4,20 +4,47 @@ export interface Message {
   content: string
   createdAt: Date
   isStreaming?: boolean
+  toolInvocations?: ToolInvocation[]
+}
+
+export interface ToolInvocation {
+  toolCallId: string
+  toolName: string
+  args: Record<string, unknown>
+  result?: string
+  state: 'pending' | 'result' | 'error'
 }
 
 export interface Model {
   id: string
   name: string
   provider: 'openai' | 'anthropic' | 'google'
-  description: string
+  description?: string
 }
 
 export interface Conversation {
   id: string
   title: string
   createdAt: Date
+  updatedAt: Date
   model: string
+  systemPrompt?: string
+  messages: Message[]
+}
+
+export interface Tool {
+  type: 'function'
+  name: string
+  description: string
+  parameters: {
+    type: 'object'
+    properties: Record<string, {
+      type: string
+      description?: string
+      enum?: string[]
+    }>
+    required?: string[]
+  }
 }
 
 export interface CreateResponseRequest {
