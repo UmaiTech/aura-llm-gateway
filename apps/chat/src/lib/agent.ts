@@ -76,8 +76,86 @@ export const BUILT_IN_TOOLS: Tool[] = [
   },
 ]
 
-// Tool execution handlers (simulated for demo purposes)
-// In production, these would call actual APIs
+// Tavily API configuration
+const TAVILY_API_KEY = import.meta.env.VITE_TAVILY_API_KEY || ''
+const TAVILY_API_URL = 'https://api.tavily.com/search'
+
+interface TavilySearchResult {
+  title: string
+  url: string
+  content: string
+  score: number
+}
+
+interface TavilyResponse {
+  results: TavilySearchResult[]
+  query: string
+  answer?: string
+}
+
+// Web search using Tavily API
+async function tavilySearch(
+  query: string,
+  numResults: number = 5
+): Promise<{ results: Array<{ title: string; url: string; snippet: string }>; answer?: string }> {
+  if (!TAVILY_API_KEY) {
+    // Return simulated results if no API key
+    return {
+      results: [
+        {
+          title: `Search result for "${query}"`,
+          url: `https://example.com/search?q=${encodeURIComponent(query)}`,
+          snippet: `Simulated result. Set VITE_TAVILY_API_KEY to enable real web search.`,
+        },
+      ],
+    }
+  }
+
+  try {
+    const response = await fetch(TAVILY_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query,
+        max_results: numResults,
+        search_depth: 'basic',
+        include_answer: true,
+        include_raw_content: false,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Tavily API error: ${response.status}`)
+    }
+
+    const data: TavilyResponse = await response.json()
+
+    return {
+      results: data.results.map((r) => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.content,
+      })),
+      answer: data.answer,
+    }
+  } catch (error) {
+    console.error('Tavily search failed:', error)
+    return {
+      results: [
+        {
+          title: 'Search failed',
+          url: '',
+          snippet: `Failed to search: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ],
+    }
+  }
+}
+
+// Tool execution handlers
 export async function executeTool(
   name: string,
   args: Record<string, unknown>
@@ -120,24 +198,12 @@ export async function executeTool(
       const query = args.query as string
       const numResults = Math.min((args.num_results as number) || 5, 10)
 
-      // Simulated search results
-      const results = [
-        {
-          title: `Search result 1 for "${query}"`,
-          url: `https://example.com/result1?q=${encodeURIComponent(query)}`,
-          snippet: `This is a simulated search result about ${query}. In a real implementation, this would return actual web search results.`,
-        },
-        {
-          title: `Search result 2 for "${query}"`,
-          url: `https://example.com/result2?q=${encodeURIComponent(query)}`,
-          snippet: `Another simulated result related to ${query}. Configure a real search API for production use.`,
-        },
-      ].slice(0, numResults)
+      const searchResults = await tavilySearch(query, numResults)
 
       return JSON.stringify({
         query,
-        results,
-        note: 'These are simulated results. Connect to a real search API for production.',
+        results: searchResults.results,
+        answer: searchResults.answer,
       })
     }
 
@@ -146,6 +212,7 @@ export async function executeTool(
       const units = (args.units as string) || 'celsius'
 
       // Simulated weather data
+      // TODO: Integrate with a real weather API (OpenWeatherMap, WeatherAPI, etc.)
       const temp = units === 'fahrenheit' ? 72 : 22
       const weather = {
         location,

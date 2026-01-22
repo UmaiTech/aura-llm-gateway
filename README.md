@@ -271,8 +271,28 @@ The `docker-compose.yml` includes:
 ### Bonus (Implemented Early)
 - [x] **Chat UI** - React + Vite + TypeScript chat application for testing
 - [x] **Database Models** - Full schema for providers, pricing, conversations, logs
+- [x] **Agent Tools** - Built-in tools with Tavily web search integration
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the complete roadmap.
+
+## Chat UI
+
+A modern chat interface is included for testing and demonstrating the gateway:
+
+```bash
+cd apps/chat
+npm install
+npm run dev
+```
+
+Features:
+- Multi-model support (OpenAI, Anthropic, Google)
+- Streaming responses with real-time updates
+- Conversation history with localStorage persistence
+- Agent mode with built-in tools (web search, calculator, etc.)
+- Dark/light mode
+
+See [apps/chat/README.md](apps/chat/README.md) for detailed documentation.
 
 ## Tech Stack
 
@@ -306,4 +326,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - [Open Responses API Specification](https://www.openresponses.org/specification)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
+- [Admin App Plan](docs/ADMIN_APP_PLAN.md)
+- [Chat UI Documentation](apps/chat/README.md)
+- [Provider Mapping Guide](docs/PROVIDER_MAPPING.md)
 - [Documentation](docs/)
