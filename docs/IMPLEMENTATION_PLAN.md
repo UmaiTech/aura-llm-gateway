@@ -481,7 +481,7 @@ pub struct ProviderRegistry {
 ### PR #14: PostgreSQL Setup
 **Rust Concepts:** SQLx, compile-time query checking, migrations
 
-**Status:** 🔄 **PARTIALLY COMPLETED** (Schema and models done, integration pending)
+**Status:** ✅ **COMPLETED** (Schema, models, and AppState integration done)
 
 **Tasks:**
 - [x] Add SQLx dependencies with Postgres feature
@@ -489,8 +489,8 @@ pub struct ProviderRegistry {
 - [x] Set up connection pool configuration
 - [x] Add `DATABASE_URL` configuration
 - [x] Create `aura-db` models
-- [ ] Integrate pool into `AppState` at startup
-- [ ] Run migrations on startup
+- [x] Integrate pool into `AppState` at startup
+- [ ] Run migrations on startup (manual for now)
 
 **Tables (Implemented):**
 - `providers` - Provider configuration
@@ -505,43 +505,68 @@ pub struct ProviderRegistry {
 - `crates/aura-db/src/pool.rs` ✅
 - `crates/aura-db/src/repo.rs` ✅
 - `crates/aura-db/src/error.rs` ✅
+- `crates/aura-proxy/src/main.rs` ✅ (AppState with optional DbPool)
 - `migrations/20250122_001_initial_schema.sql` ✅
 
 **Acceptance Criteria:**
 - ✅ Migration schema defined with all tables
 - ✅ Connection pool configuration ready
 - ✅ Repository functions for all models
+- ✅ Pool integrated with AppState (optional - graceful degradation)
 - [ ] Migrations run at startup
-- [ ] Pool integrated with AppState
+
+**Implementation Notes:**
+- Database is optional - gateway runs without it and logs warning
+- `AppState` holds `Option<DbPool>` for graceful degradation
+- `PoolConfig` exported from aura-db for custom configuration
 
 ---
 
 ### PR #15: Request Logging
 **Rust Concepts:** Background tasks, `tokio::spawn`, non-blocking writes
 
+**Status:** ✅ **COMPLETED**
+
 **Tasks:**
-- [ ] Log requests to database asynchronously
-- [ ] Capture request/response metadata
-- [ ] Add correlation IDs
+- [x] Log requests to database asynchronously
+- [x] Capture request/response metadata
+- [x] Add correlation IDs (aura_request_id)
 - [ ] Implement log rotation/cleanup
 - [ ] Add query endpoints for logs
 
-**Fields to Log:**
-- Request ID, timestamp, provider, model
-- Token counts (input/output)
-- Latency, status code
-- Error details (if any)
+**Fields Logged:**
+- `response_id` - Unique request identifier (aura_uuid format)
+- `provider_name` - Which provider handled the request
+- `model_id` - Model used
+- `input_tokens`, `output_tokens`, `cached_tokens`, `reasoning_tokens`
+- `cost_usd` - Calculated cost
+- `latency_ms` - Request duration
+- `status` - completed/failed/incomplete/cancelled
+- `error_code`, `error_message` - Error details (if any)
+- `metadata` - Full aura metadata JSON
+
+**Files:**
+- `crates/aura-proxy/src/main.rs` ✅ (log_request method)
+- `crates/aura-proxy/src/routes/responses.rs` ✅ (async logging)
+- `crates/aura-db/src/repo.rs` ✅ (RequestLogRepo)
 
 **Acceptance Criteria:**
-- All requests logged without blocking response
-- Logs queryable by time range
+- ✅ All requests logged without blocking response (tokio::spawn)
+- ✅ Both successful and failed requests logged
+- [ ] Logs queryable by time range (endpoint pending)
+
+**Implementation Notes:**
+- Logging runs in background task (`tokio::spawn`)
+- Non-blocking - response returns immediately
+- Graceful degradation - works without database
+- Error logging includes error_code and error_message
 
 ---
 
 ### PR #16: Cost Tracking
 **Rust Concepts:** Decimal math, lookups, aggregation
 
-**Status:** 🔄 **PARTIALLY COMPLETED** (Core module done, response enrichment done, DB integration pending)
+**Status:** ✅ **COMPLETED** (Core module, response enrichment, agentic metadata)
 
 **Tasks:**
 - [x] Create pricing configuration per model
@@ -549,16 +574,19 @@ pub struct ProviderRegistry {
 - [x] Create database schema for model pricing with temporal validity
 - [x] Add `cost_usd` to response `Usage` struct (server-side enrichment)
 - [x] Enrich responses with Aura metadata (provider, latency, request_id)
+- [x] Add agentic metadata (tool calls, requires_action, reasoning status)
+- [x] Update pricing for 2026 models (GPT-5, Claude 4.5, Gemini 3)
 - [ ] Aggregate costs by API key
 - [ ] Add cost alerts/limits
 - [ ] Create cost summary endpoint
 
 **Files:**
-- `crates/aura-core/src/cost.rs` ✅
+- `crates/aura-core/src/cost.rs` ✅ (2026 pricing included)
 - `crates/aura-types/src/response.rs` (Usage.cost_usd) ✅
 - `crates/aura-proxy/src/main.rs` (enrich_response methods) ✅
 - `crates/aura-db/src/models.rs` (ModelPricing) ✅
 - `crates/aura-db/src/repo.rs` (ModelPricingRepo) ✅
+- `docs/api/cost-tracking.md` ✅ (full documentation)
 - `migrations/20250122_001_initial_schema.sql` ✅
 
 **Acceptance Criteria:**
@@ -566,23 +594,33 @@ pub struct ProviderRegistry {
 - ✅ Pricing data stored in database with effective dates
 - ✅ Responses enriched with cost_usd in usage
 - ✅ Aura metadata added to response (provider, gateway_version, latency_ms, request_id)
+- ✅ Agentic metadata for agent workflows
 - [ ] Costs queryable by key and time period
 
 **Implementation Notes:**
 - `ModelPricing` struct with input/output/cached/reasoning token pricing
 - `CostCalculator` with default pricing for OpenAI, Anthropic, and Google models
+- **2026 Models Supported:** GPT-5, GPT-5.2, GPT-5-mini, Claude Opus 4.5, Claude Sonnet 4.5, Gemini 3 Pro
 - Database schema supports temporal pricing (effective_from/effective_until)
-- Seed data includes all major models from 3 providers
-- Response enrichment adds Aura-specific metadata:
+- Response enrichment adds Aura-specific metadata with agentic insights:
   ```json
   {
     "usage": { "cost_usd": 0.0035, ... },
     "metadata": {
       "aura": {
         "request_id": "aura_550e8400-...",
+        "model": "gpt-4o",
         "provider": "openai",
         "gateway_version": "0.1.7",
-        "latency_ms": 245
+        "latency_ms": 245,
+        "agentic": {
+          "output_items_count": 2,
+          "has_tool_calls": true,
+          "tool_calls_count": 1,
+          "tools_used": ["web_search"],
+          "requires_action": false,
+          "has_reasoning": false
+        }
       }
     }
   }
@@ -795,11 +833,12 @@ pub struct ProviderRegistry {
 ---
 
 ### PR #28: Documentation
-**Status:** 🔄 **PARTIALLY COMPLETED** (API docs started, landing page created)
+**Status:** ✅ **COMPLETED** (API docs, architecture diagrams, landing page)
 
 **Tasks:**
 - [ ] API reference with OpenAPI
 - [x] API documentation in Markdown (auto-loaded)
+- [x] Architecture diagrams (Mermaid for repo, ASCII for public)
 - [ ] Getting started guide
 - [ ] Provider configuration docs
 - [ ] Deployment guide
@@ -809,19 +848,33 @@ pub struct ProviderRegistry {
 - `docs/api/README.md` ✅ - API overview
 - `docs/api/create-response.md` ✅ - Create response endpoint
 - `docs/api/streaming.md` ✅ - SSE streaming documentation
-- `docs/api/cost-tracking.md` ✅ - Cost tracking and metadata
+- `docs/api/cost-tracking.md` ✅ - Cost tracking and agentic metadata
+- `docs/api/architecture.md` ✅ - Architecture overview (public docs)
+- `docs/architecture.md` ✅ - Detailed architecture with Mermaid diagrams
+- `docs/design/pricing-scraper.md` ✅ - Pricing scraper design document
 - `apps/landing/` ✅ - Landing page with docs viewer
+
+**Architecture Diagrams (Mermaid):**
+- System overview flowchart
+- Crate dependency graph
+- Non-streaming request sequence diagram
+- Streaming request sequence diagram
+- Provider system class diagram
+- Database schema ER diagram
+- Data flow summary with annotations
+- Error handling flowchart
 
 **Implementation Notes:**
 - Created `apps/landing/` React app with landing page and docs viewer
 - Docs auto-load from `docs/api/*.md` using Vite glob imports
 - Edit MD files and rebuild - they automatically appear in the docs UI
 - `react-markdown` + `remark-gfm` for rendering with custom styling
-- Fallback content for docs not yet created as MD files
+- Mermaid diagrams render natively on GitHub
 
 **Acceptance Criteria:**
 - ✅ API docs viewable in landing page
 - ✅ Markdown files auto-loaded at build time
+- ✅ Architecture diagrams in repo and public docs
 - New users can get started in < 15 minutes
 - All endpoints documented
 

@@ -24,6 +24,7 @@ Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI,
 - **Open Responses API**: Semantic streaming events for agentic workflows
 - **Load Balancing**: Distribute requests across providers and API keys
 - **Cost Tracking**: Real-time usage and cost monitoring per request
+- **Agentic Metadata**: Tool call tracking, requires_action flags, reasoning status
 - **Response Caching**: Redis-based caching with configurable TTL
 - **Rate Limiting**: Per-key rate limits with burst support
 - **Observability**: Prometheus metrics, structured logging, request tracing
@@ -39,11 +40,14 @@ aura-llm-gateway/
 │   ├── aura-core/       # Core business logic (providers, routing, caching)
 │   └── aura-proxy/      # Main server binary (Axum routes, middleware)
 ├── apps/
-│   └── chat/            # React chat UI for testing the gateway
+│   ├── chat/            # React chat UI for testing the gateway
+│   └── landing/         # Landing page and documentation site
 ├── migrations/          # SQLx database migrations
 ├── dashboard/           # React admin dashboard (coming soon)
-└── docs/               # Documentation
+└── docs/               # Documentation (with Mermaid diagrams)
 ```
+
+See [docs/architecture.md](docs/architecture.md) for detailed architecture diagrams.
 
 ## Quick Start
 
@@ -253,7 +257,7 @@ The `docker-compose.yml` includes:
 
 ## Project Status
 
-**Current Phase**: Single Provider Proxy (Milestone 2) ✅
+**Current Phase**: Persistence & Observability (Milestone 4) 🔄
 
 ### Completed
 - [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
@@ -263,15 +267,21 @@ The `docker-compose.yml` includes:
 - [x] **PR #5: HTTP Client Foundation** - Reqwest with retries and timeouts
 - [x] **PR #6: OpenAI Adapter** - Provider trait + OpenAI implementation
 - [x] **PR #7: Streaming Support** - SSE streaming with semantic events
+- [x] **PR #14: PostgreSQL Setup** - Database schema, models, AppState integration
+- [x] **PR #15: Request Logging** - Async logging to database
+- [x] **PR #16: Cost Tracking** - Per-request cost calculation with agentic metadata
+- [x] **PR #28: Documentation** - API docs, architecture diagrams (Mermaid)
 
 ### In Progress
-- 🔄 **PR #14: PostgreSQL Setup** - Database schema and models ready
-- 🔄 **PR #16: Cost Tracking** - Core module implemented
+- 🔄 **PR #17: Metrics** - Prometheus metrics endpoint
+- 🔄 **PR #9: Claude Adapter** - Anthropic provider implementation
 
 ### Bonus (Implemented Early)
-- [x] **Chat UI** - React + Vite + TypeScript chat application for testing
-- [x] **Database Models** - Full schema for providers, pricing, conversations, logs
-- [x] **Agent Tools** - Built-in tools with Tavily web search integration
+- [x] **Chat UI** - React chat app with tool execution cards
+- [x] **Landing Page** - Marketing site with integrated docs viewer
+- [x] **Agent Mode** - Built-in tools with Tavily web search integration
+- [x] **Agentic Metadata** - Tool call tracking, requires_action, reasoning status
+- [x] **2026 Model Pricing** - GPT-5, Claude 4.5, Gemini 3 supported
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the complete roadmap.
 
