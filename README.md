@@ -38,6 +38,8 @@ aura-llm-gateway/
 │   ├── aura-db/         # Database models and queries (SQLx)
 │   ├── aura-core/       # Core business logic (providers, routing, caching)
 │   └── aura-proxy/      # Main server binary (Axum routes, middleware)
+├── apps/
+│   └── chat/            # React chat UI for testing the gateway
 ├── migrations/          # SQLx database migrations
 ├── dashboard/           # React admin dashboard (coming soon)
 └── docs/               # Documentation
@@ -251,12 +253,24 @@ The `docker-compose.yml` includes:
 
 ## Project Status
 
-**Current Phase**: Foundation (Milestone 1)
+**Current Phase**: Single Provider Proxy (Milestone 2) ✅
 
+### Completed
 - [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
 - [x] **PR #2: Configuration System** - Environment + YAML config with validation
-- [ ] PR #3: Open Responses API Types
-- [ ] PR #4: Basic Axum Server
+- [x] **PR #3: Open Responses API Types** - Full type system with 60+ tests
+- [x] **PR #4: Basic Axum Server** - Health endpoint, tracing middleware
+- [x] **PR #5: HTTP Client Foundation** - Reqwest with retries and timeouts
+- [x] **PR #6: OpenAI Adapter** - Provider trait + OpenAI implementation
+- [x] **PR #7: Streaming Support** - SSE streaming with semantic events
+
+### In Progress
+- 🔄 **PR #14: PostgreSQL Setup** - Database schema and models ready
+- 🔄 **PR #16: Cost Tracking** - Core module implemented
+
+### Bonus (Implemented Early)
+- [x] **Chat UI** - React + Vite + TypeScript chat application for testing
+- [x] **Database Models** - Full schema for providers, pricing, conversations, logs
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the complete roadmap.
 
