@@ -59,11 +59,12 @@ export function ChatInput({
         )}>
           {/* Attachment button (placeholder) */}
           <button
+            aria-label="Attach file (coming soon)"
             className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             title="Attach file (coming soon)"
             disabled
           >
-            <Paperclip className="h-5 w-5" />
+            <Paperclip className="h-5 w-5" aria-hidden="true" />
           </button>
 
           {/* Input */}
@@ -75,6 +76,7 @@ export function ChatInput({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
+            aria-label="Message input"
             className={cn(
               "flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground",
               "focus:outline-none text-sm leading-relaxed py-2",
@@ -86,15 +88,17 @@ export function ChatInput({
           {isLoading ? (
             <button
               onClick={onStopGeneration}
+              aria-label="Stop generation"
               className="p-2.5 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
               title="Stop generation"
             >
-              <Square className="h-4 w-4 fill-current" />
+              <Square className="h-4 w-4 fill-current" aria-hidden="true" />
             </button>
           ) : (
             <button
               onClick={handleSubmit}
               disabled={!input.trim() || disabled}
+              aria-label="Send message"
               className={cn(
                 "p-2.5 rounded-xl transition-colors",
                 input.trim() && !disabled
@@ -103,7 +107,7 @@ export function ChatInput({
               )}
               title="Send message"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>

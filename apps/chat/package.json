@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",
+    "@mingcute/react": "^1.4.0",
     "ai": "^4.0.0",
+    "animejs": "^4.3.3",
     "clsx": "^2.1.0",
     "lucide-react": "^0.300.0",
     "react": "^18.2.0",

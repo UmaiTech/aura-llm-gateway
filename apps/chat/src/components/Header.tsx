@@ -47,13 +47,13 @@ export function Header({
           )}
           aria-label="Toggle sidebar"
         >
-          <Menu className="h-5 w-5 text-muted-foreground" />
+          <Menu className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         </button>
 
         {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-aura-400 to-primary-500 flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-white" />
+            <Sparkles className="h-4 w-4 text-white" aria-hidden="true" />
           </div>
           <span className="font-semibold text-lg hidden sm:inline">Aura</span>
         </div>
@@ -63,13 +63,24 @@ export function Header({
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setDropdownOpen(!dropdownOpen)
+            } else if (e.key === 'Escape') {
+              setDropdownOpen(false)
+            }
+          }}
+          aria-label="Select model"
+          aria-expanded={dropdownOpen}
+          aria-haspopup="listbox"
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border hover:bg-secondary transition-colors"
         >
           <span className="text-sm font-medium">{model.name}</span>
           <ChevronDown className={cn(
             "h-4 w-4 text-muted-foreground transition-transform",
             dropdownOpen && "rotate-180"
-          )} />
+          )} aria-hidden="true" />
         </button>
 
         {dropdownOpen && (
@@ -101,6 +112,8 @@ export function Header({
       {/* Agent mode toggle */}
       <button
         onClick={() => onAgentModeChange(!agentMode)}
+        aria-label={agentMode ? "Disable agent mode" : "Enable agent mode"}
+        aria-pressed={agentMode}
         className={cn(
           "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
           agentMode
@@ -109,7 +122,7 @@ export function Header({
         )}
         title={agentMode ? "Agent mode enabled (with tools)" : "Click to enable agent mode with tools"}
       >
-        <Wrench className="h-4 w-4" />
+        <Wrench className="h-4 w-4" aria-hidden="true" />
         <span className="text-sm font-medium hidden sm:inline">
           {agentMode ? "Agent" : "Chat"}
         </span>

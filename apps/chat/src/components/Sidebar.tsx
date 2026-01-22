@@ -38,6 +38,10 @@ export function Sidebar({
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onToggle}
+          onKeyDown={(e) => e.key === 'Escape' && onToggle()}
+          role="button"
+          tabIndex={0}
+          aria-label="Close sidebar"
         />
       )}
 
@@ -53,9 +57,10 @@ export function Sidebar({
           <h2 className="font-semibold">Chats</h2>
           <button
             onClick={onToggle}
+            aria-label="Close sidebar"
             className="p-1.5 rounded-lg hover:bg-secondary transition-colors lg:hidden"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -63,9 +68,10 @@ export function Sidebar({
         <div className="p-3">
           <button
             onClick={onNewConversation}
+            aria-label="Start new chat"
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-medium transition-colors"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
             New Chat
           </button>
         </div>
@@ -93,7 +99,7 @@ export function Sidebar({
 
           {conversations.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" aria-hidden="true" />
               <p className="text-sm">No conversations yet</p>
               <p className="text-xs mt-1">Start a new chat to begin</p>
             </div>
@@ -127,23 +133,33 @@ function ConversationItem({
   return (
     <div
       className={cn(
-        "group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+        "group flex items-center gap-2 rounded-lg transition-colors",
         isActive
-          ? "bg-primary-500/10 text-primary-400"
-          : "hover:bg-secondary text-foreground"
+          ? "bg-primary-500/10"
+          : ""
       )}
-      onClick={onSelect}
     >
-      <MessageSquare className="h-4 w-4 flex-shrink-0" />
-      <span className="flex-1 truncate text-sm">{conversation.title}</span>
+      <button
+        onClick={onSelect}
+        className={cn(
+          "flex-1 flex items-center gap-2 px-3 py-2 text-left rounded-lg transition-colors",
+          isActive
+            ? "text-primary-400"
+            : "hover:bg-secondary text-foreground"
+        )}
+      >
+        <MessageSquare className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+        <span className="flex-1 truncate text-sm">{conversation.title}</span>
+      </button>
       <button
         onClick={(e) => {
           e.stopPropagation()
           onDelete()
         }}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 hover:text-destructive transition-all"
+        aria-label={`Delete conversation: ${conversation.title}`}
+        className="opacity-0 group-hover:opacity-100 p-1 mr-3 rounded hover:bg-destructive/20 hover:text-destructive transition-all"
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
   )
