@@ -7,37 +7,29 @@ import {
   ChevronRight, Menu, X, ExternalLink, DollarSign, Layers
 } from 'lucide-react'
 
-// Import all markdown files from docs/api at build time using Vite's glob
-// Paths are relative to the project root (where vite.config.ts is)
-const mdModules = import.meta.glob('../../docs/api/**/*.md', {
+// Import all MDX files from src/content at build time using Vite's glob
+const mdxModules = import.meta.glob('../content/**/*.mdx', {
   query: '?raw',
   import: 'default',
   eager: true
 }) as Record<string, string>
 
-// Also import from docs root for general docs
-const rootMdModules = import.meta.glob('../../docs/*.md', {
-  query: '?raw',
-  import: 'default',
-  eager: true
-}) as Record<string, string>
-
-// Combine all modules
-const allMdModules = { ...mdModules, ...rootMdModules }
+const allMdModules = mdxModules
 
 // Map file paths to doc paths
 function getDocPath(filePath: string): string {
-  // ../../docs/api/README.md -> /docs/api
-  // ../../docs/api/create-response.md -> /docs/api/create-response
-  // ../../docs/README.md -> /docs
-  const match = filePath.match(/docs\/(.+)\.md$/)
+  // ../content/index.mdx -> /docs
+  // ../content/api/index.mdx -> /docs/api
+  // ../content/api/create-response.mdx -> /docs/api/create-response
+  // ../content/architecture.mdx -> /docs/architecture
+  const match = filePath.match(/content\/(.+)\.mdx$/)
   if (!match) return ''
 
   const path = match[1]
-  if (path === 'README') return '/docs'
-  if (path === 'api/README') return '/docs/api'
-  if (path.endsWith('/README')) {
-    return `/docs/${path.replace('/README', '')}`
+  if (path === 'index') return '/docs'
+  if (path === 'api/index') return '/docs/api'
+  if (path.endsWith('/index')) {
+    return `/docs/${path.replace('/index', '')}`
   }
   return `/docs/${path}`
 }
