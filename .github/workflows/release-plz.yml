@@ -1,4 +1,4 @@
-name: Release
+name: Release PR
 
 on:
   push:
@@ -8,8 +8,10 @@ on:
 
 jobs:
   release-plz:
-    name: Release
+    name: Create Release PR
     runs-on: ubuntu-latest
+    # Skip if this is a release commit (tag will be created by create-tag workflow)
+    if: "!startsWith(github.event.head_commit.message, 'chore: release')"
     permissions:
       contents: write
       pull-requests: write
@@ -23,43 +25,36 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Check for duplicate releases
-        id: check_duplicate
+      - name: Check for existing release PR or tag
+        id: check
         run: |
           VERSION=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
           TAG="v$VERSION"
+
+          # Check if tag already exists
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "::notice::Tag $TAG already exists, skipping release"
+            echo "::notice::Tag $TAG already exists, skipping"
             echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
+          # Check if there's already an open release PR
+          OPEN_PR=$(gh pr list --label release --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$OPEN_PR" ]; then
+            echo "::notice::Release PR #$OPEN_PR already exists"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "skip=false" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run release-plz
-        if: steps.check_duplicate.outputs.skip != 'true'
-        id: release_plz
+        if: steps.check.outputs.skip != 'true'
         uses: MarcoIeni/release-plz-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Enable auto-merge for release PR
-        if: steps.check_duplicate.outputs.skip != 'true'
-        run: |
-          # Wait a moment for PR to be created
-          sleep 5
-
-          # Find the most recent release PR
-          PR_NUMBER=$(gh pr list --label release --state open --limit 1 --json number --jq '.[0].number')
-
-          if [ -n "$PR_NUMBER" ]; then
-            echo "Enabling auto-merge for PR #$PR_NUMBER"
-            gh pr merge "$PR_NUMBER" --auto --squash
-            echo "✅ Auto-merge enabled. PR will merge after CI passes."
-          else
-            echo "::warning::No release PR found to auto-merge"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup old release branches
         if: always()
