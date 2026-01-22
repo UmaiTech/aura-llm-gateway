@@ -6,6 +6,11 @@ on:
       - main
   workflow_dispatch:
 
+# Workflow-level permissions (required for release-plz to create branches and PRs)
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   release-plz:
     name: Create Release PR
