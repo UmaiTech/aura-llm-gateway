@@ -4,172 +4,156 @@
 
 Aura is a high-performance LLM gateway built in Rust that provides a unified API for multiple LLM providers. It implements the [Open Responses API](https://openresponses.org) specification for agentic workflows.
 
-```
-                                    ┌─────────────────────────────────────────────────┐
-                                    │                 Aura Gateway                     │
-                                    │                                                  │
-┌──────────────┐                    │  ┌─────────────┐    ┌─────────────────────────┐ │
-│              │   HTTP/SSE         │  │             │    │    Provider Registry    │ │
-│   Clients    │◄──────────────────►│  │   Router    │───►│  ┌─────┐ ┌─────┐ ┌───┐ │ │
-│  (Chat UI,   │   Open Responses   │  │   (Axum)    │    │  │OpenAI│ │Anthro│ │GCP│ │ │
-│   Agents)    │   API              │  │             │    │  └─────┘ └─────┘ └───┘ │ │
-│              │                    │  └─────────────┘    └─────────────────────────┘ │
-└──────────────┘                    │         │                      │               │
-                                    │         ▼                      ▼               │
-                                    │  ┌─────────────┐    ┌─────────────────────────┐ │
-                                    │  │  Middleware │    │    Cost Calculator      │ │
-                                    │  │  - Tracing  │    │  - Per-model pricing    │ │
-                                    │  │  - Metrics  │    │  - Token accounting     │ │
-                                    │  │  - Auth     │    │  - Usage tracking       │ │
-                                    │  └─────────────┘    └─────────────────────────┘ │
-                                    │         │                      │               │
-                                    │         ▼                      ▼               │
-                                    │  ┌─────────────────────────────────────────────┐│
-                                    │  │              Request Logger                 ││
-                                    │  │         (PostgreSQL - Optional)             ││
-                                    │  └─────────────────────────────────────────────┘│
-                                    └─────────────────────────────────────────────────┘
-                                                         │
-                                                         ▼
-                                    ┌─────────────────────────────────────────────────┐
-                                    │              LLM Provider APIs                  │
-                                    │  ┌─────────┐  ┌─────────────┐  ┌─────────────┐ │
-                                    │  │ OpenAI  │  │  Anthropic  │  │   Google    │ │
-                                    │  │   API   │  │     API     │  │ Gemini API  │ │
-                                    │  └─────────┘  └─────────────┘  └─────────────┘ │
-                                    └─────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Clients
+        A[Chat UI]
+        B[Agents]
+        C[Applications]
+    end
+
+    subgraph Gateway["Aura Gateway"]
+        D[Axum Router]
+        E[Middleware Stack]
+        F[Provider Registry]
+        G[Cost Calculator]
+        H[Request Logger]
+    end
+
+    subgraph Providers["LLM Providers"]
+        I[OpenAI API]
+        J[Anthropic API]
+        K[Google Gemini API]
+    end
+
+    subgraph Storage["Storage (Optional)"]
+        L[(PostgreSQL)]
+    end
+
+    A & B & C -->|Open Responses API| D
+    D --> E
+    E --> F
+    F --> G
+    F --> I & J & K
+    G --> H
+    H -->|Async| L
 ```
 
 ## Crate Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              Workspace Structure                                │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌─────────────────┐                                                           │
-│  │   aura-proxy    │  Binary crate - Main server entry point                   │
-│  │   (bin)         │  - Axum routes & handlers                                 │
-│  └────────┬────────┘  - Middleware stack                                       │
-│           │           - Server configuration                                    │
-│           │                                                                     │
-│           ▼                                                                     │
-│  ┌─────────────────┐                                                           │
-│  │   aura-core     │  Library crate - Core business logic                      │
-│  │   (lib)         │  - Provider implementations                               │
-│  └────────┬────────┘  - Cost calculation                                       │
-│           │           - HTTP client utilities                                   │
-│           │           - Configuration management                                │
-│           │                                                                     │
-│           ├──────────────────────┐                                             │
-│           ▼                      ▼                                             │
-│  ┌─────────────────┐    ┌─────────────────┐                                    │
-│  │   aura-types    │    │    aura-db      │                                    │
-│  │   (lib)         │    │    (lib)        │                                    │
-│  └─────────────────┘    └─────────────────┘                                    │
-│  - Open Responses API    - SQLx/PostgreSQL                                      │
-│    type definitions      - Connection pooling                                   │
-│  - Request/Response      - Request logging                                      │
-│    structures            - Pricing storage                                      │
-│  - Stream events                                                                │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Workspace["Aura Workspace"]
+        A["aura-proxy<br/>(Binary)"]
+        B["aura-core<br/>(Library)"]
+        C["aura-types<br/>(Library)"]
+        D["aura-db<br/>(Library)"]
+    end
+
+    A -->|depends on| B
+    A -->|depends on| D
+    B -->|depends on| C
+    B -->|depends on| D
+    D -->|depends on| C
+
+    A -.- A1["Main server entry point<br/>Axum routes & handlers<br/>Middleware stack"]
+    B -.- B1["Provider implementations<br/>Cost calculation<br/>HTTP client utilities"]
+    C -.- C1["Open Responses API types<br/>Request/Response structures<br/>Stream events"]
+    D -.- D1["SQLx/PostgreSQL<br/>Connection pooling<br/>Request logging"]
 ```
 
 ## Request Flow
 
 ### Non-Streaming Request
 
-```
-┌────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Client │     │  Axum   │     │ Provider │     │  Cost    │     │ Database │
-│        │     │ Router  │     │ Registry │     │Calculator│     │ (opt)    │
-└───┬────┘     └────┬────┘     └────┬─────┘     └────┬─────┘     └────┬─────┘
-    │               │               │                │                │
-    │ POST /v1/responses            │                │                │
-    │──────────────►│               │                │                │
-    │               │               │                │                │
-    │               │ get_provider()│                │                │
-    │               │──────────────►│                │                │
-    │               │               │                │                │
-    │               │◄──────────────│                │                │
-    │               │  Arc<Provider>│                │                │
-    │               │               │                │                │
-    │               │ complete(req) │                │                │
-    │               │───────────────┼───────────────►│                │
-    │               │               │    LLM API     │                │
-    │               │               │◄───────────────│                │
-    │               │◄──────────────┼────────────────│                │
-    │               │   Response    │                │                │
-    │               │               │                │                │
-    │               │ calculate_cost()               │                │
-    │               │───────────────────────────────►│                │
-    │               │◄───────────────────────────────│                │
-    │               │   cost_usd                     │                │
-    │               │               │                │                │
-    │               │ enrich_response()              │                │
-    │               │──────────────►│                │                │
-    │               │               │                │                │
-    │               │               │ log_request()  │                │
-    │               │───────────────┼────────────────┼───────────────►│
-    │               │               │                │    (async)     │
-    │               │               │                │                │
-    │◄──────────────│               │                │                │
-    │ JSON Response │               │                │                │
-    │ + cost + metadata             │                │                │
-    │               │               │                │                │
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Router as Axum Router
+    participant Registry as Provider Registry
+    participant Provider as LLM Provider
+    participant Cost as Cost Calculator
+    participant DB as Database
+
+    Client->>Router: POST /v1/responses
+    Router->>Registry: get_provider(model)
+    Registry-->>Router: Arc<Provider>
+
+    Router->>Provider: complete(request)
+    Provider->>Provider: Transform to provider format
+    Provider-->>Router: Response
+
+    Router->>Cost: calculate_cost(model, tokens)
+    Cost-->>Router: cost_usd
+
+    Router->>Router: enrich_response()
+
+    Router-)DB: log_request() [async]
+
+    Router-->>Client: JSON Response<br/>+ cost + metadata
 ```
 
 ### Streaming Request
 
-```
-┌────────┐     ┌─────────┐     ┌──────────┐     ┌──────────────┐
-│ Client │     │  Axum   │     │ Provider │     │   LLM API    │
-│        │     │ Router  │     │          │     │              │
-└───┬────┘     └────┬────┘     └────┬─────┘     └──────┬───────┘
-    │               │               │                  │
-    │ POST /v1/responses            │                  │
-    │ stream: true  │               │                  │
-    │──────────────►│               │                  │
-    │               │               │                  │
-    │               │ complete_stream()                │
-    │               │──────────────►│                  │
-    │               │               │                  │
-    │               │               │ SSE Connection   │
-    │               │               │─────────────────►│
-    │               │               │                  │
-    │◄──────────────┼───────────────┼──────────────────│
-    │ SSE: response.in_progress     │                  │
-    │               │               │                  │
-    │◄──────────────┼───────────────┼──────────────────│
-    │ SSE: response.output_item.added                  │
-    │               │               │                  │
-    │◄──────────────┼───────────────┼──────────────────│
-    │ SSE: response.output_text.delta (repeated)       │
-    │               │               │                  │
-    │◄──────────────┼───────────────┼──────────────────│
-    │ SSE: response.completed       │                  │
-    │ (enriched with cost + metadata)                  │
-    │               │               │                  │
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Router as Axum Router
+    participant Provider as LLM Provider
+    participant LLM as LLM API
+
+    Client->>Router: POST /v1/responses<br/>stream: true
+    Router->>Provider: complete_stream(request)
+    Provider->>LLM: SSE Connection
+
+    LLM-->>Client: response.in_progress
+    LLM-->>Client: response.output_item.added
+
+    loop Text Generation
+        LLM-->>Client: response.output_text.delta
+    end
+
+    LLM-->>Client: response.completed<br/>(enriched with cost + metadata)
 ```
 
 ## Component Details
 
 ### Provider System
 
-```rust
-#[async_trait]
-pub trait Provider: Send + Sync {
-    fn name(&self) -> &str;
-    fn models(&self) -> &[&str];
-    fn supports_model(&self, model: &str) -> bool;
+```mermaid
+classDiagram
+    class Provider {
+        <<trait>>
+        +name() str
+        +models() [str]
+        +supports_model(model) bool
+        +complete(request) Response
+        +complete_stream(request) EventStream
+    }
 
-    async fn complete(&self, request: CreateResponseRequest)
-        -> Result<Response, ProviderError>;
+    class OpenAIProvider {
+        -api_key: String
+        -http_client: Client
+        +new(api_key) Self
+    }
 
-    async fn complete_stream(&self, request: CreateResponseRequest)
-        -> Result<EventStream, ProviderError>;
-}
+    class AnthropicProvider {
+        -api_key: String
+        -http_client: Client
+        +new(api_key) Self
+    }
+
+    class GoogleProvider {
+        -api_key: String
+        -http_client: Client
+        +new(api_key) Self
+    }
+
+    Provider <|.. OpenAIProvider
+    Provider <|.. AnthropicProvider
+    Provider <|.. GoogleProvider
 ```
 
 ### Response Enrichment
@@ -206,97 +190,120 @@ Every response is enriched with Aura-specific metadata:
 }
 ```
 
-### Database Integration (Optional)
+### Database Schema
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      PostgreSQL                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────┐    ┌─────────────────────────────────┐│
-│  │   providers     │    │        model_pricing            ││
-│  ├─────────────────┤    ├─────────────────────────────────┤│
-│  │ id              │    │ id                              ││
-│  │ name            │◄───│ provider_id                     ││
-│  │ display_name    │    │ model_id                        ││
-│  │ api_base_url    │    │ input_per_million               ││
-│  │ is_enabled      │    │ output_per_million              ││
-│  └─────────────────┘    │ cached_input_per_million        ││
-│                         │ effective_from                  ││
-│                         │ effective_until                 ││
-│                         └─────────────────────────────────┘│
-│                                                             │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │                    request_logs                         ││
-│  ├─────────────────────────────────────────────────────────┤│
-│  │ id, response_id, provider_name, model_id                ││
-│  │ input_tokens, output_tokens, cost_usd, latency_ms       ││
-│  │ status, error_code, error_message, metadata             ││
-│  │ created_at                                              ││
-│  └─────────────────────────────────────────────────────────┘│
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    providers ||--o{ model_pricing : has
+    providers {
+        uuid id PK
+        string name UK
+        string display_name
+        string api_base_url
+        boolean is_enabled
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    model_pricing {
+        uuid id PK
+        uuid provider_id FK
+        string model_id
+        string model_name
+        decimal input_per_million
+        decimal output_per_million
+        decimal cached_input_per_million
+        decimal reasoning_per_million
+        int context_window
+        int max_output_tokens
+        boolean is_enabled
+        timestamp effective_from
+        timestamp effective_until
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    request_logs {
+        uuid id PK
+        string response_id UK
+        uuid conversation_id FK
+        string provider_name
+        string model_id
+        string user_id
+        int input_tokens
+        int output_tokens
+        int cached_tokens
+        int reasoning_tokens
+        decimal cost_usd
+        int latency_ms
+        string status
+        string error_code
+        string error_message
+        jsonb metadata
+        timestamp created_at
+    }
+
+    conversations ||--o{ messages : contains
+    conversations ||--o{ request_logs : generates
+    conversations {
+        uuid id PK
+        string user_id
+        string title
+        string model_id
+        jsonb metadata
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    messages {
+        uuid id PK
+        uuid conversation_id FK
+        string role
+        text content
+        jsonb metadata
+        timestamp created_at
+    }
 ```
 
 ## Data Flow Summary
 
+```mermaid
+flowchart TD
+    A[Client Request] --> B[1. Route Matching]
+    B --> C[2. Provider Resolution]
+    C --> D[3. Request Transformation]
+    D --> E[4. Provider API Call]
+    E --> F[5. Response Transformation]
+    F --> G[6. Response Enrichment]
+    G --> H[7. Request Logging]
+    H --> I[Client Response]
+
+    B -.- B1["Axum extracts request body"]
+    C -.- C1["model → provider mapping<br/>gpt-4o → OpenAIProvider"]
+    D -.- D1["Open Responses → Provider format<br/>Add auth headers, format messages"]
+    E -.- E1["HTTP request to OpenAI/Anthropic/etc"]
+    F -.- F1["Provider format → Open Responses"]
+    G -.- G1["Add: cost_usd, request_id, provider<br/>Add: latency_ms, agentic metadata"]
+    H -.- H1["Background task → PostgreSQL"]
 ```
-                    ┌─────────────────────────────────────────┐
-                    │           Client Request                │
-                    │  POST /v1/responses                     │
-                    │  {model: "gpt-4o", input: [...]}        │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │         1. Route Matching               │
-                    │    Axum extracts request body           │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │      2. Provider Resolution             │
-                    │  model → provider mapping               │
-                    │  "gpt-4o" → OpenAIProvider              │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │      3. Request Transformation          │
-                    │  Open Responses → Provider format       │
-                    │  Add auth headers, format messages      │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │      4. Provider API Call               │
-                    │  HTTP request to OpenAI/Anthropic/etc   │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │      5. Response Transformation         │
-                    │  Provider format → Open Responses       │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │      6. Response Enrichment             │
-                    │  Add: cost_usd, request_id, provider    │
-                    │  Add: latency_ms, agentic metadata      │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │      7. Request Logging (async)         │
-                    │  Background task → PostgreSQL           │
-                    └──────────────────┬──────────────────────┘
-                                       │
-                                       ▼
-                    ┌─────────────────────────────────────────┐
-                    │         Client Response                 │
-                    │  {id, output, usage, metadata}          │
-                    └─────────────────────────────────────────┘
+
+## State Management
+
+```mermaid
+flowchart LR
+    subgraph AppState
+        A[Config]
+        B[Providers Map]
+        C[Model Map]
+        D[Cost Calculator]
+        E[DB Pool]
+    end
+
+    A --> |Arc| A1[Server config<br/>Provider keys]
+    B --> |Arc HashMap| B1[provider_name → Provider]
+    C --> |Arc HashMap| C1[model_id → provider_name]
+    D --> |Arc| D1[Pricing data]
+    E --> |Option| E1[PostgreSQL Pool]
 ```
 
 ## Configuration
@@ -322,20 +329,43 @@ database:
 
 ## Future Architecture (Planned)
 
+```mermaid
+flowchart TB
+    subgraph Current["Current Features"]
+        A[Multi-Provider Support]
+        B[Cost Tracking]
+        C[Request Logging]
+        D[Streaming SSE]
+    end
+
+    subgraph Planned["Planned Features"]
+        E[Rate Limiter<br/>Redis]
+        F[Response Cache<br/>Redis]
+        G[Load Balancer<br/>Multi-node]
+        H[Pricing Scraper<br/>Cron Job]
+        I[Webhooks<br/>Callbacks]
+        J[Admin Dashboard<br/>React UI]
+    end
+
+    Current --> Planned
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           Future Enhancements                                │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐            │
-│  │   Rate Limiter │    │   Cache Layer  │    │  Load Balancer │            │
-│  │    (Redis)     │    │    (Redis)     │    │  (Multi-node)  │            │
-│  └────────────────┘    └────────────────┘    └────────────────┘            │
-│                                                                              │
-│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐            │
-│  │ Pricing Scraper│    │   Webhooks     │    │    Admin UI    │            │
-│  │  (Cron Job)    │    │  (Callbacks)   │    │  (Dashboard)   │            │
-│  └────────────────┘    └────────────────┘    └────────────────┘            │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
+
+## Error Handling Flow
+
+```mermaid
+flowchart TD
+    A[Request] --> B{Provider Available?}
+    B -->|No| C[404 Model Not Found]
+    B -->|Yes| D{API Call Success?}
+    D -->|No| E{Error Type?}
+    E -->|Auth| F[401 Unauthorized]
+    E -->|Rate Limit| G[429 Too Many Requests]
+    E -->|Invalid| H[400 Bad Request]
+    E -->|Server| I[500 Internal Error]
+    D -->|Yes| J{Stream?}
+    J -->|Yes| K[SSE Events]
+    J -->|No| L[JSON Response]
+
+    F & G & H & I --> M[Log Error]
+    K & L --> N[Log Success]
 ```
