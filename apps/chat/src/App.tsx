@@ -7,7 +7,7 @@ import { generateId } from './lib/utils'
 import { api, messagesToInput } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage } from './lib/types'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
@@ -103,18 +103,30 @@ export default function App() {
           fullContent += event.delta
           updateMessage(assistantMessageId, { content: fullContent })
         } else if (event.type === 'response.completed') {
-          // Extract usage from completed response (gateway enriches with cost_usd)
-          const responseUsage = (event.response as { usage?: { input_tokens: number; output_tokens: number; cost_usd?: number } })?.usage
-          if (responseUsage) {
+          // Extract usage and metadata from completed response (gateway enriches with cost_usd and aura metadata)
+          const response = event.response as {
+            usage?: { input_tokens: number; output_tokens: number; cost_usd?: number }
+            metadata?: { aura?: { provider?: string; gateway_version?: string; latency_ms?: number } }
+          }
+
+          if (response?.usage) {
             usage = {
-              inputTokens: responseUsage.input_tokens,
-              outputTokens: responseUsage.output_tokens,
-              totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
-              // Use server-provided cost if available, otherwise fall back to client calculation
-              cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
+              inputTokens: response.usage.input_tokens,
+              outputTokens: response.usage.output_tokens,
+              totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+              cost: response.usage.cost_usd ?? calculateCost(model, response.usage.input_tokens, response.usage.output_tokens),
             }
           }
-          updateMessage(assistantMessageId, { isStreaming: false, usage })
+
+          // Extract Aura metadata
+          const auraMetadata = response?.metadata?.aura
+          const aura = auraMetadata ? {
+            provider: auraMetadata.provider || 'unknown',
+            gatewayVersion: auraMetadata.gateway_version || '',
+            latencyMs: auraMetadata.latency_ms,
+          } : undefined
+
+          updateMessage(assistantMessageId, { isStreaming: false, usage, aura })
         } else if (event.type === 'response.failed' || event.type === 'error') {
           const errorMessage =
             event.error?.message ||
@@ -211,6 +223,7 @@ export default function App() {
         let fullContent = ''
         const toolCalls: Array<{ id: string; name: string; arguments: string }> = []
         let usage: MessageUsage | undefined
+        let aura: AuraMetadata | undefined
 
         try {
           while (true) {
@@ -289,8 +302,17 @@ export default function App() {
                         inputTokens: responseUsage.input_tokens,
                         outputTokens: responseUsage.output_tokens,
                         totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
-                        // Use server-provided cost if available, otherwise fall back to client calculation
                         cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
+                      }
+                    }
+
+                    // Extract Aura metadata
+                    const metadata = event.response.metadata as { aura?: { provider?: string; gateway_version?: string; latency_ms?: number } } | undefined
+                    if (metadata?.aura) {
+                      aura = {
+                        provider: metadata.aura.provider || 'unknown',
+                        gatewayVersion: metadata.aura.gateway_version || '',
+                        latencyMs: metadata.aura.latency_ms,
                       }
                     }
                   }
@@ -304,7 +326,7 @@ export default function App() {
           reader.releaseLock()
         }
 
-        updateMessage(assistantMessageId, { isStreaming: false, usage })
+        updateMessage(assistantMessageId, { isStreaming: false, usage, aura })
 
         // No tool calls - we're done
         if (toolCalls.length === 0) {

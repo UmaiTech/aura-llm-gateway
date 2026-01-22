@@ -1,10 +1,23 @@
-import { User, Sparkles, Copy, Check, Wrench, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, Coins } from 'lucide-react'
+import {
+  User, Sparkles, Copy, Check, Wrench, Loader2, CheckCircle2, XCircle,
+  ChevronDown, Coins, Search, Calculator, Clock, Cloud,
+  Zap, Server, Timer
+} from 'lucide-react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '../lib/utils'
 import type { Message, ToolInvocation } from '../lib/types'
+
+// Tool-specific icons and colors
+const TOOL_CONFIG: Record<string, { icon: typeof Wrench; color: string; bgColor: string }> = {
+  web_search: { icon: Search, color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
+  calculate: { icon: Calculator, color: 'text-green-400', bgColor: 'bg-green-500/10' },
+  get_current_time: { icon: Clock, color: 'text-purple-400', bgColor: 'bg-purple-500/10' },
+  get_weather: { icon: Cloud, color: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
+  default: { icon: Wrench, color: 'text-orange-400', bgColor: 'bg-orange-500/10' },
+}
 
 interface MessageBubbleProps {
   message: Message
@@ -102,9 +115,9 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
           )}
         </div>
 
-        {/* Usage info (tokens and cost) */}
+        {/* Usage info (tokens, cost, and Aura metadata) */}
         {!isUser && message.usage && !isStreaming && (
-          <UsageDisplay usage={message.usage} />
+          <UsageDisplay usage={message.usage} aura={message.aura} />
         )}
       </div>
     </div>
@@ -197,69 +210,135 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
     })
   }
 
+  const getToolConfig = (toolName: string) => {
+    return TOOL_CONFIG[toolName] || TOOL_CONFIG.default
+  }
+
   return (
     <div className="space-y-2">
-      {invocations.map((invocation) => (
-        <div
-          key={invocation.toolCallId}
-          className="rounded-lg border border-border/50 bg-background/50 overflow-hidden"
-        >
-          {/* Tool Header */}
-          <button
-            onClick={() => toggleTool(invocation.toolCallId)}
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-secondary/50 transition-colors"
+      {invocations.map((invocation) => {
+        const config = getToolConfig(invocation.toolName)
+        const ToolIcon = config.icon
+        const isExpanded = expandedTools.has(invocation.toolCallId)
+
+        return (
+          <div
+            key={invocation.toolCallId}
+            className={cn(
+              "rounded-xl border overflow-hidden transition-all duration-200",
+              invocation.state === 'pending'
+                ? "border-border/50 bg-background/30"
+                : invocation.state === 'result'
+                ? "border-green-500/30 bg-green-500/5"
+                : "border-red-500/30 bg-red-500/5"
+            )}
           >
-            {/* Status Icon */}
-            {invocation.state === 'pending' ? (
-              <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-            ) : invocation.state === 'result' ? (
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            ) : (
-              <XCircle className="h-4 w-4 text-red-500" />
-            )}
-
-            {/* Tool Icon */}
-            <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-
-            {/* Tool Name */}
-            <span className="text-sm font-medium flex-1 text-left">
-              {invocation.toolName}
-            </span>
-
-            {/* Expand/Collapse */}
-            {expandedTools.has(invocation.toolCallId) ? (
-              <ChevronUp className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            )}
-          </button>
-
-          {/* Expanded Content */}
-          {expandedTools.has(invocation.toolCallId) && (
-            <div className="border-t border-border/50 px-3 py-2 space-y-2">
-              {/* Arguments */}
-              <div>
-                <span className="text-xs font-medium text-muted-foreground">Arguments:</span>
-                <pre className="mt-1 text-xs bg-gray-800 rounded p-2 overflow-x-auto">
-                  {JSON.stringify(invocation.args, null, 2)}
-                </pre>
+            {/* Tool Card Header */}
+            <button
+              onClick={() => toggleTool(invocation.toolCallId)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+            >
+              {/* Tool Icon with colored background */}
+              <div className={cn(
+                "flex-shrink-0 h-9 w-9 rounded-lg flex items-center justify-center",
+                config.bgColor
+              )}>
+                <ToolIcon className={cn("h-4.5 w-4.5", config.color)} />
               </div>
 
-              {/* Result */}
-              {invocation.result && (
+              {/* Tool Info */}
+              <div className="flex-1 text-left min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">
+                    {formatToolName(invocation.toolName)}
+                  </span>
+                  {/* Status Badge */}
+                  {invocation.state === 'pending' ? (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Running...
+                    </span>
+                  ) : invocation.state === 'result' ? (
+                    <span className="flex items-center gap-1 text-xs text-green-400">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Success
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-red-400">
+                      <XCircle className="h-3 w-3" />
+                      Error
+                    </span>
+                  )}
+                </div>
+                {/* Show brief args preview when collapsed */}
+                {!isExpanded && Object.keys(invocation.args).length > 0 && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {formatArgsPreview(invocation.args)}
+                  </p>
+                )}
+              </div>
+
+              {/* Expand/Collapse Arrow */}
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                isExpanded && "rotate-180"
+              )} />
+            </button>
+
+            {/* Expanded Content */}
+            {isExpanded && (
+              <div className="border-t border-border/30 px-4 py-3 space-y-3 bg-black/20">
+                {/* Arguments Section */}
                 <div>
-                  <span className="text-xs font-medium text-muted-foreground">Result:</span>
-                  <pre className="mt-1 text-xs bg-gray-800 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto">
-                    {formatToolResult(invocation.result)}
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Zap className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Input
+                    </span>
+                  </div>
+                  <pre className="text-xs bg-gray-900/80 rounded-lg p-3 overflow-x-auto border border-border/30">
+                    {JSON.stringify(invocation.args, null, 2)}
                   </pre>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+
+                {/* Result Section */}
+                {invocation.result && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Server className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Output
+                      </span>
+                    </div>
+                    <pre className="text-xs bg-gray-900/80 rounded-lg p-3 overflow-x-auto max-h-48 overflow-y-auto border border-border/30">
+                      {formatToolResult(invocation.result)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
+}
+
+function formatToolName(name: string): string {
+  return name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function formatArgsPreview(args: Record<string, unknown>): string {
+  const entries = Object.entries(args)
+  if (entries.length === 0) return ''
+  if (entries.length === 1) {
+    const [key, value] = entries[0]
+    const strValue = typeof value === 'string' ? value : JSON.stringify(value)
+    return `${key}: ${strValue.slice(0, 50)}${strValue.length > 50 ? '...' : ''}`
+  }
+  return `${entries.length} parameters`
 }
 
 function formatToolResult(result: string): string {
@@ -278,11 +357,34 @@ interface UsageDisplayProps {
     totalTokens: number
     cost?: number
   }
+  aura?: {
+    provider: string
+    gatewayVersion: string
+    latencyMs?: number
+    requestId?: string
+  }
 }
 
-function UsageDisplay({ usage }: UsageDisplayProps) {
+function UsageDisplay({ usage, aura }: UsageDisplayProps) {
   return (
-    <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+      {/* Provider badge */}
+      {aura?.provider && (
+        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary/50">
+          <Server className="h-3 w-3" />
+          <span className="capitalize">{aura.provider}</span>
+        </span>
+      )}
+
+      {/* Latency */}
+      {aura?.latencyMs !== undefined && (
+        <span className="flex items-center gap-1">
+          <Timer className="h-3 w-3" />
+          <span>{aura.latencyMs}ms</span>
+        </span>
+      )}
+
+      {/* Token counts */}
       <span className="flex items-center gap-1">
         <span className="font-medium">{usage.inputTokens.toLocaleString()}</span>
         <span>in</span>
@@ -290,8 +392,10 @@ function UsageDisplay({ usage }: UsageDisplayProps) {
         <span className="font-medium">{usage.outputTokens.toLocaleString()}</span>
         <span>out</span>
       </span>
+
+      {/* Cost */}
       {usage.cost !== undefined && usage.cost > 0 && (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 text-green-400">
           <Coins className="h-3 w-3" />
           <span>${usage.cost.toFixed(4)}</span>
         </span>

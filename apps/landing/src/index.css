@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  ::selection {
+    @apply bg-aura-500/30;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
+           bg-gradient-to-r from-aura-500 to-primary-500 text-white
+           hover:from-aura-400 hover:to-primary-400
+           transition-all duration-200 shadow-lg shadow-aura-500/25
+           hover:shadow-xl hover:shadow-aura-500/30;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
+           bg-gray-800 text-gray-100 border border-gray-700
+           hover:bg-gray-700 hover:border-gray-600
+           transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-gray-900/50 border border-gray-800 rounded-xl p-6
+           backdrop-blur-sm hover:border-gray-700 transition-colors;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-aura-400 to-primary-400 bg-clip-text text-transparent;
+  }
+}
+
+/* Code block styling */
+pre {
+  @apply bg-gray-900 rounded-lg p-4 overflow-x-auto;
+}
+
+code {
+  @apply font-mono text-sm;
+}
+
+/* Glow effects */
+.glow {
+  box-shadow: 0 0 40px rgba(14, 165, 233, 0.15),
+              0 0 80px rgba(99, 102, 241, 0.1);
+}

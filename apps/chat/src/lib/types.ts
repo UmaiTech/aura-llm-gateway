@@ -6,6 +6,7 @@ export interface Message {
   isStreaming?: boolean
   toolInvocations?: ToolInvocation[]
   usage?: MessageUsage
+  aura?: AuraMetadata  // Aura gateway metadata
 }
 
 export interface MessageUsage {
@@ -13,6 +14,14 @@ export interface MessageUsage {
   outputTokens: number
   totalTokens: number
   cost?: number  // Cost in USD (based on model pricing)
+}
+
+// Aura gateway enrichment metadata
+export interface AuraMetadata {
+  provider: string      // e.g., "openai", "anthropic", "google"
+  gatewayVersion: string
+  latencyMs?: number    // Request latency in milliseconds
+  requestId?: string    // Unique request ID for tracing
 }
 
 export interface ToolInvocation {
