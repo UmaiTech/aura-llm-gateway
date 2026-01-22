@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -60,6 +60,7 @@ const docSections = [
       { title: 'Introduction', path: '/docs', icon: BookOpen },
       { title: 'Quickstart', path: '/docs/quickstart', icon: Zap },
       { title: 'Configuration', path: '/docs/configuration', icon: Settings },
+      { title: 'Roadmap', path: '/docs/roadmap', icon: Zap },
     ],
   },
   {
@@ -284,13 +285,17 @@ See the development guide for implementing custom providers.
 
 // Mermaid component
 function MermaidDiagram({ chart }: { chart: string }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState<string>('')
+  const [error, setError] = useState<string>('')
 
   useEffect(() => {
-    if (ref.current) {
+    let cancelled = false
+
+    const renderDiagram = async () => {
       try {
+        // Initialize mermaid on first render
         mermaid.initialize({
-          startOnLoad: true,
+          startOnLoad: false,
           theme: 'dark',
           themeVariables: {
             primaryColor: '#818cf8',
@@ -303,21 +308,63 @@ function MermaidDiagram({ chart }: { chart: string }) {
             mainBkg: '#1f2937',
             secondBkg: '#374151',
             textColor: '#e5e7eb',
-            fontSize: '14px'
+            fontSize: '14px',
+            fontFamily: 'Inter, sans-serif'
+          },
+          securityLevel: 'loose',
+          flowchart: {
+            useMaxWidth: true,
+            htmlLabels: true,
+            curve: 'basis'
           }
         })
-        mermaid.render(`mermaid-${Math.random()}`, chart).then(({ svg }) => {
-          if (ref.current) {
-            ref.current.innerHTML = svg
-          }
-        })
-      } catch (error) {
-        console.error('Mermaid rendering error:', error)
+
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        const { svg: renderedSvg } = await mermaid.render(id, chart)
+
+        if (!cancelled) {
+          setSvg(renderedSvg)
+          setError('')
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Mermaid rendering error:', err)
+          setError(err instanceof Error ? err.message : 'Failed to render diagram')
+        }
       }
+    }
+
+    if (chart) {
+      renderDiagram()
+    }
+
+    return () => {
+      cancelled = true
     }
   }, [chart])
 
-  return <div ref={ref} className="my-6 flex justify-center" />
+  if (error) {
+    return (
+      <div className="my-6 p-4 bg-red-900/20 border border-red-800 rounded text-red-400 text-sm">
+        <strong>Mermaid rendering error:</strong> {error}
+      </div>
+    )
+  }
+
+  if (!svg) {
+    return (
+      <div className="my-6 flex justify-center">
+        <div className="text-gray-500 text-sm">Loading diagram...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="my-6 flex justify-center overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
 }
 
 // Markdown components for custom styling - using any for React-Markdown compatibility

@@ -468,9 +468,6 @@ export default function App() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
         <Header
-          model={selectedModel}
-          models={AVAILABLE_MODELS}
-          onModelChange={handleModelChange}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           sidebarOpen={sidebarOpen}
           agentMode={agentMode}
@@ -485,6 +482,8 @@ export default function App() {
           onSendMessage={handleSendMessage}
           onStopGeneration={handleStopGeneration}
           model={selectedModel}
+          models={AVAILABLE_MODELS}
+          onModelChange={handleModelChange}
         />
       </div>
     </div>

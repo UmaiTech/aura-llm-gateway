@@ -59,24 +59,29 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
       >
         <div
           className={cn(
-            "rounded-2xl px-4 py-3",
+            "rounded-2xl px-4 py-3 shadow-premium",
             isUser
               ? "bg-primary-500 text-white rounded-tr-md"
-              : "bg-secondary rounded-tl-md"
+              : "bg-secondary/80 backdrop-blur-sm rounded-tl-md"
           )}
         >
           {isUser ? (
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
           ) : (
             <div className="space-y-3">
-              {/* Tool Invocations */}
+              {/* Tool Invocations - only render when present */}
               {message.toolInvocations && message.toolInvocations.length > 0 && (
-                <ToolInvocations invocations={message.toolInvocations} />
+                <div className="animate-in fade-in duration-200">
+                  <ToolInvocations invocations={message.toolInvocations} />
+                </div>
               )}
 
-              {/* Message Content */}
-              {message.content && (
-                <div className="markdown-content prose prose-sm dark:prose-invert max-w-none">
+              {/* Message Content - stable container */}
+              <div className={cn(
+                "markdown-content prose prose-sm dark:prose-invert max-w-none",
+                !message.content && isStreaming && "min-h-[24px]"
+              )}>
+                {message.content && (
                   <ReactMarkdown
                     components={{
                       code({ className, children, ...props }) {
@@ -105,12 +110,9 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
                   >
                     {message.content}
                   </ReactMarkdown>
-                  {isStreaming && <TypingIndicator />}
-                </div>
-              )}
-
-              {/* Show typing indicator when streaming with no content yet */}
-              {isStreaming && !message.content && <TypingIndicator />}
+                )}
+                {isStreaming && <TypingIndicator />}
+              </div>
             </div>
           )}
         </div>
@@ -216,7 +218,7 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
 
   return (
     <div className="space-y-2">
-      {invocations.map((invocation) => {
+      {invocations.map((invocation, index) => {
         const config = getToolConfig(invocation.toolName)
         const ToolIcon = config.icon
         const isExpanded = expandedTools.has(invocation.toolCallId)
@@ -225,13 +227,18 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
           <div
             key={invocation.toolCallId}
             className={cn(
-              "rounded-xl border overflow-hidden transition-all duration-200",
+              "rounded-xl border overflow-hidden transition-all duration-300 ease-out shadow-premium",
+              "animate-in fade-in slide-in-from-top-2 backdrop-blur-sm",
               invocation.state === 'pending'
-                ? "border-border/50 bg-background/30"
+                ? "border-border/50 bg-background/40"
                 : invocation.state === 'result'
-                ? "border-green-500/30 bg-green-500/5"
-                : "border-red-500/30 bg-red-500/5"
+                ? "border-green-500/30 bg-green-500/10"
+                : "border-red-500/30 bg-red-500/10"
             )}
+            style={{
+              animationDelay: `${index * 50}ms`,
+              animationFillMode: 'backwards'
+            }}
           >
             {/* Tool Card Header */}
             <button

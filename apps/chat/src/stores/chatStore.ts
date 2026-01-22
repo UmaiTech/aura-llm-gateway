@@ -13,6 +13,7 @@ interface ChatState {
   systemPrompt: string
   agentMode: boolean
   enabledTools: string[]
+  theme: 'light' | 'dark' | 'system'
 
   // Actions
   createConversation: () => string
@@ -30,6 +31,7 @@ interface ChatState {
   setSystemPrompt: (prompt: string) => void
   setAgentMode: (enabled: boolean) => void
   toggleTool: (toolName: string) => void
+  setTheme: (theme: 'light' | 'dark' | 'system') => void
 
   // Computed
   getCurrentConversation: () => Conversation | null
@@ -45,6 +47,7 @@ export const useChatStore = create<ChatState>()(
       systemPrompt: '',
       agentMode: false,
       enabledTools: [],
+      theme: 'system',
 
       // Conversation actions
       createConversation: () => {
@@ -201,6 +204,8 @@ export const useChatStore = create<ChatState>()(
         }))
       },
 
+      setTheme: (theme) => set({ theme }),
+
       // Computed
       getCurrentConversation: () => {
         const { conversations, currentConversationId } = get()
@@ -217,6 +222,7 @@ export const useChatStore = create<ChatState>()(
         systemPrompt: state.systemPrompt,
         agentMode: state.agentMode,
         enabledTools: state.enabledTools,
+        theme: state.theme,
       }),
     }
   )

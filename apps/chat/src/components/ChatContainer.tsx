@@ -11,6 +11,8 @@ interface ChatContainerProps {
   onSendMessage: (content: string) => Promise<void>
   onStopGeneration: () => void
   model: Model
+  models: Model[]
+  onModelChange: (model: Model) => void
 }
 
 export function ChatContainer({
@@ -20,6 +22,8 @@ export function ChatContainer({
   onSendMessage,
   onStopGeneration,
   model,
+  models,
+  onModelChange,
 }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -68,6 +72,9 @@ export function ChatContainer({
         onStopGeneration={onStopGeneration}
         isLoading={isLoading}
         disabled={false}
+        model={model}
+        models={models}
+        onModelChange={onModelChange}
       />
     </div>
   )

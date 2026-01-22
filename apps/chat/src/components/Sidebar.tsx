@@ -44,7 +44,7 @@ export function Sidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:relative inset-y-0 left-0 z-50 w-72 bg-background border-r border-border flex flex-col transition-transform duration-200 ease-in-out",
+          "fixed lg:relative inset-y-0 left-0 z-50 w-72 glass border-r border-border/50 flex flex-col transition-transform duration-200 ease-in-out shadow-premium-lg",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0"
         )}
       >
@@ -60,12 +60,12 @@ export function Sidebar({
         </div>
 
         {/* New chat button */}
-        <div className="p-3">
+        <div className="p-3 border-b border-border/50">
           <button
             onClick={onNewConversation}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-medium transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-transparent hover:bg-secondary transition-colors text-sm font-medium text-foreground group"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             New Chat
           </button>
         </div>

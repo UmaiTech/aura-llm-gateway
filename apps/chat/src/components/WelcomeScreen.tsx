@@ -1,4 +1,4 @@
-import { Sparkles, Code, Lightbulb, Pencil, Zap } from 'lucide-react'
+import { Code, Lightbulb, Pencil, Zap } from 'lucide-react'
 import type { Model } from '../lib/types'
 
 interface WelcomeScreenProps {
@@ -34,15 +34,13 @@ export function WelcomeScreen({ model, onSendMessage }: WelcomeScreenProps) {
     <div className="flex flex-col items-center justify-center min-h-full px-4 py-12">
       {/* Logo and title */}
       <div className="flex flex-col items-center mb-12">
-        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-aura-400 to-primary-500 flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
-          <Sparkles className="h-8 w-8 text-white" />
-        </div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
+        <img src="/logo.svg" alt="Aura" className="h-20 w-20 logo-pulse mb-6" />
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text mb-2">
           Welcome to Aura
         </h1>
         <p className="text-muted-foreground text-center max-w-md">
-          Your unified gateway to LLM models. Currently using{' '}
-          <span className="text-primary-400 font-medium">{model.name}</span>.
+          Your unified gateway to LLM models.   <br /> Currently using{' '}
+          <span className="gradient-text font-semibold">{model.name}</span>.
         </p>
       </div>
 
@@ -52,9 +50,9 @@ export function WelcomeScreen({ model, onSendMessage }: WelcomeScreenProps) {
           <button
             key={suggestion.title}
             onClick={() => onSendMessage(suggestion.prompt)}
-            className="flex items-start gap-3 p-4 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary-500/30 transition-all text-left group"
+            className="flex items-start gap-3 p-4 rounded-xl border border-border/50 bg-secondary/40 backdrop-blur-sm hover:bg-secondary/70 hover:border-primary-500/40 hover:shadow-premium-lg transition-all text-left group"
           >
-            <div className="p-2 rounded-lg bg-primary-500/10 text-primary-400 group-hover:bg-primary-500/20 transition-colors">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary-500/10 to-aura-400/10 text-primary-400 group-hover:from-primary-500/20 group-hover:to-aura-400/20 transition-all">
               <suggestion.icon className="h-5 w-5" />
             </div>
             <div>
@@ -78,7 +76,7 @@ export function WelcomeScreen({ model, onSendMessage }: WelcomeScreenProps) {
           {['Code Generation', 'Debugging', 'Explanation', 'Translation', 'Analysis'].map((cap) => (
             <span
               key={cap}
-              className="px-3 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground"
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-secondary/60 backdrop-blur-sm text-secondary-foreground border border-border/30"
             >
               {cap}
             </span>
