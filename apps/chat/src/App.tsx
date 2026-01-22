@@ -1,0 +1,491 @@
+import { useState, useCallback, useRef } from 'react'
+import { ChatContainer } from './components/ChatContainer'
+import { Sidebar } from './components/Sidebar'
+import { Header } from './components/Header'
+import { useChatStore } from './stores/chatStore'
+import { generateId } from './lib/utils'
+import { api, messagesToInput } from './lib/api'
+import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
+import { calculateCost } from './lib/pricing'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
+export default function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const {
+    conversations,
+    currentConversationId,
+    model,
+    systemPrompt,
+    agentMode,
+    setAgentMode,
+    createConversation,
+    selectConversation,
+    deleteConversation,
+    addMessage,
+    updateMessage,
+    setModel,
+    getCurrentConversation,
+  } = useChatStore()
+
+  const currentConversation = getCurrentConversation()
+  const messages = currentConversation?.messages || []
+
+  // Find selected model object
+  const selectedModel = AVAILABLE_MODELS.find((m) => m.id === model) || AVAILABLE_MODELS[0]
+
+  const handleModelChange = useCallback(
+    (newModel: Model) => {
+      setModel(newModel.id)
+    },
+    [setModel]
+  )
+
+  const handleNewConversation = useCallback(() => {
+    createConversation()
+  }, [createConversation])
+
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      selectConversation(id)
+    },
+    [selectConversation]
+  )
+
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      deleteConversation(id)
+    },
+    [deleteConversation]
+  )
+
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setIsLoading(false)
+  }, [])
+
+  // Standard chat (no tools)
+  const handleSendMessageStandard = useCallback(
+    async (_content: string, conversationMessages: Message[]) => {
+      const assistantMessageId = generateId()
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date(),
+        isStreaming: true,
+      }
+      addMessage(assistantMessage)
+
+      const userMessage = conversationMessages[conversationMessages.length - 1]
+      const allMessages = [...conversationMessages.slice(0, -1), userMessage]
+      const input = messagesToInput(allMessages)
+
+      let fullContent = ''
+
+      let usage: MessageUsage | undefined
+
+      for await (const event of api.createResponseStream({
+        model,
+        input,
+        instructions: systemPrompt || undefined,
+        stream: true,
+      })) {
+        if (event.type === 'response.output_text.delta' && event.delta) {
+          fullContent += event.delta
+          updateMessage(assistantMessageId, { content: fullContent })
+        } else if (event.type === 'response.completed') {
+          // Extract usage and metadata from completed response (gateway enriches with cost_usd and aura metadata)
+          const response = event.response as {
+            usage?: { input_tokens: number; output_tokens: number; cost_usd?: number }
+            metadata?: { aura?: { provider?: string; gateway_version?: string; latency_ms?: number } }
+          }
+
+          if (response?.usage) {
+            usage = {
+              inputTokens: response.usage.input_tokens,
+              outputTokens: response.usage.output_tokens,
+              totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+              cost: response.usage.cost_usd ?? calculateCost(model, response.usage.input_tokens, response.usage.output_tokens),
+            }
+          }
+
+          // Extract Aura metadata
+          const auraMetadata = response?.metadata?.aura
+          const aura = auraMetadata ? {
+            provider: auraMetadata.provider || 'unknown',
+            gatewayVersion: auraMetadata.gateway_version || '',
+            latencyMs: auraMetadata.latency_ms,
+          } : undefined
+
+          updateMessage(assistantMessageId, { isStreaming: false, usage, aura })
+        } else if (event.type === 'response.failed' || event.type === 'error') {
+          const errorMessage =
+            event.error?.message ||
+            (event.response as { error?: { message?: string } })?.error?.message ||
+            'Generation failed'
+          throw new Error(errorMessage)
+        }
+      }
+
+      updateMessage(assistantMessageId, { isStreaming: false, usage })
+    },
+    [model, systemPrompt, addMessage, updateMessage]
+  )
+
+  // Agent chat with tools
+  const handleSendMessageAgent = useCallback(
+    async (_content: string, conversationMessages: Message[], signal: AbortSignal) => {
+      const maxRoundtrips = 5
+      let roundtrip = 0
+      let currentMessages = [...conversationMessages]
+
+      // Use agent system prompt if no custom prompt set
+      const effectiveSystemPrompt = systemPrompt || AGENT_SYSTEM_PROMPTS.assistant
+
+      while (roundtrip < maxRoundtrips) {
+        roundtrip++
+
+        const assistantMessageId = generateId()
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          createdAt: new Date(),
+          isStreaming: true,
+          toolInvocations: [],
+        }
+        addMessage(assistantMessage)
+
+        // Build input with tool results
+        type InputItem =
+          | { type: 'function_call_output'; call_id: string; output: string }
+          | { type: 'message'; role: 'user' | 'assistant'; content: string }
+
+        const input: InputItem[] = currentMessages
+          .filter((m) => m.role !== 'system')
+          .flatMap((m): InputItem[] => {
+            // Include tool results
+            if (m.toolInvocations?.some((t) => t.state === 'result' || t.state === 'error')) {
+              return m.toolInvocations
+                .filter((t) => t.state === 'result' || t.state === 'error')
+                .map((t): InputItem => ({
+                  type: 'function_call_output',
+                  call_id: t.toolCallId,
+                  output: t.result || '',
+                }))
+            }
+            return [{
+              type: 'message',
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            }]
+          })
+
+        const request = {
+          model,
+          input,
+          instructions: effectiveSystemPrompt,
+          tools: BUILT_IN_TOOLS.map((t) => ({
+            type: 'function' as const,
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+          })),
+          stream: true,
+        }
+
+        const response = await fetch(`${API_BASE}/v1/responses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+          signal,
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error?.message || `Request failed: ${response.status}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error('No response body')
+
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let fullContent = ''
+        const toolCalls: Array<{ id: string; name: string; arguments: string }> = []
+        let usage: MessageUsage | undefined
+        let aura: AuraMetadata | undefined
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6).trim()
+                if (data === '[DONE]') continue
+
+                try {
+                  const event = JSON.parse(data)
+
+                  // Text delta
+                  if (event.type === 'response.output_text.delta' && event.delta) {
+                    fullContent += event.delta
+                    updateMessage(assistantMessageId, { content: fullContent })
+                  }
+
+                  // Function call added
+                  if (event.type === 'response.output_item.added' && event.item?.type === 'function_call') {
+                    const toolCall = {
+                      id: event.item.call_id || generateId(),
+                      name: event.item.name || '',
+                      arguments: event.item.arguments || '{}',
+                    }
+                    toolCalls.push(toolCall)
+
+                    updateMessage(assistantMessageId, {
+                      toolInvocations: [
+                        ...(currentMessages.find(m => m.id === assistantMessageId)?.toolInvocations || []),
+                        {
+                          toolCallId: toolCall.id,
+                          toolName: toolCall.name,
+                          args: {},
+                          state: 'pending' as const,
+                        },
+                      ],
+                    })
+                  }
+
+                  // Function call arguments delta
+                  if (event.type === 'response.function_call_arguments.delta' && event.delta && toolCalls.length > 0) {
+                    toolCalls[toolCalls.length - 1].arguments += event.delta
+                  }
+
+                  // Response completed - extract function calls and usage
+                  if (event.type === 'response.completed' && event.response) {
+                    // Extract function calls
+                    if (event.response.output) {
+                      for (const item of event.response.output) {
+                        if (item.type === 'function_call' && item.name && item.call_id) {
+                          const existing = toolCalls.find((tc) => tc.id === item.call_id)
+                          if (!existing) {
+                            toolCalls.push({
+                              id: item.call_id,
+                              name: item.name,
+                              arguments: item.arguments || '{}',
+                            })
+                          } else {
+                            existing.arguments = item.arguments || existing.arguments
+                          }
+                        }
+                      }
+                    }
+
+                    // Extract usage (gateway enriches with cost_usd)
+                    const responseUsage = event.response.usage as { input_tokens?: number; output_tokens?: number; cost_usd?: number } | undefined
+                    if (responseUsage?.input_tokens !== undefined && responseUsage?.output_tokens !== undefined) {
+                      usage = {
+                        inputTokens: responseUsage.input_tokens,
+                        outputTokens: responseUsage.output_tokens,
+                        totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
+                        cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
+                      }
+                    }
+
+                    // Extract Aura metadata
+                    const metadata = event.response.metadata as { aura?: { provider?: string; gateway_version?: string; latency_ms?: number } } | undefined
+                    if (metadata?.aura) {
+                      aura = {
+                        provider: metadata.aura.provider || 'unknown',
+                        gatewayVersion: metadata.aura.gateway_version || '',
+                        latencyMs: metadata.aura.latency_ms,
+                      }
+                    }
+                  }
+                } catch {
+                  // Skip invalid JSON
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
+
+        updateMessage(assistantMessageId, { isStreaming: false, usage, aura })
+
+        // No tool calls - we're done
+        if (toolCalls.length === 0) {
+          return
+        }
+
+        // Execute tools
+        const toolInvocations: ToolInvocation[] = []
+
+        for (const toolCall of toolCalls) {
+          try {
+            const args = JSON.parse(toolCall.arguments)
+            const result = await executeTool(toolCall.name, args)
+
+            toolInvocations.push({
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              args,
+              result,
+              state: 'result',
+            })
+          } catch (err) {
+            const errorResult = JSON.stringify({
+              error: err instanceof Error ? err.message : 'Tool execution failed',
+            })
+
+            toolInvocations.push({
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              args: JSON.parse(toolCall.arguments),
+              result: errorResult,
+              state: 'error',
+            })
+          }
+        }
+
+        // Update message with tool results
+        updateMessage(assistantMessageId, { toolInvocations })
+
+        // Add to current messages for next iteration
+        currentMessages = [
+          ...currentMessages,
+          {
+            id: assistantMessageId,
+            role: 'assistant' as const,
+            content: fullContent,
+            createdAt: new Date(),
+            toolInvocations,
+          },
+        ]
+      }
+
+      setError(`Agent stopped after ${maxRoundtrips} tool roundtrips`)
+    },
+    [model, systemPrompt, addMessage, updateMessage]
+  )
+
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || isLoading) return
+
+      // Create conversation if needed
+      let conversationId = currentConversationId
+      if (!conversationId) {
+        conversationId = createConversation()
+      }
+
+      setError(null)
+      setIsLoading(true)
+
+      // Create abort controller
+      abortControllerRef.current = new AbortController()
+
+      // Add user message
+      const userMessage: Message = {
+        id: generateId(),
+        role: 'user',
+        content: content.trim(),
+        createdAt: new Date(),
+      }
+      addMessage(userMessage)
+
+      const conversationMessages = [...messages, userMessage]
+
+      try {
+        if (agentMode) {
+          await handleSendMessageAgent(content, conversationMessages, abortControllerRef.current.signal)
+        } else {
+          await handleSendMessageStandard(content, conversationMessages)
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // User cancelled
+        } else {
+          const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+          setError(errorMessage)
+        }
+      } finally {
+        setIsLoading(false)
+        abortControllerRef.current = null
+      }
+    },
+    [
+      currentConversationId,
+      createConversation,
+      messages,
+      agentMode,
+      isLoading,
+      addMessage,
+      handleSendMessageStandard,
+      handleSendMessageAgent,
+    ]
+  )
+
+  // Map conversations to sidebar format
+  const sidebarConversations = conversations.map((c) => ({
+    id: c.id,
+    title: c.title,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+    model: c.model,
+    messages: c.messages,
+  }))
+
+  return (
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        conversations={sidebarConversations}
+        currentConversationId={currentConversationId}
+        onNewConversation={handleNewConversation}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+      />
+
+      {/* Main content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Header */}
+        <Header
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          sidebarOpen={sidebarOpen}
+          agentMode={agentMode}
+          onAgentModeChange={setAgentMode}
+        />
+
+        {/* Chat area */}
+        <ChatContainer
+          messages={messages}
+          isLoading={isLoading}
+          error={error}
+          onSendMessage={handleSendMessage}
+          onStopGeneration={handleStopGeneration}
+          model={selectedModel}
+          models={AVAILABLE_MODELS}
+          onModelChange={handleModelChange}
+        />
+      </div>
+    </div>
+  )
+}

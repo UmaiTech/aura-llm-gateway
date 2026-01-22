@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
 [![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
+[![dependencies](https://deps.rs/repo/github/UmaiTech/aura-llm-gateway/status.svg)](https://deps.rs/repo/github/UmaiTech/aura-llm-gateway)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/releases)
-[![codecov](https://codecov.io/gh/UmaiTech/aura-llm-gateway/branch/main/graph/badge.svg)](https://codecov.io/gh/UmaiTech/aura-llm-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](Dockerfile)
@@ -24,6 +24,7 @@ Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI,
 - **Open Responses API**: Semantic streaming events for agentic workflows
 - **Load Balancing**: Distribute requests across providers and API keys
 - **Cost Tracking**: Real-time usage and cost monitoring per request
+- **Agentic Metadata**: Tool call tracking, requires_action flags, reasoning status
 - **Response Caching**: Redis-based caching with configurable TTL
 - **Rate Limiting**: Per-key rate limits with burst support
 - **Observability**: Prometheus metrics, structured logging, request tracing
@@ -38,10 +39,15 @@ aura-llm-gateway/
 │   ├── aura-db/         # Database models and queries (SQLx)
 │   ├── aura-core/       # Core business logic (providers, routing, caching)
 │   └── aura-proxy/      # Main server binary (Axum routes, middleware)
+├── apps/
+│   ├── chat/            # React chat UI for testing the gateway
+│   └── landing/         # Landing page and documentation site
 ├── migrations/          # SQLx database migrations
 ├── dashboard/           # React admin dashboard (coming soon)
-└── docs/               # Documentation
+└── docs/               # Documentation (with Mermaid diagrams)
 ```
+
+See [docs/architecture.md](docs/architecture.md) for detailed architecture diagrams.
 
 ## Quick Start
 
@@ -251,14 +257,52 @@ The `docker-compose.yml` includes:
 
 ## Project Status
 
-**Current Phase**: Foundation (Milestone 1)
+**Current Phase**: Persistence & Observability (Milestone 4) 🔄
 
+### Completed
 - [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
 - [x] **PR #2: Configuration System** - Environment + YAML config with validation
-- [ ] PR #3: Open Responses API Types
-- [ ] PR #4: Basic Axum Server
+- [x] **PR #3: Open Responses API Types** - Full type system with 60+ tests
+- [x] **PR #4: Basic Axum Server** - Health endpoint, tracing middleware
+- [x] **PR #5: HTTP Client Foundation** - Reqwest with retries and timeouts
+- [x] **PR #6: OpenAI Adapter** - Provider trait + OpenAI implementation
+- [x] **PR #7: Streaming Support** - SSE streaming with semantic events
+- [x] **PR #14: PostgreSQL Setup** - Database schema, models, AppState integration
+- [x] **PR #15: Request Logging** - Async logging to database
+- [x] **PR #16: Cost Tracking** - Per-request cost calculation with agentic metadata
+- [x] **PR #28: Documentation** - API docs, architecture diagrams (Mermaid)
+
+### In Progress
+- 🔄 **PR #17: Metrics** - Prometheus metrics endpoint
+- 🔄 **PR #9: Claude Adapter** - Anthropic provider implementation
+
+### Bonus (Implemented Early)
+- [x] **Chat UI** - React chat app with tool execution cards
+- [x] **Landing Page** - Marketing site with integrated docs viewer
+- [x] **Agent Mode** - Built-in tools with Tavily web search integration
+- [x] **Agentic Metadata** - Tool call tracking, requires_action, reasoning status
+- [x] **2026 Model Pricing** - GPT-5, Claude 4.5, Gemini 3 supported
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the complete roadmap.
+
+## Chat UI
+
+A modern chat interface is included for testing and demonstrating the gateway:
+
+```bash
+cd apps/chat
+npm install
+npm run dev
+```
+
+Features:
+- Multi-model support (OpenAI, Anthropic, Google)
+- Streaming responses with real-time updates
+- Conversation history with localStorage persistence
+- Agent mode with built-in tools (web search, calculator, etc.)
+- Dark/light mode
+
+See [apps/chat/README.md](apps/chat/README.md) for detailed documentation.
 
 ## Tech Stack
 
@@ -292,4 +336,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - [Open Responses API Specification](https://www.openresponses.org/specification)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
+- [Admin App Plan](docs/ADMIN_APP_PLAN.md)
+- [Chat UI Documentation](apps/chat/README.md)
+- [Provider Mapping Guide](docs/PROVIDER_MAPPING.md)
 - [Documentation](docs/)

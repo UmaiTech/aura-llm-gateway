@@ -1,0 +1,71 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logo-title logo-desc">
+  <title id="logo-title">Aura LLM Gateway</title>
+  <desc id="logo-desc">Concentric circle gateway icon with glowing lettermark A, representing the Aura LLM proxy service</desc>
+
+  <defs>
+    <!-- Gradients using the approved color scheme -->
+    <radialGradient id="logo-coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#A78BFA" stop-opacity="0.6" />
+      <stop offset="40%" stop-color="#818CF8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#4F46E5" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="logo-primaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA" stop-opacity="1" />
+      <stop offset="50%" stop-color="#818CF8" stop-opacity="1" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="1" />
+    </linearGradient>
+
+    <linearGradient id="logo-deepGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="1" />
+      <stop offset="100%" stop-color="#4F46E5" stop-opacity="1" />
+    </linearGradient>
+
+    <!-- Glow filters -->
+    <filter id="logo-strongGlow">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="logo-softGlow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer aura glow -->
+  <circle cx="256" cy="256" r="220" fill="url(#logo-coreGlow)" opacity="0.8"/>
+
+  <!-- Gateway core - concentric circles representing layers -->
+  <g filter="url(#logo-softGlow)">
+    <!-- Outer ring -->
+    <circle cx="256" cy="256" r="100" fill="none" stroke="url(#logo-primaryGradient)" stroke-width="3" opacity="0.4"/>
+
+    <!-- Middle ring -->
+    <circle cx="256" cy="256" r="75" fill="none" stroke="url(#logo-primaryGradient)" stroke-width="4" opacity="0.6"/>
+
+    <!-- Inner core -->
+    <circle cx="256" cy="256" r="50" fill="url(#logo-deepGradient)" opacity="0.3"/>
+    <circle cx="256" cy="256" r="50" fill="none" stroke="url(#logo-primaryGradient)" stroke-width="5"/>
+  </g>
+
+  <!-- Central "A" lettermark with strong glow -->
+  <g filter="url(#logo-strongGlow)">
+    <path d="M 226 286 L 256 206 L 286 286 L 274 286 L 269 271 L 243 271 L 238 286 Z M 248 258 L 264 258 L 256 230 Z"
+          fill="#FFFFFF"
+          opacity="0.95"/>
+  </g>
+
+  <!-- Subtle energy field lines radiating from center -->
+  <g opacity="0.15">
+    <circle cx="256" cy="256" r="120" fill="none" stroke="url(#logo-primaryGradient)" stroke-width="1"/>
+    <circle cx="256" cy="256" r="140" fill="none" stroke="url(#logo-primaryGradient)" stroke-width="1"/>
+    <circle cx="256" cy="256" r="160" fill="none" stroke="url(#logo-primaryGradient)" stroke-width="1"/>
+  </g>
+</svg>

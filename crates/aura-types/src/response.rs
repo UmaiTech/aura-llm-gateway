@@ -99,7 +99,10 @@ impl ResponseError {
 }
 
 /// Token usage information for a response
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+///
+/// This struct includes standard token counts plus optional Aura-specific
+/// enrichments like calculated cost.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Usage {
     /// Number of tokens in the input/prompt
     pub input_tokens: u32,
@@ -113,6 +116,10 @@ pub struct Usage {
     /// Number of cached tokens (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_tokens: Option<u32>,
+    /// Calculated cost in USD (Aura enrichment)
+    /// This is added by the gateway based on model pricing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_usd: Option<f64>,
 }
 
 impl Usage {
@@ -124,6 +131,7 @@ impl Usage {
             total_tokens: input_tokens + output_tokens,
             reasoning_tokens: None,
             cached_tokens: None,
+            cost_usd: None,
         }
     }
 
@@ -137,6 +145,17 @@ impl Usage {
     pub fn with_cached(mut self, cached_tokens: u32) -> Self {
         self.cached_tokens = Some(cached_tokens);
         self
+    }
+
+    /// Set the calculated cost in USD
+    pub fn with_cost(mut self, cost_usd: f64) -> Self {
+        self.cost_usd = Some(cost_usd);
+        self
+    }
+
+    /// Set the cost directly (mutable)
+    pub fn set_cost(&mut self, cost_usd: f64) {
+        self.cost_usd = Some(cost_usd);
     }
 }
 

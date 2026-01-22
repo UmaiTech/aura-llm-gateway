@@ -506,7 +506,7 @@ impl SseMessage {
         self
     }
 
-    /// Check if this is the [DONE] message
+    /// Check if this is the `[DONE]` message
     pub fn is_done(&self) -> bool {
         self.data.trim() == "[DONE]"
     }

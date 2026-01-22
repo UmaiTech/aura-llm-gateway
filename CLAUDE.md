@@ -23,7 +23,9 @@ Rust-based LLM proxy implementing the Open Responses API specification for agent
   aura-core/      # Core business logic (providers, routing, caching)
   aura-proxy/     # Main server binary (Axum routes, middleware)
   aura-db/        # Database models and queries (SQLx)
-/dashboard/       # React admin dashboard
+/apps/
+  chat/           # React chat playground (Vite + React 18)
+  landing/        # Marketing landing page (Vite + React)
 /docs/            # Documentation
 /migrations/      # SQLx database migrations
 ```
@@ -57,6 +59,11 @@ sqlx migrate add <name>        # Create new migration
 # Docker
 docker-compose up -d           # Start local stack
 docker-compose logs -f         # Follow logs
+
+# Frontend Apps
+cd apps/chat && npm run dev    # Run chat playground (port 3000)
+cd apps/landing && npm run dev # Run landing page (port 3001)
+cd apps/chat && npm run build  # Build chat app for production
 ```
 
 ## Key Conventions
@@ -141,6 +148,8 @@ Full spec: https://www.openresponses.org/specification
 
 ## Environment Variables
 
+### Gateway (Rust Server)
+
 ```bash
 # Required
 AURA_HOST=0.0.0.0
@@ -161,6 +170,20 @@ REDIS_URL=redis://localhost:6379
 RUST_LOG=info,aura_proxy=debug
 AURA_ADMIN_KEY=admin-secret-key
 ```
+
+### Chat App (React/Vite)
+
+Create `apps/chat/.env`:
+
+```bash
+# Aura Gateway URL (defaults to localhost:8080)
+VITE_API_BASE_URL=http://localhost:8080
+
+# Tavily API key for web search tool (optional)
+VITE_TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
+```
+
+**Note**: Restart the Vite dev server after changing `.env` files for changes to take effect.
 
 ## Common Tasks
 
@@ -185,3 +208,44 @@ AURA_ADMIN_KEY=admin-secret-key
 2. Write SQL in generated migration file
 3. Update models in `aura-db`
 4. Run `sqlx migrate run`
+
+### CORS Configuration
+
+The gateway uses `tower-http` CORS middleware to allow cross-origin requests from frontend apps.
+
+**Current configuration** (in `crates/aura-proxy/src/main.rs`):
+```rust
+use tower_http::cors::{Any, CorsLayer};
+
+// In main() function:
+.layer(
+    CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any),
+)
+```
+
+**Development**: Allows all origins (suitable for local development with chat app on `localhost:3000`)
+
+**Production**: Restrict to specific origins for security:
+```rust
+use tower_http::cors::CorsLayer;
+use http::header::{AUTHORIZATION, CONTENT_TYPE};
+use http::Method;
+
+.layer(
+    CorsLayer::new()
+        .allow_origin("https://your-domain.com".parse::<HeaderValue>().unwrap())
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([AUTHORIZATION, CONTENT_TYPE]),
+)
+```
+
+**Multiple origins**:
+```rust
+.allow_origin([
+    "http://localhost:3000".parse::<HeaderValue>().unwrap(),
+    "https://chat.yourdomain.com".parse::<HeaderValue>().unwrap(),
+])
+```

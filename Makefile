@@ -1,6 +1,8 @@
 .PHONY: help build test lint fmt clean run dev install check audit release \
 	docker-build docker-run docker-compose-up docker-compose-down docker-compose-down-v \
-	docker-compose-logs docker-compose-ps docker-deps
+	docker-compose-logs docker-compose-ps docker-deps \
+	chat chat-build chat-install landing landing-build landing-install \
+	apps apps-install apps-build dev-all
 
 # Default target
 .DEFAULT_GOAL := help
@@ -208,3 +210,73 @@ pre-commit: fmt lint test ## Run pre-commit checks
 
 # Pre-push hook
 pre-push: check build-release ## Run pre-push checks
+
+# =============================================================================
+# Frontend Apps
+# =============================================================================
+
+# Chat App (port 3000)
+chat: ## Run the chat app in development mode
+	cd apps/chat && npm run dev
+
+chat-build: ## Build the chat app for production
+	cd apps/chat && npm run build
+
+chat-install: ## Install chat app dependencies
+	cd apps/chat && npm install
+
+chat-preview: ## Preview the chat app production build
+	cd apps/chat && npm run preview
+
+# Landing Page / Docs (port 3001)
+landing: ## Run the landing page in development mode
+	cd apps/landing && npm run dev
+
+landing-build: ## Build the landing page for production
+	cd apps/landing && npm run build
+
+landing-install: ## Install landing page dependencies
+	cd apps/landing && npm install
+
+landing-preview: ## Preview the landing page production build
+	cd apps/landing && npm run preview
+
+# All Apps
+apps-install: chat-install landing-install ## Install all app dependencies
+
+apps-build: chat-build landing-build ## Build all apps for production
+
+apps: ## Run all frontend apps (in background)
+	@echo "Starting Chat app on http://localhost:3000..."
+	@cd apps/chat && npm run dev &
+	@echo "Starting Landing page on http://localhost:3001..."
+	@cd apps/landing && npm run dev &
+	@echo "✓ Apps started. Use 'make apps-stop' to stop them."
+
+apps-stop: ## Stop all frontend apps
+	@pkill -f "vite.*apps/chat" || true
+	@pkill -f "vite.*apps/landing" || true
+	@echo "✓ Apps stopped"
+
+# Full Development Stack
+dev-all: ## Run gateway + all frontend apps
+	@echo "Starting Aura Gateway on http://localhost:8080..."
+	@RUST_LOG=$(RUST_LOG) $(CARGO) run -p aura-proxy &
+	@sleep 2
+	@echo "Starting Chat app on http://localhost:3000..."
+	@cd apps/chat && npm run dev &
+	@echo "Starting Landing page on http://localhost:3001..."
+	@cd apps/landing && npm run dev &
+	@echo ""
+	@echo "✓ Full stack started:"
+	@echo "  - Gateway:  http://localhost:8080"
+	@echo "  - Chat:     http://localhost:3000"
+	@echo "  - Landing:  http://localhost:3001"
+	@echo ""
+	@echo "Use 'make dev-stop' to stop all services."
+
+dev-stop: ## Stop all development services
+	@pkill -f "aura-proxy" || true
+	@pkill -f "vite.*apps/chat" || true
+	@pkill -f "vite.*apps/landing" || true
+	@echo "✓ All services stopped"

@@ -36,9 +36,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_health_check() {
-        // Create a test AppState
+        // Create a test AppState without database
         let config = aura_core::Config::default();
-        let state = AppState::new(config);
+        let state = AppState::new(config, None);
 
         // Create the router with state
         let app = router().with_state(state);

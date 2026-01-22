@@ -1,0 +1,47 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="squareBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818CF8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4F46E5;stop-opacity:1" />
+    </linearGradient>
+
+    <radialGradient id="squareGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:0.5" />
+      <stop offset="40%" style="stop-color:#818CF8;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#6366F1;stop-opacity:0" />
+    </radialGradient>
+
+    <linearGradient id="squareRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#818CF8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366F1;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="squareGlowFilter">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="96" fill="url(#squareBg)"/>
+
+  <!-- Subtle glow -->
+  <circle cx="256" cy="256" r="200" fill="url(#squareGlow)"/>
+
+  <!-- Gateway core circles -->
+  <g filter="url(#squareGlowFilter)">
+    <circle cx="256" cy="256" r="120" fill="none" stroke="url(#squareRing)" stroke-width="4" opacity="0.4"/>
+    <circle cx="256" cy="256" r="95" fill="none" stroke="url(#squareRing)" stroke-width="5" opacity="0.6"/>
+    <circle cx="256" cy="256" r="70" fill="none" stroke="url(#squareRing)" stroke-width="6"/>
+  </g>
+
+  <!-- Central "A" with strong glow -->
+  <g filter="url(#squareGlowFilter)">
+    <path d="M 216 306 L 256 196 L 296 306 L 280 306 L 273 283 L 239 283 L 232 306 Z M 246 265 L 266 265 L 256 225 Z"
+          fill="#FFFFFF"/>
+  </g>
+</svg>
