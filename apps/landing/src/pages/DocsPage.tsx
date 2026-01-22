@@ -1,11 +1,57 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocation, Link } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   Sparkles, BookOpen, Zap, Server, Code2, Settings,
-  ChevronRight, Menu, X, ExternalLink
+  ChevronRight, Menu, X, ExternalLink, DollarSign
 } from 'lucide-react'
 
-// Documentation structure
+// Import all markdown files from docs/api at build time using Vite's glob
+// Paths are relative to the project root (where vite.config.ts is)
+const mdModules = import.meta.glob('../../docs/api/**/*.md', {
+  query: '?raw',
+  import: 'default',
+  eager: true
+}) as Record<string, string>
+
+// Also import from docs root for general docs
+const rootMdModules = import.meta.glob('../../docs/*.md', {
+  query: '?raw',
+  import: 'default',
+  eager: true
+}) as Record<string, string>
+
+// Combine all modules
+const allMdModules = { ...mdModules, ...rootMdModules }
+
+// Map file paths to doc paths
+function getDocPath(filePath: string): string {
+  // ../../docs/api/README.md -> /docs/api
+  // ../../docs/api/create-response.md -> /docs/api/create-response
+  // ../../docs/README.md -> /docs
+  const match = filePath.match(/docs\/(.+)\.md$/)
+  if (!match) return ''
+
+  const path = match[1]
+  if (path === 'README') return '/docs'
+  if (path === 'api/README') return '/docs/api'
+  if (path.endsWith('/README')) {
+    return `/docs/${path.replace('/README', '')}`
+  }
+  return `/docs/${path}`
+}
+
+// Create content map from imported modules
+const docContentFromFiles: Record<string, string> = {}
+for (const [filePath, content] of Object.entries(allMdModules)) {
+  const docPath = getDocPath(filePath)
+  if (docPath) {
+    docContentFromFiles[docPath] = content
+  }
+}
+
+// Documentation structure with icons
 const docSections = [
   {
     title: 'Getting Started',
@@ -19,38 +65,270 @@ const docSections = [
     title: 'API Reference',
     items: [
       { title: 'Overview', path: '/docs/api', icon: Code2 },
-      { title: 'Create Response', path: '/docs/api/responses', icon: Server },
+      { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
       { title: 'Streaming', path: '/docs/api/streaming', icon: Zap },
+      { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
     ],
   },
   {
     title: 'Concepts',
     items: [
       { title: 'Open Responses API', path: '/docs/concepts/open-responses', icon: BookOpen },
-      { title: 'Cost Tracking', path: '/docs/concepts/cost-tracking', icon: Zap },
       { title: 'Providers', path: '/docs/concepts/providers', icon: Server },
     ],
   },
 ]
 
-// Documentation content (can be moved to separate files or fetched from MD)
-const docContent: Record<string, { title: string; content: React.ReactNode }> = {
-  '/docs': {
-    title: 'Introduction',
-    content: <IntroductionContent />,
-  },
-  '/docs/quickstart': {
-    title: 'Quickstart',
-    content: <QuickstartContent />,
-  },
-  '/docs/api': {
-    title: 'API Overview',
-    content: <ApiOverviewContent />,
-  },
-  '/docs/api/responses': {
-    title: 'Create Response',
-    content: <CreateResponseContent />,
-  },
+// Fallback content for docs not yet created as MD files
+const fallbackContent: Record<string, string> = {
+  '/docs': `# Introduction
+
+Aura is a high-performance LLM gateway built with Rust. It provides a unified API
+for multiple LLM providers with built-in cost tracking, observability, and support
+for agentic workflows.
+
+## Features
+
+- **Unified API** for OpenAI, Anthropic, and Google models
+- **Real-time cost calculation** per request
+- **Open Responses API** specification support
+- **Streaming** with Server-Sent Events
+- **Tool/function calling** support
+- **Request enrichment** with provider and latency metadata
+
+## Architecture
+
+Aura is organized into modular Rust crates:
+
+- \`aura-types\` - Shared type definitions (Open Responses API)
+- \`aura-core\` - Core business logic (providers, routing, caching)
+- \`aura-proxy\` - Main server binary (Axum routes, middleware)
+- \`aura-db\` - Database models and queries (SQLx)
+`,
+  '/docs/quickstart': `# Quickstart
+
+Get up and running with Aura in just a few minutes.
+
+## 1. Clone and Build
+
+\`\`\`bash
+git clone https://github.com/UmaiTech/aura-llm-gateway.git
+cd aura-llm-gateway
+cargo build --release
+\`\`\`
+
+## 2. Configure Environment
+
+\`\`\`bash
+# Required: At least one provider API key
+export OPENAI_API_KEY=sk-...
+
+# Optional: Additional providers
+export ANTHROPIC_API_KEY=sk-ant-...
+export GOOGLE_API_KEY=...
+
+# Server configuration
+export AURA_HOST=0.0.0.0
+export AURA_PORT=8080
+\`\`\`
+
+## 3. Run the Gateway
+
+\`\`\`bash
+cargo run -p aura-proxy
+
+# Or with debug logging
+RUST_LOG=debug cargo run -p aura-proxy
+\`\`\`
+
+## 4. Make a Request
+
+\`\`\`bash
+curl -X POST http://localhost:8080/v1/responses \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-4o-mini",
+    "input": [
+      {"type": "message", "role": "user", "content": "Hello!"}
+    ]
+  }'
+\`\`\`
+`,
+  '/docs/configuration': `# Configuration
+
+Aura is configured through environment variables.
+
+## Required Variables
+
+| Variable | Description |
+|----------|-------------|
+| \`AURA_HOST\` | Server bind address (default: \`0.0.0.0\`) |
+| \`AURA_PORT\` | Server port (default: \`8080\`) |
+
+## Provider API Keys
+
+At least one provider API key is required:
+
+| Variable | Provider |
+|----------|----------|
+| \`OPENAI_API_KEY\` | OpenAI (GPT models) |
+| \`ANTHROPIC_API_KEY\` | Anthropic (Claude models) |
+| \`GOOGLE_API_KEY\` | Google (Gemini models) |
+
+## Optional Variables
+
+| Variable | Description |
+|----------|-------------|
+| \`RUST_LOG\` | Log level (e.g., \`info,aura_proxy=debug\`) |
+| \`DATABASE_URL\` | PostgreSQL connection string |
+| \`REDIS_URL\` | Redis connection string |
+| \`AURA_ADMIN_KEY\` | Admin API key for management endpoints |
+`,
+  '/docs/concepts/open-responses': `# Open Responses API
+
+The Open Responses API is a specification for agentic LLM workflows. Aura implements
+this specification to provide a unified interface for building AI agents.
+
+## Core Concepts
+
+### Items
+
+Items are atomic units of conversation:
+
+- **message** - User or assistant messages
+- **function_call** - Tool invocations by the model
+- **function_call_output** - Results from tool executions
+- **reasoning** - Model's internal reasoning (when available)
+
+### Response Lifecycle
+
+Responses go through a status lifecycle:
+
+\`\`\`
+in_progress → completed | failed | incomplete
+\`\`\`
+
+### Streaming Events
+
+Aura provides semantic streaming events (not raw token deltas):
+
+- \`response.in_progress\` - Response started
+- \`response.output_item.added\` - New item in output
+- \`response.output_text.delta\` - Text chunk
+- \`response.completed\` - Response finished
+- \`response.failed\` - Error occurred
+
+## Conversation Threading
+
+Use \`previous_response_id\` to continue conversations:
+
+\`\`\`json
+{
+  "model": "gpt-4o",
+  "input": [{"type": "message", "role": "user", "content": "Continue..."}],
+  "previous_response_id": "resp_abc123"
+}
+\`\`\`
+
+Learn more at [openresponses.org](https://www.openresponses.org/specification)
+`,
+  '/docs/concepts/providers': `# Providers
+
+Aura supports multiple LLM providers through a unified interface.
+
+## Supported Providers
+
+### OpenAI
+
+Models: \`gpt-4o\`, \`gpt-4o-mini\`, \`gpt-4-turbo\`, \`gpt-3.5-turbo\`, \`o1\`, \`o1-mini\`, \`o3-mini\`
+
+\`\`\`bash
+export OPENAI_API_KEY=sk-...
+\`\`\`
+
+### Anthropic (Coming Soon)
+
+Models: \`claude-3-5-sonnet-20241022\`, \`claude-3-5-haiku-20241022\`
+
+\`\`\`bash
+export ANTHROPIC_API_KEY=sk-ant-...
+\`\`\`
+
+### Google (Coming Soon)
+
+Models: \`gemini-2.0-flash\`, \`gemini-1.5-pro\`
+
+\`\`\`bash
+export GOOGLE_API_KEY=...
+\`\`\`
+
+## Provider Selection
+
+Aura automatically routes requests to the appropriate provider based on the model name.
+If a model is supported by multiple providers, the first registered provider is used.
+
+## Adding Custom Providers
+
+See the development guide for implementing custom providers.
+`,
+}
+
+// Markdown components for custom styling - using any for React-Markdown compatibility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const markdownComponents: any = {
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-3xl font-bold mb-6 text-white">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-2xl font-semibold mt-8 mb-4 text-white">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-xl font-semibold mt-6 mb-3 text-white">{children}</h3>
+  ),
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal list-inside space-y-2 text-gray-300 mb-4">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="text-gray-300">{children}</li>
+  ),
+  code: ({ inline, children }: { inline?: boolean; children?: React.ReactNode }) => (
+    inline ? (
+      <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm">{children}</code>
+    ) : (
+      <code className="text-gray-300">{children}</code>
+    )
+  ),
+  pre: ({ children }: { children?: React.ReactNode }) => (
+    <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto mb-4 text-sm">{children}</pre>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="overflow-x-auto mb-4">
+      <table className="min-w-full divide-y divide-gray-800">{children}</table>
+    </div>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-300 bg-gray-900">{children}</th>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <td className="px-4 py-2 text-sm text-gray-400 border-t border-gray-800">{children}</td>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote className="border-l-4 border-aura-500 pl-4 italic text-gray-400 mb-4">{children}</blockquote>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold text-white">{children}</strong>
+  ),
 }
 
 export function DocsPage() {
@@ -58,7 +336,18 @@ export function DocsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const currentPath = location.pathname
-  const currentDoc = docContent[currentPath] || docContent['/docs']
+
+  // Get content from MD files or fallback
+  const currentContent = useMemo(() => {
+    return docContentFromFiles[currentPath] || fallbackContent[currentPath] || fallbackContent['/docs']
+  }, [currentPath])
+
+
+  // Debug: Log available docs
+  useEffect(() => {
+    console.log('Available MD files:', Object.keys(docContentFromFiles))
+    console.log('Current path:', currentPath)
+  }, [currentPath])
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -112,6 +401,7 @@ export function DocsPage() {
                 <ul className="space-y-1">
                   {section.items.map((item) => {
                     const isActive = currentPath === item.path
+                    const hasContent = docContentFromFiles[item.path] || fallbackContent[item.path]
                     return (
                       <li key={item.path}>
                         <Link
@@ -121,7 +411,9 @@ export function DocsPage() {
                             flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
                             ${isActive
                               ? 'bg-aura-500/10 text-aura-400'
-                              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                              : hasContent
+                                ? 'text-gray-400 hover:text-white hover:bg-gray-800'
+                                : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800/50'
                             }
                           `}
                         >
@@ -141,9 +433,13 @@ export function DocsPage() {
         {/* Main Content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:pl-8">
           <div className="max-w-3xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">{currentDoc.title}</h1>
             <div className="prose prose-invert prose-gray max-w-none">
-              {currentDoc.content}
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents}
+              >
+                {currentContent}
+              </ReactMarkdown>
             </div>
           </div>
         </main>
@@ -156,232 +452,6 @@ export function DocsPage() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
-    </div>
-  )
-}
-
-// Documentation Content Components
-
-function IntroductionContent() {
-  return (
-    <div className="space-y-6">
-      <p className="text-gray-300 text-lg">
-        Aura is a high-performance LLM gateway built with Rust. It provides a unified API
-        for multiple LLM providers with built-in cost tracking, observability, and support
-        for agentic workflows.
-      </p>
-
-      <h2 className="text-2xl font-semibold mt-8">Features</h2>
-      <ul className="list-disc list-inside space-y-2 text-gray-300">
-        <li>Unified API for OpenAI, Anthropic, and Google models</li>
-        <li>Real-time cost calculation per request</li>
-        <li>Open Responses API specification support</li>
-        <li>Streaming with Server-Sent Events</li>
-        <li>Tool/function calling support</li>
-        <li>Request enrichment with provider and latency metadata</li>
-      </ul>
-
-      <h2 className="text-2xl font-semibold mt-8">Architecture</h2>
-      <p className="text-gray-300">
-        Aura is organized into modular Rust crates:
-      </p>
-      <ul className="list-disc list-inside space-y-2 text-gray-300">
-        <li><code className="text-aura-400">aura-types</code> - Shared type definitions (Open Responses API)</li>
-        <li><code className="text-aura-400">aura-core</code> - Core business logic (providers, routing, caching)</li>
-        <li><code className="text-aura-400">aura-proxy</code> - Main server binary (Axum routes, middleware)</li>
-        <li><code className="text-aura-400">aura-db</code> - Database models and queries (SQLx)</li>
-      </ul>
-    </div>
-  )
-}
-
-function QuickstartContent() {
-  return (
-    <div className="space-y-6">
-      <p className="text-gray-300 text-lg">
-        Get up and running with Aura in just a few minutes.
-      </p>
-
-      <h2 className="text-2xl font-semibold mt-8">1. Clone and Build</h2>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`git clone https://github.com/UmaiTech/aura-llm-gateway.git
-cd aura-llm-gateway
-cargo build --release`}</code>
-      </pre>
-
-      <h2 className="text-2xl font-semibold mt-8">2. Configure Environment</h2>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`# Required: At least one provider API key
-export OPENAI_API_KEY=sk-...
-
-# Optional: Additional providers
-export ANTHROPIC_API_KEY=sk-ant-...
-export GOOGLE_API_KEY=...
-
-# Server configuration
-export AURA_HOST=0.0.0.0
-export AURA_PORT=8080`}</code>
-      </pre>
-
-      <h2 className="text-2xl font-semibold mt-8">3. Run the Gateway</h2>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`cargo run -p aura-proxy
-
-# Or with debug logging
-RUST_LOG=debug cargo run -p aura-proxy`}</code>
-      </pre>
-
-      <h2 className="text-2xl font-semibold mt-8">4. Make a Request</h2>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`curl -X POST http://localhost:8080/v1/responses \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "gpt-4o-mini",
-    "input": [
-      {"type": "message", "role": "user", "content": "Hello!"}
-    ]
-  }'`}</code>
-      </pre>
-    </div>
-  )
-}
-
-function ApiOverviewContent() {
-  return (
-    <div className="space-y-6">
-      <p className="text-gray-300 text-lg">
-        Aura implements the Open Responses API specification, providing a unified
-        interface for agentic LLM workflows.
-      </p>
-
-      <h2 className="text-2xl font-semibold mt-8">Base URL</h2>
-      <pre className="bg-gray-900 rounded-lg p-4">
-        <code className="text-gray-300">http://localhost:8080</code>
-      </pre>
-
-      <h2 className="text-2xl font-semibold mt-8">Endpoints</h2>
-      <div className="space-y-4">
-        <div className="bg-gray-900 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-semibold rounded">POST</span>
-            <code className="text-gray-300">/v1/responses</code>
-          </div>
-          <p className="text-gray-400 text-sm">Create a response (streaming or non-streaming)</p>
-        </div>
-        <div className="bg-gray-900 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-semibold rounded">GET</span>
-            <code className="text-gray-300">/health</code>
-          </div>
-          <p className="text-gray-400 text-sm">Health check endpoint</p>
-        </div>
-      </div>
-
-      <h2 className="text-2xl font-semibold mt-8">Response Enrichment</h2>
-      <p className="text-gray-300">
-        Aura automatically enriches responses with additional metadata:
-      </p>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`{
-  "usage": {
-    "input_tokens": 100,
-    "output_tokens": 50,
-    "cost_usd": 0.0035  // Calculated by gateway
-  },
-  "metadata": {
-    "aura": {
-      "provider": "openai",
-      "gateway_version": "0.1.7",
-      "latency_ms": 245
-    }
-  }
-}`}</code>
-      </pre>
-    </div>
-  )
-}
-
-function CreateResponseContent() {
-  return (
-    <div className="space-y-6">
-      <p className="text-gray-300 text-lg">
-        Create a model response with optional streaming and tool use.
-      </p>
-
-      <h2 className="text-2xl font-semibold mt-8">Request</h2>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`POST /v1/responses
-Content-Type: application/json
-
-{
-  "model": "gpt-4o",
-  "input": [
-    {
-      "type": "message",
-      "role": "user",
-      "content": "What's the weather like?"
-    }
-  ],
-  "instructions": "You are a helpful assistant.",
-  "stream": true,
-  "max_output_tokens": 1000,
-  "temperature": 0.7,
-  "tools": [
-    {
-      "type": "function",
-      "name": "get_weather",
-      "description": "Get current weather",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "location": {
-            "type": "string",
-            "description": "City name"
-          }
-        },
-        "required": ["location"]
-      }
-    }
-  ]
-}`}</code>
-      </pre>
-
-      <h2 className="text-2xl font-semibold mt-8">Response</h2>
-      <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-        <code className="text-gray-300">{`{
-  "id": "resp_abc123",
-  "object": "response",
-  "created_at": 1706140800,
-  "model": "gpt-4o",
-  "status": "completed",
-  "output": [
-    {
-      "type": "message",
-      "id": "msg_xyz",
-      "role": "assistant",
-      "content": [
-        {
-          "type": "text",
-          "text": "I'd be happy to help..."
-        }
-      ]
-    }
-  ],
-  "usage": {
-    "input_tokens": 25,
-    "output_tokens": 100,
-    "total_tokens": 125,
-    "cost_usd": 0.00125
-  },
-  "metadata": {
-    "aura": {
-      "provider": "openai",
-      "gateway_version": "0.1.7",
-      "latency_ms": 523
-    }
-  }
-}`}</code>
-      </pre>
     </div>
   )
 }

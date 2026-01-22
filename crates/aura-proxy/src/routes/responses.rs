@@ -17,6 +17,7 @@ use serde::Serialize;
 use std::convert::Infallible;
 use std::time::{Duration, Instant};
 use tracing::{error, info, instrument};
+use uuid::Uuid;
 
 use crate::AppState;
 
@@ -88,7 +89,15 @@ async fn create_response(
     State(state): State<AppState>,
     Json(request): Json<CreateResponseRequest>,
 ) -> Result<AxumResponse, (StatusCode, Json<ApiError>)> {
-    info!(model = %request.model, stream = %request.stream, "Creating response");
+    // Generate unique request ID for tracing
+    let request_id = format!("aura_{}", Uuid::new_v4());
+
+    info!(
+        request_id = %request_id,
+        model = %request.model,
+        stream = %request.stream,
+        "Creating response"
+    );
 
     // Get the provider for this request
     let provider = state.get_provider(&request.model).ok_or_else(|| {
@@ -99,19 +108,21 @@ async fn create_response(
     if request.stream {
         // Streaming response
         let stream = provider.complete_stream(request).await.map_err(|e| {
-            error!(error = %e, "Streaming request failed");
+            error!(request_id = %request_id, error = %e, "Streaming request failed");
             ApiError::from_provider_error(&e)
         })?;
 
-        // Clone state for the stream closure
+        // Clone state and request_id for the stream closure
         let state_for_stream = state.clone();
+        let request_id_for_stream = request_id.clone();
 
-        // Convert to SSE stream, enriching ResponseCompleted events with cost
+        // Convert to SSE stream, enriching ResponseCompleted events with cost and request ID
         let sse_stream = stream.map(move |result| match result {
             Ok(event) => {
-                // Enrich ResponseCompleted events with cost
+                // Enrich ResponseCompleted events with cost and request ID
                 let event = if let StreamEvent::ResponseCompleted { response } = event {
-                    let response = state_for_stream.enrich_response(response);
+                    let response =
+                        state_for_stream.enrich_response(response, &request_id_for_stream);
                     StreamEvent::ResponseCompleted { response }
                 } else {
                     event
@@ -154,7 +165,7 @@ async fn create_response(
         let latency_ms = start.elapsed().as_millis() as u64;
 
         // Enrich with cost and latency information
-        let response = state.enrich_response_with_latency(response, latency_ms);
+        let response = state.enrich_response_with_latency(response, &request_id, latency_ms);
 
         info!(
             id = %response.id,

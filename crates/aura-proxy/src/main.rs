@@ -88,7 +88,11 @@ impl AppState {
     }
 
     /// Enrich a Response with cost information based on model pricing
-    pub fn enrich_response(&self, mut response: aura_types::Response) -> aura_types::Response {
+    pub fn enrich_response(
+        &self,
+        mut response: aura_types::Response,
+        request_id: &str,
+    ) -> aura_types::Response {
         // Add cost to usage
         if let Some(ref mut usage) = response.usage {
             if let Some(cost) = self.cost_calculator.calculate_cost(
@@ -111,6 +115,7 @@ impl AppState {
 
         let aura_metadata = serde_json::json!({
             "aura": {
+                "request_id": request_id,
                 "provider": provider_name,
                 "gateway_version": env!("CARGO_PKG_VERSION"),
             }
@@ -129,7 +134,7 @@ impl AppState {
                     }
                     serde_json::Value::Object(existing_map)
                 } else {
-                    serde_json::json!({"aura": {"provider": provider_name, "gateway_version": env!("CARGO_PKG_VERSION")}})
+                    serde_json::json!({"aura": {"request_id": request_id, "provider": provider_name, "gateway_version": env!("CARGO_PKG_VERSION")}})
                 }
             }
             None => aura_metadata,
@@ -138,13 +143,14 @@ impl AppState {
         response
     }
 
-    /// Enrich a Response with cost and timing information
+    /// Enrich a Response with cost, timing, and request ID information
     pub fn enrich_response_with_latency(
         &self,
         response: aura_types::Response,
+        request_id: &str,
         latency_ms: u64,
     ) -> aura_types::Response {
-        let mut response = self.enrich_response(response);
+        let mut response = self.enrich_response(response, request_id);
 
         // Add latency to aura metadata
         if let Some(ref mut metadata) = response.metadata {
