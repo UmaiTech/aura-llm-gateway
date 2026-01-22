@@ -21,7 +21,7 @@ services:
       - AURA_HOST=0.0.0.0
       - AURA_PORT=8080
       - RUST_LOG=info,aura_proxy=debug
-      - DATABASE_URL=postgres://aura:aura@postgres:5432/aura
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/aura
       - REDIS_URL=redis://redis:6379
       # Provider API keys - set these in .env file or environment
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -49,15 +49,15 @@ services:
     image: postgres:16-alpine
     container_name: aura-postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
-      - POSTGRES_USER=aura
-      - POSTGRES_PASSWORD=aura
       - POSTGRES_DB=aura
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aura -d aura"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aura"]
       interval: 10s
       timeout: 5s
       retries: 5
