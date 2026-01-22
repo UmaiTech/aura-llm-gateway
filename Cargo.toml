@@ -24,7 +24,7 @@ aura-core = { path = "crates/aura-core" }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 
 # Web framework
-axum = { version = "0.7", features = ["macros", "json"] }
+axum = { version = "0.8", features = ["macros", "json"] }
 tower = { version = "0.5", features = ["util", "timeout", "limit"] }
 tower-http = { version = "0.6", features = ["trace", "cors"] }
 
