@@ -541,18 +541,22 @@ pub struct ProviderRegistry {
 ### PR #16: Cost Tracking
 **Rust Concepts:** Decimal math, lookups, aggregation
 
-**Status:** 🔄 **PARTIALLY COMPLETED** (Core module done, DB integration pending)
+**Status:** 🔄 **PARTIALLY COMPLETED** (Core module done, response enrichment done, DB integration pending)
 
 **Tasks:**
 - [x] Create pricing configuration per model
 - [x] Calculate cost per request (input/output/cached/reasoning tokens)
 - [x] Create database schema for model pricing with temporal validity
+- [x] Add `cost_usd` to response `Usage` struct (server-side enrichment)
+- [x] Enrich responses with Aura metadata (provider, latency, request_id)
 - [ ] Aggregate costs by API key
 - [ ] Add cost alerts/limits
 - [ ] Create cost summary endpoint
 
 **Files:**
 - `crates/aura-core/src/cost.rs` ✅
+- `crates/aura-types/src/response.rs` (Usage.cost_usd) ✅
+- `crates/aura-proxy/src/main.rs` (enrich_response methods) ✅
 - `crates/aura-db/src/models.rs` (ModelPricing) ✅
 - `crates/aura-db/src/repo.rs` (ModelPricingRepo) ✅
 - `migrations/20250122_001_initial_schema.sql` ✅
@@ -560,6 +564,8 @@ pub struct ProviderRegistry {
 **Acceptance Criteria:**
 - ✅ Costs calculated accurately per request
 - ✅ Pricing data stored in database with effective dates
+- ✅ Responses enriched with cost_usd in usage
+- ✅ Aura metadata added to response (provider, gateway_version, latency_ms, request_id)
 - [ ] Costs queryable by key and time period
 
 **Implementation Notes:**
@@ -567,6 +573,20 @@ pub struct ProviderRegistry {
 - `CostCalculator` with default pricing for OpenAI, Anthropic, and Google models
 - Database schema supports temporal pricing (effective_from/effective_until)
 - Seed data includes all major models from 3 providers
+- Response enrichment adds Aura-specific metadata:
+  ```json
+  {
+    "usage": { "cost_usd": 0.0035, ... },
+    "metadata": {
+      "aura": {
+        "request_id": "aura_550e8400-...",
+        "provider": "openai",
+        "gateway_version": "0.1.7",
+        "latency_ms": 245
+      }
+    }
+  }
+  ```
 
 ---
 
@@ -775,20 +795,33 @@ pub struct ProviderRegistry {
 ---
 
 ### PR #28: Documentation
+**Status:** 🔄 **PARTIALLY COMPLETED** (API docs started, landing page created)
+
 **Tasks:**
 - [ ] API reference with OpenAPI
+- [x] API documentation in Markdown (auto-loaded)
 - [ ] Getting started guide
 - [ ] Provider configuration docs
 - [ ] Deployment guide
 - [ ] SDK examples (curl, Python, Node.js)
 
 **Files:**
-- `docs/api-reference.md`
-- `docs/getting-started.md`
-- `docs/deployment.md`
-- `docs/providers/`
+- `docs/api/README.md` ✅ - API overview
+- `docs/api/create-response.md` ✅ - Create response endpoint
+- `docs/api/streaming.md` ✅ - SSE streaming documentation
+- `docs/api/cost-tracking.md` ✅ - Cost tracking and metadata
+- `apps/landing/` ✅ - Landing page with docs viewer
+
+**Implementation Notes:**
+- Created `apps/landing/` React app with landing page and docs viewer
+- Docs auto-load from `docs/api/*.md` using Vite glob imports
+- Edit MD files and rebuild - they automatically appear in the docs UI
+- `react-markdown` + `remark-gfm` for rendering with custom styling
+- Fallback content for docs not yet created as MD files
 
 **Acceptance Criteria:**
+- ✅ API docs viewable in landing page
+- ✅ Markdown files auto-loaded at build time
 - New users can get started in < 15 minutes
 - All endpoints documented
 
@@ -836,7 +869,7 @@ A ChatGPT/Ollama-style demo application for testing and showcasing the gateway.
 ---
 
 ### PR #30: Chat Interface
-**Status:** ✅ **COMPLETED** (Implemented early alongside PR #6)
+**Status:** ✅ **COMPLETED** (Implemented early alongside PR #6, enhanced with tool cards and cost display)
 
 **Tasks:**
 - [x] Create message bubble components (user/assistant)
@@ -845,6 +878,9 @@ A ChatGPT/Ollama-style demo application for testing and showcasing the gateway.
 - [x] Add typing indicator during streaming
 - [x] Support markdown rendering in responses
 - [x] Add code syntax highlighting
+- [x] Add tool execution cards with icons and styling
+- [x] Display Aura gateway metadata (provider, latency, cost)
+- [x] Show request_id for debugging
 
 **Components:**
 - `MessageBubble` - Single message display with markdown ✅
@@ -854,10 +890,19 @@ A ChatGPT/Ollama-style demo application for testing and showcasing the gateway.
 - `Sidebar` - Conversation list ✅
 - `WelcomeScreen` - Initial empty state ✅
 
+**Enhanced Features:**
+- Tool execution cards with tool-specific icons (Search, Calculator, Clock, Cloud)
+- Color-coded tool cards by type (blue for search, green for calculate, etc.)
+- Collapsible tool call details (arguments and results)
+- Gateway metadata display (provider name, latency, cost per message)
+- Request ID shown for debugging/tracing
+
 **Acceptance Criteria:**
 - ✅ Can send messages and see responses
 - ✅ Streaming responses render progressively
 - ✅ Code blocks render with syntax highlighting (react-syntax-highlighter)
+- ✅ Tool executions displayed as visual cards
+- ✅ Cost and metadata visible per message
 
 ---
 
@@ -1096,21 +1141,35 @@ Interactive, beautiful API documentation.
 ---
 
 ### PR #41: Docs Site Foundation
-**Tech Stack:** Astro + Starlight or Mintlify
+**Tech Stack:** React + Vite + Tailwind (landing page with integrated docs)
+
+**Status:** ✅ **COMPLETED** (Implemented as landing page with docs viewer)
 
 **Tasks:**
-- [ ] Initialize `apps/docs/` with Astro Starlight
-- [ ] Configure theme and branding
-- [ ] Set up navigation structure
-- [ ] Add syntax highlighting for code blocks
-- [ ] Configure search
+- [x] Initialize `apps/landing/` with Vite + React + TypeScript
+- [x] Configure Tailwind CSS with Aura branding
+- [x] Set up navigation structure (sidebar with sections)
+- [x] Add syntax highlighting for code blocks
+- [x] Auto-load MD files from `docs/api/` using Vite glob imports
+- [ ] Configure search (optional)
 
 **Files:**
-- `apps/docs/` directory structure
+- `apps/landing/src/App.tsx` ✅ - Main app with routing
+- `apps/landing/src/pages/DocsPage.tsx` ✅ - Docs viewer with sidebar
+- `apps/landing/src/pages/LandingPage.tsx` ✅ - Marketing landing page
+
+**Implementation Notes:**
+- Landing page showcases gateway features with gradient hero section
+- Docs viewer auto-loads markdown from `docs/api/*.md`
+- Uses `react-markdown` + `remark-gfm` for GFM rendering
+- Custom styled markdown components for dark theme
+- Sidebar navigation with sections (Getting Started, API Reference, Concepts)
+- Fallback content provided for docs not yet written
 
 **Acceptance Criteria:**
-- Docs site builds and deploys
-- Navigation works correctly
+- ✅ Docs site builds and deploys
+- ✅ Navigation works correctly
+- ✅ Markdown auto-loaded from files
 
 ---
 
