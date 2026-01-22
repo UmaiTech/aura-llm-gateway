@@ -6,25 +6,82 @@
 mod routes;
 
 use anyhow::Context;
+use aura_core::{OpenAIProvider, Provider};
 use axum::Router;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::signal;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
-use tracing::{info, Level};
+use tracing::{info, warn, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Application state shared across handlers
 #[derive(Clone)]
 pub struct AppState {
-    #[allow(dead_code)] // Will be used in future PRs
-    config: std::sync::Arc<aura_core::Config>,
+    /// Configuration
+    pub config: Arc<aura_core::Config>,
+    /// Registered providers
+    providers: Arc<HashMap<String, Arc<dyn Provider>>>,
+    /// Model to provider mapping
+    model_map: Arc<HashMap<String, String>>,
 }
 
 impl AppState {
     /// Creates a new AppState with the given configuration
     pub fn new(config: aura_core::Config) -> Self {
-        Self {
-            config: std::sync::Arc::new(config),
+        let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
+        let mut model_map: HashMap<String, String> = HashMap::new();
+
+        // Register OpenAI provider if API key is configured
+        if let Some(api_key) = &config.providers.openai_api_key {
+            info!("Registering OpenAI provider");
+            let openai = Arc::new(OpenAIProvider::new(api_key)) as Arc<dyn Provider>;
+
+            // Map all supported models to this provider
+            for model in openai.models() {
+                model_map.insert(model.to_string(), "openai".to_string());
+            }
+
+            providers.insert("openai".to_string(), openai);
+        } else {
+            warn!("OpenAI API key not configured - OpenAI provider disabled");
         }
+
+        // TODO: Add Anthropic provider when implemented
+        // TODO: Add Google provider when implemented
+
+        Self {
+            config: Arc::new(config),
+            providers: Arc::new(providers),
+            model_map: Arc::new(model_map),
+        }
+    }
+
+    /// Get the provider for a given model
+    pub fn get_provider(&self, model: &str) -> Option<Arc<dyn Provider>> {
+        // First, check if we have an exact mapping
+        if let Some(provider_name) = self.model_map.get(model) {
+            return self.providers.get(provider_name).cloned();
+        }
+
+        // Otherwise, check if any provider supports this model
+        for provider in self.providers.values() {
+            if provider.supports_model(model) {
+                return Some(provider.clone());
+            }
+        }
+
+        None
+    }
+
+    /// Get all registered provider names
+    pub fn provider_names(&self) -> Vec<&str> {
+        self.providers.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Get all available models
+    pub fn available_models(&self) -> Vec<String> {
+        self.model_map.keys().cloned().collect()
     }
 }
 

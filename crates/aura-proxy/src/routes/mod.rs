@@ -1,6 +1,7 @@
 //! API routes for the Aura LLM Gateway
 
 pub mod health;
+pub mod responses;
 
 use axum::Router;
 
@@ -11,4 +12,6 @@ pub fn app_router() -> Router<AppState> {
     Router::new()
         // Health check endpoint
         .merge(health::router())
+        // Response creation endpoint
+        .merge(responses::router())
 }

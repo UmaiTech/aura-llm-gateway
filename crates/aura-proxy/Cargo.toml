@@ -23,5 +23,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 anyhow.workspace = true
+futures-util.workspace = true
+uuid.workspace = true
+async-trait.workspace = true
 
 [dev-dependencies]
