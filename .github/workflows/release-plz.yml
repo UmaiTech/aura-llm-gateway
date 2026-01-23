@@ -14,6 +14,7 @@ jobs:
   release-plz-pr:
     name: Create/Update Release PR
     runs-on: ubuntu-latest
+    continue-on-error: true
     concurrency:
       group: release-plz-pr-${{ github.ref }}
       cancel-in-progress: false
@@ -29,6 +30,29 @@ jobs:
           git fetch origin
           git checkout -B main origin/main
           git log -1 --format='%H %s'
+
+      - name: Wait for commit propagation
+        run: |
+          echo "Waiting for GitHub API to sync commit..."
+          sleep 10
+
+          # Verify commit is visible via GitHub API
+          COMMIT_SHA="${{ github.sha }}"
+          REPO="${{ github.repository }}"
+
+          for i in {1..5}; do
+            if gh api "/repos/$REPO/commits/$COMMIT_SHA" &>/dev/null; then
+              echo "✓ Commit $COMMIT_SHA is visible via API"
+              exit 0
+            fi
+            echo "Attempt $i: Commit not yet visible, waiting..."
+            sleep 5
+          done
+
+          echo "⚠ Commit visibility timeout - will retry on next push"
+          exit 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
