@@ -21,8 +21,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
+          fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure commit is available
+        run: |
+          git fetch origin ${{ github.sha }}
+          git log -1 --format='%H %s' ${{ github.sha }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -42,8 +49,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
+          fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure commit is available
+        run: |
+          git fetch origin ${{ github.sha }}
+          git log -1 --format='%H %s' ${{ github.sha }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
