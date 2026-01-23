@@ -43,12 +43,10 @@ async fn list_conversations(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<aura_db::Conversation>>, (StatusCode, String)> {
-    let pool = state
-        .db_pool()
-        .ok_or((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Database not configured".to_string(),
-        ))?;
+    let pool = state.db_pool().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Database not configured".to_string(),
+    ))?;
 
     let conversations = if let Some(user_id) = params.user_id {
         ConversationRepo::get_by_user(pool, &user_id, params.limit)
@@ -66,12 +64,10 @@ async fn get_conversation(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ConversationDetail>, (StatusCode, String)> {
-    let pool = state
-        .db_pool()
-        .ok_or((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Database not configured".to_string(),
-        ))?;
+    let pool = state.db_pool().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Database not configured".to_string(),
+    ))?;
 
     let conversation = ConversationRepo::get_by_id(pool, id)
         .await
@@ -98,12 +94,10 @@ async fn delete_conversation(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let pool = state
-        .db_pool()
-        .ok_or((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Database not configured".to_string(),
-        ))?;
+    let pool = state.db_pool().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Database not configured".to_string(),
+    ))?;
 
     ConversationRepo::delete(pool, id)
         .await

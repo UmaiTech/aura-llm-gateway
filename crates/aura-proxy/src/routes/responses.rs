@@ -17,7 +17,7 @@ use futures_util::StreamExt;
 use serde::Serialize;
 use std::convert::Infallible;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::AppState;
@@ -157,7 +157,9 @@ async fn create_response(
                             input_tokens: usage.map(|u| u.input_tokens as i32),
                             output_tokens: usage.map(|u| u.output_tokens as i32),
                             cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
-                            reasoning_tokens: usage.and_then(|u| u.reasoning_tokens).map(|t| t as i32),
+                            reasoning_tokens: usage
+                                .and_then(|u| u.reasoning_tokens)
+                                .map(|t| t as i32),
                             cost_usd: usage.and_then(|u| u.cost_usd),
                             latency_ms: None,
                             status: "completed".to_string(),
@@ -244,7 +246,9 @@ async fn create_response(
                             input_tokens: usage.map(|u| u.input_tokens as i32),
                             output_tokens: usage.map(|u| u.output_tokens as i32),
                             cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
-                            reasoning_tokens: usage.and_then(|u| u.reasoning_tokens).map(|t| t as i32),
+                            reasoning_tokens: usage
+                                .and_then(|u| u.reasoning_tokens)
+                                .map(|t| t as i32),
                             cost_usd: usage.and_then(|u| u.cost_usd),
                             latency_ms: None,
                             status: "incomplete".to_string(),

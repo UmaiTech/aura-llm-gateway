@@ -308,8 +308,7 @@ impl AppState {
                 model_id: response.model.clone(),
                 status: response_status_to_string(&response.status),
                 previous_response_id: request.previous_response_id.clone(),
-                input_items: serde_json::to_value(&request.input)
-                    .unwrap_or(serde_json::json!([])),
+                input_items: serde_json::to_value(&request.input).unwrap_or(serde_json::json!([])),
                 output_items: serde_json::to_value(&response.output)
                     .unwrap_or(serde_json::json!([])),
                 usage_input_tokens: response.usage.as_ref().map(|u| u.input_tokens as i32),
@@ -409,19 +408,17 @@ fn extract_first_user_message(request: &aura_types::CreateResponseRequest) -> Op
     use aura_types::{ContentPart, InputContent, InputItem, Role};
 
     request.input.iter().find_map(|item| match item {
-        InputItem::Message { role, content } if *role == Role::User => {
-            Some(match content {
-                InputContent::Text(text) => text.clone(),
-                InputContent::Parts(parts) => parts
-                    .iter()
-                    .filter_map(|p| match p {
-                        ContentPart::Text { text } => Some(text.as_str()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            })
-        }
+        InputItem::Message { role, content } if *role == Role::User => Some(match content {
+            InputContent::Text(text) => text.clone(),
+            InputContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| match p {
+                    ContentPart::Text { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join(" "),
+        }),
         _ => None,
     })
 }
