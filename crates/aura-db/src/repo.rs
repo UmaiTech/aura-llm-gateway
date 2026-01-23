@@ -236,6 +236,29 @@ impl ConversationRepo {
 
         Ok(())
     }
+
+    /// Create conversation with auto-generated title from first message
+    pub async fn create_with_auto_title(
+        pool: &DbPool,
+        user_id: Option<String>,
+        model_id: String,
+        first_message: &str,
+    ) -> Result<Conversation, DbError> {
+        let title = if first_message.len() > 100 {
+            format!("{}...", &first_message[..97])
+        } else {
+            first_message.to_string()
+        };
+
+        let new = NewConversation {
+            user_id,
+            title: Some(title),
+            model_id,
+            metadata: None,
+        };
+
+        Self::create(pool, new).await
+    }
 }
 
 /// Repository for message operations
@@ -372,6 +395,116 @@ impl RequestLogRepo {
                 error_message: row.get("error_message"),
                 metadata: row.get("metadata"),
                 created_at: row.get("created_at"),
+            })
+            .collect())
+    }
+}
+
+/// Repository for response operations
+pub struct ResponseRepo;
+
+impl ResponseRepo {
+    /// Create a new response record
+    pub async fn create(pool: &DbPool, new: NewResponse) -> Result<ResponseRecord, DbError> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO responses (
+                id, conversation_id, model_id, status, previous_response_id,
+                input_items, output_items,
+                usage_input_tokens, usage_output_tokens, usage_cached_tokens, usage_reasoning_tokens,
+                usage_cost_usd, error_code, error_message, incomplete_reason, metadata
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            RETURNING *
+            "#,
+        )
+        .bind(&new.id)
+        .bind(new.conversation_id)
+        .bind(&new.model_id)
+        .bind(&new.status)
+        .bind(&new.previous_response_id)
+        .bind(&new.input_items)
+        .bind(&new.output_items)
+        .bind(new.usage_input_tokens)
+        .bind(new.usage_output_tokens)
+        .bind(new.usage_cached_tokens)
+        .bind(new.usage_reasoning_tokens)
+        .bind(new.usage_cost_usd)
+        .bind(&new.error_code)
+        .bind(&new.error_message)
+        .bind(&new.incomplete_reason)
+        .bind(&new.metadata)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ResponseRecord {
+            id: row.get("id"),
+            conversation_id: row.get("conversation_id"),
+            model_id: row.get("model_id"),
+            status: row.get("status"),
+            previous_response_id: row.get("previous_response_id"),
+            input_items: row.get("input_items"),
+            output_items: row.get("output_items"),
+            usage_input_tokens: row.get("usage_input_tokens"),
+            usage_output_tokens: row.get("usage_output_tokens"),
+            usage_cached_tokens: row.get("usage_cached_tokens"),
+            usage_reasoning_tokens: row.get("usage_reasoning_tokens"),
+            usage_cost_usd: row.get("usage_cost_usd"),
+            error_code: row.get("error_code"),
+            error_message: row.get("error_message"),
+            incomplete_reason: row.get("incomplete_reason"),
+            metadata: row.get("metadata"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+    }
+
+    /// Find conversation ID by response ID (follows previous_response_id chain)
+    pub async fn find_conversation_by_response_id(
+        pool: &DbPool,
+        response_id: &str,
+    ) -> Result<Option<Uuid>, DbError> {
+        let row = sqlx::query("SELECT conversation_id FROM responses WHERE id = $1")
+            .bind(response_id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(|r| r.get("conversation_id")))
+    }
+
+    /// Get all responses in a conversation (ordered chronologically)
+    pub async fn get_by_conversation(
+        pool: &DbPool,
+        conversation_id: Uuid,
+    ) -> Result<Vec<ResponseRecord>, DbError> {
+        let rows = sqlx::query(
+            "SELECT * FROM responses WHERE conversation_id = $1 ORDER BY created_at ASC",
+        )
+        .bind(conversation_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ResponseRecord {
+                id: r.get("id"),
+                conversation_id: r.get("conversation_id"),
+                model_id: r.get("model_id"),
+                status: r.get("status"),
+                previous_response_id: r.get("previous_response_id"),
+                input_items: r.get("input_items"),
+                output_items: r.get("output_items"),
+                usage_input_tokens: r.get("usage_input_tokens"),
+                usage_output_tokens: r.get("usage_output_tokens"),
+                usage_cached_tokens: r.get("usage_cached_tokens"),
+                usage_reasoning_tokens: r.get("usage_reasoning_tokens"),
+                usage_cost_usd: r.get("usage_cost_usd"),
+                error_code: r.get("error_code"),
+                error_message: r.get("error_message"),
+                incomplete_reason: r.get("incomplete_reason"),
+                metadata: r.get("metadata"),
+                created_at: r.get("created_at"),
+                updated_at: r.get("updated_at"),
             })
             .collect())
     }

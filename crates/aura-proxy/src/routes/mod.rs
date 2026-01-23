@@ -1,5 +1,6 @@
 //! API routes for the Aura LLM Gateway
 
+pub mod conversations;
 pub mod health;
 pub mod responses;
 
@@ -14,4 +15,6 @@ pub fn app_router() -> Router<AppState> {
         .merge(health::router())
         // Response creation endpoint
         .merge(responses::router())
+        // Conversation management endpoints
+        .merge(conversations::router())
 }

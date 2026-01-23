@@ -107,26 +107,172 @@ async fn create_response(
     })?;
 
     if request.stream {
+        // Get or create conversation BEFORE streaming starts
+        let conversation_result = state.get_or_create_conversation(&request).await;
+        let conversation_id = match conversation_result {
+            Ok((conv_id, is_new)) => {
+                if is_new {
+                    info!(conversation_id = %conv_id, "Created new conversation");
+                }
+                Some(conv_id)
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to get/create conversation - continuing without persistence");
+                None
+            }
+        };
+
         // Streaming response
-        let stream = provider.complete_stream(request).await.map_err(|e| {
-            error!(request_id = %request_id, error = %e, "Streaming request failed");
-            ApiError::from_provider_error(&e)
-        })?;
+        let stream = provider
+            .complete_stream(request.clone())
+            .await
+            .map_err(|e| {
+                error!(request_id = %request_id, error = %e, "Streaming request failed");
+                ApiError::from_provider_error(&e)
+            })?;
 
         // Clone state and request_id for the stream closure
         let state_for_stream = state.clone();
         let request_id_for_stream = request_id.clone();
+        let request_for_stream = request.clone();
+        let provider_name = provider.name().to_string();
+        let model_id = request.model.clone();
 
-        // Convert to SSE stream, enriching ResponseCompleted events with cost and request ID
+        // Convert to SSE stream, enriching terminal events
         let sse_stream = stream.map(move |result| match result {
             Ok(event) => {
-                // Enrich ResponseCompleted events with cost and request ID
-                let event = if let StreamEvent::ResponseCompleted { response } = event {
-                    let response =
-                        state_for_stream.enrich_response(response, &request_id_for_stream);
-                    StreamEvent::ResponseCompleted { response }
-                } else {
-                    event
+                let event = match event {
+                    StreamEvent::ResponseCompleted { response } => {
+                        let response =
+                            state_for_stream.enrich_response(response, &request_id_for_stream);
+
+                        // Log completed response
+                        let usage = response.usage.as_ref();
+                        let log = NewRequestLog {
+                            response_id: request_id_for_stream.clone(),
+                            conversation_id,
+                            provider_name: provider_name.clone(),
+                            model_id: model_id.clone(),
+                            user_id: request_for_stream.user.clone(),
+                            input_tokens: usage.map(|u| u.input_tokens as i32),
+                            output_tokens: usage.map(|u| u.output_tokens as i32),
+                            cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
+                            reasoning_tokens: usage.and_then(|u| u.reasoning_tokens).map(|t| t as i32),
+                            cost_usd: usage.and_then(|u| u.cost_usd),
+                            latency_ms: None,
+                            status: "completed".to_string(),
+                            error_code: None,
+                            error_message: None,
+                            metadata: response.metadata.clone(),
+                        };
+
+                        // Save response
+                        if let Some(conv_id) = conversation_id {
+                            let state_bg = state_for_stream.clone();
+                            let response_bg = response.clone();
+                            let request_bg = request_for_stream.clone();
+                            tokio::spawn(async move {
+                                state_bg.log_request(log).await;
+                                state_bg
+                                    .save_response(conv_id, &request_bg, &response_bg)
+                                    .await;
+                                state_bg
+                                    .save_messages_from_items(
+                                        conv_id,
+                                        &response_bg.id,
+                                        &response_bg.output,
+                                    )
+                                    .await;
+                            });
+                        } else {
+                            tokio::spawn({
+                                let state = state_for_stream.clone();
+                                async move { state.log_request(log).await }
+                            });
+                        }
+
+                        StreamEvent::ResponseCompleted { response }
+                    }
+                    StreamEvent::ResponseFailed { response } => {
+                        // Log failed response
+                        let log = NewRequestLog {
+                            response_id: request_id_for_stream.clone(),
+                            conversation_id,
+                            provider_name: provider_name.clone(),
+                            model_id: model_id.clone(),
+                            user_id: request_for_stream.user.clone(),
+                            input_tokens: None,
+                            output_tokens: None,
+                            cached_tokens: None,
+                            reasoning_tokens: None,
+                            cost_usd: None,
+                            latency_ms: None,
+                            status: "failed".to_string(),
+                            error_code: response.error.as_ref().map(|e| e.code.clone()),
+                            error_message: response.error.as_ref().map(|e| e.message.clone()),
+                            metadata: response.metadata.clone(),
+                        };
+
+                        if let Some(conv_id) = conversation_id {
+                            let state_bg = state_for_stream.clone();
+                            let response_bg = response.clone();
+                            let request_bg = request_for_stream.clone();
+                            tokio::spawn(async move {
+                                state_bg.log_request(log).await;
+                                state_bg
+                                    .save_response(conv_id, &request_bg, &response_bg)
+                                    .await;
+                            });
+                        } else {
+                            tokio::spawn({
+                                let state = state_for_stream.clone();
+                                async move { state.log_request(log).await }
+                            });
+                        }
+
+                        StreamEvent::ResponseFailed { response }
+                    }
+                    StreamEvent::ResponseIncomplete { response } => {
+                        // Log incomplete response
+                        let usage = response.usage.as_ref();
+                        let log = NewRequestLog {
+                            response_id: request_id_for_stream.clone(),
+                            conversation_id,
+                            provider_name: provider_name.clone(),
+                            model_id: model_id.clone(),
+                            user_id: request_for_stream.user.clone(),
+                            input_tokens: usage.map(|u| u.input_tokens as i32),
+                            output_tokens: usage.map(|u| u.output_tokens as i32),
+                            cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
+                            reasoning_tokens: usage.and_then(|u| u.reasoning_tokens).map(|t| t as i32),
+                            cost_usd: usage.and_then(|u| u.cost_usd),
+                            latency_ms: None,
+                            status: "incomplete".to_string(),
+                            error_code: None,
+                            error_message: None,
+                            metadata: response.metadata.clone(),
+                        };
+
+                        if let Some(conv_id) = conversation_id {
+                            let state_bg = state_for_stream.clone();
+                            let response_bg = response.clone();
+                            let request_bg = request_for_stream.clone();
+                            tokio::spawn(async move {
+                                state_bg.log_request(log).await;
+                                state_bg
+                                    .save_response(conv_id, &request_bg, &response_bg)
+                                    .await;
+                            });
+                        } else {
+                            tokio::spawn({
+                                let state = state_for_stream.clone();
+                                async move { state.log_request(log).await }
+                            });
+                        }
+
+                        StreamEvent::ResponseIncomplete { response }
+                    }
+                    other => other,
                 };
 
                 let event_type = event.event_type();
@@ -160,16 +306,33 @@ async fn create_response(
         let provider_name = provider.name().to_string();
         let model_id = request.model.clone();
 
-        let response = provider.complete(request).await.map_err(|e| {
+        // Get or create conversation BEFORE making the provider call
+        let conversation_result = state.get_or_create_conversation(&request).await;
+        let conversation_id = match conversation_result {
+            Ok((conv_id, is_new)) => {
+                if is_new {
+                    info!(conversation_id = %conv_id, "Created new conversation");
+                } else {
+                    info!(conversation_id = %conv_id, "Continuing existing conversation");
+                }
+                Some(conv_id)
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to get/create conversation - continuing without persistence");
+                None
+            }
+        };
+
+        let response = provider.complete(request.clone()).await.map_err(|e| {
             error!(error = %e, "Request failed");
 
-            // Log failed request
+            // Log failed request (with conversation_id if available)
             let log = NewRequestLog {
                 response_id: request_id.clone(),
-                conversation_id: None,
+                conversation_id,
                 provider_name: provider_name.clone(),
                 model_id: model_id.clone(),
-                user_id: None,
+                user_id: request.user.clone(),
                 input_tokens: None,
                 output_tokens: None,
                 cached_tokens: None,
@@ -198,6 +361,7 @@ async fn create_response(
             id = %response.id,
             status = ?response.status,
             latency_ms = %latency_ms,
+            conversation_id = ?conversation_id,
             "Response completed"
         );
 
@@ -206,10 +370,10 @@ async fn create_response(
         let cost_usd = usage.and_then(|u| u.cost_usd);
         let log = NewRequestLog {
             response_id: request_id,
-            conversation_id: None,
+            conversation_id,
             provider_name,
             model_id,
-            user_id: None,
+            user_id: request.user.clone(),
             input_tokens: usage.map(|u| u.input_tokens as i32),
             output_tokens: usage.map(|u| u.output_tokens as i32),
             cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
@@ -229,10 +393,25 @@ async fn create_response(
             metadata: response.metadata.clone(),
         };
 
-        // Spawn log task in background (non-blocking)
-        tokio::spawn({
-            let state = state.clone();
-            async move { state.log_request(log).await }
+        // CRITICAL: Clone AFTER enrichment to preserve usage/cost data
+        let response_for_bg = response.clone();
+        let request_for_bg = request.clone();
+
+        // Spawn background tasks for persistence (non-blocking)
+        let state_for_bg = state.clone();
+        tokio::spawn(async move {
+            // Log to request_logs
+            state_for_bg.log_request(log).await;
+
+            // Save full response and messages if conversation exists
+            if let Some(conv_id) = conversation_id {
+                state_for_bg
+                    .save_response(conv_id, &request_for_bg, &response_for_bg)
+                    .await;
+                state_for_bg
+                    .save_messages_from_items(conv_id, &response_for_bg.id, &response_for_bg.output)
+                    .await;
+            }
         });
 
         Ok(Json(response).into_response())

@@ -247,6 +247,196 @@ impl AppState {
 
         response
     }
+
+    /// Get or create conversation for a request
+    /// Returns (conversation_id, is_new)
+    pub async fn get_or_create_conversation(
+        &self,
+        request: &aura_types::CreateResponseRequest,
+    ) -> Result<(uuid::Uuid, bool), anyhow::Error> {
+        let pool = self.db_pool.as_ref().context("Database not configured")?;
+
+        // Check if continuing existing conversation
+        if let Some(prev_response_id) = &request.previous_response_id {
+            if let Some(conv_id) =
+                aura_db::ResponseRepo::find_conversation_by_response_id(pool, prev_response_id)
+                    .await?
+            {
+                return Ok((conv_id, false));
+            }
+        }
+
+        // Create new conversation
+        let user_id = request.user.clone();
+        let first_message = extract_first_user_message(request);
+
+        let conversation = if let Some(msg) = first_message {
+            aura_db::ConversationRepo::create_with_auto_title(
+                pool,
+                user_id,
+                request.model.clone(),
+                &msg,
+            )
+            .await?
+        } else {
+            aura_db::ConversationRepo::create(
+                pool,
+                aura_db::NewConversation {
+                    user_id,
+                    title: Some(format!("Conversation with {}", request.model)),
+                    model_id: request.model.clone(),
+                    metadata: None,
+                },
+            )
+            .await?
+        };
+
+        Ok((conversation.id, true))
+    }
+
+    /// Save response to database (non-blocking)
+    pub async fn save_response(
+        &self,
+        conversation_id: uuid::Uuid,
+        request: &aura_types::CreateResponseRequest,
+        response: &aura_types::Response,
+    ) {
+        if let Some(pool) = &self.db_pool {
+            let new_response = aura_db::NewResponse {
+                id: response.id.clone(),
+                conversation_id,
+                model_id: response.model.clone(),
+                status: response_status_to_string(&response.status),
+                previous_response_id: request.previous_response_id.clone(),
+                input_items: serde_json::to_value(&request.input)
+                    .unwrap_or(serde_json::json!([])),
+                output_items: serde_json::to_value(&response.output)
+                    .unwrap_or(serde_json::json!([])),
+                usage_input_tokens: response.usage.as_ref().map(|u| u.input_tokens as i32),
+                usage_output_tokens: response.usage.as_ref().map(|u| u.output_tokens as i32),
+                usage_cached_tokens: response
+                    .usage
+                    .as_ref()
+                    .and_then(|u| u.cached_tokens)
+                    .map(|t| t as i32),
+                usage_reasoning_tokens: response
+                    .usage
+                    .as_ref()
+                    .and_then(|u| u.reasoning_tokens)
+                    .map(|t| t as i32),
+                usage_cost_usd: response.usage.as_ref().and_then(|u| u.cost_usd),
+                error_code: response.error.as_ref().map(|e| e.code.clone()),
+                error_message: response.error.as_ref().map(|e| e.message.clone()),
+                incomplete_reason: response
+                    .incomplete_reason
+                    .as_ref()
+                    .map(|r| format!("{:?}", r).to_lowercase()),
+                metadata: response.metadata.clone(),
+            };
+
+            match aura_db::ResponseRepo::create(pool, new_response).await {
+                Ok(_) => {
+                    debug!(
+                        response_id = %response.id,
+                        conversation_id = %conversation_id,
+                        "Response saved to database"
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        error = %e,
+                        response_id = %response.id,
+                        "Failed to save response to database"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Save message items to messages table (simplified view)
+    pub async fn save_messages_from_items(
+        &self,
+        conversation_id: uuid::Uuid,
+        response_id: &str,
+        items: &[aura_types::Item],
+    ) {
+        use aura_types::{Item, Role};
+
+        if let Some(pool) = &self.db_pool {
+            for item in items {
+                if let Item::Message(msg) = item {
+                    let role = match msg.role {
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                        Role::System => "system",
+                        Role::Tool => "tool",
+                    };
+
+                    let content = msg
+                        .content
+                        .iter()
+                        .filter_map(|part| match part {
+                            aura_types::ContentPart::Text { text } => Some(text.as_str()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    let metadata = serde_json::json!({
+                        "item_id": msg.id,
+                        "response_id": response_id,
+                        "status": format!("{:?}", msg.status).to_lowercase(),
+                    });
+
+                    let new_msg = aura_db::NewMessage {
+                        conversation_id,
+                        role: role.to_string(),
+                        content,
+                        metadata: Some(metadata),
+                    };
+
+                    if let Err(e) = aura_db::MessageRepo::create(pool, new_msg).await {
+                        error!(error = %e, item_id = %msg.id, "Failed to save message to database");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Extract first user message from request for conversation title
+fn extract_first_user_message(request: &aura_types::CreateResponseRequest) -> Option<String> {
+    use aura_types::{ContentPart, InputContent, InputItem, Role};
+
+    request.input.iter().find_map(|item| match item {
+        InputItem::Message { role, content } if *role == Role::User => {
+            Some(match content {
+                InputContent::Text(text) => text.clone(),
+                InputContent::Parts(parts) => parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            })
+        }
+        _ => None,
+    })
+}
+
+/// Convert ResponseStatus to string for database
+fn response_status_to_string(status: &aura_types::ResponseStatus) -> String {
+    use aura_types::ResponseStatus;
+    match status {
+        ResponseStatus::InProgress => "in_progress",
+        ResponseStatus::Completed => "completed",
+        ResponseStatus::Failed => "failed",
+        ResponseStatus::Incomplete => "incomplete",
+        ResponseStatus::Cancelled => "cancelled",
+    }
+    .to_string()
 }
 
 #[tokio::main]

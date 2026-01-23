@@ -2,6 +2,24 @@
 
 A PR-by-PR roadmap for building the Aura LLM Gateway, designed for incremental Rust learning.
 
+## Current Status (January 2026)
+
+**Project Phase:** MVP - In Progress
+
+**Recently Completed:**
+- ✅ **Conversation Persistence** (January 23, 2026) - Full stateful conversation support with threading
+  - See: [`docs/implementation-conversation-persistence.md`](./implementation-conversation-persistence.md)
+  - Database schema: conversations, responses, messages tables
+  - REST API: Conversation management endpoints
+  - Features: Auto-creation, threading, usage tracking, cost calculation
+
+**Active Milestones:**
+- M1-M4: Foundation, Single Provider, Multi-Provider, Persistence ✅ **LARGELY COMPLETE**
+- M5: Production Readiness - In Progress
+- M7: Chat Demo App ✅ **COMPLETE**
+
+---
+
 ## Overview
 
 ### Phase 1: MVP (Sellable Product)

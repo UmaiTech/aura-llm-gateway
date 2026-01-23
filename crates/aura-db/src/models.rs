@@ -163,3 +163,47 @@ pub struct NewMessage {
     pub content: String,
     pub metadata: Option<serde_json::Value>,
 }
+
+/// Response record - stores complete Open Responses API response objects
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponseRecord {
+    pub id: String,
+    pub conversation_id: Uuid,
+    pub model_id: String,
+    pub status: String,
+    pub previous_response_id: Option<String>,
+    pub input_items: serde_json::Value,
+    pub output_items: serde_json::Value,
+    pub usage_input_tokens: Option<i32>,
+    pub usage_output_tokens: Option<i32>,
+    pub usage_cached_tokens: Option<i32>,
+    pub usage_reasoning_tokens: Option<i32>,
+    pub usage_cost_usd: Option<f64>,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+    pub incomplete_reason: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// New response for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewResponse {
+    pub id: String,
+    pub conversation_id: Uuid,
+    pub model_id: String,
+    pub status: String,
+    pub previous_response_id: Option<String>,
+    pub input_items: serde_json::Value,
+    pub output_items: serde_json::Value,
+    pub usage_input_tokens: Option<i32>,
+    pub usage_output_tokens: Option<i32>,
+    pub usage_cached_tokens: Option<i32>,
+    pub usage_reasoning_tokens: Option<i32>,
+    pub usage_cost_usd: Option<f64>,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+    pub incomplete_reason: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}

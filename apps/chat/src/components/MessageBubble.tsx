@@ -176,6 +176,8 @@ function CodeBlock({ language, children }: CodeBlockProps) {
           background: '#1e1e2e',
           fontSize: '0.875rem',
         }}
+        lineProps={{ style: { backgroundColor: 'transparent' }}}
+        wrapLongLines={true}
       >
         {children}
       </SyntaxHighlighter>

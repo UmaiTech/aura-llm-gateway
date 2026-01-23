@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Conversation Persistence** - Full stateful conversation support (2026-01-23)
+  - New `responses` table storing complete Open Responses API objects with JSONB
+  - Automatic conversation creation with auto-generated titles from first message
+  - Conversation threading via `previous_response_id` mechanism
+  - REST API endpoints for conversation management (`GET /v1/conversations`, `GET /v1/conversations/{id}`, `DELETE /v1/conversations/{id}`)
+  - Request logging for both streaming and non-streaming responses
+  - Usage tracking (input/output tokens) and cost calculation persistence
+  - Message extraction to simplified `messages` table
+  - Enhanced debug logging for usage data and cost calculations
 - Initial project scaffolding with Cargo workspace
 - Four crates: aura-types, aura-db, aura-core, aura-proxy
 - Comprehensive CI/CD workflows (CI, Security Audit, Build Release)
@@ -24,10 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributing guidelines with conventional commits
 
 ### Fixed
+- **Database:** Fixed PostgreSQL type mismatch - converted `DECIMAL(10,6)` to `DOUBLE PRECISION` for cost columns (2026-01-23)
+- **Persistence:** Fixed response cloning order to preserve enriched usage/cost data (2026-01-23)
+- **Routing:** Updated Axum route parameters from `:id` to `{id}` syntax for v0.8 compatibility (2026-01-23)
+- **UI:** Fixed code block formatting in chat app - removed alternating line backgrounds (2026-01-23)
 - **Security:** Removed RSA timing attack vulnerability (RUSTSEC-2023-0071) by disabling unused MySQL support in sqlx
 - **CI:** Fixed cargo-deny configuration to use v2 format
 
 ### Changed
+- **Persistence:** All database operations now run in non-blocking background tasks (2026-01-23)
+- **Logging:** Enhanced observability with detailed usage/cost tracking logs (2026-01-23)
 - Updated sqlx to use `default-features = false` to only include PostgreSQL support
 - **Performance:** Pre-commit hook now only checks library code (3-5x faster)
 - **Performance:** CI now uses Swatinem/rust-cache for better caching (2-5x faster on cache hits)
