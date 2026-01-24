@@ -22,7 +22,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
+          # Note: persist-credentials defaults to true, which is required
+          # for release-plz to push version bump commits. The official
+          # release-plz workflow uses persist-credentials: false with a
+          # GitHub App token, but with GITHUB_TOKEN we need credentials
+          # persisted in git config.
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
