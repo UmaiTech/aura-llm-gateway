@@ -27,7 +27,9 @@ use aura_db::{ApiKey, ApiKeyRepo, NewApiKey};
 
 /// Authenticated request context
 ///
-/// This is added to request extensions after successful authentication
+/// This is added to request extensions after successful authentication.
+/// Fields are used when auth is fully wired to routes.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     /// The API key record
@@ -40,6 +42,7 @@ pub struct AuthContext {
 
 impl AuthContext {
     /// Check if the authenticated key has a specific scope
+    #[allow(dead_code)]
     pub fn has_scope(&self, scope: &str) -> bool {
         self.api_key.has_scope(scope)
     }
@@ -58,6 +61,7 @@ pub struct AuthErrorInner {
 }
 
 impl AuthError {
+    #[allow(dead_code)]
     fn missing_auth() -> Self {
         Self {
             error: AuthErrorInner {
@@ -96,6 +100,7 @@ impl AuthError {
         }
     }
 
+    #[allow(dead_code)]
     fn insufficient_scope(required: &str) -> Self {
         Self {
             error: AuthErrorInner {
@@ -221,6 +226,7 @@ pub async fn auth_middleware(
 }
 
 /// Require a specific scope for the request
+#[allow(dead_code)]
 pub fn require_scope(scope: &'static str) -> impl Fn(AuthContext) -> Result<(), AuthError> + Clone {
     move |auth: AuthContext| {
         if auth.has_scope(scope) || auth.has_scope("*") {
