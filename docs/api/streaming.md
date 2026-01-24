@@ -135,6 +135,70 @@ Sent if the response fails.
 }
 ```
 
+## Python SDK (Recommended)
+
+The Python SDK handles SSE parsing automatically:
+
+```python
+from aura import AuraClient
+
+client = AuraClient(base_url="http://localhost:8080")
+
+# Streaming with typed events
+for event in client.responses.create(
+    model="gpt-4o-mini",
+    input="Tell me a story",
+    stream=True
+):
+    if event.type == "response.output_text.delta":
+        print(event.delta, end="", flush=True)
+    elif event.type == "response.completed":
+        print(f"\n\nCost: ${event.response.usage.cost_usd:.6f}")
+```
+
+### Async Streaming
+
+```python
+from aura import AsyncAuraClient
+
+async with AsyncAuraClient() as client:
+    stream = await client.responses.create(
+        model="gpt-4o-mini",
+        input="Tell me a story",
+        stream=True
+    )
+    async for event in stream:
+        if event.type == "response.output_text.delta":
+            print(event.delta, end="", flush=True)
+```
+
+### Stream Event Types
+
+The SDK provides typed event classes:
+
+```python
+from aura.types import (
+    ResponseCreatedEvent,
+    ResponseInProgressEvent,
+    ResponseCompletedEvent,
+    TextDeltaEvent,
+    TextDoneEvent,
+    FunctionCallDeltaEvent,
+    FunctionCallDoneEvent,
+    OutputItemAddedEvent,
+    ErrorEvent,
+)
+
+for event in client.responses.create(..., stream=True):
+    match event.type:
+        case "response.output_text.delta":
+            print(event.delta, end="")
+        case "response.function_call.done":
+            print(f"Tool call: {event.item.name}")
+        case "response.completed":
+            print(f"Done! Tokens: {event.response.usage.total_tokens}")
+```
+
 ## JavaScript Example
 
 ```javascript
@@ -175,7 +239,9 @@ while (true) {
 }
 ```
 
-## Python Example
+## Python (Raw HTTP)
+
+If you prefer not to use the SDK:
 
 ```python
 import requests
