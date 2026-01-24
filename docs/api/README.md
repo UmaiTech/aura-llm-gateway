@@ -12,6 +12,17 @@ http://localhost:8080
 
 Currently, Aura does not require authentication. Provider API keys are configured on the server side.
 
+## Client SDKs
+
+Official SDKs are available for easy integration:
+
+| Language | Package | Install |
+|----------|---------|---------|
+| Python | [`aura-llm`](https://pypi.org/project/aura-llm/) | `uv add aura-llm` |
+| TypeScript | `@aura/sdk` | Coming soon |
+
+See [Client SDKs](./sdks.md) for detailed SDK documentation.
+
 ## Endpoints
 
 | Method | Path | Description |

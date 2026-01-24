@@ -64,6 +64,8 @@ POST /v1/responses
 
 ## Example Request
 
+### cURL
+
 ```bash
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
@@ -78,6 +80,34 @@ curl -X POST http://localhost:8080/v1/responses \
     ],
     "stream": false
   }'
+```
+
+### Python SDK
+
+```python
+from aura import AuraClient
+
+client = AuraClient(base_url="http://localhost:8080")
+
+response = client.responses.create(
+    model="gpt-4o-mini",
+    input="What is 2 + 2?"
+)
+print(response.output_text)  # "2 + 2 equals 4."
+print(response.usage.cost_usd)  # 0.0000048
+```
+
+### Python SDK (Async)
+
+```python
+from aura import AsyncAuraClient
+
+async with AsyncAuraClient() as client:
+    response = await client.responses.create(
+        model="gpt-4o-mini",
+        input="What is 2 + 2?"
+    )
+    print(response.output_text)
 ```
 
 ## Example Response
