@@ -1,8 +1,10 @@
 # Aura LLM Gateway
 
 [![CI](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
+[![Python SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml)
 [![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
 [![dependencies](https://deps.rs/repo/github/UmaiTech/aura-llm-gateway/status.svg)](https://deps.rs/repo/github/UmaiTech/aura-llm-gateway)
+[![PyPI](https://img.shields.io/pypi/v/aura-llm)](https://pypi.org/project/aura-llm/)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
@@ -39,6 +41,8 @@ aura-llm-gateway/
 │   ├── aura-db/         # Database models and queries (SQLx)
 │   ├── aura-core/       # Core business logic (providers, routing, caching)
 │   └── aura-proxy/      # Main server binary (Axum routes, middleware)
+├── sdks/
+│   └── python/          # Python SDK (aura-llm package)
 ├── apps/
 │   ├── chat/            # React chat UI for testing the gateway
 │   └── landing/         # Landing page and documentation site
@@ -304,6 +308,58 @@ Features:
 
 See [apps/chat/README.md](apps/chat/README.md) for detailed documentation.
 
+## SDKs
+
+Official client SDKs for the Aura LLM Gateway:
+
+### Python SDK
+
+[![PyPI](https://img.shields.io/pypi/v/aura-llm)](https://pypi.org/project/aura-llm/)
+[![Python](https://img.shields.io/pypi/pyversions/aura-llm)](https://pypi.org/project/aura-llm/)
+
+```bash
+# Install with uv (recommended)
+uv add aura-llm
+
+# Or with pip
+pip install aura-llm
+```
+
+```python
+from aura import AuraClient
+
+client = AuraClient(base_url="http://localhost:8080")
+
+# Simple completion
+response = client.responses.create(
+    model="gpt-4o",
+    input="What is the capital of France?"
+)
+print(response.output_text)
+
+# Streaming
+for event in client.responses.create(
+    model="gpt-4o",
+    input="Tell me a story",
+    stream=True
+):
+    if event.type == "response.output_text.delta":
+        print(event.delta, end="")
+```
+
+Features:
+- Sync and async clients (`AuraClient`, `AsyncAuraClient`)
+- Full streaming support with typed events
+- Conversation threading via `previous_response_id`
+- Tool/function calling support
+- Comprehensive error handling
+
+See [sdks/python/README.md](sdks/python/README.md) for full documentation.
+
+### TypeScript SDK (Coming Soon)
+
+The TypeScript/JavaScript SDK is planned for a future release.
+
 ## Tech Stack
 
 - **Language**: Rust (2021 edition)
@@ -335,6 +391,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Links
 
 - [Open Responses API Specification](https://www.openresponses.org/specification)
+- [Python SDK Documentation](sdks/python/README.md)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Admin App Plan](docs/ADMIN_APP_PLAN.md)
 - [Chat UI Documentation](apps/chat/README.md)

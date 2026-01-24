@@ -1,17 +1,34 @@
 # Aura LLM Gateway Python SDK
 
-Python SDK for the [Aura LLM Gateway](https://github.com/UmaiTech/aura-llm-gateway), implementing the Open Responses API.
+[![PyPI](https://img.shields.io/pypi/v/aura-llm)](https://pypi.org/project/aura-llm/)
+[![Python](https://img.shields.io/pypi/pyversions/aura-llm)](https://pypi.org/project/aura-llm/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Python SDK for the [Aura LLM Gateway](https://github.com/UmaiTech/aura-llm-gateway), implementing the [Open Responses API](https://www.openresponses.org/specification).
 
 ## Installation
+
+Using [uv](https://docs.astral.sh/uv/) (recommended):
+
+```bash
+uv add aura-llm
+```
+
+Using pip:
 
 ```bash
 pip install aura-llm
 ```
 
-Or install from source:
+### From Source
 
 ```bash
 cd sdks/python
+
+# With uv
+uv sync
+
+# With pip
 pip install -e .
 ```
 
@@ -235,18 +252,55 @@ except AuraError as e:
 
 ## Development
 
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
+We use [uv](https://docs.astral.sh/uv/) for fast, reliable Python package management.
 
-# Run tests
-pytest
+### Setup
+
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+cd sdks/python
+uv sync
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=aura --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_types.py -v
+```
+
+### Code Quality
+
+```bash
+# Linting
+uv run ruff check src/aura tests
+
+# Auto-fix lint issues
+uv run ruff check --fix src/aura tests
+
+# Format code
+uv run ruff format src/aura tests
 
 # Type checking
-mypy src/aura
+uv run mypy src/aura
+```
 
-# Linting
-ruff check src/aura
+### All Checks (CI equivalent)
+
+```bash
+uv run ruff check src/aura tests
+uv run ruff format --check src/aura tests
+uv run mypy src/aura
+uv run pytest --cov=aura
 ```
 
 ## License

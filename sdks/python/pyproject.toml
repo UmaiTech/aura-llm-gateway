@@ -12,7 +12,7 @@ requires-python = ">=3.9"
 authors = [
     { name = "Aura Team" }
 ]
-keywords = ["llm", "openai", "anthropic", "ai", "gateway", "api"]
+keywords = ["llm", "openai", "anthropic", "ai", "gateway", "api", "open-responses"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -22,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -31,35 +32,70 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-httpx>=0.22.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-httpx>=0.30.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/UmaiTech/aura-llm-gateway"
 Documentation = "https://github.com/UmaiTech/aura-llm-gateway/tree/main/sdks/python"
 Repository = "https://github.com/UmaiTech/aura-llm-gateway"
+Changelog = "https://github.com/UmaiTech/aura-llm-gateway/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aura"]
+
+# UV configuration
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-httpx>=0.30.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "RUF"]
 ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["aura"]
 
 [tool.mypy]
 python_version = "3.9"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/aura"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
