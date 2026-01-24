@@ -546,6 +546,12 @@ async fn main() -> anyhow::Result<()> {
     // Create app state
     let state = AppState::new(config.clone(), db_pool);
 
+    info!(
+        providers = state.provider_names().len(),
+        models = state.available_models().len(),
+        "Gateway initialized"
+    );
+
     // Build router with middleware
     let app = Router::new()
         .merge(routes::app_router())
