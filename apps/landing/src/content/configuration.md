@@ -68,18 +68,24 @@ export RUST_LOG=info,aura_proxy=debug,aura_core=debug
 export RUST_LOG=trace
 ```
 
-### Security
+### Security & Authentication
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AURA_ADMIN_KEY` | Admin API key for management endpoints | None |
+| `AURA_MASTER_KEY` | Master key for credential encryption (32 bytes, base64) | None |
 | `AURA_ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) | `*` |
 
 Example:
 ```bash
 export AURA_ADMIN_KEY=super-secret-admin-key
 export AURA_ALLOWED_ORIGINS=https://myapp.com,https://admin.myapp.com
+
+# Generate a master key for credential encryption
+export AURA_MASTER_KEY=$(openssl rand -base64 32)
 ```
+
+**Note:** The master key is required for storing encrypted provider credentials. Without it, organizations cannot store their own API keys in the database.
 
 ### Performance
 

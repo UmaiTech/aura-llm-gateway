@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Hierarchical Organization Model** - Multi-tenant support with organizations, teams, and projects (2026-01-27)
+  - Organizations as top-level billing entities
+  - Teams for department/product grouping with token limits
+  - Projects under teams for initiative-level scoping
+  - API keys scoped to organization, team, project, or user level
+- **End-User Cost Tracking** - Per-customer billing and cost allocation (2026-01-27)
+  - `user` field in API requests for end-user identification
+  - Automatic upsert of end-user records on API requests
+  - Per-user token usage and cost tracking
+  - Support for blocking abusive users
+- **Credential Encryption** - Secure storage for provider API keys (2026-01-27)
+  - AES-256-GCM envelope encryption
+  - Random DEK (Data Encryption Key) per credential
+  - Master key wrapping via AURA_MASTER_KEY environment variable
+  - Organizations can store their own provider credentials
+- **Claude/Anthropic Adapter** - Full Anthropic provider support (2026-01-26)
+  - Claude 3.5 Sonnet and Haiku model support
+  - Streaming with semantic events
+  - Tool/function calling support
+  - Proper message format transformation
+- **API Key Authentication** - Secure bearer token auth (2026-01-26)
+  - API key format: `aura_live_<random>` / `aura_test_<random>`
+  - SHA-256 hashed storage (keys never stored in plaintext)
+  - Scope-based permissions (responses:create, usage:read, etc.)
+  - Rate limiting per key (requests per minute, monthly token limits)
 - **Conversation Persistence** - Full stateful conversation support (2026-01-23)
   - New `responses` table storing complete Open Responses API objects with JSONB
   - Automatic conversation creation with auto-generated titles from first message

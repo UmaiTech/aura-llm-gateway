@@ -24,11 +24,15 @@ Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI,
 
 - **Multi-Provider Support**: OpenAI, Anthropic (Claude), Google (Gemini)
 - **Open Responses API**: Semantic streaming events for agentic workflows
-- **Load Balancing**: Distribute requests across providers and API keys
+- **API Key Authentication**: Secure API key management with scopes and rate limits
+- **Hierarchical Organizations**: Organization → Teams → Projects with scoped API keys
+- **End-User Cost Tracking**: Track costs per end-user for billing and allocation
+- **Credential Encryption**: AES-256-GCM envelope encryption for provider credentials
 - **Cost Tracking**: Real-time usage and cost monitoring per request
 - **Agentic Metadata**: Tool call tracking, requires_action flags, reasoning status
+- **Load Balancing**: Distribute requests across providers and API keys
 - **Response Caching**: Redis-based caching with configurable TTL
-- **Rate Limiting**: Per-key rate limits with burst support
+- **Rate Limiting**: Per-key and per-user rate limits with burst support
 - **Observability**: Prometheus metrics, structured logging, request tracing
 - **High Performance**: Built in Rust with async I/O (Tokio + Axum)
 
@@ -261,7 +265,7 @@ The `docker-compose.yml` includes:
 
 ## Project Status
 
-**Current Phase**: SDKs & Production Readiness (Milestone 5 & 8) 🔄
+**Current Phase**: Multi-Tenancy & Production Readiness (Milestone 5, 12 & 8) 🔄
 
 ### Completed
 - [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
@@ -271,17 +275,22 @@ The `docker-compose.yml` includes:
 - [x] **PR #5: HTTP Client Foundation** - Reqwest with retries and timeouts
 - [x] **PR #6: OpenAI Adapter** - Provider trait + OpenAI implementation
 - [x] **PR #7: Streaming Support** - SSE streaming with semantic events
+- [x] **PR #9: Claude Adapter** - Full Anthropic provider with streaming and tool support
+- [x] **PR #13: API Key Authentication** - Bearer token auth with scopes and rate limits
 - [x] **PR #14: PostgreSQL Setup** - Database schema, models, AppState integration
 - [x] **PR #15: Request Logging** - Async logging to database
 - [x] **PR #16: Cost Tracking** - Per-request cost calculation with agentic metadata
 - [x] **PR #21: Conversation Threading** - Stateful conversations with previous_response_id
 - [x] **PR #28: Documentation** - API docs, architecture diagrams (Mermaid)
 - [x] **PR #35-36: Python SDK** - Full-featured client with sync/async, streaming, typed events
+- [x] **PR #54: Organization Model** - Hierarchical org → teams → projects structure
+- [x] **Credential Encryption** - AES-256-GCM envelope encryption for provider API keys
+- [x] **End-User Tracking** - Per-user cost allocation with upsert on API requests
 
 ### In Progress
 - 🔄 **PR #17: Metrics** - Prometheus metrics endpoint
-- 🔄 **PR #9: Claude Adapter** - Anthropic provider implementation
 - 🔄 **PR #37-38: TypeScript SDK** - Coming soon
+- 🔄 **Admin Dashboard** - React admin UI for key and org management
 
 ### Bonus (Implemented Early)
 - [x] **Chat UI** - React chat app with tool execution cards

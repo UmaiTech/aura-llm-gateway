@@ -120,6 +120,62 @@ sequenceDiagram
 
 ## Component Details
 
+### Authentication & Multi-Tenancy
+
+Aura supports a hierarchical organization model with API key authentication:
+
+```mermaid
+flowchart TB
+    subgraph Auth["Authentication Flow"]
+        A[API Request]
+        B[Extract Bearer Token]
+        C[Validate API Key]
+        D[Load AuthContext]
+    end
+
+    subgraph Hierarchy["Organization Hierarchy"]
+        E[Organization]
+        F[Teams]
+        G[Projects]
+        H[API Keys]
+        I[End Users]
+    end
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    E --> I
+```
+
+**Key Components:**
+
+- **Organizations**: Top-level billing entities with owner and members
+- **Teams**: Departments or product groups within an organization
+- **Projects**: Specific initiatives under teams
+- **API Keys**: Scoped to org, team, project, or user level
+- **End Users**: Consumer/client users for cost allocation
+
+### Credential Encryption
+
+Provider credentials are stored using AES-256-GCM envelope encryption:
+
+```mermaid
+flowchart LR
+    A[Provider API Key] --> B[DEK]
+    B --> C[Encrypted Credential]
+    D[Master Key] --> E[Wrapped DEK]
+    C --> F[(Database)]
+    E --> F
+```
+
+- **DEK (Data Encryption Key)**: Randomly generated for each credential
+- **MEK (Master Encryption Key)**: Environment variable for key wrapping
+- **Nonce**: Unique per encryption operation
+
 ### Provider System
 
 ```mermaid
@@ -219,28 +275,85 @@ erDiagram
         boolean is_enabled
         timestamp effective_from
         timestamp effective_until
-        timestamp created_at
-        timestamp updated_at
     }
 
-    request_logs {
+    organizations ||--o{ teams : contains
+    organizations ||--o{ api_keys : issues
+    organizations ||--o{ provider_credentials : stores
+    organizations ||--o{ end_users : tracks
+    organizations {
         uuid id PK
-        string response_id UK
-        uuid conversation_id FK
-        string provider_name
+        string name
+        string slug UK
+        string owner_id
+        jsonb settings
+        timestamp created_at
+    }
+
+    teams ||--o{ projects : contains
+    teams ||--o{ api_keys : issues
+    teams {
+        uuid id PK
+        uuid organization_id FK
+        string name
+        string slug
+        bigint monthly_token_limit
+        bigint current_month_tokens
+    }
+
+    projects ||--o{ api_keys : issues
+    projects {
+        uuid id PK
+        uuid team_id FK
+        string name
+        string slug
+        string status
+        bigint monthly_token_limit
+    }
+
+    api_keys ||--o{ api_key_usage : logs
+    api_keys {
+        uuid id PK
+        string key_id UK
+        string key_hash
+        string name
+        string scope_type
+        uuid scope_id
+        jsonb scopes
+        int rate_limit_rpm
+        bigint monthly_token_limit
+        string status
+    }
+
+    api_key_usage {
+        uuid id PK
+        uuid api_key_id FK
+        uuid end_user_id FK
+        string request_id
         string model_id
-        string user_id
         int input_tokens
         int output_tokens
-        int cached_tokens
-        int reasoning_tokens
         decimal cost_usd
-        int latency_ms
-        string status
-        string error_code
-        string error_message
-        jsonb metadata
-        timestamp created_at
+    }
+
+    end_users {
+        uuid id PK
+        uuid organization_id FK
+        string external_id
+        string name
+        bigint total_input_tokens
+        bigint total_output_tokens
+        decimal total_cost_usd
+        boolean is_blocked
+    }
+
+    provider_credentials {
+        uuid id PK
+        uuid organization_id FK
+        string provider_name
+        bytea encrypted_api_key
+        bytea wrapped_dek
+        boolean is_active
     }
 
     conversations ||--o{ messages : contains
@@ -251,8 +364,6 @@ erDiagram
         string title
         string model_id
         jsonb metadata
-        timestamp created_at
-        timestamp updated_at
     }
 
     messages {
@@ -260,8 +371,19 @@ erDiagram
         uuid conversation_id FK
         string role
         text content
-        jsonb metadata
-        timestamp created_at
+    }
+
+    request_logs {
+        uuid id PK
+        string response_id UK
+        uuid conversation_id FK
+        string provider_name
+        string model_id
+        int input_tokens
+        int output_tokens
+        decimal cost_usd
+        int latency_ms
+        string status
     }
 ```
 
@@ -297,6 +419,7 @@ flowchart LR
         C[Model Map]
         D[Cost Calculator]
         E[DB Pool]
+        F[Master Key]
     end
 
     A --> |Arc| A1[Server config<br/>Provider keys]
@@ -304,7 +427,32 @@ flowchart LR
     C --> |Arc HashMap| C1[model_id → provider_name]
     D --> |Arc| D1[Pricing data]
     E --> |Option| E1[PostgreSQL Pool]
+    F --> |Option| F1[AES-256 Master Key<br/>for credential decryption]
 ```
+
+## End-User Tracking
+
+The gateway tracks end-user costs via the `user` field in API requests:
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Gateway
+    participant DB
+
+    App->>Gateway: POST /v1/responses<br/>user: "customer_123"
+    Gateway->>DB: Upsert end_user
+    DB-->>Gateway: end_user_id
+    Gateway->>Gateway: Process request
+    Gateway->>DB: Record usage + end_user_id
+    Gateway-->>App: Response + cost
+```
+
+This enables:
+- Per-customer billing and cost allocation
+- Per-user rate limiting
+- Usage reporting by customer
+- Blocking abusive users
 
 ## Configuration
 
@@ -336,15 +484,19 @@ flowchart TB
         B[Cost Tracking]
         C[Request Logging]
         D[Streaming SSE]
+        E[API Key Auth]
+        F[Organization Model]
+        G[End-User Tracking]
+        H[Credential Encryption]
     end
 
     subgraph Planned["Planned Features"]
-        E[Rate Limiter<br/>Redis]
-        F[Response Cache<br/>Redis]
-        G[Load Balancer<br/>Multi-node]
-        H[Pricing Scraper<br/>Cron Job]
-        I[Webhooks<br/>Callbacks]
-        J[Admin Dashboard<br/>React UI]
+        I[Rate Limiter<br/>Redis]
+        J[Response Cache<br/>Redis]
+        K[Load Balancer<br/>Multi-node]
+        L[Pricing Scraper<br/>Cron Job]
+        M[Webhooks<br/>Callbacks]
+        N[Admin Dashboard<br/>React UI]
     end
 
     Current --> Planned

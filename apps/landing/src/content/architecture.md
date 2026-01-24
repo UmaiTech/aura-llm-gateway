@@ -40,7 +40,8 @@ flowchart TB
 - **One API for all providers**: Use the same request format for OpenAI, Anthropic, and Google
 - **Automatic cost tracking**: Every response includes exact USD cost
 - **Built-in observability**: Latency, provider info, and metadata on every request
-- **Zero configuration**: Just set API keys and start using it
+- **Multi-tenant ready**: Organizations, teams, projects with scoped API keys
+- **Secure by default**: API key authentication with encrypted provider credentials
 
 ## How It Works
 
@@ -70,6 +71,52 @@ sequenceDiagram
 6. Aura adds metadata (cost, latency, provider) and returns the response
 
 **Performance:** Aura adds ~10ms overhead. A typical request takes 200-500ms total (mostly waiting for the LLM).
+
+## Authentication & Multi-Tenancy
+
+Aura uses API key authentication with a hierarchical organization model:
+
+```mermaid
+flowchart TB
+    subgraph Hierarchy["Organization Hierarchy"]
+        A[Organization]
+        B[Teams]
+        C[Projects]
+        D[API Keys]
+        E[End Users]
+    end
+
+    A --> B
+    B --> C
+    C --> D
+    A --> E
+```
+
+**Key concepts:**
+
+- **Organizations**: Top-level billing entities (your company)
+- **Teams**: Departments or product groups
+- **Projects**: Specific initiatives or applications
+- **API Keys**: Scoped to org, team, project, or user level
+- **End Users**: Your customers (for cost allocation)
+
+**API Key Format:**
+
+```
+aura_live_<random_32_chars>   # Production keys
+aura_test_<random_32_chars>   # Test/development keys
+```
+
+**Request with authentication:**
+
+```bash
+curl -X POST https://api.aura.example/v1/responses \
+  -H "Authorization: Bearer aura_live_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4o", "input": [...], "user": "customer_123"}'
+```
+
+The `user` field enables per-customer cost tracking and billing.
 
 ## Streaming
 
@@ -129,6 +176,49 @@ This makes it easy to:
 - Monitor performance
 - Debug issues
 - Build agent workflows
+
+## End-User Tracking
+
+Track costs per customer by including the `user` field in your requests:
+
+```json
+{
+  "model": "gpt-4o",
+  "input": [...],
+  "user": "customer_12345"
+}
+```
+
+Aura automatically:
+1. Creates or updates the end-user record
+2. Tracks token usage and costs per user
+3. Enables per-user rate limiting (if configured)
+4. Supports blocking abusive users
+
+This enables:
+- **Per-customer billing**: Charge customers for their usage
+- **Cost allocation**: Attribute costs to specific customers
+- **Usage analytics**: See which customers use the most tokens
+- **Abuse prevention**: Block users who exceed limits
+
+## Credential Encryption
+
+Provider API keys (OpenAI, Anthropic, etc.) are stored securely using envelope encryption:
+
+```mermaid
+flowchart LR
+    A[Provider API Key] --> B[DEK]
+    B --> C[Encrypted Credential]
+    D[Master Key] --> E[Wrapped DEK]
+    C --> F[(Database)]
+    E --> F
+```
+
+- **DEK**: Random Data Encryption Key per credential
+- **Master Key**: AES-256 key from environment variable
+- **Encryption**: AES-256-GCM with unique nonce
+
+This allows organizations to use their own provider API keys while keeping them secure at rest.
 
 ## Technology Stack
 

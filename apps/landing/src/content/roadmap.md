@@ -10,16 +10,21 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 ## ✅ Launched (v0.1)
 
 ### Core Gateway
-- **Multi-provider support** - OpenAI, Anthropic, Google with unified API
+- **Multi-provider support** - OpenAI, Anthropic (Claude), Google with unified API
 - **Automatic cost tracking** - Real-time USD cost calculation
 - **Streaming responses** - Server-Sent Events for real-time chat
 - **Open Responses API** - Standard specification for agentic workflows
 - **Request logging** - PostgreSQL integration for analytics
+- **API key authentication** - Bearer token auth with scopes and rate limits
+- **Hierarchical organizations** - Org → Teams → Projects with scoped API keys
+- **End-user cost tracking** - Per-customer billing via `user` field
+- **Credential encryption** - AES-256-GCM envelope encryption for provider keys
 
 ### Developer Experience
 - **Chat playground** - Built-in UI for testing
 - **Documentation site** - Complete API reference and guides
 - **Docker support** - Easy deployment with docker-compose
+- **Python SDK** - Full-featured client with sync/async support
 - **TypeScript types** - Auto-generated types for clients
 
 ## 🚧 In Progress (v0.2)
@@ -61,10 +66,10 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 - Load balancing across API keys
 - Cost-optimized routing
 
-**Admin dashboard** (Q3 2026)
-- Web UI for analytics
+**Admin dashboard** (Q2 2026)
+- Web UI for analytics and management
 - Cost visualization charts
-- User management
+- API key and organization management
 - Real-time request monitoring
 
 **Auto-updating pricing** (Q3 2026)
@@ -82,19 +87,14 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 - Replicate
 
 **SDKs & Integrations** (Q2-Q3 2026)
-- Official Python SDK
+- ~~Official Python SDK~~ ✅ Released!
 - Official TypeScript/Node SDK
 - LangChain integration
 - LlamaIndex integration
 
 ### Enterprise Features (v1.0)
 
-**Multi-tenancy** (Q4 2026)
-- Isolated tenant environments
-- Per-tenant rate limits and quotas
-- Custom domain support
-
-**Advanced security** (Q4 2026)
+**Advanced security** (Q3 2026)
 - API key rotation
 - IP allowlisting
 - Request signing

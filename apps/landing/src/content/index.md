@@ -10,6 +10,10 @@ Aura is a Rust-based LLM proxy implementing the [Open Responses API](https://www
 ## Features
 
 - **Multi-Provider Support**: Unified API for OpenAI, Anthropic, and Google models
+- **API Key Authentication**: Secure bearer token auth with scopes and rate limits
+- **Hierarchical Organizations**: Org → Teams → Projects with scoped API keys
+- **End-User Cost Tracking**: Per-customer billing and cost allocation via `user` field
+- **Credential Encryption**: AES-256-GCM envelope encryption for provider API keys
 - **Cost Tracking**: Real-time cost calculation per request with detailed usage metrics
 - **Open Responses API**: Built on the specification for agentic workflows with streaming and tool use
 - **Enterprise Ready**: Load balancing, rate limiting, caching, and observability built-in
@@ -41,12 +45,16 @@ The gateway will be available at `http://localhost:8080`.
 ```javascript
 const response = await fetch('http://localhost:8080/v1/responses', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer aura_live_your_api_key'
+  },
   body: JSON.stringify({
     model: 'gpt-4o',
     input: [
       { type: 'message', role: 'user', content: 'Hello!' }
-    ]
+    ],
+    user: 'customer_123'  // Optional: track costs per end-user
   })
 });
 
@@ -66,5 +74,6 @@ Aura is built with:
 ## Next Steps
 
 - [API Reference](/docs/api) - Explore the API endpoints
+- [Authentication](/docs/api/authentication) - Learn about API keys and scopes
 - [Architecture](/docs/architecture) - Learn about the system design
 - [Cost Tracking](/docs/api/cost-tracking) - Understand cost calculation

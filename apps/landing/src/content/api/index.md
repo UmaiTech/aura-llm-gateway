@@ -15,13 +15,28 @@ http://localhost:8080
 
 ## Authentication
 
-Currently, Aura does not require authentication. Provider API keys are configured on the server side.
+All API requests require a valid API key in the `Authorization` header:
+
+```bash
+curl -X POST http://localhost:8080/v1/responses \
+  -H "Authorization: Bearer aura_live_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4o", "input": [...]}'
+```
+
+See [Authentication](/docs/api/authentication) for details on API key management, scopes, and rate limits.
 
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/v1/responses` | Create a response (streaming or non-streaming) |
+| GET | `/v1/conversations` | List conversations |
+| GET | `/v1/conversations/{id}` | Get a conversation |
+| DELETE | `/v1/conversations/{id}` | Delete a conversation |
+| POST | `/v1/api-keys` | Create an API key (admin) |
+| GET | `/v1/api-keys` | List API keys (admin) |
+| DELETE | `/v1/api-keys/{key_id}` | Revoke an API key (admin) |
 | GET | `/health` | Health check endpoint |
 
 ## Response Enrichment
