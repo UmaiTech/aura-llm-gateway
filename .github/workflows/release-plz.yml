@@ -1,5 +1,16 @@
 name: Release
 
+# This workflow uses release-plz to automate releases.
+# IMPORTANT: A Personal Access Token (PAT) or GitHub App token is required
+# for the release-pr job. The built-in GITHUB_TOKEN has limitations:
+# - Cannot trigger CI workflows on PRs it creates
+# - May have issues pushing to protected branches
+#
+# To set up:
+# 1. Create a PAT with 'repo' scope (or a GitHub App with contents:write, pull-requests:write)
+# 2. Add it as a repository secret named 'RELEASE_PLZ_TOKEN'
+# 3. See: https://release-plz.dev/docs/github/token
+
 on:
   push:
     branches:
@@ -11,6 +22,8 @@ jobs:
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
+    # Only run if RELEASE_PLZ_TOKEN is configured
+    if: ${{ vars.RELEASE_PLZ_ENABLED != 'false' }}
     permissions:
       contents: write
       pull-requests: write
@@ -22,11 +35,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Note: persist-credentials defaults to true, which is required
-          # for release-plz to push version bump commits. The official
-          # release-plz workflow uses persist-credentials: false with a
-          # GitHub App token, but with GITHUB_TOKEN we need credentials
-          # persisted in git config.
+          # Use PAT token for checkout so git push works correctly
+          token: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -39,10 +49,13 @@ jobs:
         with:
           command: release-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT for GitHub API operations (creating PRs, pushing branches)
+          # Falls back to GITHUB_TOKEN but PRs won't trigger CI workflows
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  # Release unpublished packages.
+  # Release unpublished packages (creates GitHub releases, publishes to crates.io).
+  # This job can use GITHUB_TOKEN since it doesn't create PRs that need CI triggers.
   release-plz-release:
     name: Release-plz release
     runs-on: ubuntu-latest
@@ -54,7 +67,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
