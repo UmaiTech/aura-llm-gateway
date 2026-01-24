@@ -336,6 +336,8 @@ async fn create_api_key(
         expires_at,
         allowed_ips: None,
         metadata: None,
+        scope_type: Some("organization".to_string()), // Default to org scope
+        scope_id: None,
     };
 
     let api_key = ApiKeyRepo::create(pool, new_key).await.map_err(|e| {

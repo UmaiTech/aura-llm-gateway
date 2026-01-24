@@ -264,6 +264,10 @@ pub struct ApiKey {
     pub last_used_at: Option<DateTime<Utc>>,
     pub allowed_ips: Option<serde_json::Value>,
     pub metadata: Option<serde_json::Value>,
+    /// Scope type: organization, team, project, or user
+    pub scope_type: Option<String>,
+    /// ID of the scoped entity (team_id, project_id, or user_id depending on scope_type)
+    pub scope_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -313,6 +317,10 @@ pub struct NewApiKey {
     pub expires_at: Option<DateTime<Utc>>,
     pub allowed_ips: Option<serde_json::Value>,
     pub metadata: Option<serde_json::Value>,
+    /// Scope type: organization, team, project, or user
+    pub scope_type: Option<String>,
+    /// ID of the scoped entity
+    pub scope_id: Option<Uuid>,
 }
 
 /// API key usage record
@@ -328,6 +336,10 @@ pub struct ApiKeyUsage {
     pub cached_tokens: Option<i32>,
     pub reasoning_tokens: Option<i32>,
     pub cost_usd: Option<f64>,
+    /// End user ID (from end_users table)
+    pub end_user_id: Option<Uuid>,
+    /// External end user ID (provided in API request)
+    pub end_user_external_id: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -343,6 +355,10 @@ pub struct NewApiKeyUsage {
     pub cached_tokens: Option<i32>,
     pub reasoning_tokens: Option<i32>,
     pub cost_usd: Option<f64>,
+    /// End user ID (from end_users table)
+    pub end_user_id: Option<Uuid>,
+    /// External end user ID (provided in API request)
+    pub end_user_external_id: Option<String>,
 }
 
 // ============================================================================
@@ -437,4 +453,212 @@ pub struct NewOrganizationMember {
     pub organization_id: Uuid,
     pub user_id: String,
     pub role: String,
+}
+
+// ============================================================================
+// Team Models
+// ============================================================================
+
+/// Team record
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct Team {
+    pub id: Uuid,
+    pub organization_id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub monthly_token_limit: Option<i64>,
+    pub current_month_tokens: i64,
+    pub usage_reset_month: Option<String>,
+    pub settings: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// New team for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewTeam {
+    pub organization_id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub monthly_token_limit: Option<i64>,
+    pub settings: Option<serde_json::Value>,
+}
+
+/// Team member role
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TeamRole {
+    Lead,
+    Member,
+}
+
+impl std::fmt::Display for TeamRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TeamRole::Lead => write!(f, "lead"),
+            TeamRole::Member => write!(f, "member"),
+        }
+    }
+}
+
+/// Team member record
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct TeamMember {
+    pub id: Uuid,
+    pub team_id: Uuid,
+    pub user_id: String,
+    pub role: String,
+    pub joined_at: DateTime<Utc>,
+}
+
+/// New team member for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewTeamMember {
+    pub team_id: Uuid,
+    pub user_id: String,
+    pub role: String,
+}
+
+// ============================================================================
+// Project Models
+// ============================================================================
+
+/// Project status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectStatus {
+    Active,
+    Archived,
+}
+
+impl std::fmt::Display for ProjectStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProjectStatus::Active => write!(f, "active"),
+            ProjectStatus::Archived => write!(f, "archived"),
+        }
+    }
+}
+
+/// Project record
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct Project {
+    pub id: Uuid,
+    pub team_id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub monthly_token_limit: Option<i64>,
+    pub current_month_tokens: i64,
+    pub usage_reset_month: Option<String>,
+    pub status: String,
+    pub settings: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// New project for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewProject {
+    pub team_id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub monthly_token_limit: Option<i64>,
+    pub settings: Option<serde_json::Value>,
+}
+
+// ============================================================================
+// End User Models (for cost tracking)
+// ============================================================================
+
+/// End user record - tracks consumer/client users of applications built with Aura
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EndUser {
+    pub id: Uuid,
+    pub organization_id: Uuid,
+    pub external_id: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub total_input_tokens: i64,
+    pub total_output_tokens: i64,
+    pub total_cost_usd: f64,
+    pub request_count: i64,
+    pub rate_limit_rpm: Option<i32>,
+    pub monthly_token_limit: Option<i64>,
+    pub current_month_tokens: i64,
+    pub usage_reset_month: Option<String>,
+    pub is_blocked: bool,
+    pub metadata: Option<serde_json::Value>,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl EndUser {
+    /// Get total tokens consumed
+    pub fn total_tokens(&self) -> i64 {
+        self.total_input_tokens + self.total_output_tokens
+    }
+}
+
+/// New end user for insertion/upsert
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewEndUser {
+    pub organization_id: Uuid,
+    pub external_id: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// End user usage update
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EndUserUsageUpdate {
+    pub end_user_id: Uuid,
+    pub input_tokens: i32,
+    pub output_tokens: i32,
+    pub cost_usd: Option<f64>,
+}
+
+// ============================================================================
+// API Key Scope Types
+// ============================================================================
+
+/// API key scope type - determines what level the key operates at
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiKeyScopeType {
+    Organization,
+    Team,
+    Project,
+    User,
+}
+
+impl std::fmt::Display for ApiKeyScopeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApiKeyScopeType::Organization => write!(f, "organization"),
+            ApiKeyScopeType::Team => write!(f, "team"),
+            ApiKeyScopeType::Project => write!(f, "project"),
+            ApiKeyScopeType::User => write!(f, "user"),
+        }
+    }
+}
+
+impl std::str::FromStr for ApiKeyScopeType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "organization" => Ok(ApiKeyScopeType::Organization),
+            "team" => Ok(ApiKeyScopeType::Team),
+            "project" => Ok(ApiKeyScopeType::Project),
+            "user" => Ok(ApiKeyScopeType::User),
+            _ => Err(format!("Unknown API key scope type: {}", s)),
+        }
+    }
 }

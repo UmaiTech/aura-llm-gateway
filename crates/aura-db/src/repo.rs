@@ -693,6 +693,8 @@ impl ApiKeyRepo {
             last_used_at: row.get("last_used_at"),
             allowed_ips: row.get("allowed_ips"),
             metadata: row.get("metadata"),
+            scope_type: row.try_get("scope_type").ok(),
+            scope_id: row.try_get("scope_id").ok(),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         }
@@ -709,9 +711,10 @@ impl ApiKeyUsageRepo {
             r#"
             INSERT INTO api_key_usage (
                 api_key_id, request_id, model_id, provider_name,
-                input_tokens, output_tokens, cached_tokens, reasoning_tokens, cost_usd
+                input_tokens, output_tokens, cached_tokens, reasoning_tokens, cost_usd,
+                end_user_id, end_user_external_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             "#,
         )
@@ -724,22 +727,12 @@ impl ApiKeyUsageRepo {
         .bind(new.cached_tokens)
         .bind(new.reasoning_tokens)
         .bind(new.cost_usd)
+        .bind(new.end_user_id)
+        .bind(&new.end_user_external_id)
         .fetch_one(pool)
         .await?;
 
-        Ok(ApiKeyUsage {
-            id: row.get("id"),
-            api_key_id: row.get("api_key_id"),
-            request_id: row.get("request_id"),
-            model_id: row.get("model_id"),
-            provider_name: row.get("provider_name"),
-            input_tokens: row.get("input_tokens"),
-            output_tokens: row.get("output_tokens"),
-            cached_tokens: row.get("cached_tokens"),
-            reasoning_tokens: row.get("reasoning_tokens"),
-            cost_usd: row.get("cost_usd"),
-            created_at: row.get("created_at"),
-        })
+        Ok(Self::row_to_usage(row))
     }
 
     /// Get usage for an API key within a time range
@@ -761,22 +754,47 @@ impl ApiKeyUsageRepo {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows
-            .into_iter()
-            .map(|row| ApiKeyUsage {
-                id: row.get("id"),
-                api_key_id: row.get("api_key_id"),
-                request_id: row.get("request_id"),
-                model_id: row.get("model_id"),
-                provider_name: row.get("provider_name"),
-                input_tokens: row.get("input_tokens"),
-                output_tokens: row.get("output_tokens"),
-                cached_tokens: row.get("cached_tokens"),
-                reasoning_tokens: row.get("reasoning_tokens"),
-                cost_usd: row.get("cost_usd"),
-                created_at: row.get("created_at"),
-            })
-            .collect())
+        Ok(rows.into_iter().map(Self::row_to_usage).collect())
+    }
+
+    /// Get usage for a specific end user
+    pub async fn get_by_end_user(
+        pool: &DbPool,
+        end_user_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<ApiKeyUsage>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM api_key_usage
+            WHERE end_user_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(end_user_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_usage).collect())
+    }
+
+    fn row_to_usage(row: sqlx::postgres::PgRow) -> ApiKeyUsage {
+        ApiKeyUsage {
+            id: row.get("id"),
+            api_key_id: row.get("api_key_id"),
+            request_id: row.get("request_id"),
+            model_id: row.get("model_id"),
+            provider_name: row.get("provider_name"),
+            input_tokens: row.get("input_tokens"),
+            output_tokens: row.get("output_tokens"),
+            cached_tokens: row.get("cached_tokens"),
+            reasoning_tokens: row.get("reasoning_tokens"),
+            cost_usd: row.get("cost_usd"),
+            end_user_id: row.try_get("end_user_id").ok(),
+            end_user_external_id: row.try_get("end_user_external_id").ok(),
+            created_at: row.get("created_at"),
+        }
     }
 }
 
@@ -1083,5 +1101,539 @@ impl OrganizationMemberRepo {
         .await?;
 
         Ok(())
+    }
+}
+
+// ============================================================================
+// Team Repository
+// ============================================================================
+
+/// Repository for team operations
+pub struct TeamRepo;
+
+impl TeamRepo {
+    /// Create a new team
+    pub async fn create(pool: &DbPool, new: NewTeam) -> Result<Team, DbError> {
+        let team = sqlx::query_as::<_, Team>(
+            r#"
+            INSERT INTO teams (organization_id, name, slug, description, monthly_token_limit, settings)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            "#,
+        )
+        .bind(new.organization_id)
+        .bind(&new.name)
+        .bind(&new.slug)
+        .bind(&new.description)
+        .bind(new.monthly_token_limit)
+        .bind(&new.settings)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(team)
+    }
+
+    /// Find team by ID
+    pub async fn find_by_id(pool: &DbPool, id: Uuid) -> Result<Option<Team>, DbError> {
+        let team = sqlx::query_as::<_, Team>("SELECT * FROM teams WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(team)
+    }
+
+    /// Find team by organization and slug
+    pub async fn find_by_org_and_slug(
+        pool: &DbPool,
+        organization_id: Uuid,
+        slug: &str,
+    ) -> Result<Option<Team>, DbError> {
+        let team = sqlx::query_as::<_, Team>(
+            "SELECT * FROM teams WHERE organization_id = $1 AND slug = $2",
+        )
+        .bind(organization_id)
+        .bind(slug)
+        .fetch_optional(pool)
+        .await?;
+
+        Ok(team)
+    }
+
+    /// Get all teams for an organization
+    pub async fn get_by_organization(
+        pool: &DbPool,
+        organization_id: Uuid,
+    ) -> Result<Vec<Team>, DbError> {
+        let teams = sqlx::query_as::<_, Team>(
+            "SELECT * FROM teams WHERE organization_id = $1 ORDER BY name",
+        )
+        .bind(organization_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(teams)
+    }
+
+    /// Update team
+    pub async fn update(
+        pool: &DbPool,
+        id: Uuid,
+        name: Option<&str>,
+        description: Option<&str>,
+        monthly_token_limit: Option<i64>,
+    ) -> Result<(), DbError> {
+        sqlx::query(
+            r#"
+            UPDATE teams SET
+                name = COALESCE($2, name),
+                description = COALESCE($3, description),
+                monthly_token_limit = COALESCE($4, monthly_token_limit)
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .bind(name)
+        .bind(description)
+        .bind(monthly_token_limit)
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Delete team
+    pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("DELETE FROM teams WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Increment team usage
+    pub async fn increment_usage(
+        pool: &DbPool,
+        id: Uuid,
+        input_tokens: i32,
+        output_tokens: i32,
+    ) -> Result<(), DbError> {
+        sqlx::query("SELECT increment_team_usage($1, $2, $3)")
+            .bind(id)
+            .bind(input_tokens)
+            .bind(output_tokens)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+}
+
+/// Repository for team member operations
+pub struct TeamMemberRepo;
+
+impl TeamMemberRepo {
+    /// Add a member to a team
+    pub async fn add_member(pool: &DbPool, new: NewTeamMember) -> Result<TeamMember, DbError> {
+        let member = sqlx::query_as::<_, TeamMember>(
+            r#"
+            INSERT INTO team_members (team_id, user_id, role)
+            VALUES ($1, $2, $3)
+            RETURNING *
+            "#,
+        )
+        .bind(new.team_id)
+        .bind(&new.user_id)
+        .bind(&new.role)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(member)
+    }
+
+    /// Get members of a team
+    pub async fn get_members(pool: &DbPool, team_id: Uuid) -> Result<Vec<TeamMember>, DbError> {
+        let members = sqlx::query_as::<_, TeamMember>(
+            "SELECT * FROM team_members WHERE team_id = $1 ORDER BY joined_at",
+        )
+        .bind(team_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(members)
+    }
+
+    /// Check if user is a member of a team
+    pub async fn is_member(pool: &DbPool, team_id: Uuid, user_id: &str) -> Result<bool, DbError> {
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM team_members WHERE team_id = $1 AND user_id = $2")
+                .bind(team_id)
+                .bind(user_id)
+                .fetch_one(pool)
+                .await?;
+
+        Ok(count.0 > 0)
+    }
+
+    /// Remove a member from a team
+    pub async fn remove_member(pool: &DbPool, team_id: Uuid, user_id: &str) -> Result<(), DbError> {
+        sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
+            .bind(team_id)
+            .bind(user_id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Get teams for a user
+    pub async fn get_teams_for_user(pool: &DbPool, user_id: &str) -> Result<Vec<Team>, DbError> {
+        let teams = sqlx::query_as::<_, Team>(
+            r#"
+            SELECT t.* FROM teams t
+            JOIN team_members tm ON t.id = tm.team_id
+            WHERE tm.user_id = $1
+            ORDER BY t.name
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(teams)
+    }
+}
+
+// ============================================================================
+// Project Repository
+// ============================================================================
+
+/// Repository for project operations
+pub struct ProjectRepo;
+
+impl ProjectRepo {
+    /// Create a new project
+    pub async fn create(pool: &DbPool, new: NewProject) -> Result<Project, DbError> {
+        let project = sqlx::query_as::<_, Project>(
+            r#"
+            INSERT INTO projects (team_id, name, slug, description, monthly_token_limit, settings)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            "#,
+        )
+        .bind(new.team_id)
+        .bind(&new.name)
+        .bind(&new.slug)
+        .bind(&new.description)
+        .bind(new.monthly_token_limit)
+        .bind(&new.settings)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(project)
+    }
+
+    /// Find project by ID
+    pub async fn find_by_id(pool: &DbPool, id: Uuid) -> Result<Option<Project>, DbError> {
+        let project = sqlx::query_as::<_, Project>("SELECT * FROM projects WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(project)
+    }
+
+    /// Find project by team and slug
+    pub async fn find_by_team_and_slug(
+        pool: &DbPool,
+        team_id: Uuid,
+        slug: &str,
+    ) -> Result<Option<Project>, DbError> {
+        let project =
+            sqlx::query_as::<_, Project>("SELECT * FROM projects WHERE team_id = $1 AND slug = $2")
+                .bind(team_id)
+                .bind(slug)
+                .fetch_optional(pool)
+                .await?;
+
+        Ok(project)
+    }
+
+    /// Get all projects for a team
+    pub async fn get_by_team(pool: &DbPool, team_id: Uuid) -> Result<Vec<Project>, DbError> {
+        let projects =
+            sqlx::query_as::<_, Project>("SELECT * FROM projects WHERE team_id = $1 ORDER BY name")
+                .bind(team_id)
+                .fetch_all(pool)
+                .await?;
+
+        Ok(projects)
+    }
+
+    /// Get active projects for a team
+    pub async fn get_active_by_team(pool: &DbPool, team_id: Uuid) -> Result<Vec<Project>, DbError> {
+        let projects = sqlx::query_as::<_, Project>(
+            "SELECT * FROM projects WHERE team_id = $1 AND status = 'active' ORDER BY name",
+        )
+        .bind(team_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(projects)
+    }
+
+    /// Update project status
+    pub async fn update_status(pool: &DbPool, id: Uuid, status: &str) -> Result<(), DbError> {
+        sqlx::query("UPDATE projects SET status = $2 WHERE id = $1")
+            .bind(id)
+            .bind(status)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Archive project
+    pub async fn archive(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        Self::update_status(pool, id, "archived").await
+    }
+
+    /// Delete project
+    pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("DELETE FROM projects WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Increment project usage
+    pub async fn increment_usage(
+        pool: &DbPool,
+        id: Uuid,
+        input_tokens: i32,
+        output_tokens: i32,
+    ) -> Result<(), DbError> {
+        sqlx::query("SELECT increment_project_usage($1, $2, $3)")
+            .bind(id)
+            .bind(input_tokens)
+            .bind(output_tokens)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+}
+
+// ============================================================================
+// End User Repository
+// ============================================================================
+
+/// Repository for end user operations (consumer/client tracking)
+pub struct EndUserRepo;
+
+impl EndUserRepo {
+    /// Upsert an end user - creates if not exists, updates if exists
+    pub async fn upsert(pool: &DbPool, new: NewEndUser) -> Result<EndUser, DbError> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO end_users (organization_id, external_id, name, email, metadata)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (organization_id, external_id)
+            DO UPDATE SET
+                name = COALESCE(EXCLUDED.name, end_users.name),
+                email = COALESCE(EXCLUDED.email, end_users.email),
+                metadata = COALESCE(EXCLUDED.metadata, end_users.metadata),
+                last_seen_at = NOW(),
+                updated_at = NOW()
+            RETURNING *
+            "#,
+        )
+        .bind(new.organization_id)
+        .bind(&new.external_id)
+        .bind(&new.name)
+        .bind(&new.email)
+        .bind(&new.metadata)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(Self::row_to_end_user(row))
+    }
+
+    /// Find end user by ID
+    pub async fn find_by_id(pool: &DbPool, id: Uuid) -> Result<Option<EndUser>, DbError> {
+        let row = sqlx::query("SELECT * FROM end_users WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(Self::row_to_end_user))
+    }
+
+    /// Find end user by organization and external ID
+    pub async fn find_by_external_id(
+        pool: &DbPool,
+        organization_id: Uuid,
+        external_id: &str,
+    ) -> Result<Option<EndUser>, DbError> {
+        let row =
+            sqlx::query("SELECT * FROM end_users WHERE organization_id = $1 AND external_id = $2")
+                .bind(organization_id)
+                .bind(external_id)
+                .fetch_optional(pool)
+                .await?;
+
+        Ok(row.map(Self::row_to_end_user))
+    }
+
+    /// Get all end users for an organization
+    pub async fn get_by_organization(
+        pool: &DbPool,
+        organization_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<EndUser>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM end_users
+            WHERE organization_id = $1
+            ORDER BY last_seen_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(organization_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_end_user).collect())
+    }
+
+    /// Get top end users by usage for an organization
+    pub async fn get_top_by_usage(
+        pool: &DbPool,
+        organization_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<EndUser>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM end_users
+            WHERE organization_id = $1
+            ORDER BY (total_input_tokens + total_output_tokens) DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(organization_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_end_user).collect())
+    }
+
+    /// Record usage for an end user
+    pub async fn record_usage(
+        pool: &DbPool,
+        id: Uuid,
+        input_tokens: i32,
+        output_tokens: i32,
+        cost_usd: Option<f64>,
+    ) -> Result<(), DbError> {
+        sqlx::query("SELECT record_end_user_usage($1, $2, $3, $4)")
+            .bind(id)
+            .bind(input_tokens)
+            .bind(output_tokens)
+            .bind(cost_usd)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Block an end user
+    pub async fn block(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("UPDATE end_users SET is_blocked = true WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Unblock an end user
+    pub async fn unblock(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("UPDATE end_users SET is_blocked = false WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Set rate limit for an end user
+    pub async fn set_rate_limit(
+        pool: &DbPool,
+        id: Uuid,
+        rate_limit_rpm: Option<i32>,
+    ) -> Result<(), DbError> {
+        sqlx::query("UPDATE end_users SET rate_limit_rpm = $2 WHERE id = $1")
+            .bind(id)
+            .bind(rate_limit_rpm)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Set monthly token limit for an end user
+    pub async fn set_monthly_limit(
+        pool: &DbPool,
+        id: Uuid,
+        monthly_token_limit: Option<i64>,
+    ) -> Result<(), DbError> {
+        sqlx::query("UPDATE end_users SET monthly_token_limit = $2 WHERE id = $1")
+            .bind(id)
+            .bind(monthly_token_limit)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Delete an end user
+    pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("DELETE FROM end_users WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    fn row_to_end_user(row: sqlx::postgres::PgRow) -> EndUser {
+        EndUser {
+            id: row.get("id"),
+            organization_id: row.get("organization_id"),
+            external_id: row.get("external_id"),
+            name: row.get("name"),
+            email: row.get("email"),
+            total_input_tokens: row.get("total_input_tokens"),
+            total_output_tokens: row.get("total_output_tokens"),
+            total_cost_usd: row.get("total_cost_usd"),
+            request_count: row.get("request_count"),
+            rate_limit_rpm: row.get("rate_limit_rpm"),
+            monthly_token_limit: row.get("monthly_token_limit"),
+            current_month_tokens: row.get("current_month_tokens"),
+            usage_reset_month: row.get("usage_reset_month"),
+            is_blocked: row.get("is_blocked"),
+            metadata: row.get("metadata"),
+            first_seen_at: row.get("first_seen_at"),
+            last_seen_at: row.get("last_seen_at"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        }
     }
 }
