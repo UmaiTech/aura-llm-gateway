@@ -4,8 +4,6 @@ Aura SDK Exceptions
 Custom exception classes for the Aura SDK, following the Open Responses API error format.
 """
 
-from typing import Optional
-
 
 class AuraError(Exception):
     """Base exception for all Aura SDK errors."""
@@ -14,9 +12,9 @@ class AuraError(Exception):
         self,
         message: str,
         *,
-        code: Optional[str] = None,
-        param: Optional[str] = None,
-        status_code: Optional[int] = None,
+        code: str | None = None,
+        param: str | None = None,
+        status_code: int | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -63,7 +61,7 @@ class BadRequestError(APIError):
         self,
         message: str,
         *,
-        param: Optional[str] = None,
+        param: str | None = None,
     ) -> None:
         super().__init__(
             message,
@@ -80,7 +78,7 @@ class RateLimitError(APIError):
         self,
         message: str = "Rate limit exceeded",
         *,
-        retry_after: Optional[int] = None,
+        retry_after: int | None = None,
     ) -> None:
         super().__init__(
             message,

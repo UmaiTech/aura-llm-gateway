@@ -7,7 +7,7 @@ Pydantic models for the Open Responses API types.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -64,7 +64,7 @@ class ImageContent(BaseModel):
     media_type: str | None = None
 
 
-Content = Union[TextContent, ImageContent]
+Content = TextContent | ImageContent
 
 
 # ============================================================================
@@ -121,7 +121,7 @@ class ReasoningItem(BaseModel):
         return "".join(c.text for c in self.content)
 
 
-Item = Union[MessageItem, FunctionCallItem, FunctionCallOutputItem, ReasoningItem]
+Item = MessageItem | FunctionCallItem | FunctionCallOutputItem | ReasoningItem
 
 
 # ============================================================================
@@ -373,19 +373,19 @@ class ErrorEvent(StreamEventBase):
     error: ResponseError
 
 
-StreamEvent = Union[
-    ResponseCreatedEvent,
-    ResponseInProgressEvent,
-    ResponseCompletedEvent,
-    ResponseFailedEvent,
-    OutputItemAddedEvent,
-    OutputItemDoneEvent,
-    TextDeltaEvent,
-    TextDoneEvent,
-    FunctionCallDeltaEvent,
-    FunctionCallDoneEvent,
-    ErrorEvent,
-]
+StreamEvent = (
+    ResponseCreatedEvent
+    | ResponseInProgressEvent
+    | ResponseCompletedEvent
+    | ResponseFailedEvent
+    | OutputItemAddedEvent
+    | OutputItemDoneEvent
+    | TextDeltaEvent
+    | TextDoneEvent
+    | FunctionCallDeltaEvent
+    | FunctionCallDoneEvent
+    | ErrorEvent
+)
 
 
 # ============================================================================
