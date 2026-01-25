@@ -263,10 +263,11 @@ Define the core Open Responses API types in `aura-types`.
 
 **Implementation Notes:**
 - Created Axum server with TraceLayer middleware for request logging
-- Health endpoint returns JSON: `{"status":"ok","service":"aura-llm-gateway","version":"0.1.3"}`
+- Health endpoint returns JSON: `{"status":"ok","service":"aura-llm-gateway","version":"...","timestamp":"..."}`
 - Graceful shutdown handles both Ctrl+C and SIGTERM signals
 - AppState holds Arc<Config> for shared state across handlers
 - 1 passing integration test for health endpoint
+- Health check uses `tracing::debug!` to reduce log noise from probes
 
 ---
 
@@ -852,37 +853,66 @@ pub struct ProviderRegistry {
 ### PR #22: Docker Setup
 **Rust Concepts:** Multi-stage builds, cargo-chef
 
+**Status:** ✅ **COMPLETED** (January 2026)
+
 **Tasks:**
-- [ ] Create optimized Dockerfile
+- [x] Create optimized Dockerfile with multi-stage build
+- [x] Use cargo-chef for efficient layer caching
 - [ ] Add docker-compose for local dev
 - [ ] Include PostgreSQL and Redis
-- [ ] Add health check in container
-- [ ] Document environment variables
+- [x] Add health check in container (HEALTHCHECK directive)
+- [x] Document environment variables
 
 **Files:**
-- `Dockerfile`
-- `docker-compose.yml`
-- `docker-compose.dev.yml`
+- `Dockerfile` ✅
+
+**Implementation Notes:**
+- Multi-stage build: chef → planner → builder → runtime
+- Uses `rust:1.85-slim-bookworm` for edition2024 support
+- Runtime image based on `debian:bookworm-slim` with minimal dependencies
+- HEALTHCHECK enabled using wget to poll `/health` endpoint
+- Non-root user (`aura`) for security
+- Binary stripped in build stage for smaller image
 
 **Acceptance Criteria:**
-- `docker-compose up` starts full stack
-- Container is < 100MB
+- ✅ Dockerfile builds successfully for linux/amd64 and linux/arm64
+- ✅ Health check configured for container orchestration
+- [ ] `docker-compose up` starts full stack (pending)
+- [ ] Container is < 100MB (pending verification)
 
 ---
 
 ### PR #23: Health Checks & Readiness
 **Rust Concepts:** Background health polling, circuit breakers
 
+**Status:** 🔄 **PARTIALLY COMPLETE** (January 2026)
+
 **Tasks:**
-- [ ] Add `/health/live` endpoint
-- [ ] Add `/health/ready` endpoint
+- [x] Add `/health` endpoint with JSON response
+- [ ] Add `/health/live` endpoint (liveness probe)
+- [ ] Add `/health/ready` endpoint (readiness probe)
 - [ ] Check database connectivity
 - [ ] Check Redis connectivity
 - [ ] Check provider health
 
+**Implementation Notes:**
+- Basic `/health` endpoint returns: status, service name, version, timestamp
+- Uses `tracing::debug!` to avoid log spam from orchestration probes
+- Docker HEALTHCHECK configured to use this endpoint
+- Response format:
+  ```json
+  {
+    "status": "ok",
+    "service": "aura-llm-gateway",
+    "version": "0.2.5",
+    "timestamp": "2026-01-25T21:30:00Z"
+  }
+  ```
+
 **Acceptance Criteria:**
-- Kubernetes probes work correctly
-- Unhealthy providers marked unavailable
+- ✅ Basic health check works for Docker/Kubernetes
+- [ ] Separate liveness vs readiness probes
+- [ ] Unhealthy providers marked unavailable
 
 ---
 
