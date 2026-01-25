@@ -18,25 +18,33 @@ flowchart TB
         F[Provider Registry]
         G[Cost Calculator]
         H[Request Logger]
+        I[Rate Limiter]
+        J[Response Cache]
+        K[Metrics Exporter]
     end
 
     subgraph Providers["LLM Providers"]
-        I[OpenAI API]
-        J[Anthropic API]
-        K[Google Gemini API]
+        L[OpenAI API]
+        M[Anthropic API]
+        N[Google Gemini API]
     end
 
     subgraph Storage["Storage (Optional)"]
-        L[(PostgreSQL)]
+        O[(PostgreSQL)]
+        P[(Redis)]
     end
 
     A & B & C -->|Open Responses API| D
     D --> E
-    E --> F
+    E --> I
+    I --> J
+    J --> F
     F --> G
-    F --> I & J & K
+    F --> L & M & N
     G --> H
-    H -->|Async| L
+    H -->|Async| O
+    I & J -->|Cache/Limits| P
+    K -->|/metrics| D
 ```
 
 ## Crate Architecture
@@ -420,6 +428,9 @@ flowchart LR
         D[Cost Calculator]
         E[DB Pool]
         F[Master Key]
+        G[Redis Pool]
+        H[Rate Limiter]
+        I[Response Cache]
     end
 
     A --> |Arc| A1[Server config<br/>Provider keys]
@@ -428,6 +439,9 @@ flowchart LR
     D --> |Arc| D1[Pricing data]
     E --> |Option| E1[PostgreSQL Pool]
     F --> |Option| F1[AES-256 Master Key<br/>for credential decryption]
+    G --> |Option| G1[Redis connection pool]
+    H --> |Option| H1[Token bucket rate limiter<br/>per API key]
+    I --> |Option| I1[TTL-based cache<br/>SHA256 keys]
 ```
 
 ## End-User Tracking
@@ -475,7 +489,7 @@ database:
   max_connections: 10
 ```
 
-## Future Architecture (Planned)
+## Feature Architecture
 
 ```mermaid
 flowchart TB
@@ -488,15 +502,16 @@ flowchart TB
         F[Organization Model]
         G[End-User Tracking]
         H[Credential Encryption]
+        I[Rate Limiter<br/>Redis + Token Bucket]
+        J[Response Cache<br/>Redis + TTL]
+        K[Prometheus Metrics<br/>/metrics endpoint]
     end
 
     subgraph Planned["Planned Features"]
-        I[Rate Limiter<br/>Redis]
-        J[Response Cache<br/>Redis]
-        K[Load Balancer<br/>Multi-node]
-        L[Pricing Scraper<br/>Cron Job]
-        M[Webhooks<br/>Callbacks]
-        N[Admin Dashboard<br/>React UI]
+        L[Load Balancer<br/>Multi-node]
+        M[Pricing Scraper<br/>Cron Job]
+        N[Webhooks<br/>Callbacks]
+        O[Admin Dashboard<br/>React UI]
     end
 
     Current --> Planned

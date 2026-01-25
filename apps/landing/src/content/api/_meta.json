@@ -5,5 +5,8 @@
   "conversations": "Conversations",
   "streaming": "Streaming",
   "cost-tracking": "Cost Tracking",
+  "rate-limiting": "Rate Limiting",
+  "caching": "Response Caching",
+  "metrics": "Prometheus Metrics",
   "errors": "Error Reference"
 }

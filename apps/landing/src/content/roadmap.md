@@ -7,7 +7,7 @@ description: "Planned features and development timeline"
 
 Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for production applications. Here's what we're building.
 
-## ✅ Launched (v0.1)
+## ✅ Launched (v0.2)
 
 ### Core Gateway
 - **Multi-provider support** - OpenAI, Anthropic (Claude), Google with unified API
@@ -20,6 +20,26 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 - **End-user cost tracking** - Per-customer billing via `user` field
 - **Credential encryption** - AES-256-GCM envelope encryption for provider keys
 
+### Production Readiness (NEW in v0.2)
+- **Response caching** - Redis-backed caching for repeated requests
+  - SHA256-based cache keys
+  - TTL-based expiration (configurable, default 1 hour)
+  - Cache bypass via `X-Cache-Control: no-cache` header
+  - Auto-skip for streaming/high-temperature requests
+
+- **Rate limiting** - Per-user and per-key rate limits
+  - Token bucket algorithm with Redis
+  - Per-API key configurable RPM limits
+  - Monthly token budget tracking
+  - Rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+
+- **Prometheus metrics** - Full observability via `/metrics` endpoint
+  - Request count and latency histograms
+  - Token usage by provider/model
+  - Cost tracking metrics
+  - Cache hit/miss ratios
+  - Rate limit events
+
 ### Developer Experience
 - **Chat playground** - Built-in UI for testing
 - **Documentation site** - Complete API reference and guides
@@ -27,26 +47,9 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 - **Python SDK** - Full-featured client with sync/async support
 - **TypeScript types** - Auto-generated types for clients
 
-## 🚧 In Progress (v0.2)
-
-### Performance & Reliability
-- **Response caching** - Redis-backed caching for repeated requests
-  - LRU eviction policy
-  - TTL-based expiration
-  - Cache hit metrics
-
-- **Rate limiting** - Per-user and per-key rate limits
-  - Token bucket algorithm
-  - Redis-backed distributed limiting
-  - Custom limits per tier
+## 🚧 In Progress (v0.3)
 
 ### Observability
-- **Metrics endpoint** - Prometheus-compatible metrics
-  - Request latency histograms
-  - Cost per provider
-  - Error rates by type
-  - Cache hit/miss ratios
-
 - **Distributed tracing** - OpenTelemetry integration
   - Trace requests across services
   - Identify bottlenecks
@@ -145,6 +148,6 @@ We aim for:
 - **Minor releases** (new features): Monthly
 - **Major releases** (breaking changes): Quarterly
 
-Current version: **v0.2.0**
+Current version: **v0.2.6**
 
 Next release: **v0.3.0** (estimated February 2026)

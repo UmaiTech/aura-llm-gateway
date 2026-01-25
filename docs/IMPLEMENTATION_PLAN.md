@@ -54,7 +54,7 @@ A PR-by-PR roadmap for building the Aura LLM Gateway, designed for incremental R
 
 **Active Milestones:**
 - M1-M4: Foundation, Single Provider, Multi-Provider, Persistence ✅ **COMPLETE**
-- M5: Production Readiness - Rate limiting, caching (In Progress)
+- M5: Production Readiness ✅ **COMPLETE** (Prometheus metrics, Redis rate limiting, response caching)
 - M7: Chat Demo App ✅ **COMPLETE**
 - M8: SDKs - Python SDK ✅ **COMPLETE**, TypeScript SDK pending
 - M12: User & Team Management ✅ **LARGELY COMPLETE** (Org model, API keys, end-users)
@@ -729,22 +729,34 @@ pub struct ProviderRegistry {
 ### PR #17: Metrics with Prometheus
 **Rust Concepts:** Metrics crates, histograms, counters
 
-**Tasks:**
-- [ ] Add `metrics` and `metrics-exporter-prometheus`
-- [ ] Track request latency histogram
-- [ ] Track requests by provider/model
-- [ ] Track token usage
-- [ ] Add `/metrics` endpoint
+**Status:** ✅ **COMPLETED** (January 2026)
 
-**Metrics:**
-- `aura_request_duration_seconds`
-- `aura_requests_total`
-- `aura_tokens_total`
-- `aura_errors_total`
+**Tasks:**
+- [x] Add `metrics` and `metrics-exporter-prometheus`
+- [x] Track request latency histogram
+- [x] Track requests by provider/model
+- [x] Track token usage
+- [x] Add `/metrics` endpoint
+
+**Files:**
+- `crates/aura-core/src/metrics.rs` ✅ (~280 lines)
+- `crates/aura-proxy/src/routes/metrics.rs` ✅ (~72 lines)
+
+**Metrics Implemented:**
+- `aura_requests_total` - Counter with provider, model, stream labels
+- `aura_request_duration_seconds` - Histogram with provider, model, status labels
+- `aura_input_tokens_total` - Counter for input tokens
+- `aura_output_tokens_total` - Counter for output tokens
+- `aura_cached_tokens_total` - Counter for cached tokens
+- `aura_reasoning_tokens_total` - Counter for reasoning tokens
+- `aura_cost_usd_total` - Counter for cost tracking
+- `aura_cache_hits_total` / `aura_cache_misses_total` - Cache statistics
+- `aura_rate_limit_exceeded_total` - Rate limit events
 
 **Acceptance Criteria:**
-- Metrics endpoint returns Prometheus format
-- Grafana can scrape metrics
+- ✅ Metrics endpoint returns Prometheus format
+- ✅ All request/response metrics tracked
+- ✅ Grafana-compatible scraping via `/metrics`
 
 ---
 
@@ -772,37 +784,68 @@ pub struct ProviderRegistry {
 ### PR #19: Rate Limiting
 **Rust Concepts:** Token buckets, Redis integration, middleware
 
-**Tasks:**
-- [ ] Add Redis connection to `AppState`
-- [ ] Implement token bucket algorithm
-- [ ] Rate limit by API key
-- [ ] Add rate limit headers
-- [ ] Support burst allowance
+**Status:** ✅ **COMPLETED** (January 2026)
 
-**Headers:**
-- `X-RateLimit-Limit`
-- `X-RateLimit-Remaining`
-- `X-RateLimit-Reset`
+**Tasks:**
+- [x] Add Redis connection to `AppState`
+- [x] Implement token bucket algorithm
+- [x] Rate limit by API key
+- [x] Add rate limit headers
+- [x] Support burst allowance
+- [x] Monthly token budget tracking
+
+**Files:**
+- `crates/aura-core/src/redis.rs` ✅ (~106 lines) - Redis connection pool
+- `crates/aura-core/src/rate_limit.rs` ✅ (~341 lines) - Token bucket with Lua scripts
+- `crates/aura-proxy/src/routes/rate_limit.rs` ✅ (~185 lines) - Middleware
+
+**Headers Implemented:**
+- `X-RateLimit-Limit` - Requests per minute allowed
+- `X-RateLimit-Remaining` - Requests remaining in window
+- `X-RateLimit-Reset` - Seconds until window resets
+
+**Implementation Notes:**
+- Atomic Lua scripts for Redis operations (thread-safe)
+- Per-API key rate limiting with configurable RPM
+- Monthly token budget tracking per key
+- Graceful degradation when Redis unavailable
 
 **Acceptance Criteria:**
-- Excessive requests get 429
-- Rate limits configurable per key
+- ✅ Excessive requests get 429
+- ✅ Rate limits configurable per key
+- ✅ Headers included on all responses
 
 ---
 
 ### PR #20: Response Caching
 **Rust Concepts:** Cache keys, TTL, Redis commands
 
+**Status:** ✅ **COMPLETED** (January 2026)
+
 **Tasks:**
-- [ ] Hash request for cache key
-- [ ] Cache responses with TTL
-- [ ] Support cache bypass header
-- [ ] Add cache hit/miss metrics
-- [ ] Configure per-model TTL
+- [x] Hash request for cache key (SHA256)
+- [x] Cache responses with TTL
+- [x] Support cache bypass header (`X-Cache-Control: no-cache`)
+- [x] Add cache hit/miss metrics
+- [x] Configure per-model TTL
+- [x] Auto-skip caching for streaming/high-temperature requests
+
+**Files:**
+- `crates/aura-core/src/cache.rs` ✅ (~583 lines) - Response caching with TTL
+
+**Implementation Notes:**
+- SHA256 hash-based cache keys from request content
+- Configurable default TTL (default: 1 hour)
+- Automatic skip for streaming requests
+- Automatic skip for temperature > 0 (non-deterministic)
+- Cache bypass via `X-Cache-Control: no-cache` header
+- Cache hit/miss metrics integration
 
 **Acceptance Criteria:**
-- Identical requests return cached response
-- Cache properly invalidated
+- ✅ Identical requests return cached response
+- ✅ Cache bypass via header
+- ✅ Streaming requests not cached
+- ✅ High-temperature requests not cached
 
 ---
 

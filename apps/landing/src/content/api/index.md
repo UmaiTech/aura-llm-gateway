@@ -38,6 +38,25 @@ See [Authentication](/docs/api/authentication) for details on API key management
 | GET | `/v1/api-keys` | List API keys (admin) |
 | DELETE | `/v1/api-keys/{key_id}` | Revoke an API key (admin) |
 | GET | `/health` | Health check endpoint |
+| GET | `/metrics` | Prometheus metrics endpoint |
+
+## Rate Limiting
+
+All API keys have configurable rate limits. Rate limit status is included in response headers:
+
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 42
+```
+
+See [Rate Limiting](/docs/api/rate-limiting) for configuration and best practices.
+
+## Response Caching
+
+Non-streaming requests with `temperature=0` are automatically cached in Redis. Use the `X-Cache-Control: no-cache` header to bypass caching.
+
+See [Response Caching](/docs/api/caching) for details.
 
 ## Response Enrichment
 

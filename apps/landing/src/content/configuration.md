@@ -38,7 +38,9 @@ Example:
 export DATABASE_URL=postgresql://user:password@localhost:5432/aura
 ```
 
-### Redis
+### Redis (Rate Limiting & Caching)
+
+Redis is required for rate limiting and response caching features.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -49,6 +51,26 @@ Example:
 ```bash
 export REDIS_URL=redis://localhost:6379
 ```
+
+### Rate Limiting
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AURA_DEFAULT_RATE_LIMIT_RPM` | Default requests per minute per API key | `60` |
+
+Rate limits are also configurable per API key via the admin API.
+
+### Caching
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AURA_CACHE_TTL_SECONDS` | Default cache TTL | `3600` (1 hour) |
+| `AURA_CACHE_ENABLED` | Enable/disable caching | `true` |
+
+**Note:** Caching is automatically disabled for:
+- Streaming requests
+- Requests with temperature > 0
+- Requests with `X-Cache-Control: no-cache` header
 
 ### Logging
 

@@ -236,7 +236,7 @@ Aura is built with modern, high-performance technologies.
 
 - **[PostgreSQL](https://www.postgresql.org/)** - Reliable SQL database for request logging and analytics
 - **[SQLx](https://github.com/launchbadge/sqlx)** - Compile-time verified SQL queries
-- **[Redis](https://redis.io/)** - In-memory cache for rate limiting and response caching (planned)
+- **[Redis](https://redis.io/)** - In-memory store for rate limiting and response caching
 
 ### Why Rust vs Node.js/Python?
 

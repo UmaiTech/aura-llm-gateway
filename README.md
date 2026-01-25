@@ -284,7 +284,7 @@ The `docker-compose.yml` includes:
 
 ## Project Status
 
-**Current Phase**: Multi-Tenancy & Production Readiness (Milestone 5, 12 & 8) 🔄
+**Current Phase**: Developer Experience & Advanced Features (Milestone 8 & 6) 🔄
 
 ### Completed
 - [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
@@ -306,9 +306,11 @@ The `docker-compose.yml` includes:
 - [x] **PR #54: Organization Model** - Hierarchical org → teams → projects structure
 - [x] **Credential Encryption** - AES-256-GCM envelope encryption for provider API keys
 - [x] **End-User Tracking** - Per-user cost allocation with upsert on API requests
+- [x] **PR #17: Prometheus Metrics** - `/metrics` endpoint with request/token/cost metrics
+- [x] **PR #19: Rate Limiting** - Redis-backed token bucket with per-key limits
+- [x] **PR #20: Response Caching** - TTL-based caching with SHA256 cache keys
 
 ### In Progress
-- 🔄 **PR #17: Metrics** - Prometheus metrics endpoint
 - 🔄 **PR #37-38: TypeScript SDK** - Coming soon
 - 🔄 **Admin Dashboard** - React admin UI for key and org management
 
