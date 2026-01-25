@@ -1,6 +1,7 @@
 //! Health check endpoints
 
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
+use chrono::Utc;
 use serde_json::json;
 
 use crate::AppState;
@@ -15,7 +16,7 @@ pub fn router() -> Router<AppState> {
 /// Returns 200 OK with a JSON response indicating the service is healthy.
 #[tracing::instrument]
 async fn health_check() -> impl IntoResponse {
-    tracing::info!("Health check requested");
+    tracing::debug!("Health check requested");
 
     (
         StatusCode::OK,
@@ -23,6 +24,7 @@ async fn health_check() -> impl IntoResponse {
             "status": "ok",
             "service": "aura-llm-gateway",
             "version": env!("CARGO_PKG_VERSION"),
+            "timestamp": Utc::now().to_rfc3339(),
         })),
     )
 }
