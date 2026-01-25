@@ -62,7 +62,7 @@ jobs:
     name: Release-plz release
     runs-on: ubuntu-latest
     # Only run when a release PR is merged (commit message pattern from release-plz)
-    if: startsWith(github.event.head_commit.message, 'chore: release')
+    if: "startsWith(github.event.head_commit.message, 'chore: release')"
     permissions:
       contents: write
       pull-requests: read
