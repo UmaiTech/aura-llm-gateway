@@ -157,184 +157,218 @@ async fn create_response(
         let provider_name = provider.name().to_string();
         let model_id = request.model.clone();
         let auth_for_stream = auth_context.clone();
+        let auth_for_enrich = auth_context.clone();
 
         // Convert to SSE stream, enriching terminal events
-        let sse_stream = stream.map(move |result| match result {
-            Ok(event) => {
-                let event = match event {
-                    StreamEvent::ResponseCompleted { response } => {
-                        let response =
-                            state_for_stream.enrich_response(response, &request_id_for_stream);
+        let sse_stream = stream.then(move |result| {
+            let state_clone = state_for_stream.clone();
+            let request_id_clone = request_id_for_stream.clone();
+            let request_clone = request_for_stream.clone();
+            let provider_name_clone = provider_name.clone();
+            let model_id_clone = model_id.clone();
+            let auth_clone = auth_for_stream.clone();
+            let auth_enrich_clone = auth_for_enrich.clone();
 
-                        // Log completed response
-                        let usage = response.usage.as_ref();
-                        let log = NewRequestLog {
-                            response_id: request_id_for_stream.clone(),
-                            conversation_id,
-                            provider_name: provider_name.clone(),
-                            model_id: model_id.clone(),
-                            user_id: request_for_stream.user.clone(),
-                            input_tokens: usage.map(|u| u.input_tokens as i32),
-                            output_tokens: usage.map(|u| u.output_tokens as i32),
-                            cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
-                            reasoning_tokens: usage
-                                .and_then(|u| u.reasoning_tokens)
-                                .map(|t| t as i32),
-                            cost_usd: usage.and_then(|u| u.cost_usd),
-                            latency_ms: None,
-                            status: "completed".to_string(),
-                            error_code: None,
-                            error_message: None,
-                            metadata: response.metadata.clone(),
-                        };
-
-                        // Save response and record API key usage
-                        if let Some(conv_id) = conversation_id {
-                            let state_bg = state_for_stream.clone();
-                            let response_bg = response.clone();
-                            let request_bg = request_for_stream.clone();
-                            let auth_bg = auth_for_stream.clone();
-                            tokio::spawn(async move {
-                                state_bg.log_request(log).await;
-                                state_bg
-                                    .save_response(conv_id, &request_bg, &response_bg)
-                                    .await;
-                                state_bg
-                                    .save_messages_from_items(
-                                        conv_id,
-                                        &response_bg.id,
-                                        &response_bg.output,
+            async move {
+                match result {
+                    Ok(event) => {
+                        let event = match event {
+                            StreamEvent::ResponseCompleted { response } => {
+                                let response = state_clone
+                                    .enrich_response(
+                                        response,
+                                        &request_id_clone,
+                                        auth_enrich_clone.as_ref(),
+                                        Some(&request_clone),
                                     )
                                     .await;
-                                // Record API key usage
-                                if let Some(auth) = auth_bg {
-                                    state_bg
-                                        .record_api_key_usage(&auth, &response_bg, &request_bg)
-                                        .await;
-                                }
-                            });
-                        } else {
-                            let auth_bg = auth_for_stream.clone();
-                            let response_bg = response.clone();
-                            let request_bg = request_for_stream.clone();
-                            tokio::spawn({
-                                let state = state_for_stream.clone();
-                                async move {
-                                    state.log_request(log).await;
-                                    // Record API key usage
-                                    if let Some(auth) = auth_bg {
-                                        state
-                                            .record_api_key_usage(&auth, &response_bg, &request_bg)
+
+                                // Log completed response
+                                let usage = response.usage.as_ref();
+                                let log = NewRequestLog {
+                                    response_id: request_id_clone.clone(),
+                                    conversation_id,
+                                    provider_name: provider_name_clone.clone(),
+                                    model_id: model_id_clone.clone(),
+                                    user_id: request_clone.user.clone(),
+                                    input_tokens: usage.map(|u| u.input_tokens as i32),
+                                    output_tokens: usage.map(|u| u.output_tokens as i32),
+                                    cached_tokens: usage
+                                        .and_then(|u| u.cached_tokens)
+                                        .map(|t| t as i32),
+                                    reasoning_tokens: usage
+                                        .and_then(|u| u.reasoning_tokens)
+                                        .map(|t| t as i32),
+                                    cost_usd: usage.and_then(|u| u.cost_usd),
+                                    latency_ms: None,
+                                    status: "completed".to_string(),
+                                    error_code: None,
+                                    error_message: None,
+                                    metadata: response.metadata.clone(),
+                                };
+
+                                // Save response and record API key usage
+                                if let Some(conv_id) = conversation_id {
+                                    let state_bg = state_clone.clone();
+                                    let response_bg = response.clone();
+                                    let request_bg = request_clone.clone();
+                                    let auth_bg = auth_clone.clone();
+                                    tokio::spawn(async move {
+                                        state_bg.log_request(log).await;
+                                        state_bg
+                                            .save_response(conv_id, &request_bg, &response_bg)
                                             .await;
-                                    }
+                                        state_bg
+                                            .save_messages_from_items(
+                                                conv_id,
+                                                &response_bg.id,
+                                                &response_bg.output,
+                                            )
+                                            .await;
+                                        // Record API key usage
+                                        if let Some(auth) = auth_bg {
+                                            state_bg
+                                                .record_api_key_usage(
+                                                    &auth,
+                                                    &response_bg,
+                                                    &request_bg,
+                                                )
+                                                .await;
+                                        }
+                                    });
+                                } else {
+                                    let auth_bg = auth_clone.clone();
+                                    let response_bg = response.clone();
+                                    let request_bg = request_clone.clone();
+                                    tokio::spawn({
+                                        let state = state_clone.clone();
+                                        async move {
+                                            state.log_request(log).await;
+                                            // Record API key usage
+                                            if let Some(auth) = auth_bg {
+                                                state
+                                                    .record_api_key_usage(
+                                                        &auth,
+                                                        &response_bg,
+                                                        &request_bg,
+                                                    )
+                                                    .await;
+                                            }
+                                        }
+                                    });
                                 }
-                            });
-                        }
 
-                        StreamEvent::ResponseCompleted { response }
-                    }
-                    StreamEvent::ResponseFailed { response } => {
-                        // Log failed response
-                        let log = NewRequestLog {
-                            response_id: request_id_for_stream.clone(),
-                            conversation_id,
-                            provider_name: provider_name.clone(),
-                            model_id: model_id.clone(),
-                            user_id: request_for_stream.user.clone(),
-                            input_tokens: None,
-                            output_tokens: None,
-                            cached_tokens: None,
-                            reasoning_tokens: None,
-                            cost_usd: None,
-                            latency_ms: None,
-                            status: "failed".to_string(),
-                            error_code: response.error.as_ref().map(|e| e.code.clone()),
-                            error_message: response.error.as_ref().map(|e| e.message.clone()),
-                            metadata: response.metadata.clone(),
+                                StreamEvent::ResponseCompleted { response }
+                            }
+                            StreamEvent::ResponseFailed { response } => {
+                                // Log failed response
+                                let log = NewRequestLog {
+                                    response_id: request_id_clone.clone(),
+                                    conversation_id,
+                                    provider_name: provider_name_clone.clone(),
+                                    model_id: model_id_clone.clone(),
+                                    user_id: request_clone.user.clone(),
+                                    input_tokens: None,
+                                    output_tokens: None,
+                                    cached_tokens: None,
+                                    reasoning_tokens: None,
+                                    cost_usd: None,
+                                    latency_ms: None,
+                                    status: "failed".to_string(),
+                                    error_code: response.error.as_ref().map(|e| e.code.clone()),
+                                    error_message: response
+                                        .error
+                                        .as_ref()
+                                        .map(|e| e.message.clone()),
+                                    metadata: response.metadata.clone(),
+                                };
+
+                                if let Some(conv_id) = conversation_id {
+                                    let state_bg = state_clone.clone();
+                                    let response_bg = response.clone();
+                                    let request_bg = request_clone.clone();
+                                    tokio::spawn(async move {
+                                        state_bg.log_request(log).await;
+                                        state_bg
+                                            .save_response(conv_id, &request_bg, &response_bg)
+                                            .await;
+                                    });
+                                } else {
+                                    tokio::spawn({
+                                        let state = state_clone.clone();
+                                        async move { state.log_request(log).await }
+                                    });
+                                }
+
+                                StreamEvent::ResponseFailed { response }
+                            }
+                            StreamEvent::ResponseIncomplete { response } => {
+                                // Log incomplete response
+                                let usage = response.usage.as_ref();
+                                let log = NewRequestLog {
+                                    response_id: request_id_clone.clone(),
+                                    conversation_id,
+                                    provider_name: provider_name_clone.clone(),
+                                    model_id: model_id_clone.clone(),
+                                    user_id: request_clone.user.clone(),
+                                    input_tokens: usage.map(|u| u.input_tokens as i32),
+                                    output_tokens: usage.map(|u| u.output_tokens as i32),
+                                    cached_tokens: usage
+                                        .and_then(|u| u.cached_tokens)
+                                        .map(|t| t as i32),
+                                    reasoning_tokens: usage
+                                        .and_then(|u| u.reasoning_tokens)
+                                        .map(|t| t as i32),
+                                    cost_usd: usage.and_then(|u| u.cost_usd),
+                                    latency_ms: None,
+                                    status: "incomplete".to_string(),
+                                    error_code: None,
+                                    error_message: None,
+                                    metadata: response.metadata.clone(),
+                                };
+
+                                if let Some(conv_id) = conversation_id {
+                                    let state_bg = state_clone.clone();
+                                    let response_bg = response.clone();
+                                    let request_bg = request_clone.clone();
+                                    tokio::spawn(async move {
+                                        state_bg.log_request(log).await;
+                                        state_bg
+                                            .save_response(conv_id, &request_bg, &response_bg)
+                                            .await;
+                                    });
+                                } else {
+                                    tokio::spawn({
+                                        let state = state_clone.clone();
+                                        async move { state.log_request(log).await }
+                                    });
+                                }
+
+                                StreamEvent::ResponseIncomplete { response }
+                            }
+                            other => other,
                         };
 
-                        if let Some(conv_id) = conversation_id {
-                            let state_bg = state_for_stream.clone();
-                            let response_bg = response.clone();
-                            let request_bg = request_for_stream.clone();
-                            tokio::spawn(async move {
-                                state_bg.log_request(log).await;
-                                state_bg
-                                    .save_response(conv_id, &request_bg, &response_bg)
-                                    .await;
-                            });
-                        } else {
-                            tokio::spawn({
-                                let state = state_for_stream.clone();
-                                async move { state.log_request(log).await }
-                            });
-                        }
-
-                        StreamEvent::ResponseFailed { response }
+                        let event_type = event.event_type();
+                        let data = serde_json::to_string(&event).unwrap_or_else(|e| {
+                            format!(r#"{{"error":"Failed to serialize event: {}"}}"#, e)
+                        });
+                        Ok::<_, Infallible>(
+                            axum::response::sse::Event::default()
+                                .event(event_type)
+                                .data(data),
+                        )
                     }
-                    StreamEvent::ResponseIncomplete { response } => {
-                        // Log incomplete response
-                        let usage = response.usage.as_ref();
-                        let log = NewRequestLog {
-                            response_id: request_id_for_stream.clone(),
-                            conversation_id,
-                            provider_name: provider_name.clone(),
-                            model_id: model_id.clone(),
-                            user_id: request_for_stream.user.clone(),
-                            input_tokens: usage.map(|u| u.input_tokens as i32),
-                            output_tokens: usage.map(|u| u.output_tokens as i32),
-                            cached_tokens: usage.and_then(|u| u.cached_tokens).map(|t| t as i32),
-                            reasoning_tokens: usage
-                                .and_then(|u| u.reasoning_tokens)
-                                .map(|t| t as i32),
-                            cost_usd: usage.and_then(|u| u.cost_usd),
-                            latency_ms: None,
-                            status: "incomplete".to_string(),
-                            error_code: None,
-                            error_message: None,
-                            metadata: response.metadata.clone(),
-                        };
-
-                        if let Some(conv_id) = conversation_id {
-                            let state_bg = state_for_stream.clone();
-                            let response_bg = response.clone();
-                            let request_bg = request_for_stream.clone();
-                            tokio::spawn(async move {
-                                state_bg.log_request(log).await;
-                                state_bg
-                                    .save_response(conv_id, &request_bg, &response_bg)
-                                    .await;
-                            });
-                        } else {
-                            tokio::spawn({
-                                let state = state_for_stream.clone();
-                                async move { state.log_request(log).await }
-                            });
-                        }
-
-                        StreamEvent::ResponseIncomplete { response }
+                    Err(e) => {
+                        let error_event =
+                            StreamEvent::error(aura_types::StreamError::server(e.to_string()));
+                        let data = serde_json::to_string(&error_event)
+                            .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e));
+                        Ok(axum::response::sse::Event::default()
+                            .event("error")
+                            .data(data))
                     }
-                    other => other,
-                };
-
-                let event_type = event.event_type();
-                let data = serde_json::to_string(&event).unwrap_or_else(|e| {
-                    format!(r#"{{"error":"Failed to serialize event: {}"}}"#, e)
-                });
-                Ok::<_, Infallible>(
-                    axum::response::sse::Event::default()
-                        .event(event_type)
-                        .data(data),
-                )
-            }
-            Err(e) => {
-                let error_event =
-                    StreamEvent::error(aura_types::StreamError::server(e.to_string()));
-                let data = serde_json::to_string(&error_event)
-                    .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e));
-                Ok(axum::response::sse::Event::default()
-                    .event("error")
-                    .data(data))
+                }
             }
         });
 
@@ -397,7 +431,15 @@ async fn create_response(
         let latency_ms = start.elapsed().as_millis() as u64;
 
         // Enrich with cost and latency information
-        let response = state.enrich_response_with_latency(response, &request_id, latency_ms);
+        let response = state
+            .enrich_response_with_latency(
+                response,
+                &request_id,
+                latency_ms,
+                auth_context.as_ref(),
+                Some(&request),
+            )
+            .await;
 
         info!(
             id = %response.id,

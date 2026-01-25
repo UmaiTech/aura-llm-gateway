@@ -23,17 +23,31 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 
 /// Supported Claude models
 const SUPPORTED_MODELS: &[&str] = &[
+    // Claude 4.5 (dated versions)
     "claude-opus-4-5-20250514",
     "claude-sonnet-4-5-20250514",
+    // Claude 4.5 (aliases)
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    // Claude 3.7
     "claude-3-7-sonnet-20250219",
+    // Claude 3.5 (dated versions)
     "claude-3-5-sonnet-20241022",
-    "claude-3-5-sonnet-latest",
     "claude-3-5-haiku-20241022",
+    // Claude 3.5 (aliases)
+    "claude-sonnet-3-5",
+    "claude-haiku-3-5",
+    "claude-3-5-sonnet-latest",
     "claude-3-5-haiku-latest",
+    // Claude 3 (dated versions)
     "claude-3-opus-20240229",
-    "claude-3-opus-latest",
     "claude-3-sonnet-20240229",
     "claude-3-haiku-20240307",
+    // Claude 3 (aliases)
+    "claude-opus-3",
+    "claude-sonnet-3",
+    "claude-haiku-3",
+    "claude-3-opus-latest",
 ];
 
 /// Anthropic Claude provider implementation

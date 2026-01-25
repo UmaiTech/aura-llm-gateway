@@ -4,19 +4,31 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/v1`
   : '/v1'
 
+const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
+
 export class AuraAPI {
   private baseUrl: string
+  private apiKey: string
 
-  constructor(baseUrl: string = API_BASE) {
+  constructor(baseUrl: string = API_BASE, apiKey: string = API_KEY) {
     this.baseUrl = baseUrl
+    this.apiKey = apiKey
+  }
+
+  private getHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`
+    }
+    return headers
   }
 
   async createResponse(request: CreateResponseRequest): Promise<Response> {
     const response = await fetch(`${this.baseUrl}/responses`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getHeaders(),
       body: JSON.stringify({
         ...request,
         stream: false,
@@ -36,9 +48,7 @@ export class AuraAPI {
   ): AsyncGenerator<StreamEvent, void, unknown> {
     const response = await fetch(`${this.baseUrl}/responses`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getHeaders(),
       body: JSON.stringify({
         ...request,
         stream: true,

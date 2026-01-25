@@ -28,16 +28,34 @@ use aura_db::{ApiKey, ApiKeyRepo, NewApiKey};
 /// Authenticated request context
 ///
 /// This is added to request extensions after successful authentication.
-/// Fields are used when auth is fully wired to routes.
-#[allow(dead_code)]
+/// Includes full tenant hierarchy for cost attribution and analytics.
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     /// The API key record
     pub api_key: ApiKey,
     /// User ID (if associated with the key)
     pub user_id: Option<String>,
-    /// Organization ID (if associated with the key)
+    /// Tenant hierarchy (org -> team -> project)
+    pub tenant: TenantContext,
+}
+
+/// Tenant hierarchy information from the authenticated API key
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct TenantContext {
+    /// Organization ID
     pub organization_id: Option<Uuid>,
+    /// Organization name
+    pub organization_name: Option<String>,
+    /// Team ID
+    pub team_id: Option<Uuid>,
+    /// Team name
+    pub team_name: Option<String>,
+    /// Project ID
+    pub project_id: Option<Uuid>,
+    /// Project name
+    pub project_name: Option<String>,
+    /// API key ID (for tracking)
+    pub api_key_id: String,
 }
 
 impl AuthContext {
@@ -125,6 +143,75 @@ impl IntoResponse for AuthError {
     }
 }
 
+/// Load full tenant hierarchy context for the API key
+///
+/// Queries the database to get organization, team, and project names
+/// for cost attribution and analytics metadata.
+async fn load_tenant_context(pool: &aura_db::DbPool, api_key: &ApiKey) -> TenantContext {
+    use aura_db::{OrganizationRepo, ProjectRepo, TeamRepo};
+
+    let mut tenant = TenantContext {
+        api_key_id: api_key.key_id.clone(),
+        ..Default::default()
+    };
+
+    // Load organization if present
+    if let Some(org_id) = api_key.organization_id {
+        if let Ok(Some(org)) = OrganizationRepo::find_by_id(pool, org_id).await {
+            tenant.organization_id = Some(org.id);
+            tenant.organization_name = Some(org.name);
+        }
+    }
+
+    // Load scope-specific entity based on scope_type
+    if let (Some(scope_type), Some(scope_id)) = (&api_key.scope_type, api_key.scope_id) {
+        match scope_type.as_str() {
+            "team" => {
+                // Load team directly
+                if let Ok(Some(team)) = TeamRepo::find_by_id(pool, scope_id).await {
+                    tenant.team_id = Some(team.id);
+                    tenant.team_name = Some(team.name);
+                    // Also load org from team if not already set
+                    if tenant.organization_id.is_none() {
+                        if let Ok(Some(org)) =
+                            OrganizationRepo::find_by_id(pool, team.organization_id).await
+                        {
+                            tenant.organization_id = Some(org.id);
+                            tenant.organization_name = Some(org.name);
+                        }
+                    }
+                }
+            }
+            "project" => {
+                // Load project and traverse to team/org
+                if let Ok(Some(project)) = ProjectRepo::find_by_id(pool, scope_id).await {
+                    tenant.project_id = Some(project.id);
+                    tenant.project_name = Some(project.name);
+                    // Load team from project
+                    if let Ok(Some(team)) = TeamRepo::find_by_id(pool, project.team_id).await {
+                        tenant.team_id = Some(team.id);
+                        tenant.team_name = Some(team.name);
+                        // Load org from team if not already set
+                        if tenant.organization_id.is_none() {
+                            if let Ok(Some(org)) =
+                                OrganizationRepo::find_by_id(pool, team.organization_id).await
+                            {
+                                tenant.organization_id = Some(org.id);
+                                tenant.organization_name = Some(org.name);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // "organization" or "user" scope - already handled by organization_id
+            }
+        }
+    }
+
+    tenant
+}
+
 /// Authentication middleware
 ///
 /// Extracts the API key from the Authorization header, validates it,
@@ -210,10 +297,13 @@ pub async fn auth_middleware(
         let _ = ApiKeyRepo::update_last_used(&pool_clone, key_id_clone).await;
     });
 
+    // Load tenant hierarchy for metadata
+    let tenant = load_tenant_context(pool, &api_key).await;
+
     // Create auth context
     let auth_context = AuthContext {
         user_id: api_key.user_id.clone(),
-        organization_id: api_key.organization_id,
+        tenant,
         api_key,
     };
 
@@ -267,6 +357,12 @@ pub struct CreateApiKeyRequest {
     pub monthly_token_limit: Option<i64>,
     /// Optional expiration in days from now
     pub expires_in_days: Option<i64>,
+    /// Organization ID for scoping the key
+    pub organization_id: Option<uuid::Uuid>,
+    /// Scope type: "organization", "team", "project", or "user"
+    pub scope_type: Option<String>,
+    /// Scope ID (team_id, project_id, etc depending on scope_type)
+    pub scope_id: Option<uuid::Uuid>,
 }
 
 fn default_environment() -> String {
@@ -333,15 +429,15 @@ async fn create_api_key(
         name: req.name.clone(),
         description: req.description.clone(),
         user_id: None, // TODO: Get from auth context
-        organization_id: None,
+        organization_id: req.organization_id,
         scopes: serde_json::json!(req.scopes),
         rate_limit_rpm: req.rate_limit_rpm,
         monthly_token_limit: req.monthly_token_limit,
         expires_at,
         allowed_ips: None,
         metadata: None,
-        scope_type: Some("organization".to_string()), // Default to org scope
-        scope_id: None,
+        scope_type: req.scope_type,
+        scope_id: req.scope_id,
     };
 
     let api_key = ApiKeyRepo::create(pool, new_key).await.map_err(|e| {

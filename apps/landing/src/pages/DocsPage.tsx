@@ -7,7 +7,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import mermaid from 'mermaid'
 import {
   BookOpen, Zap, Server, Code2, Settings,
-  ChevronRight, Menu, X, ExternalLink, DollarSign, Layers
+  ChevronRight, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield
 } from 'lucide-react'
 
 // Import all MD files from src/content at build time using Vite's glob
@@ -60,6 +60,7 @@ const docSections = [
       { title: 'Introduction', path: '/docs', icon: BookOpen },
       { title: 'Quickstart', path: '/docs/quickstart', icon: Zap },
       { title: 'Configuration', path: '/docs/configuration', icon: Settings },
+      { title: 'Deployment', path: '/docs/deployment', icon: Server },
       { title: 'Roadmap', path: '/docs/roadmap', icon: Zap },
     ],
   },
@@ -67,10 +68,25 @@ const docSections = [
     title: 'API Reference',
     items: [
       { title: 'Overview', path: '/docs/api', icon: Code2 },
-      { title: 'Architecture', path: '/docs/architecture', icon: Layers },
+      { title: 'Authentication', path: '/docs/api/authentication', icon: Server },
       { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
+      { title: 'Conversations', path: '/docs/api/conversations', icon: BookOpen },
       { title: 'Streaming', path: '/docs/api/streaming', icon: Zap },
       { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
+      { title: 'Error Reference', path: '/docs/api/errors', icon: Code2 },
+    ],
+  },
+  {
+    title: 'Multi-Tenancy',
+    items: [
+      { title: 'Organizations & End-Users', path: '/docs/organizations', icon: Users },
+      { title: 'Provider Credentials', path: '/docs/credentials', icon: Shield },
+    ],
+  },
+  {
+    title: 'Architecture',
+    items: [
+      { title: 'Overview', path: '/docs/architecture', icon: Layers },
     ],
   },
   {
@@ -391,10 +407,14 @@ const markdownComponents: any = {
   li: ({ children }: { children?: React.ReactNode }) => (
     <li className="text-gray-300">{children}</li>
   ),
-  code: ({ inline, className, children }: { inline?: boolean; className?: string; children?: React.ReactNode }) => {
+  code: ({ node, inline, className, children, ...props }: any) => {
     const match = /language-(\w+)/.exec(className || '')
     const language = match ? match[1] : ''
-    const codeString = String(children).replace(/\n$/, '')
+
+    // Ensure children is a string
+    const codeString = Array.isArray(children)
+      ? children.join('')
+      : String(children || '').replace(/\n$/, '')
 
     // Handle Mermaid diagrams
     if (language === 'mermaid') {
@@ -402,8 +422,8 @@ const markdownComponents: any = {
     }
 
     // Inline code
-    if (inline) {
-      return <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+    if (inline || !className) {
+      return <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>{children}</code>
     }
 
     // Code blocks with syntax highlighting
@@ -415,7 +435,8 @@ const markdownComponents: any = {
           margin: '0 0 1rem 0',
           borderRadius: '0.5rem',
           fontSize: '0.875rem',
-          background: '#0f172a'
+          background: '#0f172a',
+          padding: '1rem'
         }}
         showLineNumbers={false}
       >

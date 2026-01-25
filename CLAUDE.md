@@ -249,3 +249,36 @@ use http::Method;
     "https://chat.yourdomain.com".parse::<HeaderValue>().unwrap(),
 ])
 ```
+
+## Troubleshooting
+
+### Git Repository Issues
+
+#### "fatal: not a git repository" Error
+
+**Symptom**: Running `git status` or other git commands fails with:
+```
+fatal: not a git repository (or any of the parent directories): .git
+```
+
+Even though the `.git/` directory exists.
+
+**Cause**: The `.git/HEAD` file is missing or corrupted. This file is critical for git to recognize the repository and track the current branch.
+
+**Fix**: Recreate the HEAD file pointing to your main branch:
+
+```bash
+# Recreate the HEAD file
+echo "ref: refs/heads/main" > .git/HEAD
+
+# Verify the fix worked
+git status
+```
+
+If you were on a different branch, replace `main` with your branch name:
+```bash
+# For a different branch
+echo "ref: refs/heads/your-branch-name" > .git/HEAD
+```
+
+**Prevention**: This issue can occur if git operations are interrupted or if file system issues corrupt the repository. Always ensure git operations complete cleanly.

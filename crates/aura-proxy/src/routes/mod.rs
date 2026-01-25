@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod conversations;
 pub mod health;
+pub mod organizations;
 pub mod responses;
 
 use axum::Router;
@@ -24,4 +25,6 @@ pub fn app_router() -> Router<AppState> {
         .merge(conversations::router())
         // API key management endpoints
         .merge(auth::router())
+        // Organization management endpoints
+        .merge(organizations::router())
 }

@@ -10,6 +10,12 @@ import { calculateCost } from './lib/pricing'
 import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
+
+// Debug: Log API key status on load (only in development)
+if (import.meta.env.DEV) {
+  console.log('[Auth] API Key loaded:', API_KEY ? `${API_KEY.slice(0, 20)}...` : 'MISSING')
+}
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -205,7 +211,10 @@ export default function App() {
 
         const response = await fetch(`${API_BASE}/v1/responses`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
+          },
           body: JSON.stringify(request),
           signal,
         })

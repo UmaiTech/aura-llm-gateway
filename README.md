@@ -112,18 +112,37 @@ Configuration can be provided via environment variables, YAML files, or both. En
 export AURA_HOST=0.0.0.0
 export AURA_PORT=8080
 
+# Database (required for auth and persistence)
+export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5433/aura
+
+# Master encryption key for provider credentials (required)
+export AURA_MASTER_KEY=$(openssl rand -hex 32)
+
 # Provider API Keys (at least one required)
 export OPENAI_API_KEY=sk-...
 export ANTHROPIC_API_KEY=sk-ant-...
 export GOOGLE_API_KEY=...
 
-# Optional - Database & Redis
-export DATABASE_URL=postgres://user:pass@localhost/aura
+# Optional - Redis for caching/rate limiting
 export REDIS_URL=redis://localhost:6379
 
 # Optional - Logging & Admin
 export RUST_LOG=info,aura_proxy=debug
 export AURA_ADMIN_KEY=your-admin-key
+```
+
+#### Set Up Database and Authentication
+
+```bash
+# Start PostgreSQL
+docker-compose up -d postgres
+
+# Run migrations
+make db-migrate
+
+# Create an API key for making requests
+./scripts/create_api_key.sh "my-first-key"
+# Save the generated API key - you'll need it for authentication
 ```
 
 #### YAML Configuration (Kubernetes/Helm)

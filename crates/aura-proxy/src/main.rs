@@ -150,10 +150,12 @@ impl AppState {
     }
 
     /// Enrich a Response with cost information based on model pricing
-    pub fn enrich_response(
+    pub async fn enrich_response(
         &self,
         mut response: aura_types::Response,
         request_id: &str,
+        auth_context: Option<&crate::routes::AuthContext>,
+        request: Option<&aura_types::CreateResponseRequest>,
     ) -> aura_types::Response {
         // Add cost to usage
         if let Some(ref mut usage) = response.usage {
@@ -222,14 +224,82 @@ impl AppState {
                 serde_json::json!(format!("{:?}", reason).to_lowercase());
         }
 
-        let aura_metadata = serde_json::json!({
-            "aura": {
-                "request_id": request_id,
-                "model": response.model,
-                "provider": provider_name,
-                "gateway_version": env!("CARGO_PKG_VERSION"),
-                "agentic": agentic,
+        // Build tenant metadata if auth context is available
+        let mut tenant_metadata = serde_json::json!({});
+        if let Some(auth) = auth_context {
+            let tenant = &auth.tenant;
+            let mut tenant_obj = serde_json::json!({
+                "api_key_id": tenant.api_key_id,
+            });
+
+            if let Some(org_id) = tenant.organization_id {
+                tenant_obj["organization_id"] = serde_json::json!(org_id);
+                if let Some(ref org_name) = tenant.organization_name {
+                    tenant_obj["organization_name"] = serde_json::json!(org_name);
+                }
             }
+            if let Some(team_id) = tenant.team_id {
+                tenant_obj["team_id"] = serde_json::json!(team_id);
+                if let Some(ref team_name) = tenant.team_name {
+                    tenant_obj["team_name"] = serde_json::json!(team_name);
+                }
+            }
+            if let Some(project_id) = tenant.project_id {
+                tenant_obj["project_id"] = serde_json::json!(project_id);
+                if let Some(ref project_name) = tenant.project_name {
+                    tenant_obj["project_name"] = serde_json::json!(project_name);
+                }
+            }
+
+            tenant_metadata = tenant_obj;
+        }
+
+        // Load end-user metadata if user field is provided
+        let mut end_user_metadata = None;
+        if let (Some(auth), Some(req)) = (auth_context, request) {
+            if let (Some(user_id), Some(org_id)) = (&req.user, auth.tenant.organization_id) {
+                if let Some(pool) = &self.db_pool {
+                    if let Ok(Some(end_user)) =
+                        aura_db::EndUserRepo::find_by_external_id(pool, org_id, user_id).await
+                    {
+                        let mut user_obj = serde_json::json!({
+                            "external_id": end_user.external_id,
+                        });
+                        if let Some(name) = end_user.name {
+                            user_obj["name"] = serde_json::json!(name);
+                        }
+                        if let Some(email) = end_user.email {
+                            user_obj["email"] = serde_json::json!(email);
+                        }
+                        if let Some(metadata) = end_user.metadata {
+                            user_obj["metadata"] = metadata;
+                        }
+                        end_user_metadata = Some(user_obj);
+                    }
+                }
+            }
+        }
+
+        let mut aura_metadata_obj = serde_json::json!({
+            "request_id": request_id,
+            "model": response.model,
+            "provider": provider_name,
+            "gateway_version": env!("CARGO_PKG_VERSION"),
+            "agentic": agentic,
+        });
+
+        // Add tenant metadata if available
+        if !tenant_metadata.is_null() {
+            aura_metadata_obj["tenant"] = tenant_metadata;
+        }
+
+        // Add end-user metadata if available
+        if let Some(user) = end_user_metadata {
+            aura_metadata_obj["end_user"] = user;
+        }
+
+        let aura_metadata = serde_json::json!({
+            "aura": aura_metadata_obj
         });
 
         // Merge with existing metadata or set new
@@ -255,13 +325,17 @@ impl AppState {
     }
 
     /// Enrich a Response with cost, timing, and request ID information
-    pub fn enrich_response_with_latency(
+    pub async fn enrich_response_with_latency(
         &self,
         response: aura_types::Response,
         request_id: &str,
         latency_ms: u64,
+        auth_context: Option<&crate::routes::AuthContext>,
+        request: Option<&aura_types::CreateResponseRequest>,
     ) -> aura_types::Response {
-        let mut response = self.enrich_response(response, request_id);
+        let mut response = self
+            .enrich_response(response, request_id, auth_context, request)
+            .await;
 
         // Add latency to aura metadata
         if let Some(ref mut metadata) = response.metadata {
@@ -454,6 +528,50 @@ impl AppState {
             .map(|s| s.as_str())
             .unwrap_or("unknown");
 
+        // Resolve end_user_id if user field is provided
+        let (end_user_id, end_user_external_id) = if let Some(user_external_id) = &request.user {
+            if let Some(org_id) = auth.tenant.organization_id {
+                // Try to find existing end user or create new one
+                match aura_db::EndUserRepo::find_by_external_id(pool, org_id, user_external_id)
+                    .await
+                {
+                    Ok(Some(end_user)) => (Some(end_user.id), Some(user_external_id.clone())),
+                    Ok(None) => {
+                        // Auto-create end user if not exists
+                        let new_end_user = aura_db::NewEndUser {
+                            organization_id: org_id,
+                            external_id: user_external_id.clone(),
+                            name: None,
+                            email: None,
+                            metadata: None,
+                        };
+                        match aura_db::EndUserRepo::upsert(pool, new_end_user).await {
+                            Ok(end_user) => {
+                                info!(
+                                    end_user_id = %end_user.id,
+                                    external_id = %user_external_id,
+                                    "Auto-created end user"
+                                );
+                                (Some(end_user.id), Some(user_external_id.clone()))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Failed to create end user");
+                                (None, Some(user_external_id.clone()))
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to lookup end user");
+                        (None, Some(user_external_id.clone()))
+                    }
+                }
+            } else {
+                (None, Some(user_external_id.clone()))
+            }
+        } else {
+            (None, None)
+        };
+
         let new_usage = NewApiKeyUsage {
             api_key_id: auth.api_key.id,
             request_id: response.id.clone(),
@@ -464,8 +582,8 @@ impl AppState {
             cached_tokens: usage.cached_tokens.map(|t| t as i32),
             reasoning_tokens: usage.reasoning_tokens.map(|t| t as i32),
             cost_usd: usage.cost_usd,
-            end_user_id: None, // TODO: Resolve from end_users table
-            end_user_external_id: request.user.clone(),
+            end_user_id,
+            end_user_external_id,
         };
 
         match ApiKeyUsageRepo::create(pool, new_usage).await {
