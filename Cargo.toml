@@ -65,5 +65,16 @@ hex = "0.4"
 # Configuration
 dotenvy = "0.15"
 
+# Redis
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+url = "2.5"
+
+# Metrics
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# Regex (for tests)
+regex = "1.10"
+
 # Development tools
 cargo-husky = { version = "1", features = ["user-hooks"] }

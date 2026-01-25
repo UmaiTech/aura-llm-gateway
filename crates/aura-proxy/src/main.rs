@@ -6,7 +6,10 @@
 mod routes;
 
 use anyhow::Context;
-use aura_core::{AnthropicProvider, CostCalculator, GeminiProvider, OpenAIProvider, Provider};
+use aura_core::{
+    AnthropicProvider, CostCalculator, GeminiProvider, OpenAIProvider, Provider, RateLimiter,
+    RedisPool, ResponseCache,
+};
 use aura_db::{ApiKeyUsageRepo, DbPool, NewApiKeyUsage, NewRequestLog, PoolConfig, RequestLogRepo};
 use axum::{middleware, Router};
 use std::collections::HashMap;
@@ -30,11 +33,21 @@ pub struct AppState {
     cost_calculator: Arc<CostCalculator>,
     /// Database connection pool (optional)
     db_pool: Option<DbPool>,
+    /// Redis connection pool (optional)
+    redis_pool: Option<RedisPool>,
+    /// Rate limiter (optional, requires Redis)
+    rate_limiter: Option<RateLimiter>,
+    /// Response cache (optional, requires Redis)
+    response_cache: Option<ResponseCache>,
 }
 
 impl AppState {
     /// Creates a new AppState with the given configuration
-    pub fn new(config: aura_core::Config, db_pool: Option<DbPool>) -> Self {
+    pub fn new(
+        config: aura_core::Config,
+        db_pool: Option<DbPool>,
+        redis_pool: Option<RedisPool>,
+    ) -> Self {
         let mut providers: HashMap<String, Arc<dyn Provider>> = HashMap::new();
         let mut model_map: HashMap<String, String> = HashMap::new();
 
@@ -89,18 +102,48 @@ impl AppState {
             warn!("No database connection - request logging disabled");
         }
 
+        // Initialize rate limiter and cache if Redis is available
+        let (rate_limiter, response_cache) = if let Some(ref redis) = redis_pool {
+            info!("Redis connection initialized - rate limiting and caching enabled");
+            (
+                Some(RateLimiter::new(redis.clone())),
+                Some(ResponseCache::new(redis.clone())),
+            )
+        } else {
+            warn!("No Redis connection - rate limiting and caching disabled");
+            (None, None)
+        };
+
         Self {
             config: Arc::new(config),
             providers: Arc::new(providers),
             model_map: Arc::new(model_map),
             cost_calculator: Arc::new(CostCalculator::new()),
             db_pool,
+            redis_pool,
+            rate_limiter,
+            response_cache,
         }
     }
 
     /// Get database pool reference
     pub fn db_pool(&self) -> Option<&DbPool> {
         self.db_pool.as_ref()
+    }
+
+    /// Get Redis pool reference
+    pub fn redis_pool(&self) -> Option<&RedisPool> {
+        self.redis_pool.as_ref()
+    }
+
+    /// Get rate limiter reference
+    pub fn rate_limiter(&self) -> Option<&RateLimiter> {
+        self.rate_limiter.as_ref()
+    }
+
+    /// Get response cache reference
+    pub fn response_cache(&self) -> Option<&ResponseCache> {
+        self.response_cache.as_ref()
     }
 
     /// Log a completed request to the database (if available)
@@ -658,6 +701,9 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Starting Aura LLM Gateway v{}", env!("CARGO_PKG_VERSION"));
 
+    // Initialize Prometheus metrics exporter
+    init_metrics();
+
     // Load configuration
     let config = aura_core::Config::from_env().context("Failed to load configuration")?;
 
@@ -685,18 +731,51 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Optionally connect to Redis
+    let redis_pool = if let Some(ref redis_url) = config.redis.url {
+        info!("Connecting to Redis...");
+        match RedisPool::new(redis_url).await {
+            Ok(pool) => {
+                // Verify connection with ping
+                match pool.ping().await {
+                    Ok(()) => {
+                        info!("Redis connection established");
+                        Some(pool)
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Redis ping failed - continuing without Redis");
+                        None
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to connect to Redis - continuing without caching/rate limiting");
+                None
+            }
+        }
+    } else {
+        info!("REDIS_URL not configured - running without caching/rate limiting");
+        None
+    };
+
     // Create app state
-    let state = AppState::new(config.clone(), db_pool);
+    let state = AppState::new(config.clone(), db_pool, redis_pool);
 
     info!(
         providers = state.provider_names().len(),
         models = state.available_models().len(),
+        redis = state.redis_pool().is_some(),
         "Gateway initialized"
     );
 
     // Build router with middleware
     let app = Router::new()
         .merge(routes::app_router())
+        // Rate limiting middleware (after auth, before handlers)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            routes::rate_limit_middleware,
+        ))
         // Authentication middleware
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -745,6 +824,29 @@ fn init_tracing() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+}
+
+/// Initialize Prometheus metrics exporter
+fn init_metrics() {
+    use metrics_exporter_prometheus::PrometheusBuilder;
+
+    // Build and install the Prometheus recorder
+    let builder = PrometheusBuilder::new();
+
+    // Install the recorder globally
+    match builder.install_recorder() {
+        Ok(handle) => {
+            // Store the handle for later use by the /metrics endpoint
+            routes::metrics::set_prometheus_handle(handle);
+            info!("Prometheus metrics exporter initialized");
+
+            // Describe all metrics for better Prometheus documentation
+            aura_core::metrics::describe_metrics();
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to initialize Prometheus metrics exporter");
+        }
+    }
 }
 
 /// Graceful shutdown signal handler

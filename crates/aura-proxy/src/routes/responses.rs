@@ -2,13 +2,18 @@
 //!
 //! This endpoint handles both streaming and non-streaming response creation,
 //! transforming requests through the appropriate provider.
+//!
+//! ## Caching
+//!
+//! Non-streaming responses with `temperature=0` are cached in Redis if available.
+//! To bypass caching, set the `X-Cache-Control: no-cache` header.
 
-use aura_core::ProviderError;
+use aura_core::{cache, metrics, ProviderError};
 use aura_db::NewRequestLog;
 use aura_types::{CreateResponseRequest, ResponseStatus, StreamEvent};
 use axum::{
     extract::State,
-    http::StatusCode,
+    http::{header::HeaderMap, StatusCode},
     response::{IntoResponse, Response as AxumResponse, Sse},
     routing::post,
     Extension, Json, Router,
@@ -17,11 +22,14 @@ use futures_util::StreamExt;
 use serde::Serialize;
 use std::convert::Infallible;
 use std::time::{Duration, Instant};
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::routes::AuthContext;
 use crate::AppState;
+
+/// Header to bypass response caching
+const CACHE_CONTROL_HEADER: &str = "x-cache-control";
 
 /// Creates the responses router
 pub fn router() -> Router<AppState> {
@@ -85,10 +93,20 @@ impl ApiError {
     }
 }
 
+/// Check if cache bypass is requested via headers
+fn should_bypass_cache(headers: &HeaderMap) -> bool {
+    headers
+        .get(CACHE_CONTROL_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.eq_ignore_ascii_case("no-cache") || v.eq_ignore_ascii_case("no-store"))
+        .unwrap_or(false)
+}
+
 /// Create a response (streaming or non-streaming)
-#[instrument(skip(state, request, auth), fields(model = %request.model, stream = %request.stream))]
+#[instrument(skip(state, headers, request, auth), fields(model = %request.model, stream = %request.stream))]
 async fn create_response(
     State(state): State<AppState>,
+    headers: HeaderMap,
     auth: Option<Extension<AuthContext>>,
     Json(request): Json<CreateResponseRequest>,
 ) -> Result<AxumResponse, (StatusCode, Json<ApiError>)> {
@@ -124,6 +142,12 @@ async fn create_response(
         let err = ProviderError::model_not_found(&request.model);
         ApiError::from_provider_error(&err)
     })?;
+
+    let provider_name = provider.name().to_string();
+    let is_streaming = request.stream;
+
+    // Record request metric
+    metrics::record_request(&provider_name, &request.model, is_streaming);
 
     if request.stream {
         // Track start time for latency calculation
@@ -387,8 +411,58 @@ async fn create_response(
     } else {
         // Non-streaming response - track latency
         let start = Instant::now();
-        let provider_name = provider.name().to_string();
         let model_id = request.model.clone();
+        let bypass_cache = should_bypass_cache(&headers);
+
+        // Check cache first (if caching is enabled and request is cacheable)
+        let cache_enabled = state.response_cache().is_some()
+            && !bypass_cache
+            && !cache::ResponseCache::should_skip_cache(&request);
+
+        if cache_enabled {
+            if let Some(cache) = state.response_cache() {
+                match cache.get(&request).await {
+                    Ok(Some(hit)) => {
+                        debug!(
+                            cache_key = %hit.cache_key,
+                            ttl_remaining = %hit.ttl_remaining,
+                            "Cache hit"
+                        );
+
+                        // Enrich with cache metadata
+                        let response = cache::enrich_cached_response(hit.response, &hit.cache_key);
+
+                        // Record metrics for cache hit
+                        let latency_ms = start.elapsed().as_millis() as u64;
+                        metrics::record_request_completed(
+                            &provider_name,
+                            &request.model,
+                            false,
+                            "completed",
+                            latency_ms as f64 / 1000.0,
+                        );
+
+                        info!(
+                            request_id = %request_id,
+                            cache_key = %hit.cache_key,
+                            latency_ms = %latency_ms,
+                            "Response served from cache"
+                        );
+
+                        return Ok(Json(response).into_response());
+                    }
+                    Ok(None) => {
+                        debug!("Cache miss");
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Cache lookup failed");
+                    }
+                }
+            }
+        }
+
+        // Increment active requests gauge
+        metrics::increment_active_requests(&provider_name);
 
         // Get or create conversation BEFORE making the provider call
         let conversation_result = state.get_or_create_conversation(&request).await;
@@ -408,6 +482,10 @@ async fn create_response(
         };
 
         let response = provider.complete(request.clone()).await.map_err(|e| {
+            // Decrement active requests on error
+            metrics::decrement_active_requests(&provider_name);
+            metrics::record_provider_error(&provider_name, e.error_code());
+
             error!(error = %e, "Request failed");
 
             // Log failed request (with conversation_id if available)
@@ -438,6 +516,9 @@ async fn create_response(
 
         let latency_ms = start.elapsed().as_millis() as u64;
 
+        // Decrement active requests
+        metrics::decrement_active_requests(&provider_name);
+
         // Enrich with cost and latency information
         let response = state
             .enrich_response_with_latency(
@@ -449,6 +530,45 @@ async fn create_response(
             )
             .await;
 
+        // Record metrics
+        let status_str = match response.status {
+            ResponseStatus::Completed => "completed",
+            ResponseStatus::Failed => "failed",
+            ResponseStatus::Incomplete => "incomplete",
+            ResponseStatus::InProgress => "in_progress",
+            ResponseStatus::Cancelled => "cancelled",
+        };
+
+        metrics::record_request_completed(
+            &provider_name,
+            &request.model,
+            false,
+            status_str,
+            latency_ms as f64 / 1000.0,
+        );
+
+        if let Some(ref usage) = response.usage {
+            metrics::record_tokens(
+                &provider_name,
+                &request.model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.cached_tokens,
+                usage.reasoning_tokens,
+            );
+
+            if let Some(cost) = usage.cost_usd {
+                metrics::record_cost(&provider_name, &request.model, cost);
+            }
+        }
+
+        // Record tool calls
+        for item in &response.output {
+            if let Some(fc) = item.as_function_call() {
+                metrics::record_tool_call(&fc.name, &provider_name, &request.model);
+            }
+        }
+
         info!(
             id = %response.id,
             status = ?response.status,
@@ -456,6 +576,20 @@ async fn create_response(
             conversation_id = ?conversation_id,
             "Response completed"
         );
+
+        // Cache the response if applicable
+        if cache_enabled && cache::ResponseCache::should_cache_response(&response) {
+            if let Some(cache) = state.response_cache() {
+                match cache.set(&request, &response, None).await {
+                    Ok(cache_key) => {
+                        debug!(cache_key = %cache_key, "Response cached");
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to cache response");
+                    }
+                }
+            }
+        }
 
         // Log successful request to database
         let usage = response.usage.as_ref();

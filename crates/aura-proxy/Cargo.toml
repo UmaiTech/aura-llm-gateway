@@ -27,5 +27,8 @@ futures-util.workspace = true
 uuid.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
+redis.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
 
 [dev-dependencies]
