@@ -57,9 +57,12 @@ jobs:
   # Release unpublished packages (creates GitHub releases, publishes to crates.io).
   # IMPORTANT: Must use PAT so that tags created here trigger build-release workflow.
   # Tags created with GITHUB_TOKEN do NOT trigger other workflows (GitHub security limitation).
+  # Only runs when a release-plz PR is merged (commit message starts with "chore: release").
   release-plz-release:
     name: Release-plz release
     runs-on: ubuntu-latest
+    # Only run when a release PR is merged (commit message pattern from release-plz)
+    if: ${{ startsWith(github.event.head_commit.message, 'chore: release') }}
     permissions:
       contents: write
       pull-requests: read
