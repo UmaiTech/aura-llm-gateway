@@ -8,7 +8,7 @@ import mermaid from 'mermaid'
 import {
   BookOpen, Zap, Server, Code2, Settings,
   ChevronRight, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
-  Wrench, ArrowRightLeft, Package
+  Wrench, ArrowRightLeft, Package, Plug
 } from 'lucide-react'
 
 // Import MDX components for use in MDX files
@@ -104,6 +104,7 @@ const docSections = [
   {
     title: 'Guides',
     items: [
+      { title: 'Using Existing SDKs', path: '/docs/guides/existing-sdks', icon: Plug },
       { title: 'Tool Calling', path: '/docs/guides/tool-calling', icon: Wrench },
       { title: 'Migration Guide', path: '/docs/guides/migration', icon: ArrowRightLeft },
     ],
