@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { useChatStore } from './stores/chatStore'
 import { generateId } from './lib/utils'
-import { api, messagesToInput } from './lib/api'
+import { api } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
 import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
@@ -91,12 +91,23 @@ export default function App() {
       }
       addMessage(assistantMessage)
 
+      // Get the latest user message and previous assistant response ID for threading
       const userMessage = conversationMessages[conversationMessages.length - 1]
-      const allMessages = [...conversationMessages.slice(0, -1), userMessage]
-      const input = messagesToInput(allMessages)
+      const previousAssistantMessages = conversationMessages
+        .filter(m => m.role === 'assistant' && m.responseId)
+      const previousResponseId = previousAssistantMessages.length > 0
+        ? previousAssistantMessages[previousAssistantMessages.length - 1].responseId
+        : undefined
+
+      // Send only the latest user message with conversation threading
+      const input = [{
+        type: 'message' as const,
+        role: userMessage.role,
+        content: userMessage.content,
+      }]
 
       let fullContent = ''
-
+      let responseId: string | undefined
       let usage: MessageUsage | undefined
 
       for await (const event of api.createResponseStream({
@@ -104,24 +115,52 @@ export default function App() {
         input,
         instructions: systemPrompt || undefined,
         stream: true,
+        previous_response_id: previousResponseId,
       })) {
+        // Log ALL events to debug
+        console.log('[Stream Event]', event.type, event)
+
         if (event.type === 'response.output_text.delta' && event.delta) {
           fullContent += event.delta
           updateMessage(assistantMessageId, { content: fullContent })
         } else if (event.type === 'response.completed') {
           // Extract usage and metadata from completed response (gateway enriches with cost_usd and aura metadata)
           const response = event.response as {
-            usage?: { input_tokens: number; output_tokens: number; cost_usd?: number }
-            metadata?: { aura?: { provider?: string; gateway_version?: string; latency_ms?: number } }
+            id?: string
+            usage?: {
+              input_tokens?: number
+              output_tokens?: number
+              total_tokens?: number
+              cost_usd?: number
+            }
+            metadata?: { aura?: {
+              provider?: string
+              gateway_version?: string
+              latency_ms?: number
+            } }
           }
 
-          if (response?.usage) {
+          console.log('[Standard Chat] Raw event.response:', response)
+          console.log('[Standard Chat] Response keys:', Object.keys(response || {}))
+          console.log('[Standard Chat] Usage property:', response?.usage)
+          console.log('[Standard Chat] Full event:', event)
+
+          // Store response ID for conversation threading
+          responseId = response?.id
+
+          // Parse usage with better null checks
+          if (response?.usage &&
+              typeof response.usage.input_tokens === 'number' &&
+              typeof response.usage.output_tokens === 'number') {
             usage = {
               inputTokens: response.usage.input_tokens,
               outputTokens: response.usage.output_tokens,
               totalTokens: response.usage.input_tokens + response.usage.output_tokens,
               cost: response.usage.cost_usd ?? calculateCost(model, response.usage.input_tokens, response.usage.output_tokens),
             }
+            console.log('[Standard Chat] Parsed usage:', usage)
+          } else {
+            console.warn('[Standard Chat] No valid usage data in response:', response?.usage)
           }
 
           // Extract Aura metadata
@@ -132,7 +171,14 @@ export default function App() {
             latencyMs: auraMetadata.latency_ms,
           } : undefined
 
-          updateMessage(assistantMessageId, { isStreaming: false, usage, aura })
+          console.log('[Standard Chat] Response completed:', {
+            responseId,
+            usage,
+            aura,
+            fullResponse: response
+          })
+
+          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId })
         } else if (event.type === 'response.failed' || event.type === 'error') {
           const errorMessage =
             event.error?.message ||
@@ -141,8 +187,6 @@ export default function App() {
           throw new Error(errorMessage)
         }
       }
-
-      updateMessage(assistantMessageId, { isStreaming: false, usage })
     },
     [model, systemPrompt, addMessage, updateMessage]
   )
@@ -156,6 +200,13 @@ export default function App() {
 
       // Use agent system prompt if no custom prompt set
       const effectiveSystemPrompt = systemPrompt || AGENT_SYSTEM_PROMPTS.assistant
+
+      // Get previous response ID from conversation for first roundtrip
+      const previousAssistantMessages = conversationMessages
+        .filter(m => m.role === 'assistant' && m.responseId)
+      let lastResponseId = previousAssistantMessages.length > 0
+        ? previousAssistantMessages[previousAssistantMessages.length - 1].responseId
+        : undefined
 
       while (roundtrip < maxRoundtrips) {
         roundtrip++
@@ -171,30 +222,38 @@ export default function App() {
         }
         addMessage(assistantMessage)
 
-        // Build input with tool results
+        // Build input with tool results for tool roundtrips
+        // For first roundtrip, send only latest user message
         type InputItem =
           | { type: 'function_call_output'; call_id: string; output: string }
           | { type: 'message'; role: 'user' | 'assistant'; content: string }
 
-        const input: InputItem[] = currentMessages
-          .filter((m) => m.role !== 'system')
-          .flatMap((m): InputItem[] => {
-            // Include tool results
-            if (m.toolInvocations?.some((t) => t.state === 'result' || t.state === 'error')) {
-              return m.toolInvocations
-                .filter((t) => t.state === 'result' || t.state === 'error')
-                .map((t): InputItem => ({
-                  type: 'function_call_output',
-                  call_id: t.toolCallId,
-                  output: t.result || '',
-                }))
-            }
-            return [{
+        const input: InputItem[] = roundtrip === 1
+          ? [{
               type: 'message',
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
+              role: conversationMessages[conversationMessages.length - 1].role as 'user' | 'assistant',
+              content: conversationMessages[conversationMessages.length - 1].content,
             }]
-          })
+          : currentMessages
+              .slice(-1) // Only include the last message with tool results
+              .filter((m) => m.role !== 'system')
+              .flatMap((m): InputItem[] => {
+                // Include tool results
+                if (m.toolInvocations?.some((t) => t.state === 'result' || t.state === 'error')) {
+                  return m.toolInvocations
+                    .filter((t) => t.state === 'result' || t.state === 'error')
+                    .map((t): InputItem => ({
+                      type: 'function_call_output',
+                      call_id: t.toolCallId,
+                      output: t.result || '',
+                    }))
+                }
+                return [{
+                  type: 'message',
+                  role: m.role as 'user' | 'assistant',
+                  content: m.content,
+                }]
+              })
 
         const request = {
           model,
@@ -207,6 +266,7 @@ export default function App() {
             parameters: t.parameters,
           })),
           stream: true,
+          ...(lastResponseId && { previous_response_id: lastResponseId }),
         }
 
         const response = await fetch(`${API_BASE}/v1/responses`, {
@@ -233,6 +293,7 @@ export default function App() {
         const toolCalls: Array<{ id: string; name: string; arguments: string }> = []
         let usage: MessageUsage | undefined
         let aura: AuraMetadata | undefined
+        let responseId: string | undefined
 
         try {
           while (true) {
@@ -286,6 +347,10 @@ export default function App() {
 
                   // Response completed - extract function calls and usage
                   if (event.type === 'response.completed' && event.response) {
+                    // Store response ID for next roundtrip
+                    responseId = event.response.id
+                    lastResponseId = responseId
+
                     // Extract function calls
                     if (event.response.output) {
                       for (const item of event.response.output) {
@@ -335,7 +400,7 @@ export default function App() {
           reader.releaseLock()
         }
 
-        updateMessage(assistantMessageId, { isStreaming: false, usage, aura })
+        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId })
 
         // No tool calls - we're done
         if (toolCalls.length === 0) {
@@ -384,6 +449,7 @@ export default function App() {
             content: fullContent,
             createdAt: new Date(),
             toolInvocations,
+            responseId,
           },
         ]
       }

@@ -126,6 +126,9 @@ async fn create_response(
     })?;
 
     if request.stream {
+        // Track start time for latency calculation
+        let start = std::time::Instant::now();
+
         // Get or create conversation BEFORE streaming starts
         let conversation_result = state.get_or_create_conversation(&request).await;
         let conversation_id = match conversation_result {
@@ -158,6 +161,7 @@ async fn create_response(
         let model_id = request.model.clone();
         let auth_for_stream = auth_context.clone();
         let auth_for_enrich = auth_context.clone();
+        let start_for_stream = start;
 
         // Convert to SSE stream, enriching terminal events
         let sse_stream = stream.then(move |result| {
@@ -174,10 +178,14 @@ async fn create_response(
                     Ok(event) => {
                         let event = match event {
                             StreamEvent::ResponseCompleted { response } => {
+                                // Calculate latency
+                                let latency_ms = start_for_stream.elapsed().as_millis() as u64;
+
                                 let response = state_clone
-                                    .enrich_response(
+                                    .enrich_response_with_latency(
                                         response,
                                         &request_id_clone,
+                                        latency_ms,
                                         auth_enrich_clone.as_ref(),
                                         Some(&request_clone),
                                     )

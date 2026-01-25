@@ -175,7 +175,18 @@ impl AppState {
             .model_map
             .get(&response.model)
             .map(|s| s.as_str())
-            .unwrap_or("unknown");
+            .unwrap_or_else(|| {
+                // Fallback: infer provider from model name
+                if response.model.starts_with("gpt-") || response.model.starts_with("o1-") {
+                    "openai"
+                } else if response.model.starts_with("claude-") {
+                    "anthropic"
+                } else if response.model.starts_with("gemini-") {
+                    "google"
+                } else {
+                    "unknown"
+                }
+            });
 
         // Extract agentic metadata from response
         let tool_calls: Vec<&str> = response

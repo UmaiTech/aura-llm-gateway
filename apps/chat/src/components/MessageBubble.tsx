@@ -27,6 +27,17 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
+  // Debug logging for usage data
+  if (!isUser && !isStreaming) {
+    console.log('[MessageBubble] Message:', {
+      id: message.id,
+      hasUsage: !!message.usage,
+      usage: message.usage,
+      hasAura: !!message.aura,
+      aura: message.aura,
+    })
+  }
+
   return (
     <div
       className={cn(
@@ -118,7 +129,7 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
         </div>
 
         {/* Usage info (tokens, cost, and Aura metadata) */}
-        {!isUser && message.usage && !isStreaming && (
+        {!isUser && message.usage && !message.isStreaming && (
           <UsageDisplay usage={message.usage} aura={message.aura} />
         )}
       </div>

@@ -414,6 +414,7 @@ struct OpenAIStreamTransformer {
     buffer: String,
     accumulated_text: String,
     accumulated_tool_calls: std::collections::HashMap<usize, PartialToolCall>,
+    accumulated_usage: Option<aura_types::Usage>,
     sent_created: bool,
     sent_in_progress: bool,
     output_item_added: bool,
@@ -435,6 +436,7 @@ impl OpenAIStreamTransformer {
             buffer: String::new(),
             accumulated_text: String::new(),
             accumulated_tool_calls: std::collections::HashMap::new(),
+            accumulated_usage: None,
             sent_created: false,
             sent_in_progress: false,
             output_item_added: false,
@@ -514,13 +516,19 @@ impl OpenAIStreamTransformer {
                                 )));
                             }
 
-                            let response = Response::builder(
+                            let mut builder = Response::builder(
                                 transformer.response_id.clone(),
                                 transformer.model.clone(),
                             )
                             .outputs(output)
-                            .completed()
-                            .build();
+                            .completed();
+
+                            // Add usage if available
+                            if let Some(usage) = transformer.accumulated_usage.clone() {
+                                builder = builder.usage(usage);
+                            }
+
+                            let response = builder.build();
 
                             return Some((
                                 Ok(StreamEvent::response_completed(response)),
@@ -531,6 +539,18 @@ impl OpenAIStreamTransformer {
                         if let Some(data) = line.strip_prefix("data: ") {
                             match serde_json::from_str::<OpenAIStreamChunk>(data) {
                                 Ok(chunk) => {
+                                    // Extract usage if present (comes in final chunk before [DONE])
+                                    if let Some(usage) = chunk.usage {
+                                        transformer.accumulated_usage = Some(aura_types::Usage {
+                                            input_tokens: usage.prompt_tokens,
+                                            output_tokens: usage.completion_tokens,
+                                            total_tokens: usage.total_tokens,
+                                            cached_tokens: None,
+                                            reasoning_tokens: None,
+                                            cost_usd: None,
+                                        });
+                                    }
+
                                     if let Some(choice) = chunk.choices.first() {
                                         // Handle content delta
                                         if let Some(content) = &choice.delta.content {

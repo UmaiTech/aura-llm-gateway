@@ -7,6 +7,7 @@ export interface Message {
   toolInvocations?: ToolInvocation[]
   usage?: MessageUsage
   aura?: AuraMetadata  // Aura gateway metadata
+  responseId?: string  // API response ID for conversation threading
 }
 
 export interface MessageUsage {
@@ -72,6 +73,7 @@ export interface CreateResponseRequest {
   max_output_tokens?: number
   temperature?: number
   top_p?: number
+  previous_response_id?: string  // For conversation threading
 }
 
 export interface InputItem {
