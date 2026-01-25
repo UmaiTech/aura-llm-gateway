@@ -82,7 +82,7 @@ jobs:
           cd -
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.asset_name }}
           path: ./target/${{ matrix.target }}/release/${{ matrix.asset_name }}.tar.gz
@@ -99,7 +99,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
