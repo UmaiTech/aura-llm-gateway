@@ -48,6 +48,7 @@ FROM debian:bookworm-slim AS runtime
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /bin/false aura
 
@@ -68,9 +69,9 @@ USER aura
 # Expose default port
 EXPOSE 8080
 
-# Note: Health check will be enabled once /health endpoint is implemented
-# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-#     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Set default environment variables
 ENV AURA_HOST=0.0.0.0 \
