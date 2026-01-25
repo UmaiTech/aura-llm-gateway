@@ -386,6 +386,20 @@ interface UsageDisplayProps {
 }
 
 function UsageDisplay({ usage, aura }: UsageDisplayProps) {
+  // Format latency for display
+  const formatLatency = (ms: number) => {
+    if (ms < 1000) {
+      return `${ms}ms`
+    } else if (ms < 60000) {
+      const seconds = (ms / 1000).toFixed(1)
+      return `${seconds}s (${ms}ms)`
+    } else {
+      const minutes = Math.floor(ms / 60000)
+      const seconds = Math.floor((ms % 60000) / 1000)
+      return `${minutes}m ${seconds}s (${ms}ms)`
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
       {/* Provider badge */}
@@ -400,7 +414,7 @@ function UsageDisplay({ usage, aura }: UsageDisplayProps) {
       {aura?.latencyMs !== undefined && (
         <span className="flex items-center gap-1">
           <Timer className="h-3 w-3" />
-          <span>{aura.latencyMs}ms</span>
+          <span>{formatLatency(aura.latencyMs)}</span>
         </span>
       )}
 
