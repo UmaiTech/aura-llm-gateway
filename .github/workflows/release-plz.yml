@@ -70,6 +70,14 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
 
+      - name: Get current latest tag
+        id: before_tag
+        run: |
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Current latest tag: $LATEST_TAG"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -84,3 +92,37 @@ jobs:
           # Must use PAT so tag creation triggers build-release workflow
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Check for new tag
+        id: after_tag
+        run: |
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          BEFORE_TAG="${{ steps.before_tag.outputs.tag }}"
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+          if [ "$LATEST_TAG" != "$BEFORE_TAG" ] && [ "$LATEST_TAG" != "none" ]; then
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "New release created: $LATEST_TAG"
+          else
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "No new release (tag unchanged: $LATEST_TAG)"
+          fi
+
+    outputs:
+      tag: ${{ steps.after_tag.outputs.tag }}
+      new_release: ${{ steps.after_tag.outputs.new_release }}
+
+  # Trigger build-release workflow after a new release is created
+  # This ensures binaries are built even if RELEASE_PLZ_TOKEN isn't set
+  # (tags created with GITHUB_TOKEN don't trigger other workflows)
+  trigger-build:
+    name: Trigger Build
+    needs: release-plz-release
+    if: ${{ needs.release-plz-release.outputs.new_release == 'true' }}
+    uses: ./.github/workflows/build-release.yml
+    with:
+      tag: ${{ needs.release-plz-release.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: write

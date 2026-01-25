@@ -5,6 +5,18 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v0.2.0)'
+        required: false
+        type: string
+  # Allow this workflow to be called from other workflows
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to build'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -35,6 +47,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Use the tag from input if provided, otherwise use the triggered ref
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -97,6 +112,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v7
@@ -112,6 +129,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: release-assets/*.tar.gz
           generate_release_notes: true
           fail_on_unmatched_files: true
@@ -123,6 +141,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -133,24 +161,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: umaitech/aura-llm-gateway
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            umaitech/aura-llm-gateway:${{ steps.version.outputs.version }}
+            umaitech/aura-llm-gateway:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
