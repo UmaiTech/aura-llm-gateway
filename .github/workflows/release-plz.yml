@@ -22,8 +22,10 @@ jobs:
   release-plz-pr:
     name: Release-plz PR
     runs-on: ubuntu-latest
-    # Only run if RELEASE_PLZ_TOKEN is configured
-    if: vars.RELEASE_PLZ_ENABLED != 'false'
+    # Only run if RELEASE_PLZ_TOKEN is configured and NOT a release commit
+    if: |
+      vars.RELEASE_PLZ_ENABLED != 'false' &&
+      !startsWith(github.event.head_commit.message, 'chore: release')
     permissions:
       contents: write
       pull-requests: write
