@@ -23,25 +23,34 @@ semver_check = false
 
 # Individual package configuration
 # publish = false prevents publishing to crates.io
-# Only aura-proxy creates releases (main binary)
+# All packages contribute to workspace version bumps
+# Only aura-proxy creates the actual GitHub release
 [[package]]
 name = "aura-types"
 publish = false
-release = false
+# Changes to types trigger version bumps
+release = true
+# No individual GitHub release for this package
+git_release_enable = false
 
 [[package]]
 name = "aura-db"
 publish = false
-release = false
+# Changes to db trigger version bumps
+release = true
+git_release_enable = false
 
 [[package]]
 name = "aura-core"
 publish = false
-release = false
+# Changes to core (providers, etc.) trigger version bumps
+release = true
+git_release_enable = false
 
 [[package]]
 name = "aura-proxy"
 publish = false
 # This is the main package - enable releases for it
 release = true
+# Only this package creates GitHub releases
 git_release_enable = true
