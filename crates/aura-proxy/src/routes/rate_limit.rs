@@ -140,36 +140,6 @@ pub async fn rate_limit_middleware(
     response
 }
 
-/// Check monthly token budget for an API key
-///
-/// This is called after a successful request to check if the API key
-/// has exceeded its monthly token budget.
-///
-/// Note: This function doesn't block requests but can be used for
-/// soft enforcement (warnings) or async budget tracking.
-pub async fn check_token_budget(
-    state: &AppState,
-    api_key_id: &str,
-    monthly_limit: i64,
-    tokens_used: i64,
-) -> bool {
-    let rate_limiter = match state.rate_limiter() {
-        Some(rl) => rl,
-        None => return true, // No limiter, allow
-    };
-
-    match rate_limiter
-        .check_token_budget(api_key_id, monthly_limit, tokens_used)
-        .await
-    {
-        Ok(allowed) => allowed,
-        Err(e) => {
-            warn!(error = %e, api_key_id = %api_key_id, "Token budget check failed");
-            true // On error, allow
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
