@@ -29,10 +29,9 @@ import {
 
 // Import all MD files from src/content at build time using Vite's glob
 const mdModules = import.meta.glob('../content/**/*.md', {
-  query: '?raw',
-  import: 'default',
+  as: 'raw',
   eager: true
-}) as Record<string, string>
+}) as Record<string, unknown>
 
 // Import all MDX files as lazy components
 const mdxModules = import.meta.glob('../content/**/*.mdx') as Record<
@@ -41,7 +40,16 @@ const mdxModules = import.meta.glob('../content/**/*.mdx') as Record<
 >
 
 // Remove frontmatter from markdown content
-function removeFrontmatter(content: string): string {
+function removeFrontmatter(content: unknown): string {
+  // Handle case where content might not be a string (e.g., module object)
+  if (typeof content !== 'string') {
+    console.warn('Content is not a string:', typeof content, content)
+    // Try to extract string from module-like object
+    if (content && typeof content === 'object' && 'default' in content) {
+      return removeFrontmatter((content as { default: unknown }).default)
+    }
+    return ''
+  }
   return content.replace(/^---\n[\s\S]*?\n---\n/, '')
 }
 

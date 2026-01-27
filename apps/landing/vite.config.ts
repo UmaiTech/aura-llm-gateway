@@ -7,13 +7,17 @@ import remarkGfm from 'remark-gfm'
 
 export default defineConfig({
   plugins: [
-    mdx({
-      remarkPlugins: [
-        remarkFrontmatter,
-        remarkMdxFrontmatter,
-        remarkGfm,
-      ],
-    }),
+    {
+      enforce: 'pre',
+      ...mdx({
+        include: /\.mdx$/,
+        remarkPlugins: [
+          remarkFrontmatter,
+          remarkMdxFrontmatter,
+          remarkGfm,
+        ],
+      }),
+    },
     react(),
   ],
   server: {
