@@ -81,7 +81,7 @@ def make_request_with_retry(messages, max_retries=5):
     for attempt in range(max_retries):
         try:
             return client.responses.create(
-                model="gpt-4o",
+                model="gpt-4.5",
                 input=messages
             )
         except RateLimitError as e:
@@ -109,7 +109,7 @@ async function makeRequestWithRetry(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await client.responses.create({
-        model: 'gpt-4o',
+        model: 'gpt-4.5',
         input: messages,
       });
     } catch (error) {
@@ -134,7 +134,7 @@ When tracking end-users, rate limits can be applied per-user to prevent any sing
 
 <CodeBlock language="json" title="Request with user tracking">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [{"type": "message", "role": "user", "content": "Hello"}],
   "user": "user_12345"
 }`}

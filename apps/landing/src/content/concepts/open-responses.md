@@ -54,7 +54,7 @@ Aura provides semantic streaming events (not raw token deltas):
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [
     {
       "type": "message",
@@ -69,7 +69,7 @@ Aura provides semantic streaming events (not raw token deltas):
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "instructions": "You are a helpful assistant.",
   "input": [
     {
@@ -85,7 +85,7 @@ Aura provides semantic streaming events (not raw token deltas):
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [
     {
       "type": "message",
@@ -117,7 +117,7 @@ Aura provides semantic streaming events (not raw token deltas):
   "id": "resp_abc123",
   "object": "response",
   "created_at": 1706140800,
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "status": "completed",
   "output": [
     {
@@ -147,7 +147,7 @@ Use `previous_response_id` to continue conversations:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [
     {
       "type": "message",
@@ -174,7 +174,7 @@ The Open Responses API is designed for agentic workflows where the model can:
 ```javascript
 async function runAgent(userMessage) {
   let response = await createResponse({
-    model: 'gpt-4o',
+    model: 'gpt-4.5',
     input: [{type: 'message', role: 'user', content: userMessage}],
     tools: AVAILABLE_TOOLS
   });
@@ -184,7 +184,7 @@ async function runAgent(userMessage) {
     const toolResults = await executeTools(response.output);
 
     response = await createResponse({
-      model: 'gpt-4o',
+      model: 'gpt-4.5',
       input: toolResults,
       previous_response_id: response.id
     });
@@ -243,7 +243,7 @@ const response = await fetch('/v1/responses', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({
-    model: 'gpt-4o',
+    model: 'gpt-4.5',
     input: [{type: 'message', role: 'user', content: 'Tell me a story'}],
     stream: true
   })

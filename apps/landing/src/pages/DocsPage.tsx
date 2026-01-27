@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, Suspense, ComponentType } from 'react'
-import { useLocation, Link } from 'react-router-dom'
+import { useLocation, Link, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -7,8 +7,8 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import mermaid from 'mermaid'
 import {
   BookOpen, Zap, Server, Code2, Settings,
-  ChevronRight, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
-  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical
+  ChevronRight, ChevronLeft, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
+  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical, Home
 } from 'lucide-react'
 import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
 
@@ -331,11 +331,21 @@ const markdownComponents: any = {
   pre: ({ children }: { children?: React.ReactNode }) => (
     <div className="mb-4">{children}</div>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+    // Use Link for internal navigation, regular anchor for external
+    if (href?.startsWith('/') || href?.startsWith('#')) {
+      return (
+        <Link to={href} className="text-aura-400 hover:text-aura-300 underline">
+          {children}
+        </Link>
+      )
+    }
+    return (
+      <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    )
+  },
   table: ({ children }: { children?: React.ReactNode }) => (
     <div className="overflow-x-auto mb-4">
       <table className="min-w-full divide-y divide-gray-800">{children}</table>
@@ -382,11 +392,20 @@ const mdxWrapperComponents = {
   li: ({ children }: { children?: React.ReactNode }) => (
     <li className="text-gray-300">{children}</li>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} className="text-aura-400 hover:text-aura-300 underline">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+    if (href?.startsWith('/') || href?.startsWith('#')) {
+      return (
+        <Link to={href} className="text-aura-400 hover:text-aura-300 underline">
+          {children}
+        </Link>
+      )
+    }
+    return (
+      <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    )
+  },
   table: ({ children }: { children?: React.ReactNode }) => (
     <div className="overflow-x-auto mb-4">
       <table className="min-w-full divide-y divide-gray-800">{children}</table>
@@ -581,6 +600,23 @@ export function DocsPage() {
         {/* Main Content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:pl-8">
           <div className="max-w-3xl mx-auto">
+            {/* Navigation breadcrumb */}
+            <div className="flex items-center gap-4 mb-6 text-sm">
+              <button
+                onClick={() => window.history.back()}
+                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+              <Link
+                to="/"
+                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </Link>
+            </div>
             <div className="prose prose-invert prose-gray max-w-none">
               {hasMdxContent ? (
                 <Suspense fallback={<MDXLoading />}>

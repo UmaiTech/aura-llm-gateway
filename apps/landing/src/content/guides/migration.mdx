@@ -69,7 +69,7 @@ client = AuraClient(api_key="aura-...")`}
       <CodeTab label="Before (OpenAI)">
         <CodeBlock language="python">
 {`response = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     messages=[
         {"role": "system", "content": "You are helpful"},
         {"role": "user", "content": "Hello!"}
@@ -82,7 +82,7 @@ print(response.choices[0].message.content)`}
       <CodeTab label="After (Aura)">
         <CodeBlock language="python">
 {`response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     instructions="You are helpful",
     input=[
         {"type": "message", "role": "user", "content": "Hello!"}
@@ -115,7 +115,7 @@ print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
   <CodeTab label="Before (OpenAI)">
     <CodeBlock language="python">
 {`stream = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     messages=[{"role": "user", "content": "Hello"}],
     stream=True
 )
@@ -128,7 +128,7 @@ for chunk in stream:
   <CodeTab label="After (Aura)">
     <CodeBlock language="python">
 {`stream = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "Hello"}],
     stream=True
 )
@@ -190,7 +190,7 @@ print(response.output_text)
 
 # Bonus: Same code works with OpenAI models!
 response = client.responses.create(
-    model="gpt-4o",  # Just change the model
+    model="gpt-4.5",  # Just change the model
     instructions="You are a helpful assistant",
     input=[
         {"type": "message", "role": "user", "content": "Hello!"}
@@ -282,7 +282,7 @@ If you're using LiteLLM as a proxy, Aura offers similar multi-provider support w
 {`import litellm
 
 response = litellm.completion(
-    model="gpt-4o",  # or "claude-3-opus-20240229"
+    model="gpt-4.5",  # or "claude-opus-4-5"
     messages=[{"role": "user", "content": "Hello!"}]
 )
 
@@ -296,7 +296,7 @@ print(response.choices[0].message.content)`}
 client = AuraClient()
 
 response = client.responses.create(
-    model="gpt-4o",  # or "claude-sonnet-4-5-20250514"
+    model="gpt-4.5",  # or "claude-sonnet-4-5-20250514"
     input=[{"type": "message", "role": "user", "content": "Hello!"}]
 )
 

@@ -21,7 +21,7 @@ All API requests require a valid API key in the `Authorization` header:
 curl -X POST http://localhost:8080/v1/responses \
   -H "Authorization: Bearer aura_live_abc123..." \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "input": [...]}'
+  -d '{"model": "gpt-4.5", "input": [...]}'
 ```
 
 See [Authentication](/docs/api/authentication) for details on API key management, scopes, and rate limits.
@@ -90,7 +90,7 @@ Errors follow the Open Responses API format:
 
 | Provider | Models | Status |
 |----------|--------|--------|
-| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo, o1, o1-mini, o3-mini | ✅ Live |
+| **OpenAI** | gpt-4.5, gpt-4.5-mini, gpt-4.5, gpt-3.5-turbo, o1, o1-mini, o3-mini | ✅ Live |
 | **Anthropic** | claude-opus-4-5-20251101, claude-sonnet-4-5-20250514, claude-3-5-haiku-20241022 | ✅ Live |
 | **Google** | gemini-3-pro, gemini-3-flash, gemini-2.5-pro, gemini-2.0-flash, gemini-1.5-pro | ✅ Live |
 

@@ -45,7 +45,7 @@ client = AuraClient()
   <Step title="Make your first request">
     <CodeBlock language="python">
 {`response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{
         "type": "message",
         "role": "user",
@@ -86,7 +86,7 @@ client = AuraClient(
 
 <CodeBlock language="python">
 {`response = client.responses.create(
-    model="gpt-4o-mini",
+    model="gpt-4.5-mini",
     input=[
         {"type": "message", "role": "user", "content": "Explain quantum computing"}
     ]
@@ -102,13 +102,13 @@ print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
 <CodeBlock language="python">
 {`# First message
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "What is Python?"}]
 )
 
 # Follow-up using conversation threading
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "Show me an example"}],
     previous_response_id=response.id
 )`}
@@ -132,7 +132,7 @@ response = client.responses.create(
   <CodeTab label="Basic Streaming">
     <CodeBlock language="python">
 {`stream = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "Write a poem"}],
     stream=True
 )
@@ -148,7 +148,7 @@ print(f"\\n\\nTotal tokens: {stream.response.usage.total_tokens}")`}
   <CodeTab label="Event Handling">
     <CodeBlock language="python">
 {`stream = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "Hello"}],
     stream=True
 )
@@ -180,14 +180,14 @@ async def main():
 
     # Async create
     response = await client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{"type": "message", "role": "user", "content": "Hello!"}]
     )
     print(response.output_text)
 
     # Async streaming
     stream = await client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{"type": "message", "role": "user", "content": "Count to 10"}],
         stream=True
     )
@@ -221,7 +221,7 @@ tools = [
 
 # Make request with tools
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "Weather in Tokyo?"}],
     tools=tools
 )
@@ -236,7 +236,7 @@ if response.aura.requires_action:
 
             # Return result
             response = client.responses.create(
-                model="gpt-4o",
+                model="gpt-4.5",
                 input=[{
                     "type": "function_call_output",
                     "call_id": item.id,
@@ -265,7 +265,7 @@ client = AuraClient()
 
 try:
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{"type": "message", "role": "user", "content": "Hello"}]
     )
 except AuthenticationError as e:
@@ -338,7 +338,7 @@ client.conversations.delete("conv_abc123")`}
 {`# Automatic cleanup with context manager
 with AuraClient() as client:
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{"type": "message", "role": "user", "content": "Hello"}]
     )
 
@@ -379,7 +379,7 @@ export AURA_API_KEY="your-api-key"
 export AURA_BASE_URL="https://api.aura.dev"
 export AURA_TIMEOUT="30"
 export AURA_MAX_RETRIES="3"
-export AURA_DEFAULT_MODEL="gpt-4o"`}
+export AURA_DEFAULT_MODEL="gpt-4.5"`}
 </CodeBlock>
 
 <Callout type="tip">
@@ -395,7 +395,7 @@ The SDK automatically reads these environment variables, so you can create a cli
 client = AuraClient()
 
 class Chatbot:
-    def __init__(self, model: str = "gpt-4o"):
+    def __init__(self, model: str = "gpt-4.5"):
         self.model = model
         self.response_id = None
 
@@ -427,7 +427,7 @@ async def process_batch(prompts: list[str], max_concurrent: int = 5):
     async def process_one(prompt: str):
         async with semaphore:
             return await client.responses.create(
-                model="gpt-4o-mini",
+                model="gpt-4.5-mini",
                 input=[{"type": "message", "role": "user", "content": prompt}]
             )
 

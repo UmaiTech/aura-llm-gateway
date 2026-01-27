@@ -15,17 +15,17 @@ All API requests must include a valid API key in the `Authorization` header:
 curl -X POST https://api.aura.example/v1/responses \
   -H "Authorization: Bearer aura_live_abc123..." \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "input": [...]}'
+  -d '{"model": "gpt-4.5", "input": [...]}'
 ```
 
 ## API Key Format
 
 API keys follow a structured format for easy identification:
 
-```
-aura_live_<random_32_chars>   # Production keys
-aura_test_<random_32_chars>   # Test/development keys
-```
+| Environment | Format | Example |
+|-------------|--------|---------|
+| Production | `aura_live_<32_chars>` | `aura_live_a1b2c3d4e5f6...` |
+| Development | `aura_test_<32_chars>` | `aura_test_x9y8z7w6v5u4...` |
 
 The prefix indicates the environment. Keys are never stored in plaintext—only a SHA-256 hash is kept in the database.
 
@@ -79,7 +79,7 @@ Include the `user` field in requests to track costs per customer:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [...],
   "user": "customer_12345"
 }

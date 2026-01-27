@@ -347,7 +347,7 @@ Metrics available at `/metrics`:
 
 ```
 # Request latency
-aura_request_duration_seconds{provider="openai",model="gpt-4o"}
+aura_request_duration_seconds{provider="openai",model="gpt-4.5"}
 
 # Request count
 aura_requests_total{provider="openai",status="success"}
@@ -372,7 +372,7 @@ Logs are JSON formatted for easy parsing:
   "message": "Request completed",
   "request_id": "req_abc123",
   "provider": "openai",
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "latency_ms": 342,
   "tokens": 150,
   "cost_usd": 0.0045

@@ -102,7 +102,7 @@ Now that the gateway is running, let's make a request.
 {`curl -X POST http://localhost:8080/v1/responses \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "claude-sonnet-4-5",
     "input": [
       {"type": "message", "role": "user", "content": "Hello! What is Aura?"}
     ]
@@ -116,7 +116,7 @@ Now that the gateway is running, let's make a request.
 client = AuraClient(base_url="http://localhost:8080")
 
 response = client.responses.create(
-    model="gpt-4o-mini",
+    model="claude-sonnet-4-5",
     input=[{
         "type": "message",
         "role": "user",
@@ -135,7 +135,7 @@ print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
 const client = new Aura({ baseUrl: 'http://localhost:8080' });
 
 const response = await client.responses.create({
-  model: 'gpt-4o-mini',
+  model: 'claude-sonnet-4-5',
   input: [{
     type: 'message',
     role: 'user',
@@ -151,25 +151,14 @@ console.log(\`Cost: $\${response.aura.cost.total_cost.toFixed(4)}\`);`}
 
 ## Try it Live
 
-Use the interactive playground below to test the API directly:
+Want to test Aura without setting up locally? Use our interactive chat playground:
 
-<ApiPlayground
-  endpoint="/v1/responses"
-  method="POST"
-  defaultBody={{
-    model: "gpt-4o-mini",
-    input: [
-      {
-        type: "message",
-        role: "user",
-        content: "Hello! Explain what an LLM gateway is in one sentence."
-      }
-    ]
-  }}
-/>
+<Card title="Open Chat Playground" href="http://localhost:3000">
+  Test Aura with a full-featured chat interface. Supports streaming, multiple models, and real-time cost tracking.
+</Card>
 
-<Callout type="warning">
-The playground connects to `localhost:8080` by default. Make sure your gateway is running locally.
+<Callout type="info">
+The playground requires a running Aura gateway. For a hosted demo, check our [deployment guide](/docs/deployment).
 </Callout>
 
 ## Understanding the Response
@@ -195,7 +184,7 @@ Aura responses include rich metadata beyond the model's output:
   "aura": {
     "request_id": "req_xyz789",
     "provider": "openai",
-    "model": "gpt-4o-mini",
+    "model": "claude-sonnet-4-5",
     "latency_ms": 523,
     "cost": {
       "input_cost": 0.0000225,

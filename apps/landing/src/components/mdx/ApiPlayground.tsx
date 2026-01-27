@@ -13,7 +13,7 @@ interface ApiPlaygroundProps {
 }
 
 const defaultRequest = {
-  model: 'gpt-4o-mini',
+  model: 'claude-sonnet-4-5',
   input: [
     {
       type: 'message',

@@ -63,8 +63,8 @@ sequenceDiagram
 
 **Step by step:**
 
-1. Your app sends a request to Aura (e.g., model: "gpt-4o")
-2. Aura determines which provider to use (gpt-4o → OpenAI)
+1. Your app sends a request to Aura (e.g., model: "gpt-4.5")
+2. Aura determines which provider to use (gpt-4.5 → OpenAI)
 3. Aura calls the provider's API
 4. Provider responds with the generated text and token usage
 5. Aura calculates the cost in USD
@@ -113,7 +113,7 @@ aura_test_<random_32_chars>   # Test/development keys
 curl -X POST https://api.aura.example/v1/responses \
   -H "Authorization: Bearer aura_live_abc123..." \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "input": [...], "user": "customer_123"}'
+  -d '{"model": "gpt-4.5", "input": [...], "user": "customer_123"}'
 ```
 
 The `user` field enables per-customer cost tracking and billing.
@@ -150,7 +150,7 @@ Every response from Aura includes extra metadata:
 ```json
 {
   "id": "resp_abc123",
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "output": [...],
   "usage": {
     "input_tokens": 100,
@@ -183,7 +183,7 @@ Track costs per customer by including the `user` field in your requests:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [...],
   "user": "customer_12345"
 }
@@ -358,7 +358,7 @@ Aura normalizes all provider errors to a standard format:
 {
   "error": {
     "code": "rate_limit_exceeded",
-    "message": "Rate limit reached for gpt-4o",
+    "message": "Rate limit reached for gpt-4.5",
     "param": null
   }
 }

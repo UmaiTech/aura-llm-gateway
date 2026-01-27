@@ -228,7 +228,7 @@ Revoke an API key immediately. This action cannot be undone.
       "status": "active",
       "settings": {
         "token_budget_daily": 10000000,
-        "allowed_models": ["gpt-4o", "claude-sonnet-4-5-20250514"]
+        "allowed_models": ["gpt-4.5", "claude-sonnet-4-5-20250514"]
       },
       "usage": {
         "tokens_today": 523000,
@@ -254,7 +254,7 @@ Revoke an API key immediately. This action cannot be undone.
   "slug": "new-org",
   "settings": {
     "token_budget_daily": 5000000,
-    "allowed_models": ["gpt-4o-mini", "gemini-2.0-flash"]
+    "allowed_models": ["gpt-4.5-mini", "gemini-2.0-flash"]
   }
 }`}
 </CodeBlock>
@@ -342,7 +342,7 @@ Projects belong to teams and represent individual applications or services.
   "name": "Chat Bot",
   "slug": "chat-bot",
   "settings": {
-    "default_model": "gpt-4o-mini",
+    "default_model": "gpt-4.5-mini",
     "max_tokens_per_request": 4096
   }
 }`}
@@ -467,7 +467,7 @@ Rotate a credential's API key without downtime.
   },
   "by_model": [
     {
-      "model": "gpt-4o",
+      "model": "gpt-4.5",
       "requests": 50000,
       "tokens": 25000000,
       "cost": 125.00

@@ -19,7 +19,7 @@ Aura provides comprehensive support for Anthropic's Claude models, including the
 - **claude-3-5-haiku** - Efficient for high-volume tasks
 
 ### Claude 3 Series (Legacy)
-- **claude-3-opus** - Previous flagship model
+- **claude-opus-4-5** - Previous flagship model
 
 ## Model Capabilities
 
@@ -46,7 +46,7 @@ Aura provides comprehensive support for Anthropic's Claude models, including the
 | **claude-haiku-4-5** | $1.00 | $5.00 | $0.10 |
 | **claude-3-5-sonnet** | $3.00 | $15.00 | $0.30 |
 | **claude-3-5-haiku** | $0.80 | $4.00 | $0.08 |
-| **claude-3-opus** | $15.00 | $75.00 | $1.50 |
+| **claude-opus-4-5** | $15.00 | $75.00 | $1.50 |
 
 ## Configuration
 

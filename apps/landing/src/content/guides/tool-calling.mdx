@@ -66,7 +66,7 @@ Tools are defined using JSON Schema. Here's an example weather tool:
   endpoint="/v1/responses"
   method="POST"
   defaultBody={{
-    model: "gpt-4o",
+    model: "gpt-4.5",
     input: [
       {
         type: "message",
@@ -134,7 +134,7 @@ client = AuraClient()
 
 # Initial request with tools
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input=[{"type": "message", "role": "user", "content": "What's the weather in SF?"}],
     tools=[{
         "type": "function",
@@ -157,7 +157,7 @@ if response.aura.requires_action:
 
             # Continue with tool result
             response = client.responses.create(
-                model="gpt-4o",
+                model="gpt-4.5",
                 input=[{
                     "type": "function_call_output",
                     "call_id": item.id,
@@ -177,7 +177,7 @@ const client = new Aura();
 
 // Initial request with tools
 let response = await client.responses.create({
-  model: 'gpt-4o',
+  model: 'gpt-4.5',
   input: [{ type: 'message', role: 'user', content: "What's the weather in SF?" }],
   tools: [{
     type: 'function',
@@ -200,7 +200,7 @@ if (response.aura.requires_action) {
 
       // Continue with tool result
       response = await client.responses.create({
-        model: 'gpt-4o',
+        model: 'gpt-4.5',
         input: [{
           type: 'function_call_output',
           call_id: item.id,
@@ -229,7 +229,7 @@ For complex tasks, models may need to call multiple tools in sequence. Implement
 
     for _ in range(max_iterations):
         response = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-4.5",
             input=messages,
             tools=tools,
             previous_response_id=previous_response_id

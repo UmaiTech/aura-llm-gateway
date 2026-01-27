@@ -30,7 +30,7 @@ client = OpenAI(
 
 # Use exactly as you would with OpenAI
 response = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Hello!"}
@@ -41,7 +41,7 @@ print(response.choices[0].message.content)
 
 # Streaming works too
 stream = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     messages=[{"role": "user", "content": "Tell me a story"}],
     stream=True
 )
@@ -63,7 +63,7 @@ const client = new OpenAI({
 
 // Use exactly as you would with OpenAI
 const response = await client.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-4.5',
   messages: [
     { role: 'system', content: 'You are a helpful assistant.' },
     { role: 'user', content: 'Hello!' },
@@ -74,7 +74,7 @@ console.log(response.choices[0].message.content);
 
 // Streaming
 const stream = await client.chat.completions.create({
-  model: 'gpt-4o',
+  model: 'gpt-4.5',
   messages: [{ role: 'user', content: 'Tell me a story' }],
   stream: true,
 });
@@ -97,7 +97,7 @@ client = OpenAI(base_url="http://localhost:8080/v1")
 
 # Use OpenAI models
 gpt_response = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     messages=[{"role": "user", "content": "Hello from GPT!"}]
 )
 
@@ -128,7 +128,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 llm = ChatOpenAI(
     base_url="http://localhost:8080/v1",
     api_key="your-aura-api-key",  # or set OPENAI_API_KEY env var
-    model="gpt-4o",
+    model="gpt-4.5",
 )
 
 # Simple completion
@@ -154,7 +154,7 @@ const llm = new ChatOpenAI({
     baseURL: 'http://localhost:8080/v1',
   },
   apiKey: 'your-aura-api-key',
-  modelName: 'gpt-4o',
+  modelName: 'gpt-4.5',
 });
 
 // Simple completion
@@ -185,7 +185,7 @@ from langchain_core.output_parsers import StrOutputParser
 # Set up LLM with Aura
 llm = ChatOpenAI(
     base_url="http://localhost:8080/v1",
-    model="gpt-4o"
+    model="gpt-4.5"
 )
 
 # Create a chain
@@ -214,7 +214,7 @@ from langchain_core.tools import tool
 # Configure LLM with Aura
 llm = ChatOpenAI(
     base_url="http://localhost:8080/v1",
-    model="gpt-4o"
+    model="gpt-4.5"
 )
 
 # Define tools
@@ -279,7 +279,7 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 llm = OpenAI(
     api_base="http://localhost:8080/v1",
     api_key="your-aura-api-key",
-    model="gpt-4o"
+    model="gpt-4.5"
 )
 
 # Set as default LLM
@@ -308,7 +308,7 @@ from llama_index.core.memory import ChatMemoryBuffer
 # Configure Aura
 Settings.llm = OpenAI(
     api_base="http://localhost:8080/v1",
-    model="gpt-4o"
+    model="gpt-4.5"
 )
 
 # Load documents and create index
@@ -345,7 +345,7 @@ from haystack.dataclasses import ChatMessage
 generator = OpenAIChatGenerator(
     api_base_url="http://localhost:8080/v1",
     api_key="your-aura-api-key",
-    model="gpt-4o"
+    model="gpt-4.5"
 )
 
 # Generate response
@@ -380,7 +380,7 @@ class UserInfo(BaseModel):
 
 # Extract structured data
 user = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     response_model=UserInfo,
     messages=[
         {"role": "user", "content": "John Doe is 30 years old. His email is john@example.com"}
@@ -402,7 +402,7 @@ Microsoft's AutoGen framework for multi-agent conversations.
 # Configure to use Aura
 config_list = [
     {
-        "model": "gpt-4o",
+        "model": "gpt-4.5",
         "base_url": "http://localhost:8080/v1",
         "api_key": "your-aura-api-key"
     }
@@ -442,7 +442,7 @@ from langchain_openai import ChatOpenAI
 # Configure LLM with Aura
 llm = ChatOpenAI(
     base_url="http://localhost:8080/v1",
-    model="gpt-4o"
+    model="gpt-4.5"
 )
 
 # Create agents

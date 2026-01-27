@@ -101,7 +101,7 @@ const response = await fetch('https://api.aura.example/v1/responses', {
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    model: 'gpt-4o',
+    model: 'gpt-4.5',
     input: [
       { type: 'message', role: 'user', content: 'Hello!' }
     ],

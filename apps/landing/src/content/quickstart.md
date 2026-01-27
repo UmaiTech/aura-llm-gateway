@@ -91,7 +91,7 @@ curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer aura_live_your_api_key_here" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-4.5-mini",
     "input": [
       {"type": "message", "role": "user", "content": "Hello!"}
     ]

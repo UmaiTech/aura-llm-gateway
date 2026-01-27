@@ -74,7 +74,7 @@ def test_chat_function(mock_response):
 
         client = AuraClient()
         response = client.responses.create(
-            model="gpt-4o",
+            model="gpt-4.5",
             input=[{"type": "message", "role": "user", "content": "Hello"}]
         )
 
@@ -90,7 +90,7 @@ async def test_async_chat(mock_response):
 
         client = AuraClient()
         response = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-4.5",
             input=[{"type": "message", "role": "user", "content": "Hello"}]
         )
 
@@ -145,7 +145,7 @@ describe('Chat function', () => {
 
     const client = new Aura();
     const response = await client.responses.create({
-      model: 'gpt-4o',
+      model: 'gpt-4.5',
       input: [{ type: 'message', role: 'user', content: 'Hello' }],
     });
 
@@ -293,7 +293,7 @@ def test_rate_limit_handling(client):
     with pytest.raises(RateLimitError) as exc_info:
         for _ in range(100):  # Exceed rate limit
             client.responses.create(
-                model="gpt-4o-mini",
+                model="gpt-4.5-mini",
                 input=[{"type": "message", "role": "user", "content": "Hi"}]
             )
 
@@ -310,7 +310,7 @@ def test_invalid_api_key():
 
     with pytest.raises(AuthenticationError):
         client.responses.create(
-            model="gpt-4o",
+            model="gpt-4.5",
             input=[{"type": "message", "role": "user", "content": "Hi"}]
         )
 
@@ -340,7 +340,7 @@ def test_streaming_response(client):
     events = []
 
     stream = client.responses.create(
-        model="gpt-4o-mini",
+        model="gpt-4.5-mini",
         input=[{"type": "message", "role": "user", "content": "Count to 3"}],
         stream=True
     )
@@ -362,7 +362,7 @@ def test_streaming_response(client):
 def test_streaming_cancellation(client):
     """Test that streaming can be cancelled mid-stream."""
     stream = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{"type": "message", "role": "user", "content": "Write a long essay"}],
         stream=True
     )
@@ -403,7 +403,7 @@ WEATHER_TOOL = {
 def test_tool_call_request(client):
     """Test that model can request tool calls."""
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{
             "type": "message",
             "role": "user",
@@ -431,7 +431,7 @@ def test_tool_call_response(client):
     """Test completing a tool call loop."""
     # Initial request
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{
             "type": "message",
             "role": "user",
@@ -447,7 +447,7 @@ def test_tool_call_response(client):
 
     # Send tool result
     final_response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4.5",
         input=[{
             "type": "function_call_output",
             "call_id": tool_call.id,
