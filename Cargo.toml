@@ -65,5 +65,10 @@ hex = "0.4"
 # Configuration
 dotenvy = "0.15"
 
+# OpenAPI Documentation
+utoipa = { version = "5.3", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+
 # Development tools
 cargo-husky = { version = "1", features = ["user-hooks"] }

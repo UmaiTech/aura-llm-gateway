@@ -28,4 +28,9 @@ uuid.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 
+# OpenAPI Documentation
+utoipa.workspace = true
+utoipa-axum.workspace = true
+utoipa-swagger-ui.workspace = true
+
 [dev-dependencies]

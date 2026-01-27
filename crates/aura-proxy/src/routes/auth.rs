@@ -221,8 +221,14 @@ pub async fn auth_middleware(
     mut request: Request<Body>,
     next: Next,
 ) -> Result<Response, AuthError> {
-    // Allow health checks without auth
-    if request.uri().path().starts_with("/health") {
+    let path = request.uri().path();
+
+    // Allow public endpoints without auth
+    if path.starts_with("/health")
+        || path.starts_with("/openapi")
+        || path.starts_with("/swagger-ui")
+        || path.starts_with("/swagger")
+    {
         return Ok(next.run(request).await);
     }
 

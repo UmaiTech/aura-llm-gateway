@@ -208,4 +208,4 @@ OpenAI-specific errors are normalized to the Open Responses API format:
 2. **Enable caching** for repeated prompts (especially with long system instructions)
 3. **Use o-series models** only when complex reasoning is required
 4. **Set max_output_tokens** to prevent runaway costs
-5. **Monitor usage** via Aura's cost tracking metadata
+5. **Monitor usage** via Aura's cost tracking met

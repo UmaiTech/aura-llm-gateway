@@ -4,9 +4,10 @@
 //! Each item represents a distinct piece of content in a conversation.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Role of the participant in a conversation
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     /// User input
@@ -21,7 +22,7 @@ pub enum Role {
 }
 
 /// Status of an item in the response
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemStatus {
     /// Item is currently being processed
@@ -36,7 +37,7 @@ pub enum ItemStatus {
 }
 
 /// Content type within a message
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentPart {
     /// Text content
@@ -92,7 +93,7 @@ impl ContentPart {
 }
 
 /// Message item - represents a conversation message
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct MessageItem {
     /// Unique identifier for the item
     pub id: String,
@@ -145,7 +146,7 @@ impl MessageItem {
 }
 
 /// Function call item - represents a request to call a function
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct FunctionCallItem {
     /// Unique identifier for the item
     pub id: String,
@@ -179,7 +180,7 @@ impl FunctionCallItem {
 }
 
 /// Function call output item - represents the result of a function call
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct FunctionCallOutputItem {
     /// Unique identifier for the item
     pub id: String,
@@ -209,7 +210,7 @@ impl FunctionCallOutputItem {
 }
 
 /// Reasoning item - represents the model's reasoning process
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ReasoningItem {
     /// Unique identifier for the item
     pub id: String,
@@ -224,7 +225,7 @@ pub struct ReasoningItem {
 }
 
 /// Content within a reasoning item
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ReasoningContent {
     /// Text reasoning content
@@ -268,7 +269,7 @@ impl ReasoningItem {
 /// - Function calls (requests to execute tools)
 /// - Function call outputs (results from tool execution)
 /// - Reasoning (model's chain-of-thought or reasoning process)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Item {
     /// A conversation message
@@ -359,7 +360,7 @@ impl Item {
 ///
 /// This is a simplified version of Item used for request input,
 /// allowing for easier construction of conversation context.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InputItem {
     /// A conversation message
@@ -379,7 +380,7 @@ pub enum InputItem {
 }
 
 /// Content for an input message
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(untagged)]
 pub enum InputContent {
     /// Simple text content
