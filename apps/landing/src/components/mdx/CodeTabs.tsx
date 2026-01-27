@@ -1,4 +1,4 @@
-import { useState, ReactNode, Children, isValidElement, cloneElement } from 'react'
+import { useState, ReactNode, Children, isValidElement } from 'react'
 import { clsx } from 'clsx'
 
 interface CodeTabProps {

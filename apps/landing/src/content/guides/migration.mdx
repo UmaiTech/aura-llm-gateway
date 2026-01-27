@@ -91,7 +91,7 @@ print(response.choices[0].message.content)`}
 
 print(response.output_text)
 # Bonus: Get cost and usage
-print(f"Cost: ${response.aura.cost.total_cost:.4f}")`}
+print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
         </CodeBlock>
       </CodeTab>
     </CodeTabs>
@@ -304,7 +304,7 @@ print(response.output_text)
 
 # Aura-specific features
 print(f"Provider: {response.aura.provider}")
-print(f"Cost: ${response.aura.cost.total_cost:.4f}")
+print(f"Cost: \${response.aura.cost.total_cost:.4f}")
 print(f"Latency: {response.aura.latency_ms}ms")`}
         </CodeBlock>
       </CodeTab>

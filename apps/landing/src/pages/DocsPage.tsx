@@ -418,9 +418,12 @@ function MDXLoading() {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MDXComponentType = ComponentType<{ components?: Record<string, ComponentType<any>> }>
+
 // MDX Content renderer
 function MDXContent({ path }: { path: string }) {
-  const [Component, setComponent] = useState<ComponentType | null>(null)
+  const [Component, setComponent] = useState<MDXComponentType | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {

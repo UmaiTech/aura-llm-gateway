@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { clsx } from 'clsx'
-import { Check, X, ChevronDown } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 
 interface Model {
   id: string
@@ -46,8 +45,6 @@ export function ModelTable({
   showCapabilities = true,
   providers = ['openai', 'anthropic', 'google'],
 }: ModelTableProps) {
-  const [expandedProvider, setExpandedProvider] = useState<string | null>(null)
-
   const filteredModels = models.filter((m) => providers.includes(m.provider))
   const groupedModels = filteredModels.reduce(
     (acc, model) => {
@@ -95,7 +92,7 @@ export function ModelTable({
           </tr>
         </thead>
         <tbody>
-          {Object.entries(groupedModels).map(([provider, providerModels]) => (
+          {Object.entries(groupedModels).map(([_provider, providerModels]) => (
             providerModels.map((model, idx) => (
               <tr
                 key={model.id}
