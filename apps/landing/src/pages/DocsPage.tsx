@@ -8,8 +8,9 @@ import mermaid from 'mermaid'
 import {
   BookOpen, Zap, Server, Code2, Settings,
   ChevronRight, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
-  Wrench, ArrowRightLeft, Package, Plug
+  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical
 } from 'lucide-react'
+import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
 
 // Import MDX components for use in MDX files
 import {
@@ -99,6 +100,8 @@ const docSections = [
       { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
       { title: 'Rate Limiting', path: '/docs/api/rate-limiting', icon: Shield },
       { title: 'Error Reference', path: '/docs/api/errors', icon: Code2 },
+      { title: 'Admin API', path: '/docs/api/admin', icon: KeyRound },
+      { title: 'Changelog', path: '/docs/api/changelog', icon: History },
     ],
   },
   {
@@ -106,6 +109,7 @@ const docSections = [
     items: [
       { title: 'Using Existing SDKs', path: '/docs/guides/existing-sdks', icon: Plug },
       { title: 'Tool Calling', path: '/docs/guides/tool-calling', icon: Wrench },
+      { title: 'Testing & Sandbox', path: '/docs/guides/testing', icon: FlaskConical },
       { title: 'Migration Guide', path: '/docs/guides/migration', icon: ArrowRightLeft },
     ],
   },
@@ -459,6 +463,10 @@ function MDXContent({ path }: { path: string }) {
 export function DocsPage() {
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Global keyboard shortcut for search
+  useSearchShortcut(() => setSearchOpen(true))
 
   const currentPath = location.pathname
 
@@ -501,6 +509,7 @@ export function DocsPage() {
               </Link>
             </div>
             <div className="flex items-center gap-4">
+              <SearchButton onClick={() => setSearchOpen(true)} />
               <a
                 href="http://localhost:3000"
                 className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1"
@@ -589,6 +598,9 @@ export function DocsPage() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Search Modal */}
+      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )
 }
