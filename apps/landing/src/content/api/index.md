@@ -13,6 +13,14 @@ Aura implements the [Open Responses API](https://www.openresponses.org/specifica
 http://localhost:8080
 ```
 
+## Interactive API Explorer
+
+Explore the API interactively with our Swagger UI:
+
+**[Open Swagger UI](/swagger-ui)** - Try out endpoints directly in your browser
+
+You can also access the raw OpenAPI 3.1 specification at [`/openapi.json`](/openapi.json).
+
 ## Authentication
 
 All API requests require a valid API key in the `Authorization` header:

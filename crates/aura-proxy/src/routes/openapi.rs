@@ -4,7 +4,7 @@
 //! - OpenAPI 3.1 specification at `/openapi.json`
 //! - Interactive Swagger UI at `/swagger-ui`
 
-use axum::{routing::get, Json, Router};
+use axum::Router;
 use utoipa::openapi::security::{Http, HttpAuthScheme, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
@@ -61,6 +61,21 @@ impl Modify for SecurityAddon {
         (name = "organizations", description = "Organization, team, and project management"),
         (name = "health", description = "Health check endpoints")
     ),
+    paths(
+        // Health
+        super::health::health_check,
+        // Responses
+        super::responses::create_response,
+        // Auth
+        super::auth::create_api_key,
+        super::auth::list_api_keys,
+        super::auth::get_api_key,
+        super::auth::revoke_api_key,
+        // Conversations
+        super::conversations::list_conversations,
+        super::conversations::get_conversation,
+        super::conversations::delete_conversation,
+    ),
     modifiers(&SecurityAddon),
     components(
         schemas(
@@ -92,6 +107,11 @@ impl Modify for SecurityAddon {
             aura_types::StreamEvent,
             aura_types::StreamError,
             aura_types::RateLimitInfo,
+            // Auth types
+            super::auth::CreateApiKeyRequest,
+            super::auth::CreateApiKeyResponse,
+            super::auth::ApiKeyInfo,
+            super::auth::ListApiKeysResponse,
         )
     ),
     security(
@@ -100,20 +120,14 @@ impl Modify for SecurityAddon {
 )]
 pub struct ApiDoc;
 
-/// Returns the OpenAPI specification as JSON
-async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
-    Json(ApiDoc::openapi())
-}
-
 /// Creates the OpenAPI documentation router
 ///
 /// This router provides:
 /// - `GET /openapi.json` - Raw OpenAPI 3.1 specification
 /// - `GET /swagger-ui/*` - Interactive Swagger UI
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/openapi.json", get(openapi_json))
-        .merge(SwaggerUi::new("/swagger-ui").url("/openapi.json", ApiDoc::openapi()))
+    // SwaggerUi::url() registers both the UI and the spec endpoint
+    Router::new().merge(SwaggerUi::new("/swagger-ui").url("/openapi.json", ApiDoc::openapi()))
 }
 
 #[cfg(test)]
@@ -141,12 +155,7 @@ mod tests {
     #[test]
     fn test_openapi_has_security() {
         let spec = ApiDoc::openapi();
-        let security_schemes = spec
-            .components
-            .as_ref()
-            .unwrap()
-            .security_schemes
-            .clone();
+        let security_schemes = spec.components.as_ref().unwrap().security_schemes.clone();
 
         assert!(security_schemes.contains_key("bearer_auth"));
     }
