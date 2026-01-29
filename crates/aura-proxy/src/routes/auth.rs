@@ -226,6 +226,7 @@ pub async fn auth_middleware(
 
     // Allow public endpoints without auth
     if path.starts_with("/health")
+        || path.starts_with("/metrics")
         || path.starts_with("/openapi")
         || path.starts_with("/swagger-ui")
         || path.starts_with("/swagger")
