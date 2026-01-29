@@ -20,7 +20,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize)]
-struct ListParams {
+pub struct ListParams {
     user_id: Option<String>,
     #[serde(default = "default_limit")]
     limit: i64,
@@ -31,7 +31,7 @@ fn default_limit() -> i64 {
 }
 
 #[derive(Debug, Serialize)]
-struct ConversationDetail {
+pub struct ConversationDetail {
     #[serde(flatten)]
     conversation: aura_db::Conversation,
     messages: Vec<aura_db::Message>,

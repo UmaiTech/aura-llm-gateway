@@ -101,6 +101,7 @@ const docSections = [
     title: 'API Reference',
     items: [
       { title: 'Overview', path: '/docs/api', icon: Code2 },
+      { title: 'Swagger UI', path: 'http://localhost:8080/swagger-ui', icon: ExternalLink, external: true },
       { title: 'Authentication', path: '/docs/api/authentication', icon: Server },
       { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
       { title: 'Conversations', path: '/docs/api/conversations', icon: BookOpen },
@@ -569,6 +570,25 @@ export function DocsPage() {
                   {section.items.map((item) => {
                     const isActive = currentPath === item.path
                     const itemHasContent = hasContent(item.path)
+                    const isExternal = 'external' in item && item.external
+
+                    if (isExternal) {
+                      return (
+                        <li key={item.path}>
+                          <a
+                            href={item.path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-gray-400 hover:text-white hover:bg-gray-800"
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {item.title}
+                            <ExternalLink className="h-3 w-3 ml-auto" />
+                          </a>
+                        </li>
+                      )
+                    }
+
                     return (
                       <li key={item.path}>
                         <Link

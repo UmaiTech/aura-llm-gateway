@@ -17,9 +17,9 @@ http://localhost:8080
 
 Explore the API interactively with our Swagger UI:
 
-**[Open Swagger UI](/swagger-ui)** - Try out endpoints directly in your browser
+**[Open Swagger UI](http://localhost:8080/swagger-ui)** - Try out endpoints directly in your browser
 
-You can also access the raw OpenAPI 3.1 specification at [`/openapi.json`](/openapi.json).
+You can also access the raw OpenAPI 3.1 specification at [`/openapi.json`](http://localhost:8080/openapi.json).
 
 ## Authentication
 
