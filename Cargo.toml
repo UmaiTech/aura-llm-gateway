@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 authors = ["Umai Tech <team@umai.tech>"]
 license = "MIT"
@@ -75,6 +75,11 @@ metrics-exporter-prometheus = "0.16"
 
 # Regex (for tests)
 regex = "1.10"
+
+# OpenAPI Documentation
+utoipa = { version = "5.3", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 
 # Development tools
 cargo-husky = { version = "1", features = ["user-hooks"] }

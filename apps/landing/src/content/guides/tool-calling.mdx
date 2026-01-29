@@ -1,0 +1,432 @@
+---
+title: Tool & Function Calling
+description: Build agentic workflows with tool calling
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, Expandable, ApiPlayground } from '../../components/mdx'
+
+# Tool & Function Calling
+
+Tool calling (also known as function calling) allows LLMs to invoke external functions and use the results in their responses. This is the foundation for building agentic AI applications.
+
+<Callout type="info">
+Aura provides a unified tool calling interface across all providers. Write your tools once and use them with OpenAI, Anthropic, or Google models.
+</Callout>
+
+## How Tool Calling Works
+
+<Steps>
+  <Step title="Define your tools">
+    Describe your tools with JSON Schema, specifying parameters and types.
+  </Step>
+  <Step title="Send a request with tools">
+    Include the tool definitions in your API request.
+  </Step>
+  <Step title="Model returns tool calls">
+    The model decides which tools to call and with what arguments.
+  </Step>
+  <Step title="Execute the tools">
+    Your application executes the tools and returns results.
+  </Step>
+  <Step title="Continue the conversation">
+    Send tool results back to continue the response.
+  </Step>
+</Steps>
+
+## Defining Tools
+
+Tools are defined using JSON Schema. Here's an example weather tool:
+
+<CodeBlock language="json" title="Tool Definition">
+{`{
+  "type": "function",
+  "name": "get_weather",
+  "description": "Get the current weather for a location",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "description": "City name, e.g., 'San Francisco, CA'"
+      },
+      "unit": {
+        "type": "string",
+        "enum": ["celsius", "fahrenheit"],
+        "description": "Temperature unit"
+      }
+    },
+    "required": ["location"]
+  }
+}`}
+</CodeBlock>
+
+## Making a Request with Tools
+
+<ApiPlayground
+  endpoint="/v1/responses"
+  method="POST"
+  defaultBody={{
+    model: "gpt-4.5",
+    input: [
+      {
+        type: "message",
+        role: "user",
+        content: "What's the weather like in San Francisco?"
+      }
+    ],
+    tools: [
+      {
+        type: "function",
+        name: "get_weather",
+        description: "Get the current weather for a location",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "City name"
+            }
+          },
+          required: ["location"]
+        }
+      }
+    ]
+  }}
+/>
+
+## Handling Tool Calls
+
+When the model decides to call a tool, the response includes a `function_call` item:
+
+<CodeBlock language="json" title="Response with Tool Call">
+{`{
+  "id": "resp_abc123",
+  "status": "completed",
+  "output": [
+    {
+      "type": "function_call",
+      "id": "call_xyz789",
+      "name": "get_weather",
+      "arguments": "{\"location\": \"San Francisco, CA\"}"
+    }
+  ],
+  "aura": {
+    "requires_action": true,
+    "tools_used": ["get_weather"]
+  }
+}`}
+</CodeBlock>
+
+<Callout type="tip">
+Check `aura.requires_action` to quickly determine if tool execution is needed before continuing.
+</Callout>
+
+## Returning Tool Results
+
+After executing the tool, send the result back to continue the conversation:
+
+<CodeTabs>
+  <CodeTab label="Python">
+    <CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient()
+
+# Initial request with tools
+response = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "What's the weather in SF?"}],
+    tools=[{
+        "type": "function",
+        "name": "get_weather",
+        "description": "Get weather for a location",
+        "parameters": {
+            "type": "object",
+            "properties": {"location": {"type": "string"}},
+            "required": ["location"]
+        }
+    }]
+)
+
+# Check if tool execution is needed
+if response.aura.requires_action:
+    for item in response.output:
+        if item.type == "function_call":
+            # Execute the tool
+            result = get_weather(json.loads(item.arguments))
+
+            # Continue with tool result
+            response = client.responses.create(
+                model="gpt-4.5",
+                input=[{
+                    "type": "function_call_output",
+                    "call_id": item.id,
+                    "output": json.dumps(result)
+                }],
+                previous_response_id=response.id
+            )
+
+print(response.output_text)`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="TypeScript">
+    <CodeBlock language="typescript">
+{`import { Aura } from 'aura-llm';
+
+const client = new Aura();
+
+// Initial request with tools
+let response = await client.responses.create({
+  model: 'gpt-4.5',
+  input: [{ type: 'message', role: 'user', content: "What's the weather in SF?" }],
+  tools: [{
+    type: 'function',
+    name: 'get_weather',
+    description: 'Get weather for a location',
+    parameters: {
+      type: 'object',
+      properties: { location: { type: 'string' } },
+      required: ['location'],
+    },
+  }],
+});
+
+// Check if tool execution is needed
+if (response.aura.requires_action) {
+  for (const item of response.output) {
+    if (item.type === 'function_call') {
+      // Execute the tool
+      const result = await getWeather(JSON.parse(item.arguments));
+
+      // Continue with tool result
+      response = await client.responses.create({
+        model: 'gpt-4.5',
+        input: [{
+          type: 'function_call_output',
+          call_id: item.id,
+          output: JSON.stringify(result),
+        }],
+        previous_response_id: response.id,
+      });
+    }
+  }
+}
+
+console.log(response.output_text);`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+## Agentic Loops
+
+For complex tasks, models may need to call multiple tools in sequence. Implement an agentic loop:
+
+<CodeBlock language="python" title="Agentic Loop Pattern">
+{`async def run_agent(user_message: str, tools: list, max_iterations: int = 10):
+    """Run an agentic loop with tool calling."""
+    messages = [{"type": "message", "role": "user", "content": user_message}]
+    previous_response_id = None
+
+    for _ in range(max_iterations):
+        response = await client.responses.create(
+            model="gpt-4.5",
+            input=messages,
+            tools=tools,
+            previous_response_id=previous_response_id
+        )
+
+        # Check if we're done
+        if not response.aura.requires_action:
+            return response.output_text
+
+        # Execute all tool calls
+        tool_results = []
+        for item in response.output:
+            if item.type == "function_call":
+                result = await execute_tool(item.name, item.arguments)
+                tool_results.append({
+                    "type": "function_call_output",
+                    "call_id": item.id,
+                    "output": json.dumps(result)
+                })
+
+        # Continue with tool results
+        messages = tool_results
+        previous_response_id = response.id
+
+    raise Exception("Max iterations exceeded")`}
+</CodeBlock>
+
+## Parallel Tool Calls
+
+Models can request multiple tool calls in parallel for efficiency:
+
+<CodeBlock language="json" title="Parallel Tool Calls Response">
+{`{
+  "output": [
+    {
+      "type": "function_call",
+      "id": "call_1",
+      "name": "get_weather",
+      "arguments": "{\"location\": \"San Francisco\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "call_2",
+      "name": "get_weather",
+      "arguments": "{\"location\": \"New York\"}"
+    }
+  ]
+}`}
+</CodeBlock>
+
+<Callout type="tip">
+Execute parallel tool calls concurrently with `asyncio.gather()` or `Promise.all()` for better performance.
+</Callout>
+
+## Best Practices
+
+### 1. Write Clear Descriptions
+
+Tool descriptions help the model understand when and how to use tools:
+
+<CodeBlock language="json">
+{`{
+  "name": "search_documents",
+  "description": "Search the knowledge base for relevant documents. Use this when the user asks questions about company policies, procedures, or historical data. Returns the top 5 most relevant documents with snippets.",
+  "parameters": { ... }
+}`}
+</CodeBlock>
+
+### 2. Use Specific Parameter Types
+
+Be explicit about expected formats:
+
+<CodeBlock language="json">
+{`{
+  "date": {
+    "type": "string",
+    "format": "date",
+    "description": "Date in YYYY-MM-DD format, e.g., '2025-01-25'"
+  }
+}`}
+</CodeBlock>
+
+### 3. Handle Errors Gracefully
+
+Always return structured error information:
+
+<CodeBlock language="python">
+{`def execute_tool(name: str, arguments: str) -> dict:
+    try:
+        args = json.loads(arguments)
+        result = tools[name](**args)
+        return {"success": True, "data": result}
+    except json.JSONDecodeError:
+        return {"success": False, "error": "Invalid JSON arguments"}
+    except KeyError:
+        return {"success": False, "error": f"Unknown tool: {name}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}`}
+</CodeBlock>
+
+<Expandable title="Complete Example: Research Agent">
+<CodeBlock language="python">
+{`from aura_llm import AuraClient
+import json
+
+client = AuraClient()
+
+# Define tools
+tools = [
+    {
+        "type": "function",
+        "name": "web_search",
+        "description": "Search the web for current information",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "type": "function",
+        "name": "read_url",
+        "description": "Read and extract content from a URL",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to read"}
+            },
+            "required": ["url"]
+        }
+    },
+    {
+        "type": "function",
+        "name": "save_notes",
+        "description": "Save research notes for later reference",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "content": {"type": "string"}
+            },
+            "required": ["title", "content"]
+        }
+    }
+]
+
+async def research(topic: str):
+    """Research a topic using an AI agent with tools."""
+    response = await client.responses.create(
+        model="claude-sonnet-4-5-20250514",
+        input=[{
+            "type": "message",
+            "role": "user",
+            "content": f"Research the following topic and save comprehensive notes: {topic}"
+        }],
+        tools=tools
+    )
+
+    while response.aura.requires_action:
+        results = []
+        for item in response.output:
+            if item.type == "function_call":
+                result = await execute_tool(item.name, item.arguments)
+                results.append({
+                    "type": "function_call_output",
+                    "call_id": item.id,
+                    "output": json.dumps(result)
+                })
+
+        response = await client.responses.create(
+            model="claude-sonnet-4-5-20250514",
+            input=results,
+            tools=tools,
+            previous_response_id=response.id
+        )
+
+    return response.output_text
+
+# Run the research agent
+result = await research("Latest developments in quantum computing")
+print(result)`}
+</CodeBlock>
+</Expandable>
+
+## Provider Differences
+
+While Aura normalizes tool calling across providers, there are some differences:
+
+| Feature | OpenAI | Anthropic | Google |
+|---------|--------|-----------|--------|
+| Parallel calls | ✅ | ✅ | ✅ |
+| Streaming tool calls | ✅ | ✅ | ✅ |
+| Tool choice control | ✅ | ✅ | ✅ |
+| Max tools per request | 128 | 64 | 64 |
+
+<Callout type="info">
+Aura automatically handles these differences, but be aware of limits when designing your tool sets.
+</Callout>

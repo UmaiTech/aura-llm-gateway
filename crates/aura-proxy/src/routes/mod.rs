@@ -4,6 +4,7 @@ pub mod auth;
 pub mod conversations;
 pub mod health;
 pub mod metrics;
+pub mod openapi;
 pub mod organizations;
 pub mod rate_limit;
 pub mod responses;
@@ -32,4 +33,6 @@ pub fn app_router() -> Router<AppState> {
         .merge(auth::router())
         // Organization management endpoints
         .merge(organizations::router())
+        // OpenAPI documentation and Swagger UI
+        .merge(openapi::router())
 }

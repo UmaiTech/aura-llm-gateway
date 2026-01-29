@@ -42,7 +42,7 @@ curl -X POST http://localhost:8080/v1/responses \
   -H "Authorization: Bearer aura_live_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4.5",
     "input": [
       {"type": "message", "role": "user", "content": "My name is Alice."}
     ]
@@ -53,7 +53,7 @@ Response:
 ```json
 {
   "id": "resp_abc123",
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "status": "completed",
   "output": [
     {
@@ -72,7 +72,7 @@ curl -X POST http://localhost:8080/v1/responses \
   -H "Authorization: Bearer aura_live_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4.5",
     "previous_response_id": "resp_abc123",
     "input": [
       {"type": "message", "role": "user", "content": "What is my name?"}
@@ -84,7 +84,7 @@ Response:
 ```json
 {
   "id": "resp_def456",
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "status": "completed",
   "output": [
     {
@@ -114,7 +114,7 @@ Response:
     {
       "id": "conv_abc123",
       "title": "My name is Alice",
-      "model_id": "gpt-4o",
+      "model_id": "gpt-4.5",
       "message_count": 4,
       "created_at": "2026-01-27T10:00:00Z",
       "updated_at": "2026-01-27T10:05:00Z"
@@ -135,7 +135,7 @@ Response:
 {
   "id": "conv_abc123",
   "title": "My name is Alice",
-  "model_id": "gpt-4o",
+  "model_id": "gpt-4.5",
   "messages": [
     {"role": "user", "content": "My name is Alice."},
     {"role": "assistant", "content": "Hello Alice! Nice to meet you..."},
@@ -188,13 +188,13 @@ client = AuraClient(base_url="http://localhost:8080")
 
 # Start conversation
 response1 = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input="My name is Alice."
 )
 
 # Continue conversation
 response2 = client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input="What is my name?",
     previous_response_id=response1.id
 )
@@ -207,7 +207,7 @@ print(response2.output_text)  # "Your name is Alice..."
 ```python
 # Stream a follow-up response
 for event in client.responses.create(
-    model="gpt-4o",
+    model="gpt-4.5",
     input="Tell me a joke about my name.",
     previous_response_id=response2.id,
     stream=True

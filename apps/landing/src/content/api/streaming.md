@@ -15,7 +15,7 @@ Set `stream: true` in your request:
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-4.5-mini",
     "input": [
       {"type": "message", "role": "user", "content": "Tell me a story"}
     ],
@@ -147,7 +147,7 @@ const response = await fetch('http://localhost:8080/v1/responses', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.5-mini',
     input: [{ type: 'message', role: 'user', content: 'Hello!' }],
     stream: true
   })
@@ -189,7 +189,7 @@ import json
 response = requests.post(
     'http://localhost:8080/v1/responses',
     json={
-        'model': 'gpt-4o-mini',
+        'model': 'gpt-4.5-mini',
         'input': [{'type': 'message', 'role': 'user', 'content': 'Hello!'}],
         'stream': True
     },

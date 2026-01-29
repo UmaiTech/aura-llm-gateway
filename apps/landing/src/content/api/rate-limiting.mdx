@@ -1,0 +1,223 @@
+---
+title: Rate Limiting
+description: Understand rate limits and how to handle them
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Expandable } from '../../components/mdx'
+
+# Rate Limiting
+
+Aura implements rate limiting to ensure fair usage and protect against abuse. Rate limits are applied per API key and can be configured at the organization, team, or project level.
+
+<Callout type="info">
+Rate limits are enforced at the gateway level, before requests reach upstream providers. This means you'll get consistent behavior regardless of which provider you're using.
+</Callout>
+
+## Rate Limit Headers
+
+Every API response includes rate limit information in the headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the window |
+| `X-RateLimit-Remaining` | Requests remaining in current window |
+| `X-RateLimit-Reset` | Unix timestamp when the window resets |
+| `Retry-After` | Seconds to wait before retrying (only on 429) |
+
+## Default Limits
+
+| Tier | Requests/min | Tokens/min | Concurrent |
+|------|--------------|------------|------------|
+| Free | 20 | 40,000 | 5 |
+| Standard | 100 | 200,000 | 20 |
+| Pro | 500 | 1,000,000 | 50 |
+| Enterprise | Custom | Custom | Custom |
+
+<Callout type="tip">
+Contact us for enterprise rate limits tailored to your workload.
+</Callout>
+
+## Handling Rate Limits
+
+When you exceed rate limits, the API returns a `429 Too Many Requests` response:
+
+<CodeTabs>
+  <CodeTab label="Response">
+    <CodeBlock language="json">
+{`{
+  "error": {
+    "type": "rate_limit_error",
+    "message": "Rate limit exceeded. Please retry after 30 seconds.",
+    "code": "rate_limit_exceeded"
+  }
+}`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="Headers">
+    <CodeBlock language="text">
+{`HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1706140800
+Retry-After: 30`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+## Retry Strategy
+
+Implement exponential backoff with jitter for robust error handling:
+
+<CodeTabs>
+  <CodeTab label="Python">
+    <CodeBlock language="python">
+{`import time
+import random
+from aura_llm import AuraClient, RateLimitError
+
+client = AuraClient(api_key="your-api-key")
+
+def make_request_with_retry(messages, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            return client.responses.create(
+                model="gpt-4.5",
+                input=messages
+            )
+        except RateLimitError as e:
+            if attempt == max_retries - 1:
+                raise
+
+            # Use Retry-After header if available
+            wait_time = e.retry_after or (2 ** attempt + random.random())
+            print(f"Rate limited. Waiting {wait_time:.1f}s...")
+            time.sleep(wait_time)
+
+    raise Exception("Max retries exceeded")`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="TypeScript">
+    <CodeBlock language="typescript">
+{`import { Aura, RateLimitError } from 'aura-llm';
+
+const client = new Aura({ apiKey: 'your-api-key' });
+
+async function makeRequestWithRetry(
+  messages: Message[],
+  maxRetries = 5
+): Promise<Response> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await client.responses.create({
+        model: 'gpt-4.5',
+        input: messages,
+      });
+    } catch (error) {
+      if (!(error instanceof RateLimitError)) throw error;
+      if (attempt === maxRetries - 1) throw error;
+
+      const waitTime = error.retryAfter ??
+        Math.pow(2, attempt) + Math.random();
+      console.log(\`Rate limited. Waiting \${waitTime.toFixed(1)}s...\`);
+      await new Promise(r => setTimeout(r, waitTime * 1000));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+## Per-User Rate Limiting
+
+When tracking end-users, rate limits can be applied per-user to prevent any single user from consuming your entire quota:
+
+<CodeBlock language="json" title="Request with user tracking">
+{`{
+  "model": "gpt-4.5",
+  "input": [{"type": "message", "role": "user", "content": "Hello"}],
+  "user": "user_12345"
+}`}
+</CodeBlock>
+
+<Callout type="warning">
+Per-user rate limits are separate from your API key limits. A user hitting their limit won't affect other users, but you can still hit your overall API key limit.
+</Callout>
+
+## Best Practices
+
+1. **Always check headers** - Monitor `X-RateLimit-Remaining` to proactively slow down before hitting limits
+
+2. **Implement backoff** - Use exponential backoff with jitter to avoid thundering herd problems
+
+3. **Queue requests** - For batch processing, implement a request queue with rate limiting
+
+4. **Cache responses** - Cache identical requests to reduce API calls
+
+5. **Use streaming** - Streaming requests count as a single request regardless of response length
+
+<Expandable title="Example: Request Queue Implementation">
+<CodeBlock language="python">
+{`import asyncio
+from collections import deque
+from aura_llm import AuraClient
+
+class RateLimitedQueue:
+    def __init__(self, requests_per_minute=100):
+        self.client = AuraClient()
+        self.queue = deque()
+        self.interval = 60 / requests_per_minute
+        self.last_request = 0
+
+    async def enqueue(self, request):
+        future = asyncio.Future()
+        self.queue.append((request, future))
+        return await future
+
+    async def process(self):
+        while True:
+            if self.queue:
+                now = asyncio.get_event_loop().time()
+                wait = self.last_request + self.interval - now
+                if wait > 0:
+                    await asyncio.sleep(wait)
+
+                request, future = self.queue.popleft()
+                try:
+                    result = await self.client.responses.create(**request)
+                    future.set_result(result)
+                except Exception as e:
+                    future.set_exception(e)
+                self.last_request = asyncio.get_event_loop().time()
+            else:
+                await asyncio.sleep(0.1)`}
+</CodeBlock>
+</Expandable>
+
+## Monitoring Usage
+
+Track your rate limit usage in the Aura dashboard or via the API:
+
+<CodeBlock language="bash">
+{`curl https://api.aura.dev/v1/usage/rate-limits \\
+  -H "Authorization: Bearer $AURA_API_KEY"`}
+</CodeBlock>
+
+Response includes current usage across all dimensions:
+
+<CodeBlock language="json">
+{`{
+  "requests": {
+    "limit": 100,
+    "used": 45,
+    "remaining": 55,
+    "resets_at": "2025-01-25T12:00:00Z"
+  },
+  "tokens": {
+    "limit": 200000,
+    "used": 87500,
+    "remaining": 112500,
+    "resets_at": "2025-01-25T12:00:00Z"
+  }
+}`}
+</CodeBlock>

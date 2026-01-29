@@ -17,7 +17,7 @@ POST /v1/responses
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `model` | string | Yes | Model identifier (e.g., `gpt-4o`, `gpt-4o-mini`) |
+| `model` | string | Yes | Model identifier (e.g., `gpt-4.5`, `gpt-4.5-mini`) |
 | `input` | array | Yes | Array of input items (messages, function outputs) |
 | `instructions` | string | No | System instructions for the model |
 | `stream` | boolean | No | Enable streaming (default: `false`) |
@@ -73,7 +73,7 @@ POST /v1/responses
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-4.5-mini",
     "input": [
       {
         "type": "message",
@@ -92,7 +92,7 @@ curl -X POST http://localhost:8080/v1/responses \
   "id": "resp_oai_chatcmpl-abc123",
   "object": "response",
   "created_at": 1706140800,
-  "model": "gpt-4o-mini",
+  "model": "gpt-4.5-mini",
   "status": "completed",
   "output": [
     {
@@ -138,7 +138,7 @@ curl -X POST http://localhost:8080/v1/responses \
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4.5",
     "input": [
       {
         "type": "message",
@@ -182,7 +182,7 @@ Submit the tool result to continue:
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4.5",
     "input": [
       {
         "type": "message",

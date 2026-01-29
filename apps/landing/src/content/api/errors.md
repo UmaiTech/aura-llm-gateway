@@ -348,7 +348,7 @@ def make_request_with_retry(input_text, max_retries=3):
     for attempt in range(max_retries):
         try:
             return client.responses.create(
-                model="gpt-4o",
+                model="gpt-4.5",
                 input=input_text
             )
         except AuraError as e:

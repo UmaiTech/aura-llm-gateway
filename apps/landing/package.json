@@ -10,7 +10,11 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@mdx-js/react": "^3.0.1",
+    "@mdx-js/rollup": "^3.0.1",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "clsx": "^2.1.1",
+    "fuse.js": "^7.0.0",
     "lucide-react": "^0.462.0",
     "mermaid": "^11.12.2",
     "react": "^18.3.1",
@@ -18,9 +22,12 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.1.1",
     "react-syntax-highlighter": "^16.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-mdx-frontmatter": "^4.0.0"
   },
   "devDependencies": {
+    "@types/mdx": "^2.0.13",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

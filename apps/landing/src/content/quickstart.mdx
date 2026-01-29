@@ -1,0 +1,242 @@
+---
+title: Quickstart
+description: Get up and running with Aura in 5 minutes
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, ApiPlayground, Card, CardGrid } from '../components/mdx'
+
+# Quickstart
+
+Get up and running with Aura LLM Gateway in just a few minutes. This guide will walk you through installation, configuration, and making your first request.
+
+<Callout type="tip">
+If you just want to try Aura without installation, jump to the [API Playground](#try-it-live) below.
+</Callout>
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- **Rust** 1.75+ (for building from source)
+- **Docker** (optional, for containerized deployment)
+- At least one LLM provider API key (OpenAI, Anthropic, or Google)
+
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    <CodeBlock language="bash">
+{`git clone https://github.com/UmaiTech/aura-llm-gateway.git
+cd aura-llm-gateway`}
+    </CodeBlock>
+  </Step>
+
+  <Step title="Build the project">
+    <CodeTabs>
+      <CodeTab label="Cargo (Recommended)">
+        <CodeBlock language="bash">
+{`cargo build --release`}
+        </CodeBlock>
+      </CodeTab>
+      <CodeTab label="Docker">
+        <CodeBlock language="bash">
+{`docker build -t aura-gateway .`}
+        </CodeBlock>
+      </CodeTab>
+    </CodeTabs>
+  </Step>
+
+  <Step title="Configure environment">
+    Create a `.env` file or export environment variables:
+
+    <CodeBlock language="bash" title=".env">
+{`# Required: At least one provider API key
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+
+# Server configuration (optional)
+AURA_HOST=0.0.0.0
+AURA_PORT=8080
+
+# Enable debug logging (optional)
+RUST_LOG=info,aura_proxy=debug`}
+    </CodeBlock>
+
+    <Callout type="info">
+      You only need to configure the providers you plan to use. At minimum, set one API key.
+    </Callout>
+  </Step>
+
+  <Step title="Start the gateway">
+    <CodeTabs>
+      <CodeTab label="Cargo">
+        <CodeBlock language="bash">
+{`cargo run -p aura-proxy --release`}
+        </CodeBlock>
+      </CodeTab>
+      <CodeTab label="Docker">
+        <CodeBlock language="bash">
+{`docker run -p 8080:8080 \\
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \\
+  aura-gateway`}
+        </CodeBlock>
+      </CodeTab>
+    </CodeTabs>
+
+    You should see:
+    <CodeBlock language="text">
+{`INFO aura_proxy: Starting Aura LLM Gateway v0.2.6
+INFO aura_proxy: Listening on 0.0.0.0:8080`}
+    </CodeBlock>
+  </Step>
+</Steps>
+
+## Your First Request
+
+Now that the gateway is running, let's make a request.
+
+<CodeTabs>
+  <CodeTab label="cURL">
+    <CodeBlock language="bash">
+{`curl -X POST http://localhost:8080/v1/responses \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-sonnet-4-5",
+    "input": [
+      {"type": "message", "role": "user", "content": "Hello! What is Aura?"}
+    ]
+  }'`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="Python">
+    <CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient(base_url="http://localhost:8080")
+
+response = client.responses.create(
+    model="claude-sonnet-4-5",
+    input=[{
+        "type": "message",
+        "role": "user",
+        "content": "Hello! What is Aura?"
+    }]
+)
+
+print(response.output_text)
+print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="TypeScript">
+    <CodeBlock language="typescript">
+{`import { Aura } from 'aura-llm';
+
+const client = new Aura({ baseUrl: 'http://localhost:8080' });
+
+const response = await client.responses.create({
+  model: 'claude-sonnet-4-5',
+  input: [{
+    type: 'message',
+    role: 'user',
+    content: 'Hello! What is Aura?',
+  }],
+});
+
+console.log(response.output_text);
+console.log(\`Cost: $\${response.aura.cost.total_cost.toFixed(4)}\`);`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+## Try it Live
+
+Want to test Aura without setting up locally? Use our interactive chat playground:
+
+<Card title="Open Chat Playground" href="http://localhost:3000">
+  Test Aura with a full-featured chat interface. Supports streaming, multiple models, and real-time cost tracking.
+</Card>
+
+<Callout type="info">
+The playground requires a running Aura gateway. For a hosted demo, check our [deployment guide](/docs/deployment).
+</Callout>
+
+## Understanding the Response
+
+Aura responses include rich metadata beyond the model's output:
+
+<CodeBlock language="json" title="Example Response">
+{`{
+  "id": "resp_abc123",
+  "status": "completed",
+  "output": [
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": "Aura is a high-performance LLM gateway..."
+    }
+  ],
+  "usage": {
+    "input_tokens": 15,
+    "output_tokens": 42,
+    "total_tokens": 57
+  },
+  "aura": {
+    "request_id": "req_xyz789",
+    "provider": "openai",
+    "model": "claude-sonnet-4-5",
+    "latency_ms": 523,
+    "cost": {
+      "input_cost": 0.0000225,
+      "output_cost": 0.000252,
+      "total_cost": 0.0002745
+    }
+  }
+}`}
+</CodeBlock>
+
+Key fields in the `aura` metadata:
+
+| Field | Description |
+|-------|-------------|
+| `request_id` | Unique ID for tracing and debugging |
+| `provider` | Which provider handled the request |
+| `latency_ms` | Total response time in milliseconds |
+| `cost` | Real-time cost calculation |
+
+## Next Steps
+
+<CardGrid cols={2}>
+  <Card title="Streaming" href="/docs/api/streaming">
+    Learn how to stream responses for real-time output
+  </Card>
+  <Card title="Tool Calling" href="/docs/guides/tool-calling">
+    Build agentic workflows with function calling
+  </Card>
+  <Card title="Python SDK" href="/docs/sdks/python">
+    Full SDK documentation with examples
+  </Card>
+  <Card title="Cost Tracking" href="/docs/api/cost-tracking">
+    Understand pricing and monitor usage
+  </Card>
+</CardGrid>
+
+## Troubleshooting
+
+<Callout type="danger" title="Common Issues">
+
+**"Connection refused" error**
+- Ensure the gateway is running on the correct port
+- Check that `AURA_HOST` is set to `0.0.0.0` for external access
+
+**"Invalid API key" from provider**
+- Verify your API key is correctly set in environment variables
+- Check the API key has the necessary permissions
+
+**Slow responses**
+- First request may be slower due to connection pooling
+- Check your network latency to the LLM provider
+
+</Callout>
+
+Need more help? Check our [Configuration Guide](/docs/configuration) or [open an issue](https://github.com/UmaiTech/aura-llm-gateway/issues).

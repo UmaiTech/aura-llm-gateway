@@ -31,4 +31,9 @@ redis.workspace = true
 metrics.workspace = true
 metrics-exporter-prometheus.workspace = true
 
+# OpenAPI Documentation
+utoipa.workspace = true
+utoipa-axum.workspace = true
+utoipa-swagger-ui.workspace = true
+
 [dev-dependencies]

@@ -14,8 +14,16 @@ pub fn router() -> Router<AppState> {
 /// Health check handler
 ///
 /// Returns 200 OK with a JSON response indicating the service is healthy.
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "health",
+    responses(
+        (status = 200, description = "Service is healthy")
+    )
+)]
 #[tracing::instrument]
-async fn health_check() -> impl IntoResponse {
+pub async fn health_check() -> impl IntoResponse {
     tracing::debug!("Health check requested");
 
     (

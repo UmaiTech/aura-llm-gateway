@@ -1,0 +1,251 @@
+---
+title: API Changelog
+description: Track API changes, new features, and deprecations
+---
+
+import { Callout, CodeBlock, Card, CardGrid } from '../../components/mdx'
+
+# API Changelog
+
+Track all changes to the Aura API. We follow semantic versioning and announce breaking changes with advance notice.
+
+<Callout type="info">
+Subscribe to the [GitHub releases](https://github.com/UmaiTech/aura-llm-gateway/releases) to get notified of new versions.
+</Callout>
+
+---
+
+## January 2026
+
+### v0.2.6 - January 27, 2026
+
+**New Features**
+- Added MDX support for interactive documentation
+- New `/docs/guides/existing-sdks` guide for LangChain, LlamaIndex integration
+- Enhanced rate limiting documentation with retry strategies
+
+**Improvements**
+- Improved error messages for invalid API keys
+- Better streaming performance for long responses
+
+---
+
+### v0.2.5 - January 20, 2026
+
+**New Features**
+- End-user cost tracking with `user` field in requests
+- Per-user rate limiting support
+- Token budget enforcement per organization
+
+**API Changes**
+- Added `user` field to request body (optional)
+- Added `aura.end_user` to response metadata when user tracking enabled
+
+<CodeBlock language="json" title="New user field in requests">
+{`{
+  "model": "gpt-4.5",
+  "input": [...],
+  "user": "user_12345"
+}`}
+</CodeBlock>
+
+---
+
+### v0.2.4 - January 15, 2026
+
+**New Features**
+- Provider credential encryption with AES-256-GCM
+- Multi-credential support per provider
+- Credential rotation without downtime
+
+**Security**
+- Master key-based envelope encryption
+- Secure credential storage in PostgreSQL
+
+---
+
+### v0.2.3 - January 10, 2026
+
+**New Features**
+- Organization hierarchy: Organizations → Teams → Projects
+- Hierarchical API key scoping
+- Team-level usage aggregation
+
+**API Changes**
+- New endpoints: `/v1/organizations`, `/v1/teams`, `/v1/projects`
+- API keys now include `org_id`, `team_id`, `project_id` claims
+
+---
+
+### v0.2.2 - January 5, 2026
+
+**New Features**
+- Google Gemini provider support (Gemini 2.5, 2.0, 1.5 families)
+- Multimodal input support (images, audio, video for Gemini)
+- Context caching for Gemini models
+
+**Supported Models**
+- `gemini-2.5-pro`, `gemini-2.5-flash`
+- `gemini-2.0-flash`, `gemini-2.0-flash-lite`
+- `gemini-1.5-pro`, `gemini-1.5-flash`
+
+---
+
+### v0.2.1 - December 28, 2025
+
+**New Features**
+- Anthropic Claude provider support
+- Extended thinking support for Claude models
+- Prompt caching for Claude
+
+**Supported Models**
+- `claude-opus-4-5-20250514`
+- `claude-sonnet-4-5-20250514`
+- `claude-haiku-4-5-20250514`
+
+---
+
+### v0.2.0 - December 20, 2025
+
+**Major Release**
+
+This release introduces the Open Responses API specification and multi-provider architecture.
+
+**Breaking Changes**
+- Migrated from OpenAI Chat Completions format to Open Responses API
+- Response structure changed (see migration guide)
+- Streaming events renamed for semantic clarity
+
+<Callout type="warning">
+**Migration Required**: If upgrading from v0.1.x, see the [Migration Guide](/docs/guides/migration).
+</Callout>
+
+**New Response Format**
+<CodeBlock language="json">
+{`{
+  "id": "resp_abc123",
+  "status": "completed",
+  "output": [
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": "Hello!"
+    }
+  ],
+  "usage": { ... },
+  "aura": { ... }
+}`}
+</CodeBlock>
+
+**Previous Format (v0.1.x)**
+<CodeBlock language="json">
+{`{
+  "id": "chatcmpl-abc123",
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "Hello!"
+      }
+    }
+  ]
+}`}
+</CodeBlock>
+
+---
+
+## December 2025
+
+### v0.1.5 - December 15, 2025
+
+**New Features**
+- Conversation persistence with PostgreSQL
+- Automatic conversation threading via `previous_response_id`
+- Conversation management endpoints
+
+---
+
+### v0.1.4 - December 10, 2025
+
+**New Features**
+- Real-time cost calculation per request
+- Cost enrichment in response metadata
+- 2026 model pricing data
+
+---
+
+### v0.1.3 - December 5, 2025
+
+**New Features**
+- API key authentication
+- Scoped permissions system
+- Rate limiting per API key
+
+---
+
+### v0.1.2 - December 1, 2025
+
+**New Features**
+- Streaming support with Server-Sent Events
+- Tool/function calling support
+- Request/response logging
+
+---
+
+### v0.1.1 - November 25, 2025
+
+**Improvements**
+- Connection pooling for provider APIs
+- Retry logic with exponential backoff
+- Improved error messages
+
+**Bug Fixes**
+- Fixed timeout handling for long-running requests
+- Fixed streaming connection drops
+
+---
+
+### v0.1.0 - November 20, 2025
+
+**Initial Release**
+
+- OpenAI provider support (GPT-4o, GPT-4, GPT-3.5)
+- Basic request proxying
+- Health check endpoint
+- Docker deployment support
+
+---
+
+## Deprecation Policy
+
+We provide **6 months notice** before removing deprecated features. Deprecated items are marked in responses with the `X-Aura-Deprecated` header.
+
+### Currently Deprecated
+
+| Feature | Deprecated | Removal Date | Replacement |
+|---------|------------|--------------|-------------|
+| `choices` response format | v0.2.0 | June 2026 | `output` array |
+| `messages` input format | v0.2.0 | June 2026 | `input` items |
+
+### Sunset Features
+
+None currently scheduled.
+
+---
+
+## Versioning Policy
+
+Aura follows [Semantic Versioning](https://semver.org/):
+
+- **Major (X.0.0)**: Breaking changes requiring migration
+- **Minor (0.X.0)**: New features, backwards compatible
+- **Patch (0.0.X)**: Bug fixes, no API changes
+
+<CardGrid cols={2}>
+  <Card title="Release Notes" href="https://github.com/UmaiTech/aura-llm-gateway/releases">
+    Full release notes on GitHub
+  </Card>
+  <Card title="Migration Guide" href="/docs/guides/migration">
+    Upgrade between major versions
+  </Card>
+</CardGrid>

@@ -103,8 +103,29 @@ fn should_bypass_cache(headers: &HeaderMap) -> bool {
 }
 
 /// Create a response (streaming or non-streaming)
+///
+/// This is the main endpoint for generating LLM responses. Set `stream: true` for
+/// Server-Sent Events streaming, or `stream: false` for a single JSON response.
+#[utoipa::path(
+    post,
+    path = "/v1/responses",
+    tag = "responses",
+    request_body = CreateResponseRequest,
+    responses(
+        (status = 200, description = "Response created successfully", body = aura_types::Response),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Missing or invalid authentication"),
+        (status = 403, description = "Insufficient permissions"),
+        (status = 404, description = "Model not found"),
+        (status = 429, description = "Rate limit exceeded"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 #[instrument(skip(state, headers, request, auth), fields(model = %request.model, stream = %request.stream))]
-async fn create_response(
+pub async fn create_response(
     State(state): State<AppState>,
     headers: HeaderMap,
     auth: Option<Extension<AuthContext>>,

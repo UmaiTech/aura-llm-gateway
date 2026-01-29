@@ -152,7 +152,7 @@ When a request comes in, Aura selects the credential:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.5",
   "input": [...],
   "credential_id": "cred_abc123"  // Optional: use specific credential
 }

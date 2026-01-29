@@ -1,0 +1,440 @@
+---
+title: Python SDK
+description: Official Python SDK for Aura LLM Gateway
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, Expandable } from '../../components/mdx'
+
+# Python SDK
+
+The official Python SDK for Aura LLM Gateway provides a simple, type-safe interface for building LLM-powered applications.
+
+<Callout type="info">
+The Python SDK is published on PyPI as `aura-llm`. It supports Python 3.8+.
+</Callout>
+
+## Installation
+
+<CodeBlock language="bash">
+{`pip install aura-llm`}
+</CodeBlock>
+
+Or with optional async support:
+
+<CodeBlock language="bash">
+{`pip install aura-llm[async]`}
+</CodeBlock>
+
+## Quick Start
+
+<Steps>
+  <Step title="Set up your API key">
+    <CodeBlock language="bash">
+{`export AURA_API_KEY="your-api-key"
+export AURA_BASE_URL="https://api.aura.dev"  # or your self-hosted URL`}
+    </CodeBlock>
+  </Step>
+  <Step title="Create a client">
+    <CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient()
+# Or explicitly: AuraClient(api_key="...", base_url="...")`}
+    </CodeBlock>
+  </Step>
+  <Step title="Make your first request">
+    <CodeBlock language="python">
+{`response = client.responses.create(
+    model="gpt-4.5",
+    input=[{
+        "type": "message",
+        "role": "user",
+        "content": "Hello, world!"
+    }]
+)
+
+print(response.output_text)`}
+    </CodeBlock>
+  </Step>
+</Steps>
+
+## Client Configuration
+
+<CodeBlock language="python" title="Configuration Options">
+{`from aura_llm import AuraClient
+
+client = AuraClient(
+    # Authentication
+    api_key="your-api-key",           # Default: AURA_API_KEY env var
+
+    # Connection
+    base_url="https://api.aura.dev",  # Default: AURA_BASE_URL or localhost:8080
+    timeout=30.0,                      # Request timeout in seconds
+
+    # Retry behavior
+    max_retries=3,                     # Max retry attempts
+    retry_on_status=[429, 500, 502],   # Status codes to retry
+
+    # End-user tracking
+    default_user=None,                 # Default user ID for requests
+)`}
+</CodeBlock>
+
+## Creating Responses
+
+### Basic Request
+
+<CodeBlock language="python">
+{`response = client.responses.create(
+    model="gpt-4.5-mini",
+    input=[
+        {"type": "message", "role": "user", "content": "Explain quantum computing"}
+    ]
+)
+
+print(response.output_text)
+print(f"Tokens used: {response.usage.total_tokens}")
+print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
+</CodeBlock>
+
+### Multi-turn Conversations
+
+<CodeBlock language="python">
+{`# First message
+response = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "What is Python?"}]
+)
+
+# Follow-up using conversation threading
+response = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "Show me an example"}],
+    previous_response_id=response.id
+)`}
+</CodeBlock>
+
+### With System Instructions
+
+<CodeBlock language="python">
+{`response = client.responses.create(
+    model="claude-sonnet-4-5-20250514",
+    instructions="You are a helpful coding assistant. Always provide examples.",
+    input=[
+        {"type": "message", "role": "user", "content": "How do I read a file?"}
+    ]
+)`}
+</CodeBlock>
+
+## Streaming
+
+<CodeTabs>
+  <CodeTab label="Basic Streaming">
+    <CodeBlock language="python">
+{`stream = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "Write a poem"}],
+    stream=True
+)
+
+for event in stream:
+    if event.type == "response.output_text.delta":
+        print(event.delta, end="", flush=True)
+
+# Access the final response
+print(f"\\n\\nTotal tokens: {stream.response.usage.total_tokens}")`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="Event Handling">
+    <CodeBlock language="python">
+{`stream = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "Hello"}],
+    stream=True
+)
+
+for event in stream:
+    match event.type:
+        case "response.in_progress":
+            print("Started...")
+        case "response.output_item.added":
+            print(f"New item: {event.item.type}")
+        case "response.output_text.delta":
+            print(event.delta, end="")
+        case "response.completed":
+            print("\\nDone!")
+        case "response.failed":
+            print(f"Error: {event.error}")`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+## Async Support
+
+<CodeBlock language="python">
+{`import asyncio
+from aura_llm import AsyncAuraClient
+
+async def main():
+    client = AsyncAuraClient()
+
+    # Async create
+    response = await client.responses.create(
+        model="gpt-4.5",
+        input=[{"type": "message", "role": "user", "content": "Hello!"}]
+    )
+    print(response.output_text)
+
+    # Async streaming
+    stream = await client.responses.create(
+        model="gpt-4.5",
+        input=[{"type": "message", "role": "user", "content": "Count to 10"}],
+        stream=True
+    )
+    async for event in stream:
+        if event.type == "response.output_text.delta":
+            print(event.delta, end="")
+
+asyncio.run(main())`}
+</CodeBlock>
+
+## Tool Calling
+
+<CodeBlock language="python">
+{`import json
+
+# Define tools
+tools = [
+    {
+        "type": "function",
+        "name": "get_weather",
+        "description": "Get weather for a location",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            },
+            "required": ["location"]
+        }
+    }
+]
+
+# Make request with tools
+response = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "Weather in Tokyo?"}],
+    tools=tools
+)
+
+# Check if tool execution is needed
+if response.aura.requires_action:
+    for item in response.output:
+        if item.type == "function_call":
+            # Execute your tool
+            args = json.loads(item.arguments)
+            result = get_weather(**args)
+
+            # Return result
+            response = client.responses.create(
+                model="gpt-4.5",
+                input=[{
+                    "type": "function_call_output",
+                    "call_id": item.id,
+                    "output": json.dumps(result)
+                }],
+                tools=tools,
+                previous_response_id=response.id
+            )
+
+print(response.output_text)`}
+</CodeBlock>
+
+## Error Handling
+
+<CodeBlock language="python">
+{`from aura_llm import (
+    AuraClient,
+    AuraError,
+    AuthenticationError,
+    RateLimitError,
+    ValidationError,
+    ProviderError,
+)
+
+client = AuraClient()
+
+try:
+    response = client.responses.create(
+        model="gpt-4.5",
+        input=[{"type": "message", "role": "user", "content": "Hello"}]
+    )
+except AuthenticationError as e:
+    print(f"Invalid API key: {e}")
+except RateLimitError as e:
+    print(f"Rate limited. Retry after {e.retry_after}s")
+except ValidationError as e:
+    print(f"Invalid request: {e}")
+except ProviderError as e:
+    print(f"Provider error ({e.provider}): {e}")
+except AuraError as e:
+    print(f"Aura error: {e}")`}
+</CodeBlock>
+
+## Response Object
+
+<Expandable title="Response Properties">
+<CodeBlock language="python">
+{`response = client.responses.create(...)
+
+# Core properties
+response.id                    # Unique response ID
+response.status                # "completed", "failed", "incomplete"
+response.output                # List of output items
+response.output_text           # Convenience: concatenated text content
+
+# Usage information
+response.usage.input_tokens    # Input token count
+response.usage.output_tokens   # Output token count
+response.usage.total_tokens    # Total tokens
+
+# Aura metadata
+response.aura.request_id       # Unique request ID for tracing
+response.aura.provider         # Provider used (openai, anthropic, google)
+response.aura.model            # Actual model used
+response.aura.latency_ms       # Response latency in milliseconds
+
+# Cost tracking
+response.aura.cost.input_cost      # Cost for input tokens
+response.aura.cost.output_cost     # Cost for output tokens
+response.aura.cost.total_cost      # Total cost
+
+# Agentic metadata
+response.aura.requires_action  # True if tool execution needed
+response.aura.tools_used       # List of tools called
+response.aura.is_agentic       # True if tools or reasoning used`}
+</CodeBlock>
+</Expandable>
+
+## Conversations API
+
+<CodeBlock language="python">
+{`# List conversations
+conversations = client.conversations.list(limit=10)
+for conv in conversations:
+    print(f"{conv.id}: {conv.title}")
+
+# Get conversation details
+conversation = client.conversations.get("conv_abc123")
+for message in conversation.messages:
+    print(f"{message.role}: {message.content}")
+
+# Delete conversation
+client.conversations.delete("conv_abc123")`}
+</CodeBlock>
+
+## Context Managers
+
+<CodeBlock language="python">
+{`# Automatic cleanup with context manager
+with AuraClient() as client:
+    response = client.responses.create(
+        model="gpt-4.5",
+        input=[{"type": "message", "role": "user", "content": "Hello"}]
+    )
+
+# Async context manager
+async with AsyncAuraClient() as client:
+    response = await client.responses.create(...)`}
+</CodeBlock>
+
+## Type Hints
+
+The SDK is fully typed with Pydantic models:
+
+<CodeBlock language="python">
+{`from aura_llm.types import (
+    Response,
+    ResponseCreate,
+    Message,
+    FunctionCall,
+    Usage,
+    AuraMetadata,
+)
+
+def process_response(response: Response) -> str:
+    """Process a response with full type hints."""
+    if response.status != "completed":
+        raise ValueError(f"Response failed: {response.status}")
+
+    return response.output_text`}
+</CodeBlock>
+
+## Configuration via Environment
+
+<CodeBlock language="bash">
+{`# Required
+export AURA_API_KEY="your-api-key"
+
+# Optional
+export AURA_BASE_URL="https://api.aura.dev"
+export AURA_TIMEOUT="30"
+export AURA_MAX_RETRIES="3"
+export AURA_DEFAULT_MODEL="gpt-4.5"`}
+</CodeBlock>
+
+<Callout type="tip">
+The SDK automatically reads these environment variables, so you can create a client with just `AuraClient()`.
+</Callout>
+
+## Examples
+
+<Expandable title="Chatbot with Memory">
+<CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient()
+
+class Chatbot:
+    def __init__(self, model: str = "gpt-4.5"):
+        self.model = model
+        self.response_id = None
+
+    def chat(self, message: str) -> str:
+        response = client.responses.create(
+            model=self.model,
+            input=[{"type": "message", "role": "user", "content": message}],
+            previous_response_id=self.response_id
+        )
+        self.response_id = response.id
+        return response.output_text
+
+# Usage
+bot = Chatbot()
+print(bot.chat("Hi, I'm Alice"))
+print(bot.chat("What's my name?"))  # Remembers context`}
+</CodeBlock>
+</Expandable>
+
+<Expandable title="Batch Processing with Concurrency">
+<CodeBlock language="python">
+{`import asyncio
+from aura_llm import AsyncAuraClient
+
+async def process_batch(prompts: list[str], max_concurrent: int = 5):
+    client = AsyncAuraClient()
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def process_one(prompt: str):
+        async with semaphore:
+            return await client.responses.create(
+                model="gpt-4.5-mini",
+                input=[{"type": "message", "role": "user", "content": prompt}]
+            )
+
+    return await asyncio.gather(*[process_one(p) for p in prompts])
+
+# Process 100 prompts with max 5 concurrent requests
+prompts = [f"Summarize topic {i}" for i in range(100)]
+responses = asyncio.run(process_batch(prompts))`}
+</CodeBlock>
+</Expandable>

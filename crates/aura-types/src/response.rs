@@ -5,11 +5,12 @@
 //! and tracks the overall status of the response.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::item::{InputItem, Item};
 
 /// Status of a response in the Open Responses API
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     /// Response is currently being generated
@@ -49,7 +50,7 @@ impl ResponseStatus {
 }
 
 /// Reason why a response was marked incomplete
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum IncompleteReason {
     /// Maximum output tokens reached
@@ -63,7 +64,7 @@ pub enum IncompleteReason {
 }
 
 /// Error information when a response fails
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ResponseError {
     /// Error code
     pub code: String,
@@ -102,7 +103,7 @@ impl ResponseError {
 ///
 /// This struct includes standard token counts plus optional Aura-specific
 /// enrichments like calculated cost.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 pub struct Usage {
     /// Number of tokens in the input/prompt
     pub input_tokens: u32,
@@ -164,7 +165,7 @@ impl Usage {
 /// The Response is the primary output container for LLM completions.
 /// It contains a list of output items (messages, function calls, reasoning)
 /// and tracks metadata like status, usage, and timing.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Response {
     /// Unique identifier for the response
     pub id: String,
@@ -382,7 +383,7 @@ impl ResponseBuilder {
 }
 
 /// Request to create a new response
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct CreateResponseRequest {
     /// The model to use for completion
     pub model: String,
@@ -493,7 +494,7 @@ impl CreateResponseRequest {
 }
 
 /// A tool definition for function calling
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Tool {
     /// A function tool
@@ -511,7 +512,7 @@ impl Tool {
 }
 
 /// Definition of a function for tool use
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct FunctionDefinition {
     /// Name of the function
     pub name: String,
@@ -557,7 +558,7 @@ impl FunctionDefinition {
 }
 
 /// How the model should choose which tool to use
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(untagged)]
 pub enum ToolChoice {
     /// Automatic tool selection
@@ -572,7 +573,7 @@ pub enum ToolChoice {
 }
 
 /// Automatic tool choice mode
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolChoiceAuto {
     /// Model decides whether to call tools
@@ -584,7 +585,7 @@ pub enum ToolChoiceAuto {
 }
 
 /// Specific function to call
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ToolChoiceFunction {
     /// Name of the function to call
     pub name: String,

@@ -20,7 +20,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize)]
-struct ListParams {
+pub struct ListParams {
     user_id: Option<String>,
     #[serde(default = "default_limit")]
     limit: i64,
@@ -31,7 +31,7 @@ fn default_limit() -> i64 {
 }
 
 #[derive(Debug, Serialize)]
-struct ConversationDetail {
+pub struct ConversationDetail {
     #[serde(flatten)]
     conversation: aura_db::Conversation,
     messages: Vec<aura_db::Message>,
@@ -39,7 +39,24 @@ struct ConversationDetail {
 }
 
 /// List conversations
-async fn list_conversations(
+#[utoipa::path(
+    get,
+    path = "/v1/conversations",
+    tag = "conversations",
+    params(
+        ("user_id" = Option<String>, Query, description = "Filter by user ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum number of results (default: 20)")
+    ),
+    responses(
+        (status = 200, description = "List of conversations"),
+        (status = 401, description = "Unauthorized"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn list_conversations(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<aura_db::Conversation>>, (StatusCode, String)> {
@@ -60,7 +77,24 @@ async fn list_conversations(
 }
 
 /// Get conversation detail with messages and responses
-async fn get_conversation(
+#[utoipa::path(
+    get,
+    path = "/v1/conversations/{id}",
+    tag = "conversations",
+    params(
+        ("id" = Uuid, Path, description = "Conversation ID")
+    ),
+    responses(
+        (status = 200, description = "Conversation details with messages and responses"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Conversation not found"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_conversation(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ConversationDetail>, (StatusCode, String)> {
@@ -90,7 +124,24 @@ async fn get_conversation(
 }
 
 /// Delete conversation and all associated data
-async fn delete_conversation(
+#[utoipa::path(
+    delete,
+    path = "/v1/conversations/{id}",
+    tag = "conversations",
+    params(
+        ("id" = Uuid, Path, description = "Conversation ID to delete")
+    ),
+    responses(
+        (status = 204, description = "Conversation deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Conversation not found"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn delete_conversation(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {

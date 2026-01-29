@@ -17,6 +17,7 @@ use axum::{
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::AppState;
@@ -221,8 +222,14 @@ pub async fn auth_middleware(
     mut request: Request<Body>,
     next: Next,
 ) -> Result<Response, AuthError> {
-    // Allow health checks without auth
-    if request.uri().path().starts_with("/health") {
+    let path = request.uri().path();
+
+    // Allow public endpoints without auth
+    if path.starts_with("/health")
+        || path.starts_with("/openapi")
+        || path.starts_with("/swagger-ui")
+        || path.starts_with("/swagger")
+    {
         return Ok(next.run(request).await);
     }
 
@@ -339,7 +346,7 @@ pub fn router() -> Router<AppState> {
 }
 
 /// Request to create a new API key
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateApiKeyRequest {
     /// Human-readable name for the key
     pub name: String,
@@ -374,7 +381,7 @@ fn default_scopes() -> Vec<String> {
 }
 
 /// Response after creating an API key
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CreateApiKeyResponse {
     /// The full API key (only shown once!)
     pub key: String,
@@ -391,7 +398,21 @@ pub struct CreateApiKeyResponse {
 }
 
 /// Create a new API key
-async fn create_api_key(
+#[utoipa::path(
+    post,
+    path = "/v1/api-keys",
+    tag = "auth",
+    request_body = CreateApiKeyRequest,
+    responses(
+        (status = 200, description = "API key created successfully", body = CreateApiKeyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn create_api_key(
     State(state): State<AppState>,
     Json(req): Json<CreateApiKeyRequest>,
 ) -> Result<Json<CreateApiKeyResponse>, (StatusCode, Json<AuthError>)> {
@@ -465,7 +486,7 @@ async fn create_api_key(
 }
 
 /// API key info (without the secret)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ApiKeyInfo {
     pub key_id: String,
     pub name: String,
@@ -495,13 +516,26 @@ impl From<ApiKey> for ApiKeyInfo {
 }
 
 /// List API keys response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListApiKeysResponse {
     pub keys: Vec<ApiKeyInfo>,
 }
 
 /// List API keys for the authenticated user
-async fn list_api_keys(
+#[utoipa::path(
+    get,
+    path = "/v1/api-keys",
+    tag = "auth",
+    responses(
+        (status = 200, description = "List of API keys", body = ListApiKeysResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn list_api_keys(
     State(state): State<AppState>,
     // TODO: Extract user from auth context
 ) -> Result<Json<ListApiKeysResponse>, (StatusCode, Json<AuthError>)> {
@@ -525,7 +559,24 @@ async fn list_api_keys(
 }
 
 /// Get API key by key_id
-async fn get_api_key(
+#[utoipa::path(
+    get,
+    path = "/v1/api-keys/{key_id}",
+    tag = "auth",
+    params(
+        ("key_id" = String, Path, description = "The API key ID")
+    ),
+    responses(
+        (status = 200, description = "API key info", body = ApiKeyInfo),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "API key not found"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_api_key(
     State(state): State<AppState>,
     axum::extract::Path(key_id): axum::extract::Path<String>,
 ) -> Result<Json<ApiKeyInfo>, (StatusCode, Json<AuthError>)> {
@@ -570,7 +621,24 @@ async fn get_api_key(
 }
 
 /// Revoke an API key
-async fn revoke_api_key(
+#[utoipa::path(
+    delete,
+    path = "/v1/api-keys/{key_id}",
+    tag = "auth",
+    params(
+        ("key_id" = String, Path, description = "The API key ID to revoke")
+    ),
+    responses(
+        (status = 204, description = "API key revoked successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "API key not found"),
+        (status = 503, description = "Database unavailable")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn revoke_api_key(
     State(state): State<AppState>,
     axum::extract::Path(key_id): axum::extract::Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<AuthError>)> {

@@ -1,0 +1,558 @@
+---
+title: Using Existing SDKs
+description: Use OpenAI SDK, LangChain, LlamaIndex, and other clients with Aura
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, Card, CardGrid, Expandable } from '../../components/mdx'
+
+# Using Existing SDKs
+
+Aura is designed to work as a drop-in proxy for existing LLM clients. You can use your favorite SDKs and frameworks by simply pointing them at the Aura gateway.
+
+<Callout type="tip">
+Most SDKs allow you to override the base URL. Point it to your Aura instance and you're ready to go!
+</Callout>
+
+## OpenAI SDK
+
+The official OpenAI SDK works with Aura with minimal configuration changes.
+
+<CodeTabs>
+  <CodeTab label="Python">
+    <CodeBlock language="python" title="OpenAI Python SDK">
+{`from openai import OpenAI
+
+# Point the client at your Aura gateway
+client = OpenAI(
+    base_url="http://localhost:8080/v1",  # Aura gateway URL
+    api_key="your-aura-api-key",          # Optional: Aura API key
+)
+
+# Use exactly as you would with OpenAI
+response = client.chat.completions.create(
+    model="gpt-4.5",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello!"}
+    ]
+)
+
+print(response.choices[0].message.content)
+
+# Streaming works too
+stream = client.chat.completions.create(
+    model="gpt-4.5",
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="TypeScript">
+    <CodeBlock language="typescript" title="OpenAI TypeScript SDK">
+{`import OpenAI from 'openai';
+
+// Point the client at your Aura gateway
+const client = new OpenAI({
+  baseURL: 'http://localhost:8080/v1',  // Aura gateway URL
+  apiKey: 'your-aura-api-key',          // Optional: Aura API key
+});
+
+// Use exactly as you would with OpenAI
+const response = await client.chat.completions.create({
+  model: 'gpt-4.5',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Hello!' },
+  ],
+});
+
+console.log(response.choices[0].message.content);
+
+// Streaming
+const stream = await client.chat.completions.create({
+  model: 'gpt-4.5',
+  messages: [{ role: 'user', content: 'Tell me a story' }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+}`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+<Callout type="info">
+When using the OpenAI SDK with Aura, you can access **any provider's models** (Claude, Gemini) through the same client—just change the model name!
+</Callout>
+
+<CodeBlock language="python" title="Access Multiple Providers with One Client">
+{`from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8080/v1")
+
+# Use OpenAI models
+gpt_response = client.chat.completions.create(
+    model="gpt-4.5",
+    messages=[{"role": "user", "content": "Hello from GPT!"}]
+)
+
+# Use Claude models (same client!)
+claude_response = client.chat.completions.create(
+    model="claude-sonnet-4-5-20250514",
+    messages=[{"role": "user", "content": "Hello from Claude!"}]
+)
+
+# Use Gemini models (same client!)
+gemini_response = client.chat.completions.create(
+    model="gemini-2.0-flash",
+    messages=[{"role": "user", "content": "Hello from Gemini!"}]
+)`}
+</CodeBlock>
+
+## LangChain
+
+LangChain is a popular framework for building LLM applications. Aura integrates seamlessly.
+
+<CodeTabs>
+  <CodeTab label="Python">
+    <CodeBlock language="python" title="LangChain with Aura">
+{`from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
+
+# Configure LangChain to use Aura
+llm = ChatOpenAI(
+    base_url="http://localhost:8080/v1",
+    api_key="your-aura-api-key",  # or set OPENAI_API_KEY env var
+    model="gpt-4.5",
+)
+
+# Simple completion
+response = llm.invoke([
+    SystemMessage(content="You are a helpful assistant."),
+    HumanMessage(content="What is LangChain?")
+])
+print(response.content)
+
+# Streaming
+for chunk in llm.stream([HumanMessage(content="Tell me about AI")]):
+    print(chunk.content, end="", flush=True)`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="TypeScript">
+    <CodeBlock language="typescript" title="LangChain.js with Aura">
+{`import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+
+// Configure LangChain to use Aura
+const llm = new ChatOpenAI({
+  configuration: {
+    baseURL: 'http://localhost:8080/v1',
+  },
+  apiKey: 'your-aura-api-key',
+  modelName: 'gpt-4.5',
+});
+
+// Simple completion
+const response = await llm.invoke([
+  new SystemMessage('You are a helpful assistant.'),
+  new HumanMessage('What is LangChain?'),
+]);
+console.log(response.content);
+
+// Streaming
+const stream = await llm.stream([
+  new HumanMessage('Tell me about AI'),
+]);
+for await (const chunk of stream) {
+  process.stdout.write(chunk.content);
+}`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+### LangChain Chains and Agents
+
+<CodeBlock language="python" title="LangChain Chains with Aura">
+{`from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+# Set up LLM with Aura
+llm = ChatOpenAI(
+    base_url="http://localhost:8080/v1",
+    model="gpt-4.5"
+)
+
+# Create a chain
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant that explains {topic} simply."),
+    ("human", "{question}")
+])
+
+chain = prompt | llm | StrOutputParser()
+
+# Run the chain
+result = chain.invoke({
+    "topic": "quantum computing",
+    "question": "What is superposition?"
+})
+print(result)`}
+</CodeBlock>
+
+<Expandable title="LangChain Agent with Tools">
+<CodeBlock language="python">
+{`from langchain_openai import ChatOpenAI
+from langchain.agents import create_openai_tools_agent, AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.tools import tool
+
+# Configure LLM with Aura
+llm = ChatOpenAI(
+    base_url="http://localhost:8080/v1",
+    model="gpt-4.5"
+)
+
+# Define tools
+@tool
+def get_weather(location: str) -> str:
+    """Get the current weather for a location."""
+    # Your weather API logic here
+    return f"The weather in {location} is sunny, 72°F"
+
+@tool
+def search_web(query: str) -> str:
+    """Search the web for information."""
+    # Your search logic here
+    return f"Search results for: {query}"
+
+tools = [get_weather, search_web]
+
+# Create agent prompt
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant with access to tools."),
+    ("human", "{input}"),
+    MessagesPlaceholder(variable_name="agent_scratchpad"),
+])
+
+# Create and run agent
+agent = create_openai_tools_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+result = agent_executor.invoke({
+    "input": "What's the weather like in San Francisco?"
+})
+print(result["output"])`}
+</CodeBlock>
+</Expandable>
+
+### Using Claude with LangChain via Aura
+
+<CodeBlock language="python" title="Claude Models in LangChain">
+{`from langchain_openai import ChatOpenAI
+
+# Use Claude through Aura with the OpenAI-compatible interface
+claude = ChatOpenAI(
+    base_url="http://localhost:8080/v1",
+    model="claude-sonnet-4-5-20250514",  # Claude model via Aura
+    api_key="your-aura-api-key"
+)
+
+# Works exactly the same as OpenAI models
+response = claude.invoke("Explain the difference between Python and Rust")
+print(response.content)`}
+</CodeBlock>
+
+## LlamaIndex
+
+LlamaIndex (formerly GPT Index) is great for building RAG applications.
+
+<CodeBlock language="python" title="LlamaIndex with Aura">
+{`from llama_index.llms.openai import OpenAI
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+
+# Configure LlamaIndex to use Aura
+llm = OpenAI(
+    api_base="http://localhost:8080/v1",
+    api_key="your-aura-api-key",
+    model="gpt-4.5"
+)
+
+# Set as default LLM
+Settings.llm = llm
+
+# Simple completion
+response = llm.complete("What is RAG in the context of LLMs?")
+print(response.text)
+
+# Build a RAG pipeline
+documents = SimpleDirectoryReader("./data").load_data()
+index = VectorStoreIndex.from_documents(documents)
+
+# Query with your documents
+query_engine = index.as_query_engine()
+response = query_engine.query("What are the main points in my documents?")
+print(response)`}
+</CodeBlock>
+
+<Expandable title="LlamaIndex Chat Engine">
+<CodeBlock language="python">
+{`from llama_index.llms.openai import OpenAI
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+from llama_index.core.memory import ChatMemoryBuffer
+
+# Configure Aura
+Settings.llm = OpenAI(
+    api_base="http://localhost:8080/v1",
+    model="gpt-4.5"
+)
+
+# Load documents and create index
+documents = SimpleDirectoryReader("./data").load_data()
+index = VectorStoreIndex.from_documents(documents)
+
+# Create chat engine with memory
+memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+chat_engine = index.as_chat_engine(
+    chat_mode="context",
+    memory=memory,
+    system_prompt="You are a helpful assistant that answers questions about the documents."
+)
+
+# Chat with context
+response = chat_engine.chat("What is this document about?")
+print(response)
+
+# Follow-up (remembers context)
+response = chat_engine.chat("Can you elaborate on the first point?")
+print(response)`}
+</CodeBlock>
+</Expandable>
+
+## Haystack
+
+Haystack is a framework for building search and question-answering systems.
+
+<CodeBlock language="python" title="Haystack with Aura">
+{`from haystack.components.generators.chat import OpenAIChatGenerator
+from haystack.dataclasses import ChatMessage
+
+# Configure Haystack to use Aura
+generator = OpenAIChatGenerator(
+    api_base_url="http://localhost:8080/v1",
+    api_key="your-aura-api-key",
+    model="gpt-4.5"
+)
+
+# Generate response
+messages = [
+    ChatMessage.from_system("You are a helpful assistant."),
+    ChatMessage.from_user("What is Haystack?")
+]
+
+result = generator.run(messages=messages)
+print(result["replies"][0].content)`}
+</CodeBlock>
+
+## Instructor (Structured Outputs)
+
+Instructor makes it easy to get structured JSON outputs from LLMs.
+
+<CodeBlock language="python" title="Instructor with Aura">
+{`import instructor
+from openai import OpenAI
+from pydantic import BaseModel
+
+# Patch the OpenAI client with Instructor
+client = instructor.from_openai(
+    OpenAI(base_url="http://localhost:8080/v1")
+)
+
+# Define your output schema
+class UserInfo(BaseModel):
+    name: str
+    age: int
+    email: str
+
+# Extract structured data
+user = client.chat.completions.create(
+    model="gpt-4.5",
+    response_model=UserInfo,
+    messages=[
+        {"role": "user", "content": "John Doe is 30 years old. His email is john@example.com"}
+    ]
+)
+
+print(f"Name: {user.name}")
+print(f"Age: {user.age}")
+print(f"Email: {user.email}")`}
+</CodeBlock>
+
+## AutoGen
+
+Microsoft's AutoGen framework for multi-agent conversations.
+
+<CodeBlock language="python" title="AutoGen with Aura">
+{`from autogen import AssistantAgent, UserProxyAgent
+
+# Configure to use Aura
+config_list = [
+    {
+        "model": "gpt-4.5",
+        "base_url": "http://localhost:8080/v1",
+        "api_key": "your-aura-api-key"
+    }
+]
+
+llm_config = {"config_list": config_list}
+
+# Create agents
+assistant = AssistantAgent(
+    name="assistant",
+    llm_config=llm_config,
+    system_message="You are a helpful AI assistant."
+)
+
+user_proxy = UserProxyAgent(
+    name="user_proxy",
+    human_input_mode="NEVER",
+    max_consecutive_auto_reply=3,
+    code_execution_config={"work_dir": "coding", "use_docker": False}
+)
+
+# Start conversation
+user_proxy.initiate_chat(
+    assistant,
+    message="Write a Python function to calculate fibonacci numbers."
+)`}
+</CodeBlock>
+
+## CrewAI
+
+CrewAI for orchestrating role-playing AI agents.
+
+<CodeBlock language="python" title="CrewAI with Aura">
+{`from crewai import Agent, Task, Crew
+from langchain_openai import ChatOpenAI
+
+# Configure LLM with Aura
+llm = ChatOpenAI(
+    base_url="http://localhost:8080/v1",
+    model="gpt-4.5"
+)
+
+# Create agents
+researcher = Agent(
+    role="Research Analyst",
+    goal="Research and analyze information thoroughly",
+    backstory="You are an expert researcher with attention to detail.",
+    llm=llm
+)
+
+writer = Agent(
+    role="Content Writer",
+    goal="Create engaging content based on research",
+    backstory="You are a skilled writer who creates clear, engaging content.",
+    llm=llm
+)
+
+# Create tasks
+research_task = Task(
+    description="Research the latest trends in AI development",
+    agent=researcher,
+    expected_output="A comprehensive research summary"
+)
+
+writing_task = Task(
+    description="Write a blog post based on the research",
+    agent=writer,
+    expected_output="An engaging blog post"
+)
+
+# Create and run crew
+crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task]
+)
+
+result = crew.kickoff()
+print(result)`}
+</CodeBlock>
+
+## Environment Variables
+
+For most frameworks, you can set environment variables instead of passing config directly:
+
+<CodeBlock language="bash" title="Environment Configuration">
+{`# Point OpenAI SDK to Aura
+export OPENAI_API_BASE="http://localhost:8080/v1"
+export OPENAI_API_KEY="your-aura-api-key"
+
+# Now any SDK using these env vars will use Aura automatically
+python your_langchain_app.py`}
+</CodeBlock>
+
+<Callout type="warning">
+Some frameworks may use `OPENAI_BASE_URL` instead of `OPENAI_API_BASE`. Check your framework's documentation.
+</Callout>
+
+## Benefits of Using Aura as a Proxy
+
+<CardGrid cols={2}>
+  <Card title="Unified Access">
+    Use one client to access OpenAI, Claude, and Gemini models
+  </Card>
+  <Card title="Cost Tracking">
+    Get automatic cost calculation for all requests
+  </Card>
+  <Card title="Observability">
+    Centralized logging, metrics, and tracing
+  </Card>
+  <Card title="Rate Limiting">
+    Protect your API keys with per-user rate limits
+  </Card>
+</CardGrid>
+
+## Comparison: Direct vs Aura Proxy
+
+| Feature | Direct API | Via Aura |
+|---------|-----------|----------|
+| Multi-provider | ❌ Need multiple SDKs | ✅ One SDK for all |
+| Cost tracking | ❌ Manual calculation | ✅ Automatic |
+| Conversation history | ❌ Build yourself | ✅ Built-in |
+| Rate limiting | ❌ Per-provider | ✅ Centralized |
+| API key security | ⚠️ Exposed to clients | ✅ Keys stay server-side |
+| Failover | ❌ Manual | ✅ Automatic (planned) |
+
+## Troubleshooting
+
+<Callout type="danger" title="Common Issues">
+
+**"Invalid API key" errors**
+- Ensure Aura has the provider API keys configured (not the client)
+- If using Aura auth, pass your Aura API key to the client
+
+**Model not found**
+- Check that the model name matches exactly (e.g., `claude-sonnet-4-5-20250514`)
+- Verify the provider for that model is configured in Aura
+
+**Connection refused**
+- Verify Aura is running and accessible at the specified URL
+- Check firewall rules if running in different networks
+
+</Callout>
+
+## Next Steps
+
+<CardGrid cols={2}>
+  <Card title="Tool Calling" href="/docs/guides/tool-calling">
+    Add function calling to your LangChain agents
+  </Card>
+  <Card title="Cost Tracking" href="/docs/api/cost-tracking">
+    Monitor usage and costs across all frameworks
+  </Card>
+</CardGrid>

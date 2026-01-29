@@ -5,6 +5,7 @@
 //! raw token deltas.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::item::Item;
 use crate::response::{Response, ResponseError};
@@ -16,7 +17,7 @@ use crate::response::{Response, ResponseError};
 /// - `response.output_item.*` - Item-level events
 /// - `response.output_text.*` - Text streaming events
 /// - `response.function_call_arguments.*` - Function argument streaming events
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StreamEvent {
     // =========================================================================
@@ -383,7 +384,7 @@ impl StreamEvent {
 }
 
 /// Error details for streaming errors
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamError {
     /// Error type/category
     pub r#type: String,
@@ -449,7 +450,7 @@ impl From<ResponseError> for StreamError {
 }
 
 /// Rate limit information
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct RateLimitInfo {
     /// Maximum requests allowed in the window
     pub limit: u32,

@@ -1,0 +1,360 @@
+---
+title: Migration Guide
+description: Migrate from OpenAI, Anthropic, or LiteLLM to Aura
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, Expandable, Card, CardGrid } from '../../components/mdx'
+
+# Migration Guide
+
+This guide helps you migrate your existing LLM applications to Aura. Whether you're using OpenAI, Anthropic, or another gateway like LiteLLM, we'll show you how to make the switch.
+
+<CardGrid cols={3}>
+  <Card title="OpenAI" href="#from-openai">
+    Migrate from the OpenAI Python/TypeScript SDK
+  </Card>
+  <Card title="Anthropic" href="#from-anthropic">
+    Migrate from the Anthropic Claude SDK
+  </Card>
+  <Card title="LiteLLM" href="#from-litellm">
+    Switch from LiteLLM proxy
+  </Card>
+</CardGrid>
+
+## Why Migrate to Aura?
+
+<Callout type="info">
+Aura provides a unified API for all providers while adding enterprise features like cost tracking, conversation persistence, and agentic workflow support.
+</Callout>
+
+| Feature | OpenAI SDK | Anthropic SDK | Aura |
+|---------|------------|---------------|------|
+| Multi-provider | ❌ | ❌ | ✅ |
+| Cost tracking | ❌ | ❌ | ✅ |
+| Conversation persistence | ❌ | ❌ | ✅ |
+| End-user tracking | ❌ | ❌ | ✅ |
+| Agentic metadata | ❌ | ❌ | ✅ |
+| Semantic streaming | ❌ | ❌ | ✅ |
+
+## From OpenAI
+
+<Steps>
+  <Step title="Install the Aura SDK">
+    <CodeBlock language="bash">
+{`pip install aura-llm
+# or
+npm install aura-llm`}
+    </CodeBlock>
+  </Step>
+  <Step title="Update your imports">
+    <CodeTabs>
+      <CodeTab label="Before (OpenAI)">
+        <CodeBlock language="python">
+{`from openai import OpenAI
+
+client = OpenAI(api_key="sk-...")`}
+        </CodeBlock>
+      </CodeTab>
+      <CodeTab label="After (Aura)">
+        <CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient(api_key="aura-...")`}
+        </CodeBlock>
+      </CodeTab>
+    </CodeTabs>
+  </Step>
+  <Step title="Update API calls">
+    <CodeTabs>
+      <CodeTab label="Before (OpenAI)">
+        <CodeBlock language="python">
+{`response = client.chat.completions.create(
+    model="gpt-4.5",
+    messages=[
+        {"role": "system", "content": "You are helpful"},
+        {"role": "user", "content": "Hello!"}
+    ]
+)
+
+print(response.choices[0].message.content)`}
+        </CodeBlock>
+      </CodeTab>
+      <CodeTab label="After (Aura)">
+        <CodeBlock language="python">
+{`response = client.responses.create(
+    model="gpt-4.5",
+    instructions="You are helpful",
+    input=[
+        {"type": "message", "role": "user", "content": "Hello!"}
+    ]
+)
+
+print(response.output_text)
+# Bonus: Get cost and usage
+print(f"Cost: \${response.aura.cost.total_cost:.4f}")`}
+        </CodeBlock>
+      </CodeTab>
+    </CodeTabs>
+  </Step>
+</Steps>
+
+### Key Differences from OpenAI
+
+| OpenAI | Aura | Notes |
+|--------|------|-------|
+| `chat.completions.create` | `responses.create` | Same core functionality |
+| `messages[]` | `input[]` | Items instead of messages |
+| `system` role in messages | `instructions` parameter | Cleaner API |
+| `choices[0].message.content` | `output_text` | Convenience property |
+| `stream=True` | `stream=True` | Same parameter |
+| `functions` (deprecated) | `tools` | Use modern tool calling |
+
+### Streaming Migration
+
+<CodeTabs>
+  <CodeTab label="Before (OpenAI)">
+    <CodeBlock language="python">
+{`stream = client.chat.completions.create(
+    model="gpt-4.5",
+    messages=[{"role": "user", "content": "Hello"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="After (Aura)">
+    <CodeBlock language="python">
+{`stream = client.responses.create(
+    model="gpt-4.5",
+    input=[{"type": "message", "role": "user", "content": "Hello"}],
+    stream=True
+)
+
+for event in stream:
+    if event.type == "response.output_text.delta":
+        print(event.delta, end="")`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+<Callout type="tip">
+Aura's streaming events are semantic (like `response.completed`, `response.output_item.added`) rather than raw token deltas, making it easier to build UIs.
+</Callout>
+
+## From Anthropic
+
+<Steps>
+  <Step title="Install the Aura SDK">
+    <CodeBlock language="bash">
+{`pip install aura-llm`}
+    </CodeBlock>
+  </Step>
+  <Step title="Update your code">
+    <CodeTabs>
+      <CodeTab label="Before (Anthropic)">
+        <CodeBlock language="python">
+{`import anthropic
+
+client = anthropic.Anthropic(api_key="sk-ant-...")
+
+message = client.messages.create(
+    model="claude-sonnet-4-5-20250514",
+    max_tokens=1024,
+    system="You are a helpful assistant",
+    messages=[
+        {"role": "user", "content": "Hello!"}
+    ]
+)
+
+print(message.content[0].text)`}
+        </CodeBlock>
+      </CodeTab>
+      <CodeTab label="After (Aura)">
+        <CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient(api_key="aura-...")
+
+response = client.responses.create(
+    model="claude-sonnet-4-5-20250514",
+    instructions="You are a helpful assistant",
+    input=[
+        {"type": "message", "role": "user", "content": "Hello!"}
+    ]
+)
+
+print(response.output_text)
+
+# Bonus: Same code works with OpenAI models!
+response = client.responses.create(
+    model="gpt-4.5",  # Just change the model
+    instructions="You are a helpful assistant",
+    input=[
+        {"type": "message", "role": "user", "content": "Hello!"}
+    ]
+)`}
+        </CodeBlock>
+      </CodeTab>
+    </CodeTabs>
+  </Step>
+</Steps>
+
+### Key Differences from Anthropic
+
+| Anthropic | Aura | Notes |
+|-----------|------|-------|
+| `messages.create` | `responses.create` | Same core functionality |
+| `system` parameter | `instructions` parameter | Same purpose |
+| `content[0].text` | `output_text` | Convenience property |
+| `max_tokens` required | `max_tokens` optional | Defaults to model max |
+| Claude models only | Any provider | Use OpenAI, Google too |
+
+### Tool Calling Migration
+
+<CodeTabs>
+  <CodeTab label="Before (Anthropic)">
+    <CodeBlock language="python">
+{`response = client.messages.create(
+    model="claude-sonnet-4-5-20250514",
+    max_tokens=1024,
+    tools=[{
+        "name": "get_weather",
+        "description": "Get weather",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            }
+        }
+    }],
+    messages=[{"role": "user", "content": "Weather in SF?"}]
+)
+
+for block in response.content:
+    if block.type == "tool_use":
+        print(f"Call {block.name} with {block.input}")`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="After (Aura)">
+    <CodeBlock language="python">
+{`response = client.responses.create(
+    model="claude-sonnet-4-5-20250514",
+    tools=[{
+        "type": "function",
+        "name": "get_weather",
+        "description": "Get weather",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            }
+        }
+    }],
+    input=[{"type": "message", "role": "user", "content": "Weather in SF?"}]
+)
+
+# Easy check for tool calls
+if response.aura.requires_action:
+    for item in response.output:
+        if item.type == "function_call":
+            print(f"Call {item.name} with {item.arguments}")`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+## From LiteLLM
+
+If you're using LiteLLM as a proxy, Aura offers similar multi-provider support with additional features.
+
+<Steps>
+  <Step title="Install Aura">
+    <CodeBlock language="bash">
+{`pip install aura-llm`}
+    </CodeBlock>
+  </Step>
+  <Step title="Update your code">
+    <CodeTabs>
+      <CodeTab label="Before (LiteLLM)">
+        <CodeBlock language="python">
+{`import litellm
+
+response = litellm.completion(
+    model="gpt-4.5",  # or "claude-opus-4-5"
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)`}
+        </CodeBlock>
+      </CodeTab>
+      <CodeTab label="After (Aura)">
+        <CodeBlock language="python">
+{`from aura_llm import AuraClient
+
+client = AuraClient()
+
+response = client.responses.create(
+    model="gpt-4.5",  # or "claude-sonnet-4-5-20250514"
+    input=[{"type": "message", "role": "user", "content": "Hello!"}]
+)
+
+print(response.output_text)
+
+# Aura-specific features
+print(f"Provider: {response.aura.provider}")
+print(f"Cost: \${response.aura.cost.total_cost:.4f}")
+print(f"Latency: {response.aura.latency_ms}ms")`}
+        </CodeBlock>
+      </CodeTab>
+    </CodeTabs>
+  </Step>
+</Steps>
+
+### LiteLLM vs Aura
+
+| Feature | LiteLLM | Aura |
+|---------|---------|------|
+| Multi-provider | ✅ | ✅ |
+| OpenAI-compatible API | ✅ | Uses Open Responses API |
+| Built-in cost tracking | Limited | ✅ Full |
+| Conversation persistence | ❌ | ✅ |
+| End-user tracking | ❌ | ✅ |
+| Semantic streaming | ❌ | ✅ |
+| Agentic metadata | ❌ | ✅ |
+| Performance | Python | Rust (faster) |
+
+<Callout type="info">
+Aura uses the Open Responses API instead of the OpenAI Chat Completions format. This provides richer semantics for agentic workflows.
+</Callout>
+
+## Gradual Migration
+
+You don't have to migrate everything at once. Here's a strategy for gradual adoption:
+
+<Steps>
+  <Step title="Start with new features">
+    Use Aura for new features while keeping existing code on your current SDK.
+  </Step>
+  <Step title="Migrate non-critical paths">
+    Move lower-risk endpoints to Aura first to build confidence.
+  </Step>
+  <Step title="Add monitoring">
+    Use Aura's cost tracking and observability to monitor usage.
+  </Step>
+  <Step title="Complete migration">
+    Once comfortable, migrate remaining endpoints.
+  </Step>
+</Steps>
+
+## Need Help?
+
+<CardGrid cols={2}>
+  <Card title="API Reference" href="/docs/api">
+    Complete API documentation
+  </Card>
+  <Card title="Examples" href="https://github.com/UmaiTech/aura-llm-gateway/tree/main/examples">
+    Code examples and tutorials
+  </Card>
+</CardGrid>

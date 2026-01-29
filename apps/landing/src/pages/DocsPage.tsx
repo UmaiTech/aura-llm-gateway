@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useLocation, Link } from 'react-router-dom'
+import { useState, useEffect, useMemo, Suspense, ComponentType } from 'react'
+import { useLocation, Link, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -7,31 +7,55 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import mermaid from 'mermaid'
 import {
   BookOpen, Zap, Server, Code2, Settings,
-  ChevronRight, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield
+  ChevronRight, ChevronLeft, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
+  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical, Home
 } from 'lucide-react'
+import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
+
+// Import MDX components for use in MDX files
+import {
+  Callout,
+  CodeBlock,
+  CodeTabs,
+  CodeTab,
+  Steps,
+  Step,
+  Expandable,
+  Card,
+  CardGrid,
+  ApiPlayground,
+  ModelTable,
+} from '../components/mdx'
 
 // Import all MD files from src/content at build time using Vite's glob
 const mdModules = import.meta.glob('../content/**/*.md', {
-  query: '?raw',
-  import: 'default',
+  as: 'raw',
   eager: true
-}) as Record<string, string>
+}) as Record<string, unknown>
 
-const allMdModules = mdModules
+// Import all MDX files as lazy components
+const mdxModules = import.meta.glob('../content/**/*.mdx') as Record<
+  string,
+  () => Promise<{ default: ComponentType }>
+>
 
 // Remove frontmatter from markdown content
-function removeFrontmatter(content: string): string {
-  // Remove YAML frontmatter (--- ... ---)
+function removeFrontmatter(content: unknown): string {
+  // Handle case where content might not be a string (e.g., module object)
+  if (typeof content !== 'string') {
+    console.warn('Content is not a string:', typeof content, content)
+    // Try to extract string from module-like object
+    if (content && typeof content === 'object' && 'default' in content) {
+      return removeFrontmatter((content as { default: unknown }).default)
+    }
+    return ''
+  }
   return content.replace(/^---\n[\s\S]*?\n---\n/, '')
 }
 
 // Map file paths to doc paths
 function getDocPath(filePath: string): string {
-  // ../content/index.md -> /docs
-  // ../content/api/index.md -> /docs/api
-  // ../content/api/create-response.md -> /docs/api/create-response
-  // ../content/architecture.md -> /docs/architecture
-  const match = filePath.match(/content\/(.+)\.md$/)
+  const match = filePath.match(/content\/(.+)\.(md|mdx)$/)
   if (!match) return ''
 
   const path = match[1]
@@ -43,12 +67,21 @@ function getDocPath(filePath: string): string {
   return `/docs/${path}`
 }
 
-// Create content map from imported modules
+// Create content map from imported MD modules
 const docContentFromFiles: Record<string, string> = {}
-for (const [filePath, content] of Object.entries(allMdModules)) {
+for (const [filePath, content] of Object.entries(mdModules)) {
   const docPath = getDocPath(filePath)
   if (docPath) {
     docContentFromFiles[docPath] = removeFrontmatter(content)
+  }
+}
+
+// Create MDX component map
+const mdxComponents: Record<string, () => Promise<{ default: ComponentType }>> = {}
+for (const [filePath, loader] of Object.entries(mdxModules)) {
+  const docPath = getDocPath(filePath)
+  if (docPath) {
+    mdxComponents[docPath] = loader
   }
 }
 
@@ -68,12 +101,31 @@ const docSections = [
     title: 'API Reference',
     items: [
       { title: 'Overview', path: '/docs/api', icon: Code2 },
+      { title: 'Swagger UI', path: 'http://localhost:8080/swagger-ui', icon: ExternalLink, external: true },
       { title: 'Authentication', path: '/docs/api/authentication', icon: Server },
       { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
       { title: 'Conversations', path: '/docs/api/conversations', icon: BookOpen },
       { title: 'Streaming', path: '/docs/api/streaming', icon: Zap },
       { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
+      { title: 'Rate Limiting', path: '/docs/api/rate-limiting', icon: Shield },
       { title: 'Error Reference', path: '/docs/api/errors', icon: Code2 },
+      { title: 'Admin API', path: '/docs/api/admin', icon: KeyRound },
+      { title: 'Changelog', path: '/docs/api/changelog', icon: History },
+    ],
+  },
+  {
+    title: 'Guides',
+    items: [
+      { title: 'Using Existing SDKs', path: '/docs/guides/existing-sdks', icon: Plug },
+      { title: 'Tool Calling', path: '/docs/guides/tool-calling', icon: Wrench },
+      { title: 'Testing & Sandbox', path: '/docs/guides/testing', icon: FlaskConical },
+      { title: 'Migration Guide', path: '/docs/guides/migration', icon: ArrowRightLeft },
+    ],
+  },
+  {
+    title: 'SDKs',
+    items: [
+      { title: 'Python', path: '/docs/sdks/python', icon: Package },
     ],
   },
   {
@@ -131,172 +183,6 @@ Aura is organized into modular Rust crates:
 - \`aura-proxy\` - Main server binary (Axum routes, middleware)
 - \`aura-db\` - Database models and queries (SQLx)
 `,
-  '/docs/quickstart': `# Quickstart
-
-Get up and running with Aura in just a few minutes.
-
-## 1. Clone and Build
-
-\`\`\`bash
-git clone https://github.com/UmaiTech/aura-llm-gateway.git
-cd aura-llm-gateway
-cargo build --release
-\`\`\`
-
-## 2. Configure Environment
-
-\`\`\`bash
-# Required: At least one provider API key
-export OPENAI_API_KEY=sk-...
-
-# Optional: Additional providers
-export ANTHROPIC_API_KEY=sk-ant-...
-export GOOGLE_API_KEY=...
-
-# Server configuration
-export AURA_HOST=0.0.0.0
-export AURA_PORT=8080
-\`\`\`
-
-## 3. Run the Gateway
-
-\`\`\`bash
-cargo run -p aura-proxy
-
-# Or with debug logging
-RUST_LOG=debug cargo run -p aura-proxy
-\`\`\`
-
-## 4. Make a Request
-
-\`\`\`bash
-curl -X POST http://localhost:8080/v1/responses \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "gpt-4o-mini",
-    "input": [
-      {"type": "message", "role": "user", "content": "Hello!"}
-    ]
-  }'
-\`\`\`
-`,
-  '/docs/configuration': `# Configuration
-
-Aura is configured through environment variables.
-
-## Required Variables
-
-| Variable | Description |
-|----------|-------------|
-| \`AURA_HOST\` | Server bind address (default: \`0.0.0.0\`) |
-| \`AURA_PORT\` | Server port (default: \`8080\`) |
-
-## Provider API Keys
-
-At least one provider API key is required:
-
-| Variable | Provider |
-|----------|----------|
-| \`OPENAI_API_KEY\` | OpenAI (GPT models) |
-| \`ANTHROPIC_API_KEY\` | Anthropic (Claude models) |
-| \`GOOGLE_API_KEY\` | Google (Gemini models) |
-
-## Optional Variables
-
-| Variable | Description |
-|----------|-------------|
-| \`RUST_LOG\` | Log level (e.g., \`info,aura_proxy=debug\`) |
-| \`DATABASE_URL\` | PostgreSQL connection string |
-| \`REDIS_URL\` | Redis connection string |
-| \`AURA_ADMIN_KEY\` | Admin API key for management endpoints |
-`,
-  '/docs/concepts/open-responses': `# Open Responses API
-
-The Open Responses API is a specification for agentic LLM workflows. Aura implements
-this specification to provide a unified interface for building AI agents.
-
-## Core Concepts
-
-### Items
-
-Items are atomic units of conversation:
-
-- **message** - User or assistant messages
-- **function_call** - Tool invocations by the model
-- **function_call_output** - Results from tool executions
-- **reasoning** - Model's internal reasoning (when available)
-
-### Response Lifecycle
-
-Responses go through a status lifecycle:
-
-\`\`\`
-in_progress → completed | failed | incomplete
-\`\`\`
-
-### Streaming Events
-
-Aura provides semantic streaming events (not raw token deltas):
-
-- \`response.in_progress\` - Response started
-- \`response.output_item.added\` - New item in output
-- \`response.output_text.delta\` - Text chunk
-- \`response.completed\` - Response finished
-- \`response.failed\` - Error occurred
-
-## Conversation Threading
-
-Use \`previous_response_id\` to continue conversations:
-
-\`\`\`json
-{
-  "model": "gpt-4o",
-  "input": [{"type": "message", "role": "user", "content": "Continue..."}],
-  "previous_response_id": "resp_abc123"
-}
-\`\`\`
-
-Learn more at [openresponses.org](https://www.openresponses.org/specification)
-`,
-  '/docs/concepts/providers': `# Providers
-
-Aura supports multiple LLM providers through a unified interface.
-
-## Supported Providers
-
-### OpenAI
-
-Models: \`gpt-4o\`, \`gpt-4o-mini\`, \`gpt-4-turbo\`, \`gpt-3.5-turbo\`, \`o1\`, \`o1-mini\`, \`o3-mini\`
-
-\`\`\`bash
-export OPENAI_API_KEY=sk-...
-\`\`\`
-
-### Anthropic (Coming Soon)
-
-Models: \`claude-3-5-sonnet-20241022\`, \`claude-3-5-haiku-20241022\`
-
-\`\`\`bash
-export ANTHROPIC_API_KEY=sk-ant-...
-\`\`\`
-
-### Google (Coming Soon)
-
-Models: \`gemini-2.0-flash\`, \`gemini-1.5-pro\`
-
-\`\`\`bash
-export GOOGLE_API_KEY=...
-\`\`\`
-
-## Provider Selection
-
-Aura automatically routes requests to the appropriate provider based on the model name.
-If a model is supported by multiple providers, the first registered provider is used.
-
-## Adding Custom Providers
-
-See the development guide for implementing custom providers.
-`,
 }
 
 // Mermaid component
@@ -309,7 +195,6 @@ function MermaidDiagram({ chart }: { chart: string }) {
 
     const renderDiagram = async () => {
       try {
-        // Initialize mermaid on first render
         mermaid.initialize({
           startOnLoad: false,
           theme: 'dark',
@@ -383,7 +268,7 @@ function MermaidDiagram({ chart }: { chart: string }) {
   )
 }
 
-// Markdown components for custom styling - using any for React-Markdown compatibility
+// Markdown components for custom styling
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const markdownComponents: any = {
   h1: ({ children }: { children?: React.ReactNode }) => (
@@ -394,6 +279,9 @@ const markdownComponents: any = {
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
     <h3 className="text-xl font-semibold mt-6 mb-3 text-white">{children}</h3>
+  ),
+  h4: ({ children }: { children?: React.ReactNode }) => (
+    <h4 className="text-lg font-semibold mt-4 mb-2 text-white">{children}</h4>
   ),
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
@@ -407,26 +295,23 @@ const markdownComponents: any = {
   li: ({ children }: { children?: React.ReactNode }) => (
     <li className="text-gray-300">{children}</li>
   ),
-  code: ({ node, inline, className, children, ...props }: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  code: ({ inline, className, children, ...props }: any) => {
     const match = /language-(\w+)/.exec(className || '')
     const language = match ? match[1] : ''
 
-    // Ensure children is a string
     const codeString = Array.isArray(children)
       ? children.join('')
       : String(children || '').replace(/\n$/, '')
 
-    // Handle Mermaid diagrams
     if (language === 'mermaid') {
       return <MermaidDiagram chart={codeString} />
     }
 
-    // Inline code
     if (inline || !className) {
       return <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>{children}</code>
     }
 
-    // Code blocks with syntax highlighting
     return (
       <SyntaxHighlighter
         language={language || 'text'}
@@ -447,11 +332,21 @@ const markdownComponents: any = {
   pre: ({ children }: { children?: React.ReactNode }) => (
     <div className="mb-4">{children}</div>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+    // Use Link for internal navigation, regular anchor for external
+    if (href?.startsWith('/') || href?.startsWith('#')) {
+      return (
+        <Link to={href} className="text-aura-400 hover:text-aura-300 underline">
+          {children}
+        </Link>
+      )
+    }
+    return (
+      <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    )
+  },
   table: ({ children }: { children?: React.ReactNode }) => (
     <div className="overflow-x-auto mb-4">
       <table className="min-w-full divide-y divide-gray-800">{children}</table>
@@ -471,21 +366,155 @@ const markdownComponents: any = {
   ),
 }
 
+// MDX wrapper components - these are passed to MDX files
+const mdxWrapperComponents = {
+  // Standard HTML elements with styling
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-3xl font-bold mb-6 text-white">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-2xl font-semibold mt-8 mb-4 text-white">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-xl font-semibold mt-6 mb-3 text-white">{children}</h3>
+  ),
+  h4: ({ children }: { children?: React.ReactNode }) => (
+    <h4 className="text-lg font-semibold mt-4 mb-2 text-white">{children}</h4>
+  ),
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal list-inside space-y-2 text-gray-300 mb-4">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="text-gray-300">{children}</li>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+    if (href?.startsWith('/') || href?.startsWith('#')) {
+      return (
+        <Link to={href} className="text-aura-400 hover:text-aura-300 underline">
+          {children}
+        </Link>
+      )
+    }
+    return (
+      <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    )
+  },
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="overflow-x-auto mb-4">
+      <table className="min-w-full divide-y divide-gray-800">{children}</table>
+    </div>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-300 bg-gray-900">{children}</th>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <td className="px-4 py-2 text-sm text-gray-400 border-t border-gray-800">{children}</td>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote className="border-l-4 border-aura-500 pl-4 italic text-gray-400 mb-4">{children}</blockquote>
+  ),
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+  ),
+  pre: ({ children }: { children?: React.ReactNode }) => (
+    <div className="mb-4">{children}</div>
+  ),
+  // Custom MDX components
+  Callout,
+  CodeBlock,
+  CodeTabs,
+  CodeTab,
+  Steps,
+  Step,
+  Expandable,
+  Card,
+  CardGrid,
+  ApiPlayground,
+  ModelTable,
+}
+
+// Loading component for MDX
+function MDXLoading() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-pulse text-gray-500">Loading documentation...</div>
+    </div>
+  )
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MDXComponentType = ComponentType<{ components?: Record<string, ComponentType<any>> }>
+
+// MDX Content renderer
+function MDXContent({ path }: { path: string }) {
+  const [Component, setComponent] = useState<MDXComponentType | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loader = mdxComponents[path]
+    if (loader) {
+      loader()
+        .then((mod) => {
+          setComponent(() => mod.default)
+          setError(null)
+        })
+        .catch((err) => {
+          console.error('Failed to load MDX:', err)
+          setError('Failed to load documentation')
+        })
+    }
+  }, [path])
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-900/20 border border-red-800 rounded text-red-400">
+        {error}
+      </div>
+    )
+  }
+
+  if (!Component) {
+    return <MDXLoading />
+  }
+
+  return <Component components={mdxWrapperComponents} />
+}
+
 export function DocsPage() {
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Global keyboard shortcut for search
+  useSearchShortcut(() => setSearchOpen(true))
 
   const currentPath = location.pathname
 
-  // Get content from MD files or fallback
+  // Check if we have MDX content for this path
+  const hasMdxContent = mdxComponents[currentPath] !== undefined
+
+  // Get markdown content from MD files or fallback
   const currentContent = useMemo(() => {
+    if (hasMdxContent) return null
     return docContentFromFiles[currentPath] || fallbackContent[currentPath] || fallbackContent['/docs']
-  }, [currentPath])
+  }, [currentPath, hasMdxContent])
 
+  // Check if path has any content
+  const hasContent = (path: string) => {
+    return docContentFromFiles[path] || fallbackContent[path] || mdxComponents[path]
+  }
 
-  // Debug: Log available docs
   useEffect(() => {
     console.log('Available MD files:', Object.keys(docContentFromFiles))
+    console.log('Available MDX files:', Object.keys(mdxComponents))
     console.log('Current path:', currentPath)
   }, [currentPath])
 
@@ -508,6 +537,7 @@ export function DocsPage() {
               </Link>
             </div>
             <div className="flex items-center gap-4">
+              <SearchButton onClick={() => setSearchOpen(true)} />
               <a
                 href="http://localhost:3000"
                 className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1"
@@ -539,7 +569,26 @@ export function DocsPage() {
                 <ul className="space-y-1">
                   {section.items.map((item) => {
                     const isActive = currentPath === item.path
-                    const hasContent = docContentFromFiles[item.path] || fallbackContent[item.path]
+                    const itemHasContent = hasContent(item.path)
+                    const isExternal = 'external' in item && item.external
+
+                    if (isExternal) {
+                      return (
+                        <li key={item.path}>
+                          <a
+                            href={item.path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-gray-400 hover:text-white hover:bg-gray-800"
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {item.title}
+                            <ExternalLink className="h-3 w-3 ml-auto" />
+                          </a>
+                        </li>
+                      )
+                    }
+
                     return (
                       <li key={item.path}>
                         <Link
@@ -549,7 +598,7 @@ export function DocsPage() {
                             flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
                             ${isActive
                               ? 'bg-aura-500/10 text-aura-400'
-                              : hasContent
+                              : itemHasContent
                                 ? 'text-gray-400 hover:text-white hover:bg-gray-800'
                                 : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800/50'
                             }
@@ -571,13 +620,36 @@ export function DocsPage() {
         {/* Main Content */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:pl-8">
           <div className="max-w-3xl mx-auto">
-            <div className="prose prose-invert prose-gray max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
+            {/* Navigation breadcrumb */}
+            <div className="flex items-center gap-4 mb-6 text-sm">
+              <button
+                onClick={() => window.history.back()}
+                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
               >
-                {currentContent}
-              </ReactMarkdown>
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+              <Link
+                to="/"
+                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </Link>
+            </div>
+            <div className="prose prose-invert prose-gray max-w-none">
+              {hasMdxContent ? (
+                <Suspense fallback={<MDXLoading />}>
+                  <MDXContent path={currentPath} />
+                </Suspense>
+              ) : (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
+                  {currentContent || ''}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
         </main>
@@ -590,6 +662,9 @@ export function DocsPage() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Search Modal */}
+      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )
 }

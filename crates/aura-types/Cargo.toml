@@ -12,6 +12,7 @@ serde_json.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 cargo-husky.workspace = true

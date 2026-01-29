@@ -1,0 +1,558 @@
+---
+title: Admin API Reference
+description: Manage API keys, organizations, and credentials
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Expandable, Card, CardGrid } from '../../components/mdx'
+
+# Admin API Reference
+
+The Admin API allows you to manage API keys, organizations, teams, projects, and provider credentials programmatically.
+
+<Callout type="warning">
+Admin endpoints require authentication with an admin-scoped API key or the `AURA_ADMIN_KEY`.
+</Callout>
+
+---
+
+## Authentication
+
+Admin endpoints require the `admin:*` scope or use of the master admin key:
+
+<CodeBlock language="bash">
+{`curl -X GET http://localhost:8080/v1/api-keys \\
+  -H "Authorization: Bearer \$AURA_ADMIN_KEY"`}
+</CodeBlock>
+
+---
+
+## API Keys
+
+### List API Keys
+
+Retrieve all API keys for your organization.
+
+<CodeBlock language="http">
+{`GET /v1/api-keys`}
+</CodeBlock>
+
+**Query Parameters**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by status: `active`, `revoked`, `expired` |
+| `org_id` | string | Filter by organization |
+| `limit` | integer | Max results (default: 100) |
+| `offset` | integer | Pagination offset |
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "data": [
+    {
+      "id": "key_abc123",
+      "name": "Production API Key",
+      "prefix": "aura_prod_",
+      "scopes": ["responses:create", "conversations:read"],
+      "status": "active",
+      "org_id": "org_xyz",
+      "team_id": "team_123",
+      "project_id": null,
+      "rate_limit": {
+        "requests_per_minute": 100,
+        "tokens_per_day": 1000000
+      },
+      "usage": {
+        "requests_today": 1523,
+        "tokens_today": 245000
+      },
+      "created_at": "2026-01-15T10:30:00Z",
+      "expires_at": null,
+      "last_used_at": "2026-01-27T08:45:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 15,
+    "limit": 100,
+    "offset": 0
+  }
+}`}
+</CodeBlock>
+
+---
+
+### Create API Key
+
+Create a new API key with specified scopes and limits.
+
+<CodeBlock language="http">
+{`POST /v1/api-keys`}
+</CodeBlock>
+
+**Request Body**
+
+<CodeBlock language="json">
+{`{
+  "name": "Mobile App Key",
+  "scopes": ["responses:create"],
+  "org_id": "org_xyz",
+  "team_id": "team_123",
+  "project_id": "proj_456",
+  "rate_limit": {
+    "requests_per_minute": 60,
+    "tokens_per_day": 100000
+  },
+  "expires_at": "2027-01-01T00:00:00Z",
+  "metadata": {
+    "environment": "production",
+    "app": "mobile-ios"
+  }
+}`}
+</CodeBlock>
+
+**Parameters**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Human-readable name |
+| `scopes` | string[] | Yes | Permission scopes |
+| `org_id` | string | No | Organization to associate |
+| `team_id` | string | No | Team to associate |
+| `project_id` | string | No | Project to associate |
+| `rate_limit` | object | No | Rate limit configuration |
+| `expires_at` | string | No | Expiration datetime (ISO 8601) |
+| `metadata` | object | No | Custom key-value metadata |
+
+**Available Scopes**
+
+| Scope | Description |
+|-------|-------------|
+| `responses:create` | Create new responses |
+| `responses:read` | Read response history |
+| `conversations:read` | Read conversations |
+| `conversations:write` | Create/delete conversations |
+| `usage:read` | Read usage statistics |
+| `admin:keys` | Manage API keys |
+| `admin:orgs` | Manage organizations |
+| `admin:*` | Full admin access |
+| `*` | All permissions |
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "id": "key_new789",
+  "name": "Mobile App Key",
+  "key": "aura_prod_sk_live_abc123xyz...",
+  "prefix": "aura_prod_",
+  "scopes": ["responses:create"],
+  "status": "active",
+  "created_at": "2026-01-27T12:00:00Z"
+}`}
+</CodeBlock>
+
+<Callout type="danger">
+The full API key is only returned once at creation. Store it securely—it cannot be retrieved later.
+</Callout>
+
+---
+
+### Get API Key
+
+Retrieve details for a specific API key.
+
+<CodeBlock language="http">
+{`GET /v1/api-keys/{key_id}`}
+</CodeBlock>
+
+---
+
+### Update API Key
+
+Update an existing API key's name, scopes, or limits.
+
+<CodeBlock language="http">
+{`PATCH /v1/api-keys/{key_id}`}
+</CodeBlock>
+
+<CodeBlock language="json">
+{`{
+  "name": "Updated Name",
+  "scopes": ["responses:create", "conversations:read"],
+  "rate_limit": {
+    "requests_per_minute": 120
+  }
+}`}
+</CodeBlock>
+
+---
+
+### Revoke API Key
+
+Revoke an API key immediately. This action cannot be undone.
+
+<CodeBlock language="http">
+{`DELETE /v1/api-keys/{key_id}`}
+</CodeBlock>
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "id": "key_abc123",
+  "status": "revoked",
+  "revoked_at": "2026-01-27T12:00:00Z"
+}`}
+</CodeBlock>
+
+---
+
+## Organizations
+
+### List Organizations
+
+<CodeBlock language="http">
+{`GET /v1/organizations`}
+</CodeBlock>
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "data": [
+    {
+      "id": "org_abc123",
+      "name": "Acme Corp",
+      "slug": "acme-corp",
+      "status": "active",
+      "settings": {
+        "token_budget_daily": 10000000,
+        "allowed_models": ["gpt-4.5", "claude-sonnet-4-5-20250514"]
+      },
+      "usage": {
+        "tokens_today": 523000,
+        "cost_today": 1.24
+      },
+      "created_at": "2026-01-01T00:00:00Z"
+    }
+  ]
+}`}
+</CodeBlock>
+
+---
+
+### Create Organization
+
+<CodeBlock language="http">
+{`POST /v1/organizations`}
+</CodeBlock>
+
+<CodeBlock language="json">
+{`{
+  "name": "New Organization",
+  "slug": "new-org",
+  "settings": {
+    "token_budget_daily": 5000000,
+    "allowed_models": ["gpt-4.5-mini", "gemini-2.0-flash"]
+  }
+}`}
+</CodeBlock>
+
+---
+
+### Update Organization
+
+<CodeBlock language="http">
+{`PATCH /v1/organizations/{org_id}`}
+</CodeBlock>
+
+---
+
+### Delete Organization
+
+<CodeBlock language="http">
+{`DELETE /v1/organizations/{org_id}`}
+</CodeBlock>
+
+<Callout type="warning">
+Deleting an organization will revoke all associated API keys and delete all teams and projects.
+</Callout>
+
+---
+
+## Teams
+
+Teams belong to organizations and can have their own API keys and budgets.
+
+### List Teams
+
+<CodeBlock language="http">
+{`GET /v1/organizations/{org_id}/teams`}
+</CodeBlock>
+
+### Create Team
+
+<CodeBlock language="http">
+{`POST /v1/organizations/{org_id}/teams`}
+</CodeBlock>
+
+<CodeBlock language="json">
+{`{
+  "name": "Engineering",
+  "slug": "engineering",
+  "settings": {
+    "token_budget_daily": 2000000
+  }
+}`}
+</CodeBlock>
+
+### Update Team
+
+<CodeBlock language="http">
+{`PATCH /v1/teams/{team_id}`}
+</CodeBlock>
+
+### Delete Team
+
+<CodeBlock language="http">
+{`DELETE /v1/teams/{team_id}`}
+</CodeBlock>
+
+---
+
+## Projects
+
+Projects belong to teams and represent individual applications or services.
+
+### List Projects
+
+<CodeBlock language="http">
+{`GET /v1/teams/{team_id}/projects`}
+</CodeBlock>
+
+### Create Project
+
+<CodeBlock language="http">
+{`POST /v1/teams/{team_id}/projects`}
+</CodeBlock>
+
+<CodeBlock language="json">
+{`{
+  "name": "Chat Bot",
+  "slug": "chat-bot",
+  "settings": {
+    "default_model": "gpt-4.5-mini",
+    "max_tokens_per_request": 4096
+  }
+}`}
+</CodeBlock>
+
+---
+
+## Provider Credentials
+
+Manage encrypted provider API keys.
+
+### List Credentials
+
+<CodeBlock language="http">
+{`GET /v1/credentials`}
+</CodeBlock>
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "data": [
+    {
+      "id": "cred_abc123",
+      "provider": "openai",
+      "name": "Production OpenAI",
+      "status": "active",
+      "org_id": "org_xyz",
+      "created_at": "2026-01-01T00:00:00Z",
+      "last_used_at": "2026-01-27T08:00:00Z"
+    }
+  ]
+}`}
+</CodeBlock>
+
+<Callout type="info">
+API keys are encrypted at rest and never returned in responses.
+</Callout>
+
+---
+
+### Create Credential
+
+<CodeBlock language="http">
+{`POST /v1/credentials`}
+</CodeBlock>
+
+<CodeBlock language="json">
+{`{
+  "provider": "openai",
+  "name": "Production OpenAI",
+  "api_key": "sk-...",
+  "org_id": "org_xyz"
+}`}
+</CodeBlock>
+
+**Supported Providers**
+
+| Provider | Value |
+|----------|-------|
+| OpenAI | `openai` |
+| Anthropic | `anthropic` |
+| Google | `google` |
+
+---
+
+### Rotate Credential
+
+Rotate a credential's API key without downtime.
+
+<CodeBlock language="http">
+{`POST /v1/credentials/{cred_id}/rotate`}
+</CodeBlock>
+
+<CodeBlock language="json">
+{`{
+  "new_api_key": "sk-new-key..."
+}`}
+</CodeBlock>
+
+---
+
+### Delete Credential
+
+<CodeBlock language="http">
+{`DELETE /v1/credentials/{cred_id}`}
+</CodeBlock>
+
+---
+
+## Usage & Analytics
+
+### Get Usage Summary
+
+<CodeBlock language="http">
+{`GET /v1/usage`}
+</CodeBlock>
+
+**Query Parameters**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `start_date` | string | Start date (ISO 8601) |
+| `end_date` | string | End date (ISO 8601) |
+| `group_by` | string | Group by: `day`, `model`, `org`, `team`, `project` |
+| `org_id` | string | Filter by organization |
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "period": {
+    "start": "2026-01-01T00:00:00Z",
+    "end": "2026-01-27T23:59:59Z"
+  },
+  "totals": {
+    "requests": 152340,
+    "input_tokens": 45000000,
+    "output_tokens": 23000000,
+    "total_tokens": 68000000,
+    "cost": 245.67
+  },
+  "by_model": [
+    {
+      "model": "gpt-4.5",
+      "requests": 50000,
+      "tokens": 25000000,
+      "cost": 125.00
+    },
+    {
+      "model": "claude-sonnet-4-5-20250514",
+      "requests": 40000,
+      "tokens": 20000000,
+      "cost": 80.00
+    }
+  ],
+  "by_day": [
+    {
+      "date": "2026-01-27",
+      "requests": 5234,
+      "tokens": 2500000,
+      "cost": 8.50
+    }
+  ]
+}`}
+</CodeBlock>
+
+---
+
+### Get Rate Limit Status
+
+<CodeBlock language="http">
+{`GET /v1/usage/rate-limits`}
+</CodeBlock>
+
+**Response**
+
+<CodeBlock language="json">
+{`{
+  "key_id": "key_abc123",
+  "limits": {
+    "requests_per_minute": 100,
+    "tokens_per_day": 1000000
+  },
+  "current": {
+    "requests_this_minute": 45,
+    "tokens_today": 523000
+  },
+  "remaining": {
+    "requests_this_minute": 55,
+    "tokens_today": 477000
+  },
+  "resets_at": {
+    "minute": "2026-01-27T12:01:00Z",
+    "day": "2026-01-28T00:00:00Z"
+  }
+}`}
+</CodeBlock>
+
+---
+
+## Error Responses
+
+Admin API errors follow the standard error format:
+
+<CodeBlock language="json">
+{`{
+  "error": {
+    "code": "forbidden",
+    "message": "API key does not have admin:keys scope",
+    "request_id": "req_abc123"
+  }
+}`}
+</CodeBlock>
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `unauthorized` | 401 | Missing or invalid API key |
+| `forbidden` | 403 | Insufficient permissions |
+| `not_found` | 404 | Resource not found |
+| `conflict` | 409 | Resource already exists |
+| `validation_error` | 422 | Invalid request body |
+
+---
+
+<CardGrid cols={2}>
+  <Card title="Authentication" href="/docs/api/authentication">
+    Learn about API key scopes
+  </Card>
+  <Card title="Organizations" href="/docs/organizations">
+    Multi-tenancy setup guide
+  </Card>
+</CardGrid>

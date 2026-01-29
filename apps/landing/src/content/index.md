@@ -50,7 +50,7 @@ const response = await fetch('http://localhost:8080/v1/responses', {
     'Authorization': 'Bearer aura_live_your_api_key'
   },
   body: JSON.stringify({
-    model: 'gpt-4o',
+    model: 'gpt-4.5',
     input: [
       { type: 'message', role: 'user', content: 'Hello!' }
     ],

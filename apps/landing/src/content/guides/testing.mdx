@@ -1,0 +1,587 @@
+---
+title: Testing & Sandbox
+description: Test your integration safely without incurring costs
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, Card, CardGrid, Expandable } from '../../components/mdx'
+
+# Testing & Sandbox
+
+This guide covers strategies for testing your Aura integration safely, including mock responses, test API keys, and integration testing patterns.
+
+## Testing Strategies
+
+<CardGrid cols={3}>
+  <Card title="Unit Testing">
+    Mock the Aura client in your tests
+  </Card>
+  <Card title="Integration Testing">
+    Use test API keys with rate limits
+  </Card>
+  <Card title="Staging Environment">
+    Full gateway with test credentials
+  </Card>
+</CardGrid>
+
+---
+
+## Unit Testing with Mocks
+
+For unit tests, mock the Aura client to avoid real API calls.
+
+<CodeTabs>
+  <CodeTab label="Python (pytest)">
+    <CodeBlock language="python" title="test_my_app.py">
+{`import pytest
+from unittest.mock import Mock, patch, AsyncMock
+from aura_llm import AuraClient
+
+# Mock response fixture
+@pytest.fixture
+def mock_response():
+    return Mock(
+        id="resp_test123",
+        status="completed",
+        output_text="This is a test response",
+        output=[
+            Mock(
+                type="message",
+                role="assistant",
+                content="This is a test response"
+            )
+        ],
+        usage=Mock(
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30
+        ),
+        aura=Mock(
+            request_id="req_test456",
+            provider="openai",
+            latency_ms=150,
+            cost=Mock(
+                input_cost=0.0001,
+                output_cost=0.0002,
+                total_cost=0.0003
+            )
+        )
+    )
+
+# Test with mocked client
+def test_chat_function(mock_response):
+    with patch.object(AuraClient, 'responses') as mock_responses:
+        mock_responses.create.return_value = mock_response
+
+        client = AuraClient()
+        response = client.responses.create(
+            model="gpt-4.5",
+            input=[{"type": "message", "role": "user", "content": "Hello"}]
+        )
+
+        assert response.status == "completed"
+        assert response.output_text == "This is a test response"
+        assert response.aura.cost.total_cost == 0.0003
+
+# Test async code
+@pytest.mark.asyncio
+async def test_async_chat(mock_response):
+    with patch.object(AuraClient, 'responses') as mock_responses:
+        mock_responses.create = AsyncMock(return_value=mock_response)
+
+        client = AuraClient()
+        response = await client.responses.create(
+            model="gpt-4.5",
+            input=[{"type": "message", "role": "user", "content": "Hello"}]
+        )
+
+        assert response.status == "completed"`}
+    </CodeBlock>
+  </CodeTab>
+  <CodeTab label="TypeScript (Jest)">
+    <CodeBlock language="typescript" title="app.test.ts">
+{`import { Aura } from 'aura-llm';
+
+// Mock the Aura module
+jest.mock('aura-llm');
+
+const mockResponse = {
+  id: 'resp_test123',
+  status: 'completed',
+  output_text: 'This is a test response',
+  output: [
+    {
+      type: 'message',
+      role: 'assistant',
+      content: 'This is a test response',
+    },
+  ],
+  usage: {
+    input_tokens: 10,
+    output_tokens: 20,
+    total_tokens: 30,
+  },
+  aura: {
+    request_id: 'req_test456',
+    provider: 'openai',
+    latency_ms: 150,
+    cost: {
+      input_cost: 0.0001,
+      output_cost: 0.0002,
+      total_cost: 0.0003,
+    },
+  },
+};
+
+describe('Chat function', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return a response', async () => {
+    const mockCreate = jest.fn().mockResolvedValue(mockResponse);
+    (Aura as jest.Mock).mockImplementation(() => ({
+      responses: { create: mockCreate },
+    }));
+
+    const client = new Aura();
+    const response = await client.responses.create({
+      model: 'gpt-4.5',
+      input: [{ type: 'message', role: 'user', content: 'Hello' }],
+    });
+
+    expect(response.status).toBe('completed');
+    expect(response.output_text).toBe('This is a test response');
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+});`}
+    </CodeBlock>
+  </CodeTab>
+</CodeTabs>
+
+---
+
+## Test API Keys
+
+Create API keys with limited scope and rate limits for testing.
+
+<Steps>
+  <Step title="Create a test API key">
+    <CodeBlock language="bash">
+{`curl -X POST http://localhost:8080/v1/api-keys \\
+  -H "Authorization: Bearer \$AURA_ADMIN_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "test-key",
+    "scopes": ["responses:create"],
+    "rate_limit": {
+      "requests_per_minute": 10,
+      "tokens_per_day": 10000
+    },
+    "metadata": {
+      "environment": "test"
+    }
+  }'`}
+    </CodeBlock>
+  </Step>
+  <Step title="Use the test key in your tests">
+    <CodeBlock language="python">
+{`import os
+
+# Use test key from environment
+client = AuraClient(
+    api_key=os.environ.get("AURA_TEST_API_KEY"),
+    base_url="http://localhost:8080"
+)`}
+    </CodeBlock>
+  </Step>
+  <Step title="Clean up after tests">
+    <CodeBlock language="bash">
+{`# Delete test API key
+curl -X DELETE http://localhost:8080/v1/api-keys/key_test123 \\
+  -H "Authorization: Bearer \$AURA_ADMIN_KEY"`}
+    </CodeBlock>
+  </Step>
+</Steps>
+
+<Callout type="tip">
+Use environment variables to manage test vs production API keys. Never commit API keys to version control.
+</Callout>
+
+---
+
+## Mock Server
+
+For integration tests, you can run a mock Aura server that returns predictable responses.
+
+<CodeBlock language="python" title="mock_server.py">
+{`from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import uvicorn
+
+app = FastAPI()
+
+# Predictable mock responses
+MOCK_RESPONSES = {
+    "hello": {
+        "id": "resp_mock_001",
+        "status": "completed",
+        "output": [
+            {"type": "message", "role": "assistant", "content": "Hello! How can I help you?"}
+        ],
+        "usage": {"input_tokens": 5, "output_tokens": 8, "total_tokens": 13},
+        "aura": {
+            "request_id": "req_mock_001",
+            "provider": "mock",
+            "latency_ms": 50,
+            "cost": {"total_cost": 0.0001}
+        }
+    },
+    "error": {
+        "error": {
+            "code": "rate_limit_exceeded",
+            "message": "Rate limit exceeded. Please retry after 60 seconds."
+        }
+    }
+}
+
+@app.post("/v1/responses")
+async def create_response(request: Request):
+    body = await request.json()
+
+    # Check for test scenarios based on input
+    user_input = body.get("input", [{}])[0].get("content", "")
+
+    if "error" in user_input.lower():
+        return JSONResponse(MOCK_RESPONSES["error"], status_code=429)
+
+    if "timeout" in user_input.lower():
+        import asyncio
+        await asyncio.sleep(30)  # Simulate timeout
+
+    return JSONResponse(MOCK_RESPONSES["hello"])
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "mock": True}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8081)`}
+</CodeBlock>
+
+<Callout type="info">
+Run the mock server on a different port (e.g., 8081) and point your tests at it.
+</Callout>
+
+---
+
+## Integration Testing Patterns
+
+### Testing Error Handling
+
+<CodeBlock language="python" title="test_error_handling.py">
+{`import pytest
+from aura_llm import AuraClient
+from aura_llm.exceptions import RateLimitError, AuthenticationError, ProviderError
+
+@pytest.fixture
+def client():
+    return AuraClient(base_url="http://localhost:8080")
+
+def test_rate_limit_handling(client):
+    """Test that rate limit errors are handled correctly."""
+    # Make requests until rate limited
+    with pytest.raises(RateLimitError) as exc_info:
+        for _ in range(100):  # Exceed rate limit
+            client.responses.create(
+                model="gpt-4.5-mini",
+                input=[{"type": "message", "role": "user", "content": "Hi"}]
+            )
+
+    error = exc_info.value
+    assert error.retry_after > 0
+    assert "rate limit" in str(error).lower()
+
+def test_invalid_api_key():
+    """Test authentication error with invalid key."""
+    client = AuraClient(
+        api_key="invalid_key",
+        base_url="http://localhost:8080"
+    )
+
+    with pytest.raises(AuthenticationError):
+        client.responses.create(
+            model="gpt-4.5",
+            input=[{"type": "message", "role": "user", "content": "Hi"}]
+        )
+
+def test_invalid_model(client):
+    """Test error when requesting non-existent model."""
+    with pytest.raises(ProviderError) as exc_info:
+        client.responses.create(
+            model="nonexistent-model",
+            input=[{"type": "message", "role": "user", "content": "Hi"}]
+        )
+
+    assert "model" in str(exc_info.value).lower()`}
+</CodeBlock>
+
+### Testing Streaming
+
+<CodeBlock language="python" title="test_streaming.py">
+{`import pytest
+from aura_llm import AuraClient
+
+@pytest.fixture
+def client():
+    return AuraClient(base_url="http://localhost:8080")
+
+def test_streaming_response(client):
+    """Test that streaming returns expected events."""
+    events = []
+
+    stream = client.responses.create(
+        model="gpt-4.5-mini",
+        input=[{"type": "message", "role": "user", "content": "Count to 3"}],
+        stream=True
+    )
+
+    for event in stream:
+        events.append(event)
+
+    # Verify event sequence
+    event_types = [e.type for e in events]
+
+    assert "response.in_progress" in event_types
+    assert "response.output_text.delta" in event_types
+    assert "response.completed" in event_types
+
+    # Verify we got the final response
+    completed_event = next(e for e in events if e.type == "response.completed")
+    assert completed_event.response.status == "completed"
+
+def test_streaming_cancellation(client):
+    """Test that streaming can be cancelled mid-stream."""
+    stream = client.responses.create(
+        model="gpt-4.5",
+        input=[{"type": "message", "role": "user", "content": "Write a long essay"}],
+        stream=True
+    )
+
+    event_count = 0
+    for event in stream:
+        event_count += 1
+        if event_count > 5:
+            break  # Cancel early
+
+    assert event_count > 5`}
+</CodeBlock>
+
+### Testing Tool Calling
+
+<CodeBlock language="python" title="test_tool_calling.py">
+{`import pytest
+import json
+from aura_llm import AuraClient
+
+@pytest.fixture
+def client():
+    return AuraClient(base_url="http://localhost:8080")
+
+WEATHER_TOOL = {
+    "type": "function",
+    "name": "get_weather",
+    "description": "Get the current weather",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "location": {"type": "string"}
+        },
+        "required": ["location"]
+    }
+}
+
+def test_tool_call_request(client):
+    """Test that model can request tool calls."""
+    response = client.responses.create(
+        model="gpt-4.5",
+        input=[{
+            "type": "message",
+            "role": "user",
+            "content": "What's the weather in San Francisco?"
+        }],
+        tools=[WEATHER_TOOL]
+    )
+
+    # Should request a tool call
+    assert response.aura.requires_action == True
+    assert len(response.aura.tools_used) > 0
+
+    # Find the tool call
+    tool_call = next(
+        (item for item in response.output if item.type == "function_call"),
+        None
+    )
+    assert tool_call is not None
+    assert tool_call.name == "get_weather"
+
+    args = json.loads(tool_call.arguments)
+    assert "location" in args
+
+def test_tool_call_response(client):
+    """Test completing a tool call loop."""
+    # Initial request
+    response = client.responses.create(
+        model="gpt-4.5",
+        input=[{
+            "type": "message",
+            "role": "user",
+            "content": "What's the weather in NYC?"
+        }],
+        tools=[WEATHER_TOOL]
+    )
+
+    # Get tool call
+    tool_call = next(
+        item for item in response.output if item.type == "function_call"
+    )
+
+    # Send tool result
+    final_response = client.responses.create(
+        model="gpt-4.5",
+        input=[{
+            "type": "function_call_output",
+            "call_id": tool_call.id,
+            "output": json.dumps({"temperature": 72, "conditions": "sunny"})
+        }],
+        tools=[WEATHER_TOOL],
+        previous_response_id=response.id
+    )
+
+    # Should complete without needing more tools
+    assert final_response.aura.requires_action == False
+    assert "72" in final_response.output_text or "sunny" in final_response.output_text`}
+</CodeBlock>
+
+---
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+<CodeBlock language="yaml" title=".github/workflows/test.yml">
+{`name: Integration Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      aura:
+        image: ghcr.io/umaitech/aura-gateway:latest
+        ports:
+          - 8080:8080
+        env:
+          OPENAI_API_KEY: \${{ secrets.OPENAI_API_KEY }}
+          AURA_ADMIN_KEY: test-admin-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-asyncio aura-llm
+
+      - name: Wait for Aura to be ready
+        run: |
+          timeout 30 bash -c 'until curl -s http://localhost:8080/health; do sleep 1; done'
+
+      - name: Run integration tests
+        env:
+          AURA_BASE_URL: http://localhost:8080
+          AURA_TEST_API_KEY: \${{ secrets.AURA_TEST_API_KEY }}
+        run: |
+          pytest tests/integration/ -v`}
+</CodeBlock>
+
+---
+
+## Staging Environment
+
+For pre-production testing, deploy a full Aura instance with:
+
+<Steps>
+  <Step title="Separate database">
+    Use a dedicated PostgreSQL database for staging data isolation.
+  </Step>
+  <Step title="Test provider keys">
+    Use separate provider API keys with spending limits.
+  </Step>
+  <Step title="Reduced rate limits">
+    Configure lower rate limits to catch issues early.
+  </Step>
+  <Step title="Monitoring">
+    Enable verbose logging for debugging.
+  </Step>
+</Steps>
+
+<CodeBlock language="yaml" title="docker-compose.staging.yml">
+{`version: '3.8'
+services:
+  aura-staging:
+    image: ghcr.io/umaitech/aura-gateway:latest
+    environment:
+      RUST_LOG: debug
+      AURA_HOST: 0.0.0.0
+      AURA_PORT: 8080
+      DATABASE_URL: postgres://user:pass@db-staging/aura_staging
+      OPENAI_API_KEY: \${OPENAI_STAGING_KEY}
+      ANTHROPIC_API_KEY: \${ANTHROPIC_STAGING_KEY}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db-staging
+
+  db-staging:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aura_staging
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - staging_data:/var/lib/postgresql/data
+
+volumes:
+  staging_data:`}
+</CodeBlock>
+
+---
+
+## Best Practices
+
+<Callout type="tip" title="Testing Checklist">
+
+- [ ] Unit tests mock the Aura client
+- [ ] Integration tests use test API keys with rate limits
+- [ ] Error scenarios are tested (rate limits, auth, invalid input)
+- [ ] Streaming is tested end-to-end
+- [ ] Tool calling loops are tested
+- [ ] CI/CD runs integration tests on every PR
+- [ ] Staging environment mirrors production config
+
+</Callout>
+
+<CardGrid cols={2}>
+  <Card title="Error Reference" href="/docs/api/errors">
+    All error codes and how to handle them
+  </Card>
+  <Card title="Rate Limiting" href="/docs/api/rate-limiting">
+    Understand and test rate limit behavior
+  </Card>
+</CardGrid>

@@ -20,8 +20,8 @@ Aura provides first-class support for OpenAI's latest models including GPT-5, GP
 - **gpt-4.1-nano** - Ultra-fast, low-cost option
 
 ### GPT-4o Series (Vision & Multimodal)
-- **gpt-4o** - Original multimodal model
-- **gpt-4o-mini** - Affordable vision-enabled model
+- **gpt-4.5** - Original multimodal model
+- **gpt-4.5-mini** - Affordable vision-enabled model
 
 ### Reasoning Models (o-series)
 - **o1** - Advanced reasoning capabilities
@@ -55,8 +55,8 @@ Aura provides first-class support for OpenAI's latest models including GPT-5, GP
 | **gpt-4.1** | $2.00 | $8.00 | $0.50 |
 | **gpt-4.1-mini** | $0.40 | $1.60 | $0.10 |
 | **gpt-4.1-nano** | $0.10 | $0.40 | $0.025 |
-| **gpt-4o** | $2.50 | $10.00 | $1.25 |
-| **gpt-4o-mini** | $0.15 | $0.60 | $0.075 |
+| **gpt-4.5** | $2.50 | $10.00 | $1.25 |
+| **gpt-4.5-mini** | $0.15 | $0.60 | $0.075 |
 | **o1** | $15.00 | $60.00 | $7.50 |
 | **o1-pro** | $150.00 | $600.00 | $75.00 |
 | **o3** | $2.00 | $8.00 | $1.00 |
@@ -163,7 +163,7 @@ Cached tokens are billed at a lower rate (see pricing table above).
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4.5",
     "input": [
       {
         "type": "message",
@@ -196,7 +196,7 @@ OpenAI-specific errors are normalized to the Open Responses API format:
 {
   "error": {
     "code": "rate_limit_exceeded",
-    "message": "Rate limit reached for gpt-4o in organization org-...",
+    "message": "Rate limit reached for gpt-4.5 in organization org-...",
     "param": null
   }
 }
@@ -208,4 +208,4 @@ OpenAI-specific errors are normalized to the Open Responses API format:
 2. **Enable caching** for repeated prompts (especially with long system instructions)
 3. **Use o-series models** only when complex reasoning is required
 4. **Set max_output_tokens** to prevent runaway costs
-5. **Monitor usage** via Aura's cost tracking metadata
+5. **Monitor usage** via Aura's cost tracking met
