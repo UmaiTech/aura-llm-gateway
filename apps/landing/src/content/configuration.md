@@ -154,6 +154,65 @@ logging:
   filters:
     - "aura_proxy=debug"
     - "aura_core=debug"
+
+# Smart Routing Configuration (v0.3+)
+routing:
+  # Routing strategy: round_robin, weighted, random, least_latency,
+  #                   region_based, priority, trait_based, cost_optimized
+  strategy: weighted
+
+  # Default region for region-based routing
+  default_region: us-east
+
+  # Optimization goal: min_cost, min_latency, max_quality, balanced
+  optimization_goal: balanced
+
+  # Required traits for trait-based routing
+  required_traits:
+    - code
+    - tool_use
+
+  # Custom weights for multi-objective optimization
+  weights:
+    cost: 0.4
+    latency: 0.3
+    quality: 0.3
+
+  # Health tracking (circuit breaker)
+  health:
+    failure_threshold: 5
+    recovery_timeout: 30s
+    success_threshold: 2
+    rate_limit_is_failure: false
+
+  # Automatic failover configuration
+  fallback:
+    enabled: true
+    max_attempts: 3
+    on_rate_limit: true
+    on_timeout: true
+    retry_delay: 100ms
+    chains:
+      openai:
+        - anthropic
+        - google
+      anthropic:
+        - openai
+        - google
+
+  # Multiple API keys per provider with load balancing
+  endpoints:
+    openai:
+      - id: openai-primary
+        api_key_ref: "env:OPENAI_API_KEY"
+        weight: 2
+        priority: 0
+        region: us-east
+      - id: openai-secondary
+        api_key_ref: "env:OPENAI_API_KEY_2"
+        weight: 1
+        priority: 1
+        region: us-west
 ```
 
 To use the config file:

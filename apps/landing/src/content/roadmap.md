@@ -55,6 +55,24 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
   - Identify bottlenecks
   - Debug production issues
 
+### Smart Routing (NEW in v0.3)
+- **Multiple routing strategies** - 8 strategies for different use cases
+  - Round-robin, weighted, random, least-latency
+  - Region-based routing for low latency
+  - Trait-based routing for task-specific model selection
+  - Cost-optimized routing for budget control
+  - Multi-objective optimization balancing cost/latency/quality
+
+- **Automatic failover** - Circuit breaker pattern for high availability
+  - Health tracking with configurable thresholds
+  - Automatic endpoint recovery
+  - Fallback chains across providers
+
+- **Load balancing** - Distribute across multiple API keys
+  - Per-endpoint weight and priority
+  - Region-aware routing
+  - Rate limit per endpoint
+
 ## 📅 Planned (v0.3+)
 
 ### Advanced Features
@@ -63,11 +81,6 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 - Configure webhooks for response completion
 - Async processing workflows
 - Event filtering by provider/model
-
-**Smart routing** (Q2 2026)
-- Automatic failover between providers
-- Load balancing across API keys
-- Cost-optimized routing
 
 **Admin dashboard** (Q2 2026)
 - Web UI for analytics and management
@@ -116,12 +129,12 @@ Our vision for Aura is to be the most powerful, easiest-to-use LLM gateway for p
 
 Features we're evaluating based on community feedback:
 
-- **Model fallbacks** - Automatically retry with cheaper model on failure
 - **Budget limits** - Hard caps on spending per user/key
 - **A/B testing** - Route percentage of traffic to different models
 - **Custom models** - Support for fine-tuned models
 - **Batch processing** - Bulk request API with lower costs
 - **Model playground** - Compare outputs across providers
+- **Semantic caching** - Vector-based caching for similar queries
 
 ## How We Prioritize
 
@@ -148,6 +161,6 @@ We aim for:
 - **Minor releases** (new features): Monthly
 - **Major releases** (breaking changes): Quarterly
 
-Current version: **v0.2.6**
+Current version: **v0.2.8**
 
 Next release: **v0.3.0** (estimated February 2026)

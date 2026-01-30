@@ -6,6 +6,7 @@
   "streaming": "Streaming",
   "cost-tracking": "Cost Tracking",
   "rate-limiting": "Rate Limiting",
+  "routing": "Smart Routing",
   "caching": "Response Caching",
   "metrics": "Prometheus Metrics",
   "errors": "Error Reference"
