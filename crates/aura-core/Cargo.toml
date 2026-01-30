@@ -32,6 +32,7 @@ redis.workspace = true
 metrics.workspace = true
 url.workspace = true
 chrono.workspace = true
+humantime.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
