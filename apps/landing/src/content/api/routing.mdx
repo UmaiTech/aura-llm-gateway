@@ -15,7 +15,9 @@ Smart routing enables high availability and cost optimization without code chang
 
 ## Routing Strategies
 
-Aura supports 8 routing strategies:
+Aura supports 12 routing strategies across two categories:
+
+### Standard Strategies
 
 | Strategy | Description | Best For |
 |----------|-------------|----------|
@@ -27,6 +29,15 @@ Aura supports 8 routing strategies:
 | `priority` | Route to lowest priority healthy endpoint | Failover scenarios |
 | `trait_based` | Route based on model capabilities | Task-specific routing |
 | `cost_optimized` | Route to cheapest capable endpoint | Budget optimization |
+
+### Agentic Strategies
+
+| Strategy | Description | Best For |
+|----------|-------------|----------|
+| `tool_aware` | Route based on tools requested | Agentic workflows with tools |
+| `context_adaptive` | Route based on input token count | Long-context conversations |
+| `sticky_session` | Maintain endpoint affinity per conversation | Multi-turn agent sessions |
+| `reasoning_depth` | Route complex reasoning to thinking models | Chain-of-thought tasks |
 
 ## Configuration
 
@@ -431,6 +442,216 @@ Check endpoint health via the admin API:
 }`}
 </CodeBlock>
 
+## Agentic Routing Strategies
+
+Aura provides specialized routing strategies designed for agentic AI workflows with tools, long-context conversations, and complex reasoning tasks.
+
+### Tool-Aware Routing
+
+Routes requests based on the tools being used. Different models excel at different tool categories:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: tool_aware
+
+  # Tool-to-model preferences
+  tool_routing:
+    code_execution:
+      preferred_models:
+        - claude-sonnet-4
+        - gpt-4o
+      required_traits: [code, tool_use]
+
+    web_search:
+      preferred_models:
+        - gemini-2.0-flash
+        - gpt-4o-mini
+      required_traits: [fast, tool_use]
+
+    data_analysis:
+      preferred_models:
+        - claude-opus-4
+        - gpt-4o
+      required_traits: [analysis, code]
+
+    image_processing:
+      preferred_models:
+        - gpt-4o
+        - gemini-2.0-pro
+      required_traits: [vision]`}
+</CodeBlock>
+
+#### Tool Categories
+
+| Category | Tools | Recommended Models |
+|----------|-------|-------------------|
+| `code_execution` | execute_code, run_command | Claude Sonnet, GPT-4o |
+| `web_search` | search, browse | Gemini Flash, GPT-4o-mini |
+| `data_analysis` | analyze, query_data | Claude Opus, GPT-4o |
+| `image_processing` | analyze_image, generate_image | GPT-4o, Gemini Pro |
+| `file_system` | read_file, write_file | Claude Sonnet, GPT-4o |
+| `api_calls` | http_request, webhook | Any model with tool_use |
+| `calculator` | calculate, math | Any model |
+| `memory` | remember, recall | Claude (long context) |
+
+<Callout type="tip">
+Tool-aware routing automatically detects tools in your request and routes to the model best suited for those tools. No configuration needed for common tools.
+</Callout>
+
+### Context-Adaptive Routing
+
+Routes based on input token count to ensure requests stay within model context windows:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: context_adaptive
+
+  context_routing:
+    # Small context (< 4K tokens) - use fast models
+    small:
+      max_tokens: 4000
+      preferred_models:
+        - gpt-4o-mini
+        - gemini-2.0-flash
+        - claude-3-5-haiku
+
+    # Medium context (4K-32K) - use standard models
+    medium:
+      max_tokens: 32000
+      preferred_models:
+        - gpt-4o
+        - claude-sonnet-4
+        - gemini-2.0-pro
+
+    # Large context (32K-128K) - use long-context models
+    large:
+      max_tokens: 128000
+      preferred_models:
+        - claude-sonnet-4
+        - gpt-4o
+
+    # Very large context (128K+) - use extended context models
+    xlarge:
+      preferred_models:
+        - claude-sonnet-4    # 200K context
+        - gemini-2.0-pro      # 1M+ context`}
+</CodeBlock>
+
+<Callout type="info">
+Context-adaptive routing estimates token count from your input and routes to a model with sufficient context window. This prevents context overflow errors and optimizes cost for shorter requests.
+</Callout>
+
+### Sticky Session Routing
+
+Maintains endpoint affinity within a conversation for consistency:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: sticky_session
+
+  session:
+    # Use previous_response_id for session tracking
+    tracking: response_id
+
+    # Optional: custom session header
+    # header: X-Session-ID
+
+    # Fallback if preferred endpoint unavailable
+    fallback_strategy: least_latency
+
+    # Session timeout (route anywhere after this)
+    timeout: 30m`}
+</CodeBlock>
+
+When a request includes `previous_response_id`, Aura routes to the same endpoint that handled the previous response. This ensures:
+
+- **Consistent model behavior** across conversation turns
+- **Cache efficiency** when providers cache conversation state
+- **Predictable responses** for multi-turn agentic workflows
+
+<CodeBlock language="json" title="Request with session tracking">
+{`{
+  "model": "gpt-4o",
+  "previous_response_id": "resp_abc123",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "Continue from where we left off..."
+    }
+  ]
+}`}
+</CodeBlock>
+
+### Reasoning-Depth Routing
+
+Routes complex reasoning tasks to models with extended thinking capabilities:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: reasoning_depth
+
+  reasoning:
+    # Patterns that trigger deep reasoning routing
+    triggers:
+      - "step by step"
+      - "think carefully"
+      - "explain your reasoning"
+      - "analyze this"
+      - "compare and contrast"
+
+    # Models for deep reasoning tasks
+    deep_reasoning_models:
+      - o1                    # OpenAI reasoning model
+      - claude-opus-4         # With extended thinking
+
+    # Models for standard tasks
+    standard_models:
+      - gpt-4o
+      - claude-sonnet-4
+      - gemini-2.0-pro`}
+</CodeBlock>
+
+Reasoning-depth routing automatically detects when a task requires extended thinking:
+
+| Signal | Routing Decision |
+|--------|-----------------|
+| `requires_reasoning: true` in request | Deep reasoning model |
+| Reasoning trigger phrases detected | Deep reasoning model |
+| Math/logic problem patterns | Deep reasoning model |
+| Simple chat/completion | Standard model |
+
+<Callout type="warning">
+Deep reasoning models (like o1) have higher latency and cost. Use reasoning-depth routing when you need thorough analysis, not for every request.
+</Callout>
+
+## Combining Strategies
+
+You can combine agentic strategies with standard strategies:
+
+<CodeBlock language="yaml">
+{`routing:
+  # Primary strategy for agentic requests
+  strategy: tool_aware
+
+  # Fallback to cost optimization for simple requests
+  fallback_strategy: cost_optimized
+
+  # Enable sticky sessions for multi-turn conversations
+  session:
+    enabled: true
+    tracking: response_id
+
+  # Context-based model selection
+  context_routing:
+    enabled: true
+
+  # Health-based failover
+  health:
+    failure_threshold: 5
+    recovery_timeout: 30s`}
+</CodeBlock>
+
 ## Best Practices
 
 1. **Start with round-robin** - Simple and effective for most use cases
@@ -448,3 +669,11 @@ Check endpoint health via the admin API:
 7. **Monitor endpoint health** - Track success rates and fallback frequency
 
 8. **Test failover** - Periodically verify fallback chains work correctly
+
+9. **Use tool-aware for agents** - When your application uses multiple tools
+
+10. **Enable sticky sessions** - For multi-turn agentic conversations
+
+11. **Use context-adaptive** - When handling variable-length inputs
+
+12. **Reserve reasoning-depth** - Only for tasks that truly need extended thinking

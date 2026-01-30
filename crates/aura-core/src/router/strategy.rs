@@ -4,13 +4,23 @@
 //! - **RoundRobin**: Evenly distribute requests in order
 //! - **Weighted**: Distribute based on endpoint weights
 //! - **Random**: Random selection
-//! - **LeastConnections**: Route to endpoint with fewest active requests
+//! - **LeastLatency**: Route to endpoint with best health/success rate
 //! - **RegionBased**: Route based on client region/latency
+//! - **Priority**: Route to lowest priority healthy endpoint (failover)
+//! - **TraitBased**: Route based on model capabilities
+//! - **CostOptimized**: Route to cheapest capable model
+//!
+//! Agentic strategies:
+//! - **ToolAware**: Route based on tools requested (code tools → Claude, etc.)
+//! - **ContextAdaptive**: Route based on input token count to appropriate context window
+//! - **StickySession**: Maintain endpoint affinity within a conversation
+//! - **ReasoningDepth**: Route complex reasoning to thinking models (o1, Claude)
 
 use super::endpoint::ProviderEndpoint;
 use super::health::HealthTracker;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Routing strategy for load balancing across endpoints
@@ -34,6 +44,16 @@ pub enum RoutingStrategy {
     TraitBased,
     /// Route based on cost optimization (cheapest capable model)
     CostOptimized,
+
+    // === Agentic Strategies ===
+    /// Route based on tools in the request (code tools → Claude, web → GPT-4o)
+    ToolAware,
+    /// Route based on input token count to models with appropriate context windows
+    ContextAdaptive,
+    /// Maintain endpoint affinity within a conversation (use previous_response_id)
+    StickySession,
+    /// Route complex multi-step reasoning to thinking models (o1, Claude with thinking)
+    ReasoningDepth,
 }
 
 impl std::fmt::Display for RoutingStrategy {
@@ -47,6 +67,10 @@ impl std::fmt::Display for RoutingStrategy {
             RoutingStrategy::Priority => write!(f, "priority"),
             RoutingStrategy::TraitBased => write!(f, "trait_based"),
             RoutingStrategy::CostOptimized => write!(f, "cost_optimized"),
+            RoutingStrategy::ToolAware => write!(f, "tool_aware"),
+            RoutingStrategy::ContextAdaptive => write!(f, "context_adaptive"),
+            RoutingStrategy::StickySession => write!(f, "sticky_session"),
+            RoutingStrategy::ReasoningDepth => write!(f, "reasoning_depth"),
         }
     }
 }
@@ -448,6 +472,134 @@ impl Region {
     }
 }
 
+/// Tool category for tool-aware routing
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolCategory {
+    /// Code execution tools (run code, file operations)
+    CodeExecution,
+    /// Web browsing/search tools
+    WebSearch,
+    /// Data analysis tools (CSV, SQL, etc.)
+    DataAnalysis,
+    /// Image/vision tools
+    ImageProcessing,
+    /// File system tools
+    FileSystem,
+    /// API/HTTP tools
+    ApiCalls,
+    /// Math/calculation tools
+    Calculator,
+    /// Memory/retrieval tools
+    Memory,
+    /// Custom tool category
+    Custom(String),
+}
+
+impl ToolCategory {
+    /// Infer tool category from tool name
+    pub fn from_tool_name(name: &str) -> Self {
+        let name_lower = name.to_lowercase();
+        if name_lower.contains("code") || name_lower.contains("execute") || name_lower.contains("python") || name_lower.contains("bash") {
+            ToolCategory::CodeExecution
+        } else if name_lower.contains("search") || name_lower.contains("web") || name_lower.contains("browse") {
+            ToolCategory::WebSearch
+        } else if name_lower.contains("csv") || name_lower.contains("sql") || name_lower.contains("data") || name_lower.contains("analyze") {
+            ToolCategory::DataAnalysis
+        } else if name_lower.contains("image") || name_lower.contains("vision") || name_lower.contains("screenshot") {
+            ToolCategory::ImageProcessing
+        } else if name_lower.contains("file") || name_lower.contains("read") || name_lower.contains("write") || name_lower.contains("directory") {
+            ToolCategory::FileSystem
+        } else if name_lower.contains("api") || name_lower.contains("http") || name_lower.contains("fetch") || name_lower.contains("request") {
+            ToolCategory::ApiCalls
+        } else if name_lower.contains("math") || name_lower.contains("calc") || name_lower.contains("compute") {
+            ToolCategory::Calculator
+        } else if name_lower.contains("memory") || name_lower.contains("retrieve") || name_lower.contains("recall") {
+            ToolCategory::Memory
+        } else {
+            ToolCategory::Custom(name.to_string())
+        }
+    }
+
+    /// Get recommended model traits for this tool category
+    pub fn recommended_traits(&self) -> Vec<ModelTrait> {
+        match self {
+            ToolCategory::CodeExecution => vec![ModelTrait::Code, ModelTrait::ToolUse],
+            ToolCategory::WebSearch => vec![ModelTrait::Research, ModelTrait::ToolUse],
+            ToolCategory::DataAnalysis => vec![ModelTrait::Analysis, ModelTrait::Code, ModelTrait::ToolUse],
+            ToolCategory::ImageProcessing => vec![ModelTrait::Vision, ModelTrait::ToolUse],
+            ToolCategory::FileSystem => vec![ModelTrait::Code, ModelTrait::ToolUse],
+            ToolCategory::ApiCalls => vec![ModelTrait::ToolUse, ModelTrait::StructuredOutput],
+            ToolCategory::Calculator => vec![ModelTrait::Math, ModelTrait::ToolUse],
+            ToolCategory::Memory => vec![ModelTrait::LongContext, ModelTrait::ToolUse],
+            ToolCategory::Custom(_) => vec![ModelTrait::ToolUse],
+        }
+    }
+}
+
+/// Context for agentic routing decisions
+#[derive(Debug, Clone, Default)]
+pub struct AgentContext {
+    /// Tools requested in this request
+    pub tools: Vec<String>,
+    /// Estimated input token count
+    pub estimated_tokens: Option<u32>,
+    /// Previous response ID for session affinity
+    pub previous_response_id: Option<String>,
+    /// Whether this appears to be a complex reasoning task
+    pub requires_reasoning: bool,
+    /// Session ID for sticky routing
+    pub session_id: Option<String>,
+}
+
+impl AgentContext {
+    /// Create a new agent context
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add tools to the context
+    pub fn with_tools(mut self, tools: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.tools = tools.into_iter().map(|t| t.into()).collect();
+        self
+    }
+
+    /// Set estimated token count
+    pub fn with_tokens(mut self, tokens: u32) -> Self {
+        self.estimated_tokens = Some(tokens);
+        self
+    }
+
+    /// Set previous response ID for session affinity
+    pub fn with_previous_response(mut self, response_id: impl Into<String>) -> Self {
+        self.previous_response_id = Some(response_id.into());
+        self
+    }
+
+    /// Mark as requiring reasoning
+    pub fn with_reasoning(mut self) -> Self {
+        self.requires_reasoning = true;
+        self
+    }
+
+    /// Get tool categories from the tools list
+    pub fn tool_categories(&self) -> Vec<ToolCategory> {
+        self.tools.iter().map(|t| ToolCategory::from_tool_name(t)).collect()
+    }
+
+    /// Get recommended traits based on tools
+    pub fn recommended_traits(&self) -> HashSet<ModelTrait> {
+        let mut traits = HashSet::new();
+        for category in self.tool_categories() {
+            traits.extend(category.recommended_traits());
+        }
+        if self.requires_reasoning {
+            traits.insert(ModelTrait::Reasoning);
+        }
+        traits
+    }
+}
+
 /// Selector for choosing endpoints based on strategy
 pub struct StrategySelector {
     /// Current strategy
@@ -460,6 +612,11 @@ pub struct StrategySelector {
     required_traits: Vec<ModelTrait>,
     /// Model profiles for trait/cost routing
     model_profiles: Vec<ModelProfile>,
+    /// Agent context for agentic strategies
+    agent_context: Option<AgentContext>,
+    /// Session affinity cache (session_id -> endpoint_id)
+    #[allow(dead_code)]
+    session_cache: std::collections::HashMap<String, String>,
 }
 
 impl StrategySelector {
@@ -471,7 +628,15 @@ impl StrategySelector {
             preferred_region: None,
             required_traits: Vec::new(),
             model_profiles: ModelProfile::defaults(),
+            agent_context: None,
+            session_cache: std::collections::HashMap::new(),
         }
+    }
+
+    /// Set agent context for agentic strategies
+    pub fn with_agent_context(mut self, context: AgentContext) -> Self {
+        self.agent_context = Some(context);
+        self
     }
 
     /// Set the preferred region for region-based routing
@@ -533,6 +698,11 @@ impl StrategySelector {
             RoutingStrategy::Priority => self.select_priority(&enabled),
             RoutingStrategy::TraitBased => self.select_trait_based(&enabled),
             RoutingStrategy::CostOptimized => self.select_cost_optimized(&enabled),
+            // Agentic strategies
+            RoutingStrategy::ToolAware => self.select_tool_aware(&enabled),
+            RoutingStrategy::ContextAdaptive => self.select_context_adaptive(&enabled),
+            RoutingStrategy::StickySession => self.select_sticky_session(&enabled),
+            RoutingStrategy::ReasoningDepth => self.select_reasoning_depth(&enabled),
         }
     }
 
@@ -731,6 +901,222 @@ impl StrategySelector {
 
         // Return cheapest or fall back to round-robin
         if scored.first().map(|(_, c)| *c < f64::MAX).unwrap_or(false) {
+            scored.first().map(|(e, _)| *e)
+        } else {
+            self.select_round_robin(endpoints)
+        }
+    }
+
+    // === Agentic Strategy Implementations ===
+
+    /// Select endpoint based on tools in the request
+    ///
+    /// Analyzes the tools requested and routes to models that excel at those tool types:
+    /// - Code execution tools → Claude, GPT-4
+    /// - Web search tools → GPT-4o
+    /// - Data analysis → GPT-4, Claude
+    /// - Vision tools → GPT-4o, Claude, Gemini
+    fn select_tool_aware<'a>(
+        &self,
+        endpoints: &[&'a ProviderEndpoint],
+    ) -> Option<&'a ProviderEndpoint> {
+        let context = match &self.agent_context {
+            Some(ctx) => ctx,
+            None => return self.select_round_robin(endpoints),
+        };
+
+        if context.tools.is_empty() {
+            return self.select_round_robin(endpoints);
+        }
+
+        // Get recommended traits from tools
+        let recommended_traits: Vec<_> = context.recommended_traits().into_iter().collect();
+
+        // Score each endpoint based on tool compatibility
+        let mut scored: Vec<_> = endpoints
+            .iter()
+            .map(|e| {
+                let score = self
+                    .model_profiles
+                    .iter()
+                    .filter(|p| e.supports_model(&p.model) || e.provider_name() == p.provider)
+                    .map(|p| p.trait_match_score(&recommended_traits))
+                    .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(0.0);
+                (*e, score)
+            })
+            .collect();
+
+        // Sort by score (highest first)
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        if scored.first().map(|(_, s)| *s > 0.0).unwrap_or(false) {
+            scored.first().map(|(e, _)| *e)
+        } else {
+            self.select_round_robin(endpoints)
+        }
+    }
+
+    /// Select endpoint based on input context length
+    ///
+    /// Routes to models with appropriate context windows:
+    /// - Small context (<8K) → Any model
+    /// - Medium context (8K-32K) → Most models
+    /// - Large context (32K-128K) → GPT-4, Claude
+    /// - Very large context (>128K) → Gemini, Claude
+    fn select_context_adaptive<'a>(
+        &self,
+        endpoints: &[&'a ProviderEndpoint],
+    ) -> Option<&'a ProviderEndpoint> {
+        let context = match &self.agent_context {
+            Some(ctx) => ctx,
+            None => return self.select_round_robin(endpoints),
+        };
+
+        let estimated_tokens = context.estimated_tokens.unwrap_or(0);
+
+        // Filter to endpoints with sufficient context window
+        let suitable: Vec<_> = endpoints
+            .iter()
+            .filter(|e| {
+                // Find model profile and check context window
+                self.model_profiles
+                    .iter()
+                    .filter(|p| e.supports_model(&p.model) || e.provider_name() == p.provider)
+                    .any(|p| {
+                        p.max_context
+                            .map(|ctx| ctx >= estimated_tokens)
+                            .unwrap_or(true) // Assume sufficient if not specified
+                    })
+            })
+            .copied()
+            .collect();
+
+        if suitable.is_empty() {
+            // No endpoint with sufficient context, return largest
+            let mut scored: Vec<_> = endpoints
+                .iter()
+                .map(|e| {
+                    let max_ctx = self
+                        .model_profiles
+                        .iter()
+                        .filter(|p| e.supports_model(&p.model) || e.provider_name() == p.provider)
+                        .filter_map(|p| p.max_context)
+                        .max()
+                        .unwrap_or(0);
+                    (*e, max_ctx)
+                })
+                .collect();
+            scored.sort_by_key(|(_, ctx)| std::cmp::Reverse(*ctx));
+            return scored.first().map(|(e, _)| *e);
+        }
+
+        // Among suitable, prefer cheaper models
+        let mut scored: Vec<_> = suitable
+            .iter()
+            .map(|e| {
+                let cost = self
+                    .model_profiles
+                    .iter()
+                    .filter(|p| e.supports_model(&p.model) || e.provider_name() == p.provider)
+                    .map(|p| (p.input_cost_per_million + p.output_cost_per_million) / 2.0)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(f64::MAX);
+                (*e, cost)
+            })
+            .collect();
+
+        scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.first().map(|(e, _)| *e)
+    }
+
+    /// Select endpoint with session affinity
+    ///
+    /// Maintains endpoint affinity within a conversation using previous_response_id.
+    /// This ensures consistent behavior across multi-turn agent interactions.
+    fn select_sticky_session<'a>(
+        &self,
+        endpoints: &[&'a ProviderEndpoint],
+    ) -> Option<&'a ProviderEndpoint> {
+        let context = match &self.agent_context {
+            Some(ctx) => ctx,
+            None => return self.select_round_robin(endpoints),
+        };
+
+        // If we have a previous response ID, try to route to the same endpoint
+        if let Some(ref _prev_id) = context.previous_response_id {
+            // In a real implementation, we'd look up which endpoint handled the previous request
+            // For now, we use a hash of the response ID to consistently select an endpoint
+            if let Some(ref session_id) = context.session_id {
+                let hash = session_id.bytes().fold(0usize, |acc, b| acc.wrapping_add(b as usize));
+                let idx = hash % endpoints.len();
+                return Some(endpoints[idx]);
+            }
+
+            // Hash the previous response ID to get consistent endpoint selection
+            let hash = _prev_id.bytes().fold(0usize, |acc, b| acc.wrapping_add(b as usize));
+            let idx = hash % endpoints.len();
+            return Some(endpoints[idx]);
+        }
+
+        // No session context, use round-robin
+        self.select_round_robin(endpoints)
+    }
+
+    /// Select endpoint for complex reasoning tasks
+    ///
+    /// Routes to models with extended thinking capabilities:
+    /// - o1, o1-pro → Complex reasoning
+    /// - Claude with thinking → Multi-step reasoning
+    /// - Falls back to capable models for simpler tasks
+    fn select_reasoning_depth<'a>(
+        &self,
+        endpoints: &[&'a ProviderEndpoint],
+    ) -> Option<&'a ProviderEndpoint> {
+        let context = match &self.agent_context {
+            Some(ctx) => ctx,
+            None => return self.select_round_robin(endpoints),
+        };
+
+        if !context.requires_reasoning {
+            // Not a reasoning task, use default
+            return self.select_round_robin(endpoints);
+        }
+
+        // Score endpoints by reasoning capability
+        let mut scored: Vec<_> = endpoints
+            .iter()
+            .map(|e| {
+                let score = self
+                    .model_profiles
+                    .iter()
+                    .filter(|p| e.supports_model(&p.model) || e.provider_name() == p.provider)
+                    .map(|p| {
+                        let mut s = 0.0;
+                        if p.has_trait(ModelTrait::Reasoning) {
+                            s += 1.0;
+                        }
+                        if p.has_trait(ModelTrait::Analysis) {
+                            s += 0.5;
+                        }
+                        if p.has_trait(ModelTrait::Math) {
+                            s += 0.3;
+                        }
+                        if p.has_trait(ModelTrait::Code) {
+                            s += 0.2;
+                        }
+                        s
+                    })
+                    .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(0.0);
+                (*e, score)
+            })
+            .collect();
+
+        // Sort by reasoning score (highest first)
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        if scored.first().map(|(_, s)| *s > 0.0).unwrap_or(false) {
             scored.first().map(|(e, _)| *e)
         } else {
             self.select_round_robin(endpoints)

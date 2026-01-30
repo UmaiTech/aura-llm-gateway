@@ -4,7 +4,7 @@
 //! health check parameters, and fallback settings.
 
 use super::health::HealthConfig;
-use super::strategy::{ModelTrait, OptimizationGoal, Region, RoutingStrategy};
+use super::strategy::{ModelTrait, OptimizationGoal, Region, RoutingStrategy, ToolCategory};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -29,6 +29,16 @@ pub struct RoutingConfig {
     pub required_traits: Vec<ModelTrait>,
     /// Custom weights for multi-objective routing
     pub weights: Option<RoutingWeights>,
+
+    // --- Agentic Strategy Configurations ---
+    /// Session configuration for sticky_session strategy
+    pub session: SessionConfig,
+    /// Tool routing configuration for tool_aware strategy
+    pub tool_routing: ToolRoutingConfig,
+    /// Context routing configuration for context_adaptive strategy
+    pub context_routing: ContextRoutingConfig,
+    /// Reasoning configuration for reasoning_depth strategy
+    pub reasoning: ReasoningConfig,
 }
 
 impl Default for RoutingConfig {
@@ -42,6 +52,11 @@ impl Default for RoutingConfig {
             optimization_goal: OptimizationGoal::Balanced,
             required_traits: Vec::new(),
             weights: None,
+            // Agentic configurations
+            session: SessionConfig::default(),
+            tool_routing: ToolRoutingConfig::default(),
+            context_routing: ContextRoutingConfig::default(),
+            reasoning: ReasoningConfig::default(),
         }
     }
 }
@@ -99,6 +114,30 @@ impl RoutingConfig {
     /// Set custom weights
     pub fn with_weights(mut self, weights: RoutingWeights) -> Self {
         self.weights = Some(weights);
+        self
+    }
+
+    /// Set session configuration
+    pub fn with_session(mut self, session: SessionConfig) -> Self {
+        self.session = session;
+        self
+    }
+
+    /// Set tool routing configuration
+    pub fn with_tool_routing(mut self, tool_routing: ToolRoutingConfig) -> Self {
+        self.tool_routing = tool_routing;
+        self
+    }
+
+    /// Set context routing configuration
+    pub fn with_context_routing(mut self, context_routing: ContextRoutingConfig) -> Self {
+        self.context_routing = context_routing;
+        self
+    }
+
+    /// Set reasoning configuration
+    pub fn with_reasoning(mut self, reasoning: ReasoningConfig) -> Self {
+        self.reasoning = reasoning;
         self
     }
 }
@@ -163,6 +202,213 @@ impl RoutingWeights {
             }
         } else {
             Self::default()
+        }
+    }
+}
+
+// =============================================================================
+// Agentic Routing Configurations
+// =============================================================================
+
+/// Configuration for sticky session routing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SessionConfig {
+    /// Whether sticky sessions are enabled
+    pub enabled: bool,
+    /// Use previous_response_id for session tracking
+    pub tracking: SessionTracking,
+    /// Optional custom header for session ID
+    pub header: Option<String>,
+    /// Fallback strategy if preferred endpoint unavailable
+    pub fallback_strategy: RoutingStrategy,
+    /// Session timeout (route anywhere after this)
+    #[serde(with = "humantime_serde")]
+    pub timeout: Duration,
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tracking: SessionTracking::ResponseId,
+            header: None,
+            fallback_strategy: RoutingStrategy::LeastLatency,
+            timeout: Duration::from_secs(30 * 60), // 30 minutes
+        }
+    }
+}
+
+/// How to track sessions for sticky routing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionTracking {
+    /// Use previous_response_id from request
+    #[default]
+    ResponseId,
+    /// Use custom header (X-Session-ID)
+    Header,
+    /// Use both (prefer header, fallback to response_id)
+    Both,
+}
+
+/// Configuration for tool-aware routing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ToolRoutingConfig {
+    /// Whether tool-aware routing is enabled
+    pub enabled: bool,
+    /// Per-category routing preferences
+    pub categories: HashMap<ToolCategory, ToolCategoryConfig>,
+    /// Default models to use when no category matches
+    pub default_models: Vec<String>,
+    /// Default required traits for tool use
+    pub default_traits: Vec<ModelTrait>,
+}
+
+impl Default for ToolRoutingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            categories: Self::default_categories(),
+            default_models: vec!["gpt-4o".to_string(), "claude-sonnet-4".to_string()],
+            default_traits: vec![ModelTrait::ToolUse],
+        }
+    }
+}
+
+impl ToolRoutingConfig {
+    fn default_categories() -> HashMap<ToolCategory, ToolCategoryConfig> {
+        let mut categories = HashMap::new();
+
+        // Code execution prefers Claude and GPT-4
+        categories.insert(
+            ToolCategory::CodeExecution,
+            ToolCategoryConfig {
+                preferred_models: vec!["claude-sonnet-4".to_string(), "gpt-4o".to_string()],
+                required_traits: vec![ModelTrait::Code, ModelTrait::ToolUse],
+            },
+        );
+
+        // Web search prefers fast models
+        categories.insert(
+            ToolCategory::WebSearch,
+            ToolCategoryConfig {
+                preferred_models: vec!["gemini-2.0-flash".to_string(), "gpt-4o-mini".to_string()],
+                required_traits: vec![ModelTrait::Fast, ModelTrait::ToolUse],
+            },
+        );
+
+        // Data analysis prefers analytical models
+        categories.insert(
+            ToolCategory::DataAnalysis,
+            ToolCategoryConfig {
+                preferred_models: vec!["claude-opus-4".to_string(), "gpt-4o".to_string()],
+                required_traits: vec![ModelTrait::Analysis, ModelTrait::Code],
+            },
+        );
+
+        // Image processing requires vision
+        categories.insert(
+            ToolCategory::ImageProcessing,
+            ToolCategoryConfig {
+                preferred_models: vec!["gpt-4o".to_string(), "gemini-2.0-pro".to_string()],
+                required_traits: vec![ModelTrait::Vision],
+            },
+        );
+
+        categories
+    }
+}
+
+/// Configuration for a specific tool category
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCategoryConfig {
+    /// Preferred models for this tool category
+    pub preferred_models: Vec<String>,
+    /// Required traits for this category
+    pub required_traits: Vec<ModelTrait>,
+}
+
+/// Configuration for context-adaptive routing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ContextRoutingConfig {
+    /// Whether context-adaptive routing is enabled
+    pub enabled: bool,
+    /// Token threshold for small context (use fast models)
+    pub small_threshold: u32,
+    /// Token threshold for medium context (use standard models)
+    pub medium_threshold: u32,
+    /// Token threshold for large context (use long-context models)
+    pub large_threshold: u32,
+    /// Models for small context
+    pub small_models: Vec<String>,
+    /// Models for medium context
+    pub medium_models: Vec<String>,
+    /// Models for large context
+    pub large_models: Vec<String>,
+    /// Models for very large context
+    pub xlarge_models: Vec<String>,
+}
+
+impl Default for ContextRoutingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            small_threshold: 4000,
+            medium_threshold: 32000,
+            large_threshold: 128000,
+            small_models: vec![
+                "gpt-4o-mini".to_string(),
+                "gemini-2.0-flash".to_string(),
+                "claude-3-5-haiku".to_string(),
+            ],
+            medium_models: vec![
+                "gpt-4o".to_string(),
+                "claude-sonnet-4".to_string(),
+                "gemini-2.0-pro".to_string(),
+            ],
+            large_models: vec!["claude-sonnet-4".to_string(), "gpt-4o".to_string()],
+            xlarge_models: vec!["claude-sonnet-4".to_string(), "gemini-2.0-pro".to_string()],
+        }
+    }
+}
+
+/// Configuration for reasoning-depth routing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ReasoningConfig {
+    /// Whether reasoning-depth routing is enabled
+    pub enabled: bool,
+    /// Patterns that trigger deep reasoning routing
+    pub triggers: Vec<String>,
+    /// Models for deep reasoning tasks
+    pub deep_reasoning_models: Vec<String>,
+    /// Models for standard tasks
+    pub standard_models: Vec<String>,
+}
+
+impl Default for ReasoningConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            triggers: vec![
+                "step by step".to_string(),
+                "think carefully".to_string(),
+                "explain your reasoning".to_string(),
+                "analyze this".to_string(),
+                "compare and contrast".to_string(),
+                "prove that".to_string(),
+                "derive".to_string(),
+                "calculate".to_string(),
+            ],
+            deep_reasoning_models: vec!["o1".to_string(), "claude-opus-4".to_string()],
+            standard_models: vec![
+                "gpt-4o".to_string(),
+                "claude-sonnet-4".to_string(),
+                "gemini-2.0-pro".to_string(),
+            ],
         }
     }
 }

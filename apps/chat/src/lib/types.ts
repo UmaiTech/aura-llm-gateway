@@ -38,8 +38,14 @@ export type RoutingStrategy =
   | 'priority'
   | 'trait_based'
   | 'cost_optimized'
+  // Agentic strategies
+  | 'tool_aware'
+  | 'context_adaptive'
+  | 'sticky_session'
+  | 'reasoning_depth'
 
 export const ROUTING_STRATEGIES: { id: RoutingStrategy; name: string; description: string }[] = [
+  // Standard strategies
   { id: 'round_robin', name: 'Round Robin', description: 'Distribute evenly across endpoints' },
   { id: 'weighted', name: 'Weighted', description: 'Route based on endpoint weights' },
   { id: 'random', name: 'Random', description: 'Random endpoint selection' },
@@ -48,6 +54,11 @@ export const ROUTING_STRATEGIES: { id: RoutingStrategy; name: string; descriptio
   { id: 'priority', name: 'Priority', description: 'Route to highest priority endpoint' },
   { id: 'trait_based', name: 'Trait Based', description: 'Route based on model capabilities' },
   { id: 'cost_optimized', name: 'Cost Optimized', description: 'Route to cheapest capable model' },
+  // Agentic strategies
+  { id: 'tool_aware', name: 'Tool Aware', description: 'Route based on tools in request' },
+  { id: 'context_adaptive', name: 'Context Adaptive', description: 'Route based on input token count' },
+  { id: 'sticky_session', name: 'Sticky Session', description: 'Maintain endpoint affinity per conversation' },
+  { id: 'reasoning_depth', name: 'Reasoning Depth', description: 'Route complex reasoning to thinking models' },
 ]
 
 export interface ToolInvocation {
