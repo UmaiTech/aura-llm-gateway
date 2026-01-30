@@ -1,4 +1,4 @@
-import type { CreateResponseRequest, Response, StreamEvent, Message } from './types'
+import type { CreateResponseRequest, Response, StreamEvent, Message, RoutingStrategy } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/v1`
@@ -9,15 +9,22 @@ const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
 export class AuraAPI {
   private baseUrl: string
   private apiKey: string
+  private routingStrategy: RoutingStrategy
 
-  constructor(baseUrl: string = API_BASE, apiKey: string = API_KEY) {
+  constructor(
+    baseUrl: string = API_BASE,
+    apiKey: string = API_KEY,
+    routingStrategy: RoutingStrategy = 'round_robin'
+  ) {
     this.baseUrl = baseUrl
     this.apiKey = apiKey
+    this.routingStrategy = routingStrategy
   }
 
   private getHeaders(): HeadersInit {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      'X-Routing-Strategy': this.routingStrategy,
     }
     if (this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`

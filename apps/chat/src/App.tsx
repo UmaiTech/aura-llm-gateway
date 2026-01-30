@@ -4,10 +4,10 @@ import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { useChatStore } from './stores/chatStore'
 import { generateId } from './lib/utils'
-import { api } from './lib/api'
+import { AuraAPI } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, RoutingStrategy } from './lib/types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
@@ -30,6 +30,8 @@ export default function App() {
     systemPrompt,
     agentMode,
     setAgentMode,
+    routingStrategy,
+    setRoutingStrategy,
     createConversation,
     selectConversation,
     deleteConversation,
@@ -38,6 +40,13 @@ export default function App() {
     setModel,
     getCurrentConversation,
   } = useChatStore()
+
+  // Create API instance with routing strategy
+  const api = new AuraAPI(
+    import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1` : '/v1',
+    API_KEY,
+    routingStrategy
+  )
 
   const currentConversation = getCurrentConversation()
   const messages = currentConversation?.messages || []
@@ -273,6 +282,7 @@ export default function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Routing-Strategy': routingStrategy,
             ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
           },
           body: JSON.stringify(request),
@@ -456,7 +466,7 @@ export default function App() {
 
       setError(`Agent stopped after ${maxRoundtrips} tool roundtrips`)
     },
-    [model, systemPrompt, addMessage, updateMessage]
+    [model, systemPrompt, routingStrategy, addMessage, updateMessage]
   )
 
   const handleSendMessage = useCallback(
@@ -547,6 +557,8 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           agentMode={agentMode}
           onAgentModeChange={setAgentMode}
+          routingStrategy={routingStrategy}
+          onRoutingStrategyChange={setRoutingStrategy}
         />
 
         {/* Chat area */}

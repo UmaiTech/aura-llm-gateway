@@ -10,6 +10,7 @@
 //! 2. YAML configuration file
 //! 3. Default values
 
+use crate::router::RoutingConfig;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::Path;
@@ -94,6 +95,10 @@ pub struct Config {
     /// Admin configuration
     #[serde(default)]
     pub admin: AdminConfig,
+
+    /// Smart routing configuration
+    #[serde(default)]
+    pub routing: RoutingConfig,
 }
 
 /// Server configuration
@@ -180,6 +185,7 @@ impl Default for Config {
             database: DatabaseConfig::default(),
             redis: RedisConfig::default(),
             admin: AdminConfig::default(),
+            routing: RoutingConfig::default(),
         }
     }
 }
@@ -486,6 +492,11 @@ impl Config {
         self.admin.key.as_deref()
     }
 
+    /// Returns the routing configuration
+    pub fn routing_config(&self) -> &RoutingConfig {
+        &self.routing
+    }
+
     /// Logs the current configuration (with sensitive values masked)
     pub fn log_config(&self) {
         info!(
@@ -497,6 +508,7 @@ impl Config {
             google = %self.has_google(),
             database = %self.database.url.is_some(),
             redis = %self.redis.url.is_some(),
+            routing_strategy = %self.routing.strategy,
             "Configuration loaded"
         );
     }
@@ -611,6 +623,12 @@ impl ConfigBuilder {
     /// Sets the admin API key
     pub fn admin_key(mut self, key: impl Into<String>) -> Self {
         self.config.admin.key = Some(key.into());
+        self
+    }
+
+    /// Sets the routing configuration
+    pub fn routing(mut self, routing: RoutingConfig) -> Self {
+        self.config.routing = routing;
         self
     }
 

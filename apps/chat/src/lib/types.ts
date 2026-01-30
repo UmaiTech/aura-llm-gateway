@@ -23,7 +23,32 @@ export interface AuraMetadata {
   gatewayVersion: string
   latencyMs?: number    // Request latency in milliseconds
   requestId?: string    // Unique request ID for tracing
+  endpointId?: string   // Routing endpoint ID
+  routingStrategy?: string // Routing strategy used
+  isFallback?: boolean  // Whether this was a fallback
 }
+
+// Routing strategies available
+export type RoutingStrategy =
+  | 'round_robin'
+  | 'weighted'
+  | 'random'
+  | 'least_latency'
+  | 'region_based'
+  | 'priority'
+  | 'trait_based'
+  | 'cost_optimized'
+
+export const ROUTING_STRATEGIES: { id: RoutingStrategy; name: string; description: string }[] = [
+  { id: 'round_robin', name: 'Round Robin', description: 'Distribute evenly across endpoints' },
+  { id: 'weighted', name: 'Weighted', description: 'Route based on endpoint weights' },
+  { id: 'random', name: 'Random', description: 'Random endpoint selection' },
+  { id: 'least_latency', name: 'Least Latency', description: 'Route to healthiest endpoint' },
+  { id: 'region_based', name: 'Region Based', description: 'Route to nearest region' },
+  { id: 'priority', name: 'Priority', description: 'Route to highest priority endpoint' },
+  { id: 'trait_based', name: 'Trait Based', description: 'Route based on model capabilities' },
+  { id: 'cost_optimized', name: 'Cost Optimized', description: 'Route to cheapest capable model' },
+]
 
 export interface ToolInvocation {
   toolCallId: string
