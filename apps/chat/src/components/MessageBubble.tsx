@@ -1,9 +1,9 @@
 import {
   User, Sparkles, Copy, Check, Wrench, Loader2, CheckCircle2, XCircle,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
-  Zap, Server, Timer, ThumbsUp, ThumbsDown
+  Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send
 } from 'lucide-react'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -390,14 +390,35 @@ interface UsageDisplayProps {
   responseId?: string
 }
 
-type FeedbackState = 'none' | 'up' | 'down' | 'submitting'
+type FeedbackState = 'none' | 'pending_up' | 'pending_down' | 'up' | 'down' | 'submitting'
 
 function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
   const [feedback, setFeedback] = useState<FeedbackState>('none')
+  const [reason, setReason] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const submitFeedback = useCallback(async (signal: 'thumbs_up' | 'thumbs_down') => {
-    if (!responseId || feedback !== 'none') return
+  // Focus textarea when modal opens
+  useEffect(() => {
+    if ((feedback === 'pending_up' || feedback === 'pending_down') && textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }, [feedback])
 
+  const handleFeedbackClick = (signal: 'up' | 'down') => {
+    if (feedback !== 'none') return
+    setFeedback(signal === 'up' ? 'pending_up' : 'pending_down')
+    setReason('')
+  }
+
+  const cancelFeedback = () => {
+    setFeedback('none')
+    setReason('')
+  }
+
+  const submitFeedback = useCallback(async () => {
+    if (!responseId) return
+
+    const signal = feedback === 'pending_up' ? 'thumbs_up' : 'thumbs_down'
     setFeedback('submitting')
 
     try {
@@ -410,11 +431,13 @@ function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
         body: JSON.stringify({
           response_id: responseId,
           signal,
+          reason: reason.trim() || undefined,
         }),
       })
 
       if (response.ok) {
         setFeedback(signal === 'thumbs_up' ? 'up' : 'down')
+        setReason('')
       } else {
         console.error('Failed to submit feedback:', await response.text())
         setFeedback('none')
@@ -423,7 +446,7 @@ function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
       console.error('Error submitting feedback:', error)
       setFeedback('none')
     }
-  }, [responseId, feedback])
+  }, [responseId, feedback, reason])
   // Format latency for display
   const formatLatency = (ms: number) => {
     if (ms < 1000) {
@@ -475,32 +498,36 @@ function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
 
       {/* Feedback buttons */}
       {responseId && (
-        <span className="flex items-center gap-1 ml-2 border-l border-border/50 pl-2">
+        <span className="relative flex items-center gap-1 ml-2 border-l border-border/50 pl-2">
           <button
-            onClick={() => submitFeedback('thumbs_up')}
+            onClick={() => handleFeedbackClick('up')}
             disabled={feedback !== 'none'}
             className={cn(
               "p-1 rounded transition-colors",
               feedback === 'up'
                 ? "text-green-400 bg-green-500/20"
-                : feedback === 'none'
-                  ? "hover:text-green-400 hover:bg-green-500/10"
-                  : "text-muted-foreground/30 cursor-not-allowed"
+                : feedback === 'pending_up'
+                  ? "text-green-400 bg-green-500/20"
+                  : feedback === 'none'
+                    ? "hover:text-green-400 hover:bg-green-500/10"
+                    : "text-muted-foreground/30 cursor-not-allowed"
             )}
             title="This response was helpful"
           >
             <ThumbsUp className="h-3.5 w-3.5" />
           </button>
           <button
-            onClick={() => submitFeedback('thumbs_down')}
+            onClick={() => handleFeedbackClick('down')}
             disabled={feedback !== 'none'}
             className={cn(
               "p-1 rounded transition-colors",
               feedback === 'down'
                 ? "text-red-400 bg-red-500/20"
-                : feedback === 'none'
-                  ? "hover:text-red-400 hover:bg-red-500/10"
-                  : "text-muted-foreground/30 cursor-not-allowed"
+                : feedback === 'pending_down'
+                  ? "text-red-400 bg-red-500/20"
+                  : feedback === 'none'
+                    ? "hover:text-red-400 hover:bg-red-500/10"
+                    : "text-muted-foreground/30 cursor-not-allowed"
             )}
             title="This response wasn't helpful"
           >
@@ -508,6 +535,66 @@ function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
           </button>
           {feedback === 'submitting' && (
             <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
+
+          {/* Feedback Modal */}
+          {(feedback === 'pending_up' || feedback === 'pending_down') && (
+            <div className="absolute bottom-full right-0 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="bg-secondary border border-border rounded-lg shadow-lg p-3 min-w-[280px]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={cn(
+                    "text-sm font-medium flex items-center gap-1.5",
+                    feedback === 'pending_up' ? "text-green-400" : "text-red-400"
+                  )}>
+                    {feedback === 'pending_up' ? (
+                      <><ThumbsUp className="h-4 w-4" /> Helpful</>
+                    ) : (
+                      <><ThumbsDown className="h-4 w-4" /> Not helpful</>
+                    )}
+                  </span>
+                  <button
+                    onClick={cancelFeedback}
+                    className="p-1 hover:bg-secondary-foreground/10 rounded transition-colors"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Tell us more (optional)..."
+                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  rows={2}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault()
+                      submitFeedback()
+                    }
+                    if (e.key === 'Escape') {
+                      cancelFeedback()
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-muted-foreground">
+                    Press ⌘+Enter to submit
+                  </span>
+                  <button
+                    onClick={submitFeedback}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      feedback === 'pending_up'
+                        ? "bg-green-500 hover:bg-green-600 text-white"
+                        : "bg-red-500 hover:bg-red-600 text-white"
+                    )}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </span>
       )}
