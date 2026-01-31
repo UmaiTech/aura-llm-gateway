@@ -557,22 +557,20 @@ mod tests {
 
     #[test]
     fn test_consistency_score() {
-        let similar = vec![
+        let similar = [
             "The capital of France is Paris.",
             "Paris is the capital of France.",
             "France's capital is Paris.",
         ];
 
-        let different = vec![
+        let different = [
             "The capital of France is Paris.",
             "Hello world, how are you?",
             "The weather is nice today.",
         ];
 
-        let similar_score =
-            HeuristicAnalyzer::consistency_score(&similar.iter().map(|s| *s).collect::<Vec<_>>());
-        let different_score =
-            HeuristicAnalyzer::consistency_score(&different.iter().map(|s| *s).collect::<Vec<_>>());
+        let similar_score = HeuristicAnalyzer::consistency_score(similar.as_ref());
+        let different_score = HeuristicAnalyzer::consistency_score(different.as_ref());
 
         assert!(similar_score > different_score);
     }
