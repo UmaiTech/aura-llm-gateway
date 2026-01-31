@@ -220,3 +220,120 @@ export const SELECTION_CRITERIA: { id: SelectionCriteria; name: string }[] = [
   { id: 'most_relevant', name: 'Most Relevant' },
   { id: 'lowest_perplexity', name: 'Lowest Perplexity' },
 ]
+
+// Consistency strategies for cross-model response normalization
+export type ConsistencyStrategy =
+  | 'none'
+  | 'constitutional'
+  | 'reference_anchoring'
+  | 'model_calibration'
+  | 'format_schema'
+  | 'few_shot_priming'
+  | 'style_profile'
+  | 'semantic_normalization'
+  | 'ensemble_voting'
+
+export type Tone = 'professional' | 'friendly' | 'neutral' | 'authoritative' | 'empathetic'
+export type Formality = 'formal' | 'standard' | 'casual'
+export type Verbosity = 'concise' | 'balanced' | 'detailed'
+
+export interface StyleProfile {
+  tone: Tone
+  formality: Formality
+  verbosity: Verbosity
+  use_markdown?: boolean
+  use_bullet_points?: boolean
+  format_code?: boolean
+  max_length?: number
+}
+
+export interface ConsistencyExample {
+  input: string
+  output: string
+  explanation?: string
+}
+
+export interface ConsistencyConfig {
+  strategy: ConsistencyStrategy
+  principles?: string[]
+  reference_response?: string
+  examples?: ConsistencyExample[]
+  output_schema?: Record<string, unknown>
+  style_profile?: StyleProfile
+  apply_calibration?: boolean
+}
+
+export interface ConsistencyMetadata {
+  strategy: ConsistencyStrategy
+  calibration_applied: boolean
+  adjustments?: string[]
+  style_applied?: string
+  principles_injected?: number
+  examples_injected?: number
+}
+
+export const CONSISTENCY_STRATEGIES: { id: ConsistencyStrategy; name: string; description: string }[] = [
+  { id: 'none', name: 'None', description: 'No consistency enforcement (default)' },
+  { id: 'constitutional', name: 'Constitutional', description: 'Inject guiding principles (Constitutional AI)' },
+  { id: 'reference_anchoring', name: 'Reference Anchoring', description: 'Match style of example response' },
+  { id: 'model_calibration', name: 'Model Calibration', description: 'Apply model-specific corrections' },
+  { id: 'format_schema', name: 'Format Schema', description: 'Force structured JSON output' },
+  { id: 'few_shot_priming', name: 'Few-Shot Priming', description: 'Prime with input/output examples' },
+  { id: 'style_profile', name: 'Style Profile', description: 'Apply tone/formality/verbosity settings' },
+  { id: 'semantic_normalization', name: 'Semantic Normalization', description: 'Two-pass fact extraction and formatting' },
+  { id: 'ensemble_voting', name: 'Ensemble Voting', description: 'Query multiple models, find consensus' },
+]
+
+export const STYLE_PRESETS: { id: string; name: string; profile: StyleProfile }[] = [
+  {
+    id: 'technical',
+    name: 'Technical',
+    profile: { tone: 'professional', formality: 'formal', verbosity: 'concise', use_markdown: true, format_code: true }
+  },
+  {
+    id: 'conversational',
+    name: 'Conversational',
+    profile: { tone: 'friendly', formality: 'casual', verbosity: 'balanced', use_markdown: false }
+  },
+  {
+    id: 'academic',
+    name: 'Academic',
+    profile: { tone: 'neutral', formality: 'formal', verbosity: 'detailed', use_markdown: true }
+  },
+]
+
+export const CONSTITUTIONAL_PRESETS: { id: string; name: string; principles: string[] }[] = [
+  {
+    id: 'concise',
+    name: 'Concise',
+    principles: [
+      'Get to the point immediately.',
+      'Avoid unnecessary preambles.',
+      'Do not repeat the question back.',
+      'Skip obvious disclaimers.',
+      'End with the answer, not pleasantries.',
+    ],
+  },
+  {
+    id: 'factual',
+    name: 'Factual',
+    principles: [
+      'Only state facts you are confident about.',
+      'Clearly distinguish between facts and opinions.',
+      'If uncertain, explicitly state uncertainty.',
+      'Do not fabricate information or sources.',
+      'Prefer specific, verifiable claims.',
+    ],
+  },
+  {
+    id: 'technical',
+    name: 'Technical',
+    principles: [
+      'Use precise technical terminology.',
+      'Include relevant code examples.',
+      'Mention version numbers when relevant.',
+      'Explain trade-offs when recommending solutions.',
+      'Cite documentation when relevant.',
+    ],
+  },
+]

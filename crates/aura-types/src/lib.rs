@@ -40,6 +40,7 @@
 //! assert_eq!(response.text(), "Hi there!");
 //! ```
 
+pub mod consistency;
 pub mod item;
 pub mod response;
 pub mod stream;
@@ -61,6 +62,12 @@ pub use stream::{RateLimitInfo, SseMessage, StreamError, StreamEvent};
 pub use validation::{
     HeuristicAnalyzer, LogprobsData, SelectionCriteria, TokenLogprob, TopLogprob, ValidationConfig,
     ValidationMetadata, ValidationStrategy,
+};
+
+pub use consistency::{
+    ConsistencyConfig, ConsistencyExample, ConsistencyMetadata, ConsistencyStrategy,
+    DefaultCalibrations, DefaultConstitution, EnsembleVotes, Formality, ModelCalibration,
+    ModelQuirk, PromptAugmenter, StyleProfile, Tone, Verbosity,
 };
 
 /// Returns the crate version

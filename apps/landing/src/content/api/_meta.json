@@ -8,6 +8,7 @@
   "rate-limiting": "Rate Limiting",
   "routing": "Smart Routing",
   "validation": "Response Validation",
+  "consistency": "Response Consistency",
   "caching": "Response Caching",
   "metrics": "Prometheus Metrics",
   "errors": "Error Reference"

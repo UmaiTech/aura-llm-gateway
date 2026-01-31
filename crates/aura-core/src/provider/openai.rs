@@ -859,7 +859,8 @@ struct OpenAITokenLogprob {
     token: String,
     /// Log probability of this token
     logprob: f32,
-    /// Byte representation
+    /// Byte representation (required for deserialization but not used)
+    #[allow(dead_code)]
     bytes: Option<Vec<u8>>,
     /// Top alternative tokens
     top_logprobs: Option<Vec<OpenAITopLogprob>>,
@@ -872,7 +873,8 @@ struct OpenAITopLogprob {
     token: String,
     /// Log probability
     logprob: f32,
-    /// Byte representation
+    /// Byte representation (required for deserialization but not used)
+    #[allow(dead_code)]
     bytes: Option<Vec<u8>>,
 }
 

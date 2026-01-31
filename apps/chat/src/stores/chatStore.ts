@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig } from '../lib/types'
+import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity } from '../lib/types'
 import { generateId } from '../lib/utils'
 
 interface ChatState {
@@ -19,6 +19,12 @@ interface ChatState {
   validationN: number
   validationMinConfidence: number
   validationSelection: SelectionCriteria
+  consistencyStrategy: ConsistencyStrategy
+  consistencyPrinciples: string[]
+  consistencyStyleTone: Tone
+  consistencyStyleFormality: Formality
+  consistencyStyleVerbosity: Verbosity
+  consistencyApplyCalibration: boolean
 
   // Actions
   createConversation: () => string
@@ -43,6 +49,13 @@ interface ChatState {
   setValidationMinConfidence: (confidence: number) => void
   setValidationSelection: (selection: SelectionCriteria) => void
   getValidationConfig: () => ValidationConfig | undefined
+  setConsistencyStrategy: (strategy: ConsistencyStrategy) => void
+  setConsistencyPrinciples: (principles: string[]) => void
+  setConsistencyStyleTone: (tone: Tone) => void
+  setConsistencyStyleFormality: (formality: Formality) => void
+  setConsistencyStyleVerbosity: (verbosity: Verbosity) => void
+  setConsistencyApplyCalibration: (apply: boolean) => void
+  getConsistencyConfig: () => ConsistencyConfig | undefined
 
   // Computed
   getCurrentConversation: () => Conversation | null
@@ -64,6 +77,12 @@ export const useChatStore = create<ChatState>()(
       validationN: 3,
       validationMinConfidence: 0.7,
       validationSelection: 'highest_confidence',
+      consistencyStrategy: 'none',
+      consistencyPrinciples: [],
+      consistencyStyleTone: 'neutral',
+      consistencyStyleFormality: 'standard',
+      consistencyStyleVerbosity: 'balanced',
+      consistencyApplyCalibration: false,
 
       // Conversation actions
       createConversation: () => {
@@ -247,6 +266,55 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
+      setConsistencyStrategy: (consistencyStrategy) => set({ consistencyStrategy }),
+
+      setConsistencyPrinciples: (consistencyPrinciples) => set({ consistencyPrinciples }),
+
+      setConsistencyStyleTone: (consistencyStyleTone) => set({ consistencyStyleTone }),
+
+      setConsistencyStyleFormality: (consistencyStyleFormality) => set({ consistencyStyleFormality }),
+
+      setConsistencyStyleVerbosity: (consistencyStyleVerbosity) => set({ consistencyStyleVerbosity }),
+
+      setConsistencyApplyCalibration: (consistencyApplyCalibration) => set({ consistencyApplyCalibration }),
+
+      getConsistencyConfig: () => {
+        const {
+          consistencyStrategy,
+          consistencyPrinciples,
+          consistencyStyleTone,
+          consistencyStyleFormality,
+          consistencyStyleVerbosity,
+          consistencyApplyCalibration,
+        } = get()
+
+        if (consistencyStrategy === 'none') {
+          return undefined
+        }
+
+        const config: ConsistencyConfig = {
+          strategy: consistencyStrategy,
+          apply_calibration: consistencyApplyCalibration,
+        }
+
+        if (consistencyStrategy === 'constitutional' && consistencyPrinciples.length > 0) {
+          config.principles = consistencyPrinciples
+        }
+
+        if (consistencyStrategy === 'style_profile') {
+          config.style_profile = {
+            tone: consistencyStyleTone,
+            formality: consistencyStyleFormality,
+            verbosity: consistencyStyleVerbosity,
+            use_markdown: true,
+            use_bullet_points: true,
+            format_code: true,
+          }
+        }
+
+        return config
+      },
+
       // Computed
       getCurrentConversation: () => {
         const { conversations, currentConversationId } = get()
@@ -269,6 +337,12 @@ export const useChatStore = create<ChatState>()(
         validationN: state.validationN,
         validationMinConfidence: state.validationMinConfidence,
         validationSelection: state.validationSelection,
+        consistencyStrategy: state.consistencyStrategy,
+        consistencyPrinciples: state.consistencyPrinciples,
+        consistencyStyleTone: state.consistencyStyleTone,
+        consistencyStyleFormality: state.consistencyStyleFormality,
+        consistencyStyleVerbosity: state.consistencyStyleVerbosity,
+        consistencyApplyCalibration: state.consistencyApplyCalibration,
       }),
     }
   )

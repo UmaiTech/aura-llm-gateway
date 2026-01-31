@@ -417,7 +417,7 @@ impl GeminiProvider {
 
         // For validation metadata when single candidate
         let validation_meta = validation_meta.or_else(|| {
-            if validation_strategy.is_some() {
+            if let Some(strategy) = validation_strategy {
                 // Add heuristic confidence for single candidate
                 let text = output
                     .iter()
@@ -427,11 +427,9 @@ impl GeminiProvider {
                 if !text.is_empty() {
                     let confidence = HeuristicAnalyzer::estimate_confidence(&text, "");
                     Some(
-                        ValidationMetadata::with_confidence(
-                            validation_strategy.unwrap(),
-                            confidence,
-                        )
-                        .with_warning("Heuristic confidence (logprobs not available for Gemini)"),
+                        ValidationMetadata::with_confidence(strategy, confidence).with_warning(
+                            "Heuristic confidence (logprobs not available for Gemini)",
+                        ),
                     )
                 } else {
                     None

@@ -35,6 +35,8 @@ export default function App() {
     validationStrategy,
     setValidationStrategy,
     getValidationConfig,
+    consistencyStrategy,
+    setConsistencyStrategy,
     createConversation,
     selectConversation,
     deleteConversation,
@@ -566,6 +568,8 @@ export default function App() {
           onRoutingStrategyChange={setRoutingStrategy}
           validationStrategy={validationStrategy}
           onValidationStrategyChange={setValidationStrategy}
+          consistencyStrategy={consistencyStrategy}
+          onConsistencyStrategyChange={setConsistencyStrategy}
         />
 
         {/* Chat area */}

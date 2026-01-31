@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::consistency::{ConsistencyConfig, ConsistencyMetadata};
 use crate::item::{InputItem, Item};
 use crate::validation::{ValidationConfig, ValidationMetadata};
 
@@ -211,6 +212,11 @@ pub struct Response {
     /// Contains confidence scores and validation status
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validation: Option<ValidationMetadata>,
+
+    /// Consistency metadata (Aura extension)
+    /// Contains information about consistency strategies applied
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consistency: Option<ConsistencyMetadata>,
 }
 
 fn default_object_type() -> String {
@@ -238,6 +244,7 @@ impl Response {
             previous_response_id: None,
             metadata: None,
             validation: None,
+            consistency: None,
         }
     }
 
@@ -289,6 +296,7 @@ pub struct ResponseBuilder {
     metadata: Option<serde_json::Value>,
     created_at: Option<i64>,
     validation: Option<ValidationMetadata>,
+    consistency: Option<ConsistencyMetadata>,
 }
 
 impl ResponseBuilder {
@@ -306,6 +314,7 @@ impl ResponseBuilder {
             metadata: None,
             created_at: None,
             validation: None,
+            consistency: None,
         }
     }
 
@@ -377,6 +386,12 @@ impl ResponseBuilder {
         self
     }
 
+    /// Set consistency metadata
+    pub fn consistency(mut self, consistency: ConsistencyMetadata) -> Self {
+        self.consistency = Some(consistency);
+        self
+    }
+
     /// Build the response
     pub fn build(self) -> Response {
         Response {
@@ -394,6 +409,7 @@ impl ResponseBuilder {
             previous_response_id: self.previous_response_id,
             metadata: self.metadata,
             validation: self.validation,
+            consistency: self.consistency,
         }
     }
 }
@@ -451,6 +467,11 @@ pub struct CreateResponseRequest {
     /// Enables response quality scoring and validation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validation: Option<ValidationConfig>,
+
+    /// Consistency configuration (Aura extension)
+    /// Enables cross-model response consistency
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consistency: Option<ConsistencyConfig>,
 }
 
 impl CreateResponseRequest {
@@ -470,6 +491,7 @@ impl CreateResponseRequest {
             user: None,
             metadata: None,
             validation: None,
+            consistency: None,
         }
     }
 
@@ -517,6 +539,12 @@ impl CreateResponseRequest {
     /// Set validation configuration
     pub fn with_validation(mut self, validation: ValidationConfig) -> Self {
         self.validation = Some(validation);
+        self
+    }
+
+    /// Set consistency configuration
+    pub fn with_consistency(mut self, consistency: ConsistencyConfig) -> Self {
+        self.consistency = Some(consistency);
         self
     }
 }

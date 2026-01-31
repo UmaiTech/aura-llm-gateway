@@ -73,7 +73,7 @@ impl ValidationConfig {
     pub fn best_of_n(n: u8, selection: SelectionCriteria) -> Self {
         Self {
             strategy: ValidationStrategy::BestOfN,
-            n: Some(n.max(2).min(5)),
+            n: Some(n.clamp(2, 5)),
             selection: Some(selection),
             ..Default::default()
         }
@@ -83,7 +83,7 @@ impl ValidationConfig {
     pub fn self_consistency(n: u8, min_confidence: f32) -> Self {
         Self {
             strategy: ValidationStrategy::SelfConsistency,
-            n: Some(n.max(2).min(5)),
+            n: Some(n.clamp(2, 5)),
             min_confidence: Some(min_confidence),
             ..Default::default()
         }
