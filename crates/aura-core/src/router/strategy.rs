@@ -500,21 +500,49 @@ impl ToolCategory {
     /// Infer tool category from tool name
     pub fn from_tool_name(name: &str) -> Self {
         let name_lower = name.to_lowercase();
-        if name_lower.contains("code") || name_lower.contains("execute") || name_lower.contains("python") || name_lower.contains("bash") {
+        if name_lower.contains("code")
+            || name_lower.contains("execute")
+            || name_lower.contains("python")
+            || name_lower.contains("bash")
+        {
             ToolCategory::CodeExecution
-        } else if name_lower.contains("search") || name_lower.contains("web") || name_lower.contains("browse") {
+        } else if name_lower.contains("search")
+            || name_lower.contains("web")
+            || name_lower.contains("browse")
+        {
             ToolCategory::WebSearch
-        } else if name_lower.contains("csv") || name_lower.contains("sql") || name_lower.contains("data") || name_lower.contains("analyze") {
+        } else if name_lower.contains("csv")
+            || name_lower.contains("sql")
+            || name_lower.contains("data")
+            || name_lower.contains("analyze")
+        {
             ToolCategory::DataAnalysis
-        } else if name_lower.contains("image") || name_lower.contains("vision") || name_lower.contains("screenshot") {
+        } else if name_lower.contains("image")
+            || name_lower.contains("vision")
+            || name_lower.contains("screenshot")
+        {
             ToolCategory::ImageProcessing
-        } else if name_lower.contains("file") || name_lower.contains("read") || name_lower.contains("write") || name_lower.contains("directory") {
+        } else if name_lower.contains("file")
+            || name_lower.contains("read")
+            || name_lower.contains("write")
+            || name_lower.contains("directory")
+        {
             ToolCategory::FileSystem
-        } else if name_lower.contains("api") || name_lower.contains("http") || name_lower.contains("fetch") || name_lower.contains("request") {
+        } else if name_lower.contains("api")
+            || name_lower.contains("http")
+            || name_lower.contains("fetch")
+            || name_lower.contains("request")
+        {
             ToolCategory::ApiCalls
-        } else if name_lower.contains("math") || name_lower.contains("calc") || name_lower.contains("compute") {
+        } else if name_lower.contains("math")
+            || name_lower.contains("calc")
+            || name_lower.contains("compute")
+        {
             ToolCategory::Calculator
-        } else if name_lower.contains("memory") || name_lower.contains("retrieve") || name_lower.contains("recall") {
+        } else if name_lower.contains("memory")
+            || name_lower.contains("retrieve")
+            || name_lower.contains("recall")
+        {
             ToolCategory::Memory
         } else {
             ToolCategory::Custom(name.to_string())
@@ -526,7 +554,9 @@ impl ToolCategory {
         match self {
             ToolCategory::CodeExecution => vec![ModelTrait::Code, ModelTrait::ToolUse],
             ToolCategory::WebSearch => vec![ModelTrait::Research, ModelTrait::ToolUse],
-            ToolCategory::DataAnalysis => vec![ModelTrait::Analysis, ModelTrait::Code, ModelTrait::ToolUse],
+            ToolCategory::DataAnalysis => {
+                vec![ModelTrait::Analysis, ModelTrait::Code, ModelTrait::ToolUse]
+            }
             ToolCategory::ImageProcessing => vec![ModelTrait::Vision, ModelTrait::ToolUse],
             ToolCategory::FileSystem => vec![ModelTrait::Code, ModelTrait::ToolUse],
             ToolCategory::ApiCalls => vec![ModelTrait::ToolUse, ModelTrait::StructuredOutput],
@@ -584,7 +614,10 @@ impl AgentContext {
 
     /// Get tool categories from the tools list
     pub fn tool_categories(&self) -> Vec<ToolCategory> {
-        self.tools.iter().map(|t| ToolCategory::from_tool_name(t)).collect()
+        self.tools
+            .iter()
+            .map(|t| ToolCategory::from_tool_name(t))
+            .collect()
     }
 
     /// Get recommended traits based on tools
@@ -1048,13 +1081,17 @@ impl StrategySelector {
             // In a real implementation, we'd look up which endpoint handled the previous request
             // For now, we use a hash of the response ID to consistently select an endpoint
             if let Some(ref session_id) = context.session_id {
-                let hash = session_id.bytes().fold(0usize, |acc, b| acc.wrapping_add(b as usize));
+                let hash = session_id
+                    .bytes()
+                    .fold(0usize, |acc, b| acc.wrapping_add(b as usize));
                 let idx = hash % endpoints.len();
                 return Some(endpoints[idx]);
             }
 
             // Hash the previous response ID to get consistent endpoint selection
-            let hash = _prev_id.bytes().fold(0usize, |acc, b| acc.wrapping_add(b as usize));
+            let hash = _prev_id
+                .bytes()
+                .fold(0usize, |acc, b| acc.wrapping_add(b as usize));
             let idx = hash % endpoints.len();
             return Some(endpoints[idx]);
         }
