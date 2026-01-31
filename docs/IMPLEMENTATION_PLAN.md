@@ -7,6 +7,34 @@ A PR-by-PR roadmap for building the Aura LLM Gateway, designed for incremental R
 **Project Phase:** Multi-Tenancy & Production Readiness
 
 **Recently Completed:**
+- ✅ **Prompt Compression System** (January 31, 2026) - Multi-format token reduction
+  - TOON (Token-Oriented Object Notation): 40-60% savings for uniform arrays
+  - YAML conversion: 10-25% savings for nested objects
+  - AISP (AI Symbolic Protocol): Mathematical notation for unambiguous rules
+  - JSON minification: 15-30% savings with optional key shortening
+  - Smart format selector with auto-detection
+  - See: [`crates/aura-core/src/compression/`](../crates/aura-core/src/compression/)
+
+- ✅ **Adaptive Feedback System** (January 30, 2026) - Few-shot learning from feedback
+  - Feedback API with thumbs up/down and text feedback
+  - Automatic sampling for few-shot examples
+  - Context injection for improved responses
+  - Database-backed persistence
+  - See: [`docs/api/feedback.md`](./api/feedback.md)
+
+- ✅ **Response Consistency** (January 29, 2026) - Cross-model normalization
+  - Style profiles for consistent tone/format
+  - Constitutional AI integration
+  - Model calibration for response alignment
+  - See: [`crates/aura-types/src/consistency.rs`](../crates/aura-types/src/consistency.rs)
+
+- ✅ **Response Validation** (January 28, 2026) - Hallucination reduction
+  - Log probability validation (OpenAI)
+  - Best-of-N sampling
+  - Self-consistency checks
+  - Confidence thresholds
+  - See: [`docs/api/validation.mdx`](../apps/landing/src/content/api/validation.mdx)
+
 - ✅ **Hierarchical Organization Model** (January 26, 2026) - Full multi-tenant support
   - Organization → Teams → Projects hierarchy
   - Scoped API keys (org, team, project, user level)
@@ -2080,6 +2108,123 @@ Result: "Translate to Spanish: Hello"
 **Acceptance Criteria:**
 - Automatic content filtering
 - PII protection
+
+---
+
+## Milestone 15: Prompt Optimization
+
+**Status:** ✅ **COMPLETED** (January 2026)
+
+### PR #69: Prompt Compression System
+**Status:** ✅ **COMPLETED** (January 31, 2026)
+
+**Tasks:**
+- [x] Create compression types in aura-types
+- [x] Implement JSON minification with key shortening
+- [x] Implement TOON (Token-Oriented Object Notation) encoder
+- [x] Implement YAML converter for nested objects
+- [x] Implement AISP (AI Symbolic Protocol) encoder
+- [x] Create smart format selector with auto-detection
+- [x] Add compression metadata to responses
+- [x] Document compression API
+
+**Files:**
+- `crates/aura-types/src/compression.rs` ✅
+- `crates/aura-core/src/compression/mod.rs` ✅
+- `crates/aura-core/src/compression/json.rs` ✅
+- `crates/aura-core/src/compression/toon.rs` ✅
+- `crates/aura-core/src/compression/yaml.rs` ✅
+- `crates/aura-core/src/compression/aisp.rs` ✅
+- `crates/aura-core/src/compression/selector.rs` ✅
+- `docs/api/compression.md` ✅
+- `apps/landing/src/content/api/compression.mdx` ✅
+
+**Compression Strategies:**
+| Strategy | Token Savings | Best For |
+|----------|--------------|----------|
+| JSON Minification | 15-30% | Structured data |
+| TOON | 40-60% | Uniform arrays |
+| YAML | 10-25% | Nested objects |
+| AISP | Clarity boost | Rules and logic |
+
+**Acceptance Criteria:**
+- ✅ Multiple compression formats supported
+- ✅ Smart auto-selection based on content type
+- ✅ Compression metadata in responses
+- ✅ 52 unit tests passing
+
+---
+
+### PR #70: Adaptive Feedback System
+**Status:** ✅ **COMPLETED** (January 30, 2026)
+
+**Tasks:**
+- [x] Create feedback API endpoints
+- [x] Implement feedback storage in database
+- [x] Add thumbs up/down and text feedback
+- [x] Implement automatic sampling for few-shot examples
+- [x] Create context injection mechanism
+- [x] Document feedback API
+
+**Files:**
+- `crates/aura-proxy/src/routes/feedback.rs` ✅
+- `migrations/xxx_feedback.sql` ✅
+- `docs/api/feedback.md` ✅
+
+**Acceptance Criteria:**
+- ✅ Users can submit feedback on responses
+- ✅ Positive feedback used for few-shot learning
+- ✅ Feedback queryable via API
+
+---
+
+### PR #71: Response Validation
+**Status:** ✅ **COMPLETED** (January 28, 2026)
+
+**Tasks:**
+- [x] Implement log probability validation
+- [x] Add best-of-N sampling
+- [x] Implement self-consistency checks
+- [x] Create confidence thresholds
+- [x] Add heuristic analysis for non-OpenAI providers
+- [x] Document validation API
+
+**Files:**
+- `crates/aura-types/src/validation.rs` ✅
+- `apps/landing/src/content/api/validation.mdx` ✅
+
+**Validation Strategies:**
+| Strategy | Description | Provider Support |
+|----------|-------------|------------------|
+| `none` | No validation (default) | All |
+| `logprobs` | Token-level confidence | OpenAI only |
+| `best_of_n` | Generate N, select best | All |
+| `self_consistency` | Pick most consistent | All |
+| `confidence_threshold` | Reject below threshold | All |
+
+**Acceptance Criteria:**
+- ✅ Multiple validation strategies
+- ✅ Confidence scoring
+- ✅ Heuristic fallback for non-OpenAI
+
+---
+
+### PR #72: Response Consistency
+**Status:** ✅ **COMPLETED** (January 29, 2026)
+
+**Tasks:**
+- [x] Create style profiles for consistent formatting
+- [x] Implement Constitutional AI integration
+- [x] Add model calibration for response alignment
+- [x] Create prompt augmenter for consistency injection
+
+**Files:**
+- `crates/aura-types/src/consistency.rs` ✅
+
+**Acceptance Criteria:**
+- ✅ Cross-model response normalization
+- ✅ Style profile support
+- ✅ Constitutional principles integration
 
 ---
 
