@@ -60,6 +60,12 @@ X-RateLimit-Reset: 42
 
 See [Rate Limiting](/docs/api/rate-limiting) for configuration and best practices.
 
+## Prompt Compression
+
+Reduce token usage and costs with intelligent prompt compression. Supports TOON, YAML, AISP, and JSON minification.
+
+See [Prompt Compression](/docs/api/compression) for strategies and configuration.
+
 ## Response Caching
 
 Non-streaming requests with `temperature=0` are automatically cached in Redis. Use the `X-Cache-Control: no-cache` header to bypass caching.

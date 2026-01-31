@@ -40,6 +40,7 @@
 //! assert_eq!(response.text(), "Hi there!");
 //! ```
 
+pub mod compression;
 pub mod consistency;
 pub mod item;
 pub mod response;
@@ -70,6 +71,11 @@ pub use consistency::{
     FeedbackSampleSummary, FeedbackSignal, FeedbackStats, Formality, ListFeedbackQuery,
     ListFeedbackResponse, ModelCalibration, ModelQuirk, PromptAugmenter, StyleProfile,
     SubmitFeedbackRequest, Tone, Verbosity,
+};
+
+pub use compression::{
+    AispConfig, AispSymbolSet, CompressionAnalysis, CompressionConfig, CompressionMetadata,
+    CompressionStrategy, DataFormat, SemanticFormat, StructureType, ToonConfig, YamlConfig,
 };
 
 /// Returns the crate version

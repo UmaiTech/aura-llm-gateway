@@ -4,6 +4,7 @@
 //! including provider implementations, routing, caching, and load balancing.
 
 pub mod cache;
+pub mod compression;
 pub mod config;
 pub mod cost;
 pub mod crypto;
@@ -16,6 +17,11 @@ pub mod router;
 pub mod state;
 
 pub use cache::{CacheError, CacheHit, CacheStats, ResponseCache};
+pub use compression::{
+    compress, AispEncoder, AispError, CompressedOutput, CompressionError, Compressor,
+    JsonCompressor, JsonError, SmartCompressor, SmartCompressorBuilder, ToonEncoder, ToonError,
+    YamlConverter, YamlError,
+};
 pub use config::{
     AdminConfig, Config, ConfigBuilder, ConfigError, DatabaseConfig, LoggingConfig, ProviderConfig,
     RedisConfig, ServerConfig,

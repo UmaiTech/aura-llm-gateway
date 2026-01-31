@@ -37,6 +37,8 @@ See [Client SDKs](./sdks.md) for detailed SDK documentation.
 
 See [Feedback API](./feedback.md) for adaptive few-shot learning documentation.
 
+See [Compression API](./compression.md) for prompt compression and token reduction.
+
 ## Response Enrichment
 
 Aura automatically enriches all responses with:
