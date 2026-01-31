@@ -1,0 +1,361 @@
+---
+title: Response Validation
+description: Reduce hallucinations and improve response quality with validation strategies
+---
+
+import { Callout, CodeBlock, Expandable } from '../../components/mdx'
+
+# Response Validation
+
+Aura provides response validation strategies to reduce hallucinations and improve output quality. Different providers expose different validation signals - Aura provides a unified interface that works across all providers.
+
+<Callout type="info">
+Response validation is an Aura extension to the Open Responses API. It adds confidence scoring, best-of-N sampling, and self-consistency checks to improve response reliability.
+</Callout>
+
+## Validation Strategies
+
+| Strategy | Description | Provider Support |
+|----------|-------------|------------------|
+| `none` | No validation (default, fastest) | All |
+| `logprobs` | Token-level confidence via log probabilities | OpenAI only |
+| `best_of_n` | Generate N responses, select the best | All |
+| `self_consistency` | Generate N responses, pick most consistent | All |
+| `confidence_threshold` | Reject responses below threshold | All (heuristic for non-OpenAI) |
+
+## Quick Start
+
+Add validation to any request:
+
+<CodeBlock language="json" title="Request with validation">
+{`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "What is the capital of France?"
+    }
+  ],
+  "validation": {
+    "strategy": "logprobs",
+    "min_confidence": 0.8,
+    "top_logprobs": 5
+  }
+}`}
+</CodeBlock>
+
+The response includes validation metadata:
+
+<CodeBlock language="json" title="Response with validation metadata">
+{`{
+  "id": "resp_abc123",
+  "model": "gpt-4o",
+  "status": "completed",
+  "output": [...],
+  "validation": {
+    "strategy": "logprobs",
+    "confidence": 0.94,
+    "perplexity": 1.23,
+    "passed": true
+  }
+}`}
+</CodeBlock>
+
+## Log Probability Validation
+
+For OpenAI models, you can use token-level log probabilities for precise confidence scoring:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [...],
+  "validation": {
+    "strategy": "logprobs",
+    "min_confidence": 0.8,
+    "include_logprobs": true,
+    "top_logprobs": 5
+  }
+}`}
+</CodeBlock>
+
+### How Confidence is Calculated
+
+1. **Average Log Probability**: Mean of all token logprobs
+2. **Perplexity**: `exp(-avg_logprob)` - lower is better
+3. **Confidence Score**: Normalized 0-1 scale based on perplexity
+
+<CodeBlock language="json" title="Response with logprobs">
+{`{
+  "validation": {
+    "strategy": "logprobs",
+    "confidence": 0.94,
+    "perplexity": 1.23,
+    "passed": true,
+    "logprobs": {
+      "tokens": [
+        {
+          "token": "Paris",
+          "logprob": -0.01,
+          "top_logprobs": [
+            {"token": "Paris", "logprob": -0.01},
+            {"token": "Lyon", "logprob": -4.5},
+            {"token": "Marseille", "logprob": -5.2}
+          ]
+        }
+      ]
+    }
+  }
+}`}
+</CodeBlock>
+
+<Callout type="warning">
+Log probabilities are only available from OpenAI. For other providers (Anthropic, Google), Aura falls back to heuristic confidence scoring.
+</Callout>
+
+## Best-of-N Sampling
+
+Generate multiple responses and select the best one:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [...],
+  "validation": {
+    "strategy": "best_of_n",
+    "n": 3,
+    "selection": "highest_confidence"
+  }
+}`}
+</CodeBlock>
+
+### Selection Criteria
+
+| Criteria | Description |
+|----------|-------------|
+| `highest_confidence` | Highest logprob/heuristic score (default) |
+| `longest` | Most detailed response |
+| `shortest` | Most concise response |
+| `most_relevant` | Best match to prompt (by consistency) |
+| `lowest_perplexity` | Most fluent response |
+
+<CodeBlock language="json" title="Best-of-N response">
+{`{
+  "validation": {
+    "strategy": "best_of_n",
+    "confidence": 0.89,
+    "candidates_generated": 3,
+    "selected_index": 1,
+    "selection_reason": "Selected by highest heuristic confidence",
+    "passed": true
+  }
+}`}
+</CodeBlock>
+
+<Callout type="tip">
+Best-of-N uses Gemini's native `candidate_count` when available, reducing latency. For OpenAI and Anthropic, Aura generates N requests in parallel.
+</Callout>
+
+## Self-Consistency Sampling
+
+For reasoning tasks, generate multiple responses and pick the most consistent:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "What is 15% of 240?"
+    }
+  ],
+  "validation": {
+    "strategy": "self_consistency",
+    "n": 3,
+    "min_confidence": 0.7
+  }
+}`}
+</CodeBlock>
+
+Self-consistency works by:
+1. Generating N responses with slight temperature variation
+2. Comparing responses using word overlap (Jaccard similarity)
+3. Selecting the response most similar to others
+
+<Callout type="info">
+Self-consistency is particularly effective for math problems, factual questions, and reasoning tasks where there's a single correct answer.
+</Callout>
+
+## Confidence Threshold
+
+Reject responses below a confidence threshold:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [...],
+  "validation": {
+    "strategy": "confidence_threshold",
+    "min_confidence": 0.8
+  }
+}`}
+</CodeBlock>
+
+When confidence is below the threshold:
+
+<CodeBlock language="json" title="Response below threshold">
+{`{
+  "validation": {
+    "strategy": "confidence_threshold",
+    "confidence": 0.65,
+    "passed": false,
+    "warning": "Response confidence (0.65) below threshold (0.8)"
+  }
+}`}
+</CodeBlock>
+
+## Heuristic Confidence (Non-OpenAI)
+
+For providers without logprobs, Aura uses heuristic analysis:
+
+| Signal | Effect on Confidence |
+|--------|---------------------|
+| Hedging language ("I think", "maybe") | Decreases |
+| Confident language ("certainly", "the answer is") | Increases |
+| Very short responses (< 50 chars) | Decreases |
+| Repetitive text | Decreases |
+| Code blocks present | Increases |
+| Structured lists | Increases |
+
+<CodeBlock language="json" title="Heuristic confidence response">
+{`{
+  "validation": {
+    "strategy": "logprobs",
+    "confidence": 0.72,
+    "passed": true,
+    "warning": "Heuristic confidence (logprobs not available for Anthropic)"
+  }
+}`}
+</CodeBlock>
+
+## Configuration
+
+### YAML Configuration
+
+<CodeBlock language="yaml" title="aura.yaml">
+{`validation:
+  # Default strategy for all requests
+  default_strategy: none
+
+  # Logprobs configuration
+  logprobs:
+    enabled: true
+    top_logprobs: 5
+    min_confidence: 0.7
+
+  # Best-of-N configuration
+  best_of_n:
+    enabled: true
+    default_n: 3
+    max_n: 5
+    selection: highest_confidence
+
+  # Per-model overrides
+  model_overrides:
+    "gpt-4o":
+      default_strategy: logprobs
+      min_confidence: 0.8
+    "claude-sonnet-4":
+      default_strategy: none  # Has native reasoning`}
+</CodeBlock>
+
+### Request-Level Override
+
+Any request can override the default configuration:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [...],
+  "validation": {
+    "strategy": "best_of_n",
+    "n": 5,
+    "selection": "longest",
+    "min_confidence": 0.9
+  }
+}`}
+</CodeBlock>
+
+## Best Practices
+
+1. **Start with no validation** - Only add validation for high-stakes queries
+
+2. **Use logprobs for factual questions** - Best for questions with definitive answers
+
+3. **Use best-of-N for creative tasks** - When you want the best quality output
+
+4. **Use self-consistency for reasoning** - Math, logic, and multi-step problems
+
+5. **Set appropriate thresholds** - 0.7-0.8 is a good starting point
+
+6. **Monitor latency impact** - Best-of-N increases latency proportionally to N
+
+7. **Consider cost** - Each candidate in best-of-N counts as a separate request
+
+## Performance Considerations
+
+| Strategy | Latency Impact | Cost Impact |
+|----------|---------------|-------------|
+| `none` | None | None |
+| `logprobs` | Minimal | None |
+| `confidence_threshold` | Minimal | None |
+| `best_of_n` (N=3) | ~3x | ~3x |
+| `self_consistency` (N=3) | ~3x | ~3x |
+
+<Callout type="tip">
+For Gemini, best-of-N uses native `candidate_count` which is more efficient than parallel requests. The latency increase is minimal.
+</Callout>
+
+## Example Use Cases
+
+### High-Stakes Factual Query
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [{"type": "message", "role": "user", "content": "What is the LD50 of acetaminophen in mg/kg?"}],
+  "validation": {
+    "strategy": "logprobs",
+    "min_confidence": 0.9,
+    "top_logprobs": 10
+  }
+}`}
+</CodeBlock>
+
+### Math Problem
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [{"type": "message", "role": "user", "content": "Solve: 3x + 7 = 22"}],
+  "validation": {
+    "strategy": "self_consistency",
+    "n": 3
+  }
+}`}
+</CodeBlock>
+
+### Creative Writing
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [{"type": "message", "role": "user", "content": "Write a haiku about programming"}],
+  "validation": {
+    "strategy": "best_of_n",
+    "n": 5,
+    "selection": "longest"
+  }
+}`}
+</CodeBlock>

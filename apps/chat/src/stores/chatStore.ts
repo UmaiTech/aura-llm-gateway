@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Conversation, Message, RoutingStrategy } from '../lib/types'
+import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig } from '../lib/types'
 import { generateId } from '../lib/utils'
 
 interface ChatState {
@@ -15,6 +15,10 @@ interface ChatState {
   enabledTools: string[]
   theme: 'light' | 'dark' | 'system'
   routingStrategy: RoutingStrategy
+  validationStrategy: ValidationStrategy
+  validationN: number
+  validationMinConfidence: number
+  validationSelection: SelectionCriteria
 
   // Actions
   createConversation: () => string
@@ -34,6 +38,11 @@ interface ChatState {
   toggleTool: (toolName: string) => void
   setTheme: (theme: 'light' | 'dark' | 'system') => void
   setRoutingStrategy: (strategy: RoutingStrategy) => void
+  setValidationStrategy: (strategy: ValidationStrategy) => void
+  setValidationN: (n: number) => void
+  setValidationMinConfidence: (confidence: number) => void
+  setValidationSelection: (selection: SelectionCriteria) => void
+  getValidationConfig: () => ValidationConfig | undefined
 
   // Computed
   getCurrentConversation: () => Conversation | null
@@ -51,6 +60,10 @@ export const useChatStore = create<ChatState>()(
       enabledTools: [],
       theme: 'system',
       routingStrategy: 'round_robin',
+      validationStrategy: 'none',
+      validationN: 3,
+      validationMinConfidence: 0.7,
+      validationSelection: 'highest_confidence',
 
       // Conversation actions
       createConversation: () => {
@@ -211,6 +224,29 @@ export const useChatStore = create<ChatState>()(
 
       setRoutingStrategy: (routingStrategy) => set({ routingStrategy }),
 
+      setValidationStrategy: (validationStrategy) => set({ validationStrategy }),
+
+      setValidationN: (validationN) => set({ validationN }),
+
+      setValidationMinConfidence: (validationMinConfidence) => set({ validationMinConfidence }),
+
+      setValidationSelection: (validationSelection) => set({ validationSelection }),
+
+      getValidationConfig: () => {
+        const { validationStrategy, validationN, validationMinConfidence, validationSelection } = get()
+        if (validationStrategy === 'none') {
+          return undefined
+        }
+        return {
+          strategy: validationStrategy,
+          n: validationN,
+          min_confidence: validationMinConfidence,
+          selection: validationSelection,
+          include_logprobs: validationStrategy === 'logprobs',
+          top_logprobs: validationStrategy === 'logprobs' ? 5 : undefined,
+        }
+      },
+
       // Computed
       getCurrentConversation: () => {
         const { conversations, currentConversationId } = get()
@@ -229,6 +265,10 @@ export const useChatStore = create<ChatState>()(
         enabledTools: state.enabledTools,
         theme: state.theme,
         routingStrategy: state.routingStrategy,
+        validationStrategy: state.validationStrategy,
+        validationN: state.validationN,
+        validationMinConfidence: state.validationMinConfidence,
+        validationSelection: state.validationSelection,
       }),
     }
   )

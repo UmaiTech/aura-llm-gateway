@@ -5,8 +5,9 @@
 use async_trait::async_trait;
 use aura_types::{
     ContentPart, CreateResponseRequest, FunctionCallItem, IncompleteReason, InputContent,
-    InputItem, Item, MessageItem, Response, ResponseError, Role, StreamEvent, Tool, ToolChoice,
-    ToolChoiceAuto, Usage,
+    InputItem, Item, LogprobsData, MessageItem, Response, ResponseError, Role, StreamEvent,
+    TokenLogprob, Tool, ToolChoice, ToolChoiceAuto, TopLogprob, Usage, ValidationMetadata,
+    ValidationStrategy,
 };
 use futures_util::{Stream, StreamExt};
 use reqwest::Client;
@@ -190,6 +191,32 @@ impl OpenAIProvider {
             },
         });
 
+        // Determine if we need logprobs based on validation config
+        let (logprobs, top_logprobs) = if let Some(ref validation) = request.validation {
+            match validation.strategy {
+                ValidationStrategy::Logprobs | ValidationStrategy::ConfidenceThreshold => {
+                    let include = validation.include_logprobs.unwrap_or(true);
+                    let top = validation.top_logprobs.unwrap_or(5).min(20);
+                    (Some(include), Some(top))
+                }
+                ValidationStrategy::BestOfN | ValidationStrategy::SelfConsistency => {
+                    // Also enable logprobs for selection if highest confidence is used
+                    if validation.selection
+                        == Some(aura_types::SelectionCriteria::HighestConfidence)
+                        || validation.selection
+                            == Some(aura_types::SelectionCriteria::LowestPerplexity)
+                    {
+                        (Some(true), Some(5))
+                    } else {
+                        (None, None)
+                    }
+                }
+                _ => (None, None),
+            }
+        } else {
+            (None, None)
+        };
+
         OpenAIRequest {
             model: request.model.clone(),
             messages,
@@ -207,6 +234,8 @@ impl OpenAIProvider {
             } else {
                 None
             },
+            logprobs,
+            top_logprobs,
         }
     }
 
@@ -270,6 +299,34 @@ impl OpenAIProvider {
             .usage
             .map(|u| Usage::new(u.prompt_tokens, u.completion_tokens));
 
+        // Extract logprobs and build validation metadata
+        let validation = choice.and_then(|c| {
+            c.logprobs.as_ref().and_then(|lp| {
+                lp.content.as_ref().map(|tokens| {
+                    let token_logprobs: Vec<TokenLogprob> = tokens
+                        .iter()
+                        .map(|t| {
+                            let top = t.top_logprobs.as_ref().map(|tops| {
+                                tops.iter()
+                                    .map(|tp| TopLogprob::new(&tp.token, tp.logprob))
+                                    .collect()
+                            });
+                            TokenLogprob::new(&t.token, t.logprob)
+                                .with_top_logprobs(top.unwrap_or_default())
+                        })
+                        .collect();
+
+                    let logprobs_data = LogprobsData::new(token_logprobs);
+                    let confidence = logprobs_data.confidence_score();
+                    let perplexity = logprobs_data.perplexity();
+
+                    ValidationMetadata::with_confidence(ValidationStrategy::Logprobs, confidence)
+                        .with_perplexity(perplexity)
+                        .with_logprobs(logprobs_data)
+                })
+            })
+        });
+
         let mut builder = Response::builder(format!("resp_oai_{}", response.id), model)
             .created_at(response.created)
             .outputs(output)
@@ -283,6 +340,9 @@ impl OpenAIProvider {
         }
         if let Some(err) = error {
             builder = builder.failed(err);
+        }
+        if let Some(validation) = validation {
+            builder = builder.validation(validation);
         }
 
         builder.build()
@@ -673,6 +733,12 @@ struct OpenAIRequest {
     user: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream_options: Option<StreamOptions>,
+    /// Whether to return log probabilities
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logprobs: Option<bool>,
+    /// Number of top log probabilities to return (1-20)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_logprobs: Option<u8>,
 }
 
 #[derive(Debug, Serialize)]
@@ -775,6 +841,39 @@ struct OpenAIResponse {
 struct OpenAIChoice {
     message: OpenAIResponseMessage,
     finish_reason: String,
+    /// Log probabilities for the generated tokens
+    logprobs: Option<OpenAILogprobs>,
+}
+
+/// OpenAI logprobs structure
+#[derive(Debug, Deserialize)]
+struct OpenAILogprobs {
+    /// List of token logprobs
+    content: Option<Vec<OpenAITokenLogprob>>,
+}
+
+/// Log probability for a single token
+#[derive(Debug, Deserialize)]
+struct OpenAITokenLogprob {
+    /// The token string
+    token: String,
+    /// Log probability of this token
+    logprob: f32,
+    /// Byte representation
+    bytes: Option<Vec<u8>>,
+    /// Top alternative tokens
+    top_logprobs: Option<Vec<OpenAITopLogprob>>,
+}
+
+/// Alternative token with its log probability
+#[derive(Debug, Deserialize)]
+struct OpenAITopLogprob {
+    /// The alternative token
+    token: String,
+    /// Log probability
+    logprob: f32,
+    /// Byte representation
+    bytes: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize)]

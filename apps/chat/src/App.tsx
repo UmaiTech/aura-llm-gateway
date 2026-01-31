@@ -7,7 +7,7 @@ import { generateId } from './lib/utils'
 import { AuraAPI } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, RoutingStrategy } from './lib/types'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
@@ -32,6 +32,9 @@ export default function App() {
     setAgentMode,
     routingStrategy,
     setRoutingStrategy,
+    validationStrategy,
+    setValidationStrategy,
+    getValidationConfig,
     createConversation,
     selectConversation,
     deleteConversation,
@@ -41,11 +44,13 @@ export default function App() {
     getCurrentConversation,
   } = useChatStore()
 
-  // Create API instance with routing strategy
+  // Create API instance with routing strategy and validation config
+  const validationConfig = getValidationConfig()
   const api = new AuraAPI(
     import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1` : '/v1',
     API_KEY,
-    routingStrategy
+    routingStrategy,
+    validationConfig
   )
 
   const currentConversation = getCurrentConversation()
@@ -559,6 +564,8 @@ export default function App() {
           onAgentModeChange={setAgentMode}
           routingStrategy={routingStrategy}
           onRoutingStrategyChange={setRoutingStrategy}
+          validationStrategy={validationStrategy}
+          onValidationStrategyChange={setValidationStrategy}
         />
 
         {/* Chat area */}

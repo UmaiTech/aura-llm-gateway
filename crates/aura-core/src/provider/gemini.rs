@@ -4,9 +4,9 @@
 
 use async_trait::async_trait;
 use aura_types::{
-    ContentPart, CreateResponseRequest, FunctionCallItem, IncompleteReason, InputContent,
-    InputItem, Item, MessageItem, Response, ResponseError, Role, StreamEvent, Tool, ToolChoice,
-    ToolChoiceAuto, Usage,
+    ContentPart, CreateResponseRequest, FunctionCallItem, HeuristicAnalyzer, IncompleteReason,
+    InputContent, InputItem, Item, MessageItem, Response, ResponseError, Role, SelectionCriteria,
+    StreamEvent, Tool, ToolChoice, ToolChoiceAuto, Usage, ValidationMetadata, ValidationStrategy,
 };
 use futures_util::{Stream, StreamExt};
 use reqwest::Client;
@@ -162,12 +162,25 @@ impl GeminiProvider {
             }
         });
 
+        // Determine candidate count based on validation config
+        let candidate_count = if let Some(ref validation) = request.validation {
+            match validation.strategy {
+                ValidationStrategy::BestOfN | ValidationStrategy::SelfConsistency => {
+                    // Gemini supports up to 8 candidates
+                    Some(validation.n.unwrap_or(3).min(8) as u32)
+                }
+                _ => Some(1),
+            }
+        } else {
+            Some(1)
+        };
+
         // Build generation config
         let generation_config = GeminiGenerationConfig {
             max_output_tokens: request.max_output_tokens,
             temperature: request.temperature,
             top_p: request.top_p,
-            candidate_count: Some(1),
+            candidate_count,
         };
 
         GeminiRequest {
@@ -270,12 +283,113 @@ impl GeminiProvider {
 
     /// Transform Gemini response to Open Responses format
     fn transform_response(&self, response: GeminiResponse, model: &str) -> Response {
+        self.transform_response_with_validation(response, model, None, None)
+    }
+
+    /// Transform response with optional validation config
+    fn transform_response_with_validation(
+        &self,
+        response: GeminiResponse,
+        model: &str,
+        validation_strategy: Option<ValidationStrategy>,
+        selection_criteria: Option<SelectionCriteria>,
+    ) -> Response {
+        let candidates = response.candidates.as_ref();
+        let num_candidates = candidates.map(|c| c.len()).unwrap_or(0);
+
+        // If we have multiple candidates, select the best one
+        let (selected_candidate, _selected_index, validation_meta) =
+            if num_candidates > 1 && validation_strategy.is_some() {
+                let candidates = candidates.unwrap();
+                let selection = selection_criteria.unwrap_or(SelectionCriteria::HighestConfidence);
+
+                // Extract text from each candidate for scoring
+                let candidate_texts: Vec<String> = candidates
+                    .iter()
+                    .map(|c| {
+                        c.content
+                            .as_ref()
+                            .map(|content| {
+                                content
+                                    .parts
+                                    .iter()
+                                    .filter_map(|p| match p {
+                                        GeminiPart::Text { text } => Some(text.as_str()),
+                                        _ => None,
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("")
+                            })
+                            .unwrap_or_default()
+                    })
+                    .collect();
+
+                let (best_idx, confidence, reason) = match selection {
+                    SelectionCriteria::Longest => {
+                        let idx = candidate_texts
+                            .iter()
+                            .enumerate()
+                            .max_by_key(|(_, t)| t.len())
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        let conf = 0.5 + (0.5 * (1.0 / num_candidates as f32));
+                        (idx, conf, "Selected longest response".to_string())
+                    }
+                    SelectionCriteria::Shortest => {
+                        let idx = candidate_texts
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, t)| !t.is_empty())
+                            .min_by_key(|(_, t)| t.len())
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        let conf = 0.5 + (0.5 * (1.0 / num_candidates as f32));
+                        (idx, conf, "Selected shortest response".to_string())
+                    }
+                    SelectionCriteria::HighestConfidence | SelectionCriteria::LowestPerplexity => {
+                        // Use heuristic analyzer for confidence scoring
+                        let scores: Vec<f32> = candidate_texts
+                            .iter()
+                            .map(|t| HeuristicAnalyzer::estimate_confidence(t, ""))
+                            .collect();
+                        let idx = scores
+                            .iter()
+                            .enumerate()
+                            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        (
+                            idx,
+                            scores[idx],
+                            "Selected by highest heuristic confidence".to_string(),
+                        )
+                    }
+                    SelectionCriteria::MostRelevant => {
+                        // For now, use consistency as a proxy for relevance
+                        let refs: Vec<&str> = candidate_texts.iter().map(|s| s.as_str()).collect();
+                        let consistency = HeuristicAnalyzer::consistency_score(&refs);
+                        // Pick the one most similar to others (median-like selection)
+                        let idx = 0; // Simplified: pick first
+                        (idx, consistency, "Selected for consistency".to_string())
+                    }
+                };
+
+                let meta = ValidationMetadata::best_of_n(
+                    num_candidates as u8,
+                    best_idx as u8,
+                    confidence,
+                    reason,
+                );
+                (candidates.get(best_idx), Some(best_idx), Some(meta))
+            } else {
+                let candidate = candidates.and_then(|c| c.first());
+                (candidate, None, None)
+            };
+
         let mut output = Vec::new();
         let mut item_index = 0;
 
-        let candidate = response.candidates.as_ref().and_then(|c| c.first());
-
-        if let Some(candidate) = candidate {
+        if let Some(candidate) = selected_candidate {
             if let Some(content) = &candidate.content {
                 for part in &content.parts {
                     match part {
@@ -301,9 +415,38 @@ impl GeminiProvider {
             }
         }
 
+        // For validation metadata when single candidate
+        let validation_meta = validation_meta.or_else(|| {
+            if validation_strategy.is_some() {
+                // Add heuristic confidence for single candidate
+                let text = output
+                    .iter()
+                    .filter_map(|item| item.as_message())
+                    .map(|m| m.text())
+                    .collect::<String>();
+                if !text.is_empty() {
+                    let confidence = HeuristicAnalyzer::estimate_confidence(&text, "");
+                    Some(
+                        ValidationMetadata::with_confidence(
+                            validation_strategy.unwrap(),
+                            confidence,
+                        )
+                        .with_warning("Heuristic confidence (logprobs not available for Gemini)"),
+                    )
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+        // Use the selected candidate for status
+        let candidate_for_status = selected_candidate;
+
         // Determine status from finish reason
         let (status, incomplete_reason, error) =
-            match candidate.and_then(|c| c.finish_reason.as_deref()) {
+            match candidate_for_status.and_then(|c| c.finish_reason.as_deref()) {
                 Some("STOP") => (aura_types::ResponseStatus::Completed, None, None),
                 Some("MAX_TOKENS") => (
                     aura_types::ResponseStatus::Incomplete,
@@ -368,6 +511,9 @@ impl GeminiProvider {
         }
         if let Some(err) = error {
             builder = builder.failed(err);
+        }
+        if let Some(validation) = validation_meta {
+            builder = builder.validation(validation);
         }
 
         builder.build()

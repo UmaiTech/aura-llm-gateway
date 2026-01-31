@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { Menu, Wrench, Route, ChevronDown, Check } from 'lucide-react'
+import { Menu, Wrench, Route, ChevronDown, Check, Shield } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { ThemeToggle } from './ThemeToggle'
-import { ROUTING_STRATEGIES, type RoutingStrategy } from '../lib/types'
+import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, type RoutingStrategy, type ValidationStrategy } from '../lib/types'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -11,6 +11,8 @@ interface HeaderProps {
   onAgentModeChange: (enabled: boolean) => void
   routingStrategy: RoutingStrategy
   onRoutingStrategyChange: (strategy: RoutingStrategy) => void
+  validationStrategy: ValidationStrategy
+  onValidationStrategyChange: (strategy: ValidationStrategy) => void
 }
 
 export function Header({
@@ -20,25 +22,33 @@ export function Header({
   onAgentModeChange,
   routingStrategy,
   onRoutingStrategyChange,
+  validationStrategy,
+  onValidationStrategyChange,
 }: HeaderProps) {
   const [routingDropdownOpen, setRoutingDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [validationDropdownOpen, setValidationDropdownOpen] = useState(false)
+  const routingDropdownRef = useRef<HTMLDivElement>(null)
+  const validationDropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (routingDropdownRef.current && !routingDropdownRef.current.contains(event.target as Node)) {
         setRoutingDropdownOpen(false)
+      }
+      if (validationDropdownRef.current && !validationDropdownRef.current.contains(event.target as Node)) {
+        setValidationDropdownOpen(false)
       }
     }
 
-    if (routingDropdownOpen) {
+    if (routingDropdownOpen || validationDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [routingDropdownOpen])
+  }, [routingDropdownOpen, validationDropdownOpen])
 
   const currentStrategy = ROUTING_STRATEGIES.find(s => s.id === routingStrategy) || ROUTING_STRATEGIES[0]
+  const currentValidation = VALIDATION_STRATEGIES.find(s => s.id === validationStrategy) || VALIDATION_STRATEGIES[0]
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/50 glass px-4 shadow-premium">
@@ -65,7 +75,7 @@ export function Header({
       {/* Right side controls */}
       <div className="flex items-center gap-3">
         {/* Routing strategy selector */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative" ref={routingDropdownRef}>
           <button
             onClick={() => setRoutingDropdownOpen(!routingDropdownOpen)}
             className={cn(
@@ -114,6 +124,66 @@ export function Header({
                     </div>
                     {strategy.id === routingStrategy && (
                       <Check className="h-4 w-4 text-primary-400 flex-shrink-0 mt-0.5" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Validation strategy selector */}
+        <div className="relative" ref={validationDropdownRef}>
+          <button
+            onClick={() => setValidationDropdownOpen(!validationDropdownOpen)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
+              validationStrategy !== 'none'
+                ? "border-success-500/50 bg-success-500/10 text-success-400"
+                : "border-border hover:bg-secondary text-muted-foreground"
+            )}
+            title={`Validation: ${currentValidation.name} - ${currentValidation.description}`}
+          >
+            <Shield className="h-4 w-4" />
+            <span className="text-sm font-medium hidden md:inline">{currentValidation.name}</span>
+            <ChevronDown className={cn(
+              "h-3.5 w-3.5 transition-transform hidden sm:block",
+              validationDropdownOpen && "rotate-180"
+            )} />
+          </button>
+
+          {/* Dropdown menu */}
+          {validationDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-72 rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="p-2">
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border mb-2">
+                  Response Validation
+                </div>
+                {VALIDATION_STRATEGIES.map((strategy) => (
+                  <button
+                    key={strategy.id}
+                    onClick={() => {
+                      onValidationStrategyChange(strategy.id)
+                      setValidationDropdownOpen(false)
+                    }}
+                    className={cn(
+                      "w-full flex items-start gap-3 px-3 py-2 rounded-lg text-left hover:bg-secondary transition-colors",
+                      strategy.id === validationStrategy && "bg-success-500/10"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className={cn(
+                        "text-sm font-medium",
+                        strategy.id === validationStrategy ? "text-success-400" : "text-foreground"
+                      )}>
+                        {strategy.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {strategy.description}
+                      </div>
+                    </div>
+                    {strategy.id === validationStrategy && (
+                      <Check className="h-4 w-4 text-success-400 flex-shrink-0 mt-0.5" />
                     )}
                   </button>
                 ))}

@@ -169,3 +169,54 @@ export interface StreamErrorDetails {
   code: string
   message: string
 }
+
+// Validation strategies for response quality
+export type ValidationStrategy =
+  | 'none'
+  | 'logprobs'
+  | 'best_of_n'
+  | 'self_consistency'
+  | 'confidence_threshold'
+
+export type SelectionCriteria =
+  | 'highest_confidence'
+  | 'longest'
+  | 'shortest'
+  | 'most_relevant'
+  | 'lowest_perplexity'
+
+export interface ValidationConfig {
+  strategy: ValidationStrategy
+  min_confidence?: number
+  n?: number
+  selection?: SelectionCriteria
+  include_logprobs?: boolean
+  top_logprobs?: number
+}
+
+export interface ValidationMetadata {
+  strategy: ValidationStrategy
+  confidence?: number
+  perplexity?: number
+  candidates_generated?: number
+  selected_index?: number
+  selection_reason?: string
+  passed: boolean
+  warning?: string
+}
+
+export const VALIDATION_STRATEGIES: { id: ValidationStrategy; name: string; description: string }[] = [
+  { id: 'none', name: 'None', description: 'No validation (fastest)' },
+  { id: 'logprobs', name: 'Log Probabilities', description: 'Use token logprobs for confidence (OpenAI only)' },
+  { id: 'best_of_n', name: 'Best of N', description: 'Generate N responses, select best' },
+  { id: 'self_consistency', name: 'Self-Consistency', description: 'Generate N responses, pick most consistent' },
+  { id: 'confidence_threshold', name: 'Confidence Threshold', description: 'Reject responses below threshold' },
+]
+
+export const SELECTION_CRITERIA: { id: SelectionCriteria; name: string }[] = [
+  { id: 'highest_confidence', name: 'Highest Confidence' },
+  { id: 'longest', name: 'Longest Response' },
+  { id: 'shortest', name: 'Shortest Response' },
+  { id: 'most_relevant', name: 'Most Relevant' },
+  { id: 'lowest_perplexity', name: 'Lowest Perplexity' },
+]

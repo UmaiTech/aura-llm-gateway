@@ -43,6 +43,7 @@
 pub mod item;
 pub mod response;
 pub mod stream;
+pub mod validation;
 
 // Re-export commonly used types at the crate root for convenience
 pub use item::{
@@ -56,6 +57,11 @@ pub use response::{
 };
 
 pub use stream::{RateLimitInfo, SseMessage, StreamError, StreamEvent};
+
+pub use validation::{
+    HeuristicAnalyzer, LogprobsData, SelectionCriteria, TokenLogprob, TopLogprob, ValidationConfig,
+    ValidationMetadata, ValidationStrategy,
+};
 
 /// Returns the crate version
 pub fn version() -> &'static str {
