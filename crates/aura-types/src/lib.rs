@@ -65,9 +65,11 @@ pub use validation::{
 };
 
 pub use consistency::{
-    ConsistencyConfig, ConsistencyExample, ConsistencyMetadata, ConsistencyStrategy,
-    DefaultCalibrations, DefaultConstitution, EnsembleVotes, Formality, ModelCalibration,
-    ModelQuirk, PromptAugmenter, StyleProfile, Tone, Verbosity,
+    AdaptiveFewShotConfig, ConsistencyConfig, ConsistencyExample, ConsistencyMetadata,
+    ConsistencyStrategy, DefaultCalibrations, DefaultConstitution, EnsembleVotes, FeedbackResponse,
+    FeedbackSampleSummary, FeedbackSignal, FeedbackStats, Formality, ListFeedbackQuery,
+    ListFeedbackResponse, ModelCalibration, ModelQuirk, PromptAugmenter, StyleProfile,
+    SubmitFeedbackRequest, Tone, Verbosity,
 };
 
 /// Returns the crate version

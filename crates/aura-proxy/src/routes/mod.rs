@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod conversations;
+pub mod feedback;
 pub mod health;
 pub mod metrics;
 pub mod openapi;
@@ -29,6 +30,8 @@ pub fn app_router() -> Router<AppState> {
         .merge(responses::router())
         // Conversation management endpoints
         .merge(conversations::router())
+        // Feedback management endpoints
+        .merge(feedback::router())
         // API key management endpoints
         .merge(auth::router())
         // Organization management endpoints

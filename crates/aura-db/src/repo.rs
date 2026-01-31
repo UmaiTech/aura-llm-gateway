@@ -1,5 +1,6 @@
 //! Database repository functions
 
+use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -1636,4 +1637,310 @@ impl EndUserRepo {
             updated_at: row.get("updated_at"),
         }
     }
+}
+
+// ============================================================================
+// Feedback Sample Repository
+// ============================================================================
+
+/// Repository for feedback sample operations (adaptive few-shot learning)
+pub struct FeedbackSampleRepo;
+
+impl FeedbackSampleRepo {
+    /// Create a new feedback sample
+    pub async fn create(pool: &DbPool, new: NewFeedbackSample) -> Result<FeedbackSample, DbError> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO feedback_samples (
+                organization_id, input_text, output_text, model_id,
+                feedback, feedback_reason, feedback_by,
+                tags, category, response_id, conversation_id,
+                confidence_score, metadata
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING *
+            "#,
+        )
+        .bind(new.organization_id)
+        .bind(&new.input_text)
+        .bind(&new.output_text)
+        .bind(&new.model_id)
+        .bind(&new.feedback)
+        .bind(&new.feedback_reason)
+        .bind(&new.feedback_by)
+        .bind(&new.tags)
+        .bind(&new.category)
+        .bind(&new.response_id)
+        .bind(new.conversation_id)
+        .bind(new.confidence_score)
+        .bind(&new.metadata)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(Self::row_to_sample(row))
+    }
+
+    /// Find sample by ID
+    pub async fn find_by_id(pool: &DbPool, id: Uuid) -> Result<Option<FeedbackSample>, DbError> {
+        let row = sqlx::query("SELECT * FROM feedback_samples WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(Self::row_to_sample))
+    }
+
+    /// Get approved samples for an organization
+    pub async fn get_approved(
+        pool: &DbPool,
+        organization_id: Option<Uuid>,
+        limit: i64,
+    ) -> Result<Vec<FeedbackSample>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM feedback_samples
+            WHERE feedback = 'approved'
+              AND (organization_id = $1 OR ($1 IS NULL AND organization_id IS NULL))
+            ORDER BY use_count DESC, created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(organization_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_sample).collect())
+    }
+
+    /// Get samples by category
+    pub async fn get_by_category(
+        pool: &DbPool,
+        organization_id: Option<Uuid>,
+        category: &str,
+        feedback: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<FeedbackSample>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM feedback_samples
+            WHERE category = $1
+              AND (organization_id = $2 OR ($2 IS NULL AND organization_id IS NULL))
+              AND ($3 IS NULL OR feedback = $3)
+            ORDER BY use_count DESC, created_at DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(category)
+        .bind(organization_id)
+        .bind(feedback)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_sample).collect())
+    }
+
+    /// Get samples by tags (returns samples that have ANY of the provided tags)
+    pub async fn get_by_tags(
+        pool: &DbPool,
+        organization_id: Option<Uuid>,
+        tags: &[String],
+        feedback: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<FeedbackSample>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM feedback_samples
+            WHERE tags && $1
+              AND (organization_id = $2 OR ($2 IS NULL AND organization_id IS NULL))
+              AND ($3 IS NULL OR feedback = $3)
+            ORDER BY use_count DESC, created_at DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(tags)
+        .bind(organization_id)
+        .bind(feedback)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_sample).collect())
+    }
+
+    /// Search samples by text (full-text search)
+    pub async fn search(
+        pool: &DbPool,
+        organization_id: Option<Uuid>,
+        query: &str,
+        feedback: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<FeedbackSample>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT *, ts_rank(to_tsvector('english', input_text), plainto_tsquery('english', $1)) as rank
+            FROM feedback_samples
+            WHERE to_tsvector('english', input_text) @@ plainto_tsquery('english', $1)
+              AND (organization_id = $2 OR ($2 IS NULL AND organization_id IS NULL))
+              AND ($3 IS NULL OR feedback = $3)
+            ORDER BY rank DESC, use_count DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(query)
+        .bind(organization_id)
+        .bind(feedback)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_sample).collect())
+    }
+
+    /// Get recent samples for an organization
+    pub async fn get_recent(
+        pool: &DbPool,
+        organization_id: Option<Uuid>,
+        limit: i64,
+    ) -> Result<Vec<FeedbackSample>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM feedback_samples
+            WHERE organization_id = $1 OR ($1 IS NULL AND organization_id IS NULL)
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(organization_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Self::row_to_sample).collect())
+    }
+
+    /// Increment use count for a sample
+    pub async fn increment_use_count(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("SELECT increment_sample_use_count($1)")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Update sample feedback
+    pub async fn update_feedback(
+        pool: &DbPool,
+        id: Uuid,
+        feedback: &str,
+        reason: Option<&str>,
+    ) -> Result<(), DbError> {
+        sqlx::query(
+            "UPDATE feedback_samples SET feedback = $2, feedback_reason = $3 WHERE id = $1",
+        )
+        .bind(id)
+        .bind(feedback)
+        .bind(reason)
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Update sample tags
+    pub async fn update_tags(pool: &DbPool, id: Uuid, tags: &[String]) -> Result<(), DbError> {
+        sqlx::query("UPDATE feedback_samples SET tags = $2 WHERE id = $1")
+            .bind(id)
+            .bind(tags)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Update sample category
+    pub async fn update_category(
+        pool: &DbPool,
+        id: Uuid,
+        category: Option<&str>,
+    ) -> Result<(), DbError> {
+        sqlx::query("UPDATE feedback_samples SET category = $2 WHERE id = $1")
+            .bind(id)
+            .bind(category)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Delete a sample
+    pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("DELETE FROM feedback_samples WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Get sample statistics for an organization
+    pub async fn get_stats(
+        pool: &DbPool,
+        organization_id: Option<Uuid>,
+    ) -> Result<FeedbackSampleStats, DbError> {
+        let row = sqlx::query(
+            r#"
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE feedback = 'approved') as approved,
+                COUNT(*) FILTER (WHERE feedback = 'rejected') as rejected,
+                SUM(use_count) as total_uses
+            FROM feedback_samples
+            WHERE organization_id = $1 OR ($1 IS NULL AND organization_id IS NULL)
+            "#,
+        )
+        .bind(organization_id)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(FeedbackSampleStats {
+            total: row.get::<i64, _>("total") as u64,
+            approved: row.get::<i64, _>("approved") as u64,
+            rejected: row.get::<i64, _>("rejected") as u64,
+            total_uses: row.get::<Option<i64>, _>("total_uses").unwrap_or(0) as u64,
+        })
+    }
+
+    fn row_to_sample(row: sqlx::postgres::PgRow) -> FeedbackSample {
+        FeedbackSample {
+            id: row.get("id"),
+            organization_id: row.get("organization_id"),
+            input_text: row.get("input_text"),
+            output_text: row.get("output_text"),
+            model_id: row.get("model_id"),
+            feedback: row.get("feedback"),
+            feedback_reason: row.get("feedback_reason"),
+            feedback_by: row.get("feedback_by"),
+            tags: row.get("tags"),
+            category: row.get("category"),
+            response_id: row.get("response_id"),
+            conversation_id: row.get("conversation_id"),
+            confidence_score: row.get("confidence_score"),
+            use_count: row.get("use_count"),
+            metadata: row.get("metadata"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        }
+    }
+}
+
+/// Statistics for feedback samples
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedbackSampleStats {
+    pub total: u64,
+    pub approved: u64,
+    pub rejected: u64,
+    pub total_uses: u64,
 }

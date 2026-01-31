@@ -46,6 +46,10 @@ pub struct ConsistencyConfig {
     /// Custom model calibration overrides
     #[serde(skip_serializing_if = "Option::is_none")]
     pub calibration_overrides: Option<HashMap<String, ModelCalibration>>,
+
+    /// Adaptive few-shot configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adaptive_config: Option<AdaptiveFewShotConfig>,
 }
 
 impl Default for ConsistencyConfig {
@@ -59,7 +63,94 @@ impl Default for ConsistencyConfig {
             style_profile: None,
             apply_calibration: false,
             calibration_overrides: None,
+            adaptive_config: None,
         }
+    }
+}
+
+/// Configuration for adaptive few-shot learning
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct AdaptiveFewShotConfig {
+    /// Maximum number of examples to include
+    #[serde(default = "default_max_examples")]
+    pub max_examples: u8,
+
+    /// Category filter for samples
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+
+    /// Tag filter for samples
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+
+    /// Include only approved samples (default true)
+    #[serde(default = "default_true")]
+    pub approved_only: bool,
+
+    /// Use a small LLM to select relevant examples
+    #[serde(default)]
+    pub use_selector_model: bool,
+
+    /// Model to use for selection (e.g., "gpt-4o-mini")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector_model: Option<String>,
+
+    /// Minimum similarity threshold for text search
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_similarity: Option<f32>,
+}
+
+fn default_max_examples() -> u8 {
+    3
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for AdaptiveFewShotConfig {
+    fn default() -> Self {
+        Self {
+            max_examples: 3,
+            category: None,
+            tags: None,
+            approved_only: true,
+            use_selector_model: false,
+            selector_model: None,
+            min_similarity: None,
+        }
+    }
+}
+
+impl AdaptiveFewShotConfig {
+    /// Create default config
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set category filter
+    pub fn with_category(mut self, category: impl Into<String>) -> Self {
+        self.category = Some(category.into());
+        self
+    }
+
+    /// Set tag filter
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+
+    /// Set max examples
+    pub fn with_max_examples(mut self, n: u8) -> Self {
+        self.max_examples = n;
+        self
+    }
+
+    /// Enable selector model
+    pub fn with_selector_model(mut self, model: impl Into<String>) -> Self {
+        self.use_selector_model = true;
+        self.selector_model = Some(model.into());
+        self
     }
 }
 
@@ -119,6 +210,15 @@ impl ConsistencyConfig {
         self.apply_calibration = true;
         self
     }
+
+    /// Create an adaptive few-shot config
+    pub fn adaptive_few_shot(config: AdaptiveFewShotConfig) -> Self {
+        Self {
+            strategy: ConsistencyStrategy::AdaptiveFewShot,
+            adaptive_config: Some(config),
+            ..Default::default()
+        }
+    }
 }
 
 /// Consistency strategy to apply
@@ -160,6 +260,11 @@ pub enum ConsistencyStrategy {
     /// Query multiple models and find consensus
     /// Returns the most agreed-upon response
     EnsembleVoting,
+
+    /// Adaptive few-shot learning from user feedback
+    /// Dynamically selects examples from a feedback store
+    /// based on similarity to the current query
+    AdaptiveFewShot,
 }
 
 /// A few-shot example for consistency priming
@@ -809,6 +914,161 @@ impl PromptAugmenter {
 
         augmented
     }
+}
+
+// ============================================================================
+// Feedback Signal API Types
+// ============================================================================
+
+/// Feedback signal type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackSignal {
+    /// Positive feedback (thumbs up)
+    ThumbsUp,
+    /// Negative feedback (thumbs down)
+    ThumbsDown,
+}
+
+impl FeedbackSignal {
+    /// Convert to feedback string for database
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FeedbackSignal::ThumbsUp => "approved",
+            FeedbackSignal::ThumbsDown => "rejected",
+        }
+    }
+}
+
+/// Request to submit feedback on a response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SubmitFeedbackRequest {
+    /// ID of the response being rated
+    pub response_id: String,
+
+    /// The feedback signal
+    pub signal: FeedbackSignal,
+
+    /// Optional reason for feedback
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+
+    /// Tags to categorize this sample
+    #[serde(default)]
+    pub tags: Vec<String>,
+
+    /// Category for this sample
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+}
+
+/// Response after submitting feedback
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FeedbackResponse {
+    /// ID of the created feedback sample
+    pub id: String,
+
+    /// Whether the feedback was recorded
+    pub recorded: bool,
+
+    /// Message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Query parameters for listing feedback samples
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct ListFeedbackQuery {
+    /// Filter by category
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+
+    /// Filter by tags (any match)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+
+    /// Filter by feedback type
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feedback: Option<String>,
+
+    /// Search query for text search
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+
+    /// Maximum number of results
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+
+    /// Offset for pagination
+    #[serde(default)]
+    pub offset: u32,
+}
+
+fn default_limit() -> u32 {
+    50
+}
+
+/// Summary of a feedback sample for API responses
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FeedbackSampleSummary {
+    /// Sample ID
+    pub id: String,
+
+    /// The input/query
+    pub input: String,
+
+    /// The output/response
+    pub output: String,
+
+    /// Model that generated this
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+
+    /// Feedback type
+    pub feedback: String,
+
+    /// Reason for feedback
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+
+    /// Tags
+    pub tags: Vec<String>,
+
+    /// Category
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+
+    /// Number of times used
+    pub use_count: u32,
+
+    /// When created
+    pub created_at: String,
+}
+
+/// Response listing feedback samples
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ListFeedbackResponse {
+    /// The samples
+    pub samples: Vec<FeedbackSampleSummary>,
+
+    /// Total count matching query
+    pub total: u64,
+}
+
+/// Statistics about feedback samples
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FeedbackStats {
+    /// Total samples
+    pub total: u64,
+
+    /// Approved samples
+    pub approved: u64,
+
+    /// Rejected samples
+    pub rejected: u64,
+
+    /// Total times samples were used
+    pub total_uses: u64,
 }
 
 #[cfg(test)]

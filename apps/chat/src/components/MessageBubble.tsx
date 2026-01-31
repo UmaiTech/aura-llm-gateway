@@ -1,9 +1,9 @@
 import {
   User, Sparkles, Copy, Check, Wrench, Loader2, CheckCircle2, XCircle,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
-  Zap, Server, Timer
+  Zap, Server, Timer, ThumbsUp, ThumbsDown
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -130,7 +130,11 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
 
         {/* Usage info (tokens, cost, and Aura metadata) */}
         {!isUser && message.usage && !message.isStreaming && (
-          <UsageDisplay usage={message.usage} aura={message.aura} />
+          <UsageDisplay
+            usage={message.usage}
+            aura={message.aura}
+            responseId={message.aura?.requestId}
+          />
         )}
       </div>
     </div>
@@ -383,9 +387,43 @@ interface UsageDisplayProps {
     latencyMs?: number
     requestId?: string
   }
+  responseId?: string
 }
 
-function UsageDisplay({ usage, aura }: UsageDisplayProps) {
+type FeedbackState = 'none' | 'up' | 'down' | 'submitting'
+
+function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
+  const [feedback, setFeedback] = useState<FeedbackState>('none')
+
+  const submitFeedback = useCallback(async (signal: 'thumbs_up' | 'thumbs_down') => {
+    if (!responseId || feedback !== 'none') return
+
+    setFeedback('submitting')
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+      const response = await fetch(`${apiBaseUrl}/v1/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          response_id: responseId,
+          signal,
+        }),
+      })
+
+      if (response.ok) {
+        setFeedback(signal === 'thumbs_up' ? 'up' : 'down')
+      } else {
+        console.error('Failed to submit feedback:', await response.text())
+        setFeedback('none')
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+      setFeedback('none')
+    }
+  }, [responseId, feedback])
   // Format latency for display
   const formatLatency = (ms: number) => {
     if (ms < 1000) {
@@ -432,6 +470,45 @@ function UsageDisplay({ usage, aura }: UsageDisplayProps) {
         <span className="flex items-center gap-1 text-green-400">
           <Coins className="h-3 w-3" />
           <span>${usage.cost.toFixed(4)}</span>
+        </span>
+      )}
+
+      {/* Feedback buttons */}
+      {responseId && (
+        <span className="flex items-center gap-1 ml-2 border-l border-border/50 pl-2">
+          <button
+            onClick={() => submitFeedback('thumbs_up')}
+            disabled={feedback !== 'none'}
+            className={cn(
+              "p-1 rounded transition-colors",
+              feedback === 'up'
+                ? "text-green-400 bg-green-500/20"
+                : feedback === 'none'
+                  ? "hover:text-green-400 hover:bg-green-500/10"
+                  : "text-muted-foreground/30 cursor-not-allowed"
+            )}
+            title="This response was helpful"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => submitFeedback('thumbs_down')}
+            disabled={feedback !== 'none'}
+            className={cn(
+              "p-1 rounded transition-colors",
+              feedback === 'down'
+                ? "text-red-400 bg-red-500/20"
+                : feedback === 'none'
+                  ? "hover:text-red-400 hover:bg-red-500/10"
+                  : "text-muted-foreground/30 cursor-not-allowed"
+            )}
+            title="This response wasn't helpful"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+          </button>
+          {feedback === 'submitting' && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
         </span>
       )}
     </div>
