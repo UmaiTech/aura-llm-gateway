@@ -1,7 +1,7 @@
 import {
   User, Sparkles, Copy, Check, Wrench, Loader2, CheckCircle2, XCircle,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
-  Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send
+  Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send, Code2
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -134,6 +134,7 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
             usage={message.usage}
             aura={message.aura}
             responseId={message.aura?.requestId}
+            rawResponse={message.rawResponse}
           />
         )}
       </div>
@@ -388,13 +389,15 @@ interface UsageDisplayProps {
     requestId?: string
   }
   responseId?: string
+  rawResponse?: unknown
 }
 
 type FeedbackState = 'none' | 'pending_up' | 'pending_down' | 'up' | 'down' | 'submitting'
 
-function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
+function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProps) {
   const [feedback, setFeedback] = useState<FeedbackState>('none')
   const [reason, setReason] = useState('')
+  const [showRaw, setShowRaw] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Focus textarea when modal opens
@@ -462,7 +465,7 @@ function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+    <div className="relative flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
       {/* Provider badge */}
       {aura?.provider && (
         <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary/50">
@@ -597,6 +600,43 @@ function UsageDisplay({ usage, aura, responseId }: UsageDisplayProps) {
             </div>
           )}
         </span>
+      )}
+
+      {/* Raw Response Button */}
+      {rawResponse && (
+        <button
+          onClick={() => setShowRaw(!showRaw)}
+          className={cn(
+            "flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ml-2 border-l border-border/50 pl-2",
+            showRaw
+              ? "text-aura-400 bg-aura-500/10"
+              : "hover:text-aura-400 hover:bg-aura-500/10"
+          )}
+          title="View raw API response"
+        >
+          <Code2 className="h-3 w-3" />
+          <span className="text-xs">Raw</span>
+        </button>
+      )}
+
+      {/* Raw Response Panel */}
+      {showRaw && rawResponse && (
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="bg-gray-900 border border-border rounded-lg shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-border">
+              <span className="text-xs font-medium text-muted-foreground">Raw API Response</span>
+              <button
+                onClick={() => setShowRaw(false)}
+                className="p-1 hover:bg-secondary-foreground/10 rounded transition-colors"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+            <pre className="text-xs p-3 overflow-x-auto max-h-80 overflow-y-auto text-gray-300 font-mono">
+              {JSON.stringify(rawResponse, null, 2)}
+            </pre>
+          </div>
+        </div>
       )}
     </div>
   )

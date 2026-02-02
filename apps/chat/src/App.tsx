@@ -202,7 +202,7 @@ export default function App() {
             fullResponse: response
           })
 
-          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId })
+          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, rawResponse: event.response })
         } else if (event.type === 'response.failed' || event.type === 'error') {
           const errorMessage =
             event.error?.message ||
@@ -319,6 +319,7 @@ export default function App() {
         let usage: MessageUsage | undefined
         let aura: AuraMetadata | undefined
         let responseId: string | undefined
+        let rawResponse: unknown
 
         try {
           while (true) {
@@ -414,6 +415,9 @@ export default function App() {
                         latencyMs: metadata.aura.latency_ms,
                       }
                     }
+
+                    // Capture raw response for debugging
+                    rawResponse = event.response
                   }
                 } catch {
                   // Skip invalid JSON
@@ -425,7 +429,7 @@ export default function App() {
           reader.releaseLock()
         }
 
-        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId })
+        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, rawResponse })
 
         // No tool calls - we're done
         if (toolCalls.length === 0) {

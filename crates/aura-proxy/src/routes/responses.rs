@@ -105,6 +105,127 @@ fn should_bypass_cache(headers: &HeaderMap) -> bool {
         .unwrap_or(false)
 }
 
+/// Preprocess request with compression and consistency augmentation
+fn preprocess_request(mut request: CreateResponseRequest) -> CreateResponseRequest {
+    // Apply compression to input items if configured
+    if let Some(ref config) = request.compression {
+        if config.enabled {
+            let mut compressed_input = Vec::new();
+            for item in &request.input {
+                match item {
+                    InputItem::Message { role, content } => {
+                        // Extract text content for compression
+                        let text = match content {
+                            aura_types::InputContent::Text(s) => s.clone(),
+                            aura_types::InputContent::Parts(parts) => {
+                                // Concatenate text parts for compression
+                                parts
+                                    .iter()
+                                    .filter_map(|p| {
+                                        if let aura_types::ContentPart::Text { text } = p {
+                                            Some(text.as_str())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            }
+                        };
+
+                        // Compress the content
+                        match compression::compress(&text, config) {
+                            Ok(output) => {
+                                if output.metadata.ratio.unwrap_or(1.0) < 1.0 {
+                                    debug!(
+                                        original_tokens = ?output.metadata.original_tokens,
+                                        compressed_tokens = ?output.metadata.compressed_tokens,
+                                        ratio = ?output.metadata.ratio,
+                                        "Compressed message content"
+                                    );
+                                }
+                                compressed_input.push(InputItem::Message {
+                                    role: role.clone(),
+                                    content: aura_types::InputContent::Text(output.content),
+                                });
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Compression failed, using original content");
+                                compressed_input.push(item.clone());
+                            }
+                        }
+                    }
+                    other => compressed_input.push(other.clone()),
+                }
+            }
+            request.input = compressed_input;
+        }
+    }
+
+    // Apply consistency augmentation to instructions if configured
+    if let Some(ref config) = request.consistency {
+        match config.strategy {
+            ConsistencyStrategy::None => {}
+            ConsistencyStrategy::Constitutional => {
+                if let Some(ref principles) = config.principles {
+                    let augmented = PromptAugmenter::with_constitution(
+                        request.instructions.as_deref(),
+                        principles,
+                    );
+                    request.instructions = Some(augmented);
+                    debug!(
+                        principles_count = principles.len(),
+                        "Applied constitutional consistency"
+                    );
+                }
+            }
+            ConsistencyStrategy::StyleProfile => {
+                if let Some(ref style) = config.style_profile {
+                    let augmented =
+                        PromptAugmenter::with_style(request.instructions.as_deref(), style);
+                    request.instructions = Some(augmented);
+                    debug!("Applied style profile consistency");
+                }
+            }
+            ConsistencyStrategy::ReferenceAnchoring => {
+                if let Some(ref reference) = config.reference_response {
+                    let augmented =
+                        PromptAugmenter::with_reference(request.instructions.as_deref(), reference);
+                    request.instructions = Some(augmented);
+                    debug!("Applied reference anchoring consistency");
+                }
+            }
+            ConsistencyStrategy::FewShotPriming => {
+                if let Some(ref examples) = config.examples {
+                    let augmented =
+                        PromptAugmenter::with_examples(request.instructions.as_deref(), examples);
+                    request.instructions = Some(augmented);
+                    debug!(
+                        examples_count = examples.len(),
+                        "Applied few-shot priming consistency"
+                    );
+                }
+            }
+            ConsistencyStrategy::ModelCalibration => {
+                // Get default calibration for the model
+                let calibration = aura_types::DefaultCalibrations::for_model(&request.model);
+                let augmented = PromptAugmenter::with_calibration(
+                    request.instructions.as_deref(),
+                    &calibration,
+                );
+                request.instructions = Some(augmented);
+                debug!(model = %request.model, "Applied model calibration consistency");
+            }
+            _ => {
+                // Other strategies not yet implemented
+                debug!(strategy = ?config.strategy, "Consistency strategy not yet implemented");
+            }
+        }
+    }
+
+    request
+}
+
 /// Create a response (streaming or non-streaming)
 ///
 /// This is the main endpoint for generating LLM responses. Set `stream: true` for
@@ -163,6 +284,9 @@ pub async fn create_response(
         has_compression = request.compression.is_some(),
         "Creating response"
     );
+
+    // Preprocess request with compression and consistency
+    let request = preprocess_request(request);
 
     // Get the provider for this request
     let provider = state.get_provider(&request.model).ok_or_else(|| {

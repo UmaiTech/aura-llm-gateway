@@ -8,6 +8,7 @@ export interface Message {
   usage?: MessageUsage
   aura?: AuraMetadata  // Aura gateway metadata
   responseId?: string  // API response ID for conversation threading
+  rawResponse?: unknown  // Full raw API response for debugging
 }
 
 export interface MessageUsage {
