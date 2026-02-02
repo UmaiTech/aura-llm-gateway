@@ -10,13 +10,13 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@mingcute/react": "^1.4.0",
     "@tanstack/react-query": "^5.60.0",
     "@tanstack/react-table": "^8.20.0",
     "@tanstack/react-virtual": "^3.10.0",
     "animejs": "^3.2.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "@mingcute/react": "^1.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
