@@ -7,6 +7,7 @@
   "cost-tracking": "Cost Tracking",
   "rate-limiting": "Rate Limiting",
   "routing": "Smart Routing",
+  "compression": "Prompt Compression",
   "validation": "Response Validation",
   "consistency": "Response Consistency",
   "caching": "Response Caching",

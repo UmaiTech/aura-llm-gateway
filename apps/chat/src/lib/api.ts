@@ -1,4 +1,4 @@
-import type { CreateResponseRequest, Response, StreamEvent, Message, RoutingStrategy, ValidationConfig } from './types'
+import type { CreateResponseRequest, Response, StreamEvent, Message, RoutingStrategy, ValidationConfig, ConsistencyConfig, CompressionConfig } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/v1`
@@ -6,22 +6,30 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
 
+export interface AuraAPIConfig {
+  baseUrl?: string
+  apiKey?: string
+  routingStrategy?: RoutingStrategy
+  validationConfig?: ValidationConfig
+  consistencyConfig?: ConsistencyConfig
+  compressionConfig?: CompressionConfig
+}
+
 export class AuraAPI {
   private baseUrl: string
   private apiKey: string
   private routingStrategy: RoutingStrategy
   private validationConfig?: ValidationConfig
+  private consistencyConfig?: ConsistencyConfig
+  private compressionConfig?: CompressionConfig
 
-  constructor(
-    baseUrl: string = API_BASE,
-    apiKey: string = API_KEY,
-    routingStrategy: RoutingStrategy = 'round_robin',
-    validationConfig?: ValidationConfig
-  ) {
-    this.baseUrl = baseUrl
-    this.apiKey = apiKey
-    this.routingStrategy = routingStrategy
-    this.validationConfig = validationConfig
+  constructor(config: AuraAPIConfig = {}) {
+    this.baseUrl = config.baseUrl || API_BASE
+    this.apiKey = config.apiKey || API_KEY
+    this.routingStrategy = config.routingStrategy || 'round_robin'
+    this.validationConfig = config.validationConfig
+    this.consistencyConfig = config.consistencyConfig
+    this.compressionConfig = config.compressionConfig
   }
 
   private getHeaders(): HeadersInit {
@@ -43,6 +51,8 @@ export class AuraAPI {
         ...request,
         stream: false,
         ...(this.validationConfig && { validation: this.validationConfig }),
+        ...(this.consistencyConfig && { consistency: this.consistencyConfig }),
+        ...(this.compressionConfig && { compression: this.compressionConfig }),
       }),
     })
 
@@ -64,6 +74,8 @@ export class AuraAPI {
         ...request,
         stream: true,
         ...(this.validationConfig && { validation: this.validationConfig }),
+        ...(this.consistencyConfig && { consistency: this.consistencyConfig }),
+        ...(this.compressionConfig && { compression: this.compressionConfig }),
       }),
     })
 

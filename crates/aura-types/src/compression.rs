@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 /// - TOON: Best for uniform arrays (40-60% savings)
 /// - YAML: Good for nested objects (10-25% savings)
 /// - JSON Compact: Safe default (15-30% savings)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DataFormat {
     /// Standard JSON with formatting
@@ -36,7 +36,7 @@ pub enum DataFormat {
 /// AISP (AI Symbolic Protocol) uses mathematical notation to eliminate
 /// ambiguity in rule specifications, achieving <2% ambiguity vs 40-65%
 /// with natural language.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SemanticFormat {
     /// Standard natural language
@@ -49,7 +49,7 @@ pub enum SemanticFormat {
 }
 
 /// AISP symbol set complexity level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AispSymbolSet {
     /// ~50 most common symbols (∀, ∃, ⇒, ∧, ∨, etc.)
@@ -62,7 +62,7 @@ pub enum AispSymbolSet {
 }
 
 /// Configuration for AISP encoding.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AispConfig {
     /// Symbol set complexity level
     #[serde(default)]
@@ -98,7 +98,7 @@ impl Default for AispConfig {
 }
 
 /// Configuration for TOON encoding.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ToonConfig {
     /// Minimum array size to use tabular format
     #[serde(default = "default_toon_threshold")]
@@ -124,7 +124,7 @@ impl Default for ToonConfig {
 }
 
 /// Configuration for YAML conversion.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct YamlConfig {
     /// Use flow style for short arrays
     #[serde(default = "default_true")]
@@ -150,7 +150,7 @@ impl Default for YamlConfig {
 }
 
 /// Main compression configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CompressionConfig {
     /// Enable compression
     #[serde(default)]

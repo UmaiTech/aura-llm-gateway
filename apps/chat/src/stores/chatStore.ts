@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity } from '../lib/types'
+import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity, CompressionStrategy, CompressionConfig } from '../lib/types'
 import { generateId } from '../lib/utils'
 
 interface ChatState {
@@ -25,6 +25,7 @@ interface ChatState {
   consistencyStyleFormality: Formality
   consistencyStyleVerbosity: Verbosity
   consistencyApplyCalibration: boolean
+  compressionStrategy: CompressionStrategy
 
   // Actions
   createConversation: () => string
@@ -56,6 +57,8 @@ interface ChatState {
   setConsistencyStyleVerbosity: (verbosity: Verbosity) => void
   setConsistencyApplyCalibration: (apply: boolean) => void
   getConsistencyConfig: () => ConsistencyConfig | undefined
+  setCompressionStrategy: (strategy: CompressionStrategy) => void
+  getCompressionConfig: () => CompressionConfig | undefined
 
   // Computed
   getCurrentConversation: () => Conversation | null
@@ -83,6 +86,7 @@ export const useChatStore = create<ChatState>()(
       consistencyStyleFormality: 'standard',
       consistencyStyleVerbosity: 'balanced',
       consistencyApplyCalibration: false,
+      compressionStrategy: 'none',
 
       // Conversation actions
       createConversation: () => {
@@ -315,6 +319,20 @@ export const useChatStore = create<ChatState>()(
         return config
       },
 
+      setCompressionStrategy: (compressionStrategy) => set({ compressionStrategy }),
+
+      getCompressionConfig: () => {
+        const { compressionStrategy } = get()
+        if (compressionStrategy === 'none') {
+          return undefined
+        }
+        return {
+          strategy: compressionStrategy,
+          preserve_structure: true,
+          min_savings_threshold: 0.1,
+        }
+      },
+
       // Computed
       getCurrentConversation: () => {
         const { conversations, currentConversationId } = get()
@@ -343,6 +361,7 @@ export const useChatStore = create<ChatState>()(
         consistencyStyleFormality: state.consistencyStyleFormality,
         consistencyStyleVerbosity: state.consistencyStyleVerbosity,
         consistencyApplyCalibration: state.consistencyApplyCalibration,
+        compressionStrategy: state.compressionStrategy,
       }),
     }
   )

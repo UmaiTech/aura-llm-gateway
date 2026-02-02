@@ -337,3 +337,34 @@ export const CONSTITUTIONAL_PRESETS: { id: string; name: string; principles: str
     ],
   },
 ]
+
+// Compression strategies for token reduction
+export type CompressionStrategy =
+  | 'none'
+  | 'auto'
+  | 'json'
+  | 'toon'
+  | 'yaml'
+  | 'aisp'
+
+export interface CompressionConfig {
+  strategy: CompressionStrategy
+  preserve_structure?: boolean
+  min_savings_threshold?: number
+}
+
+export interface CompressionMetadata {
+  strategy: CompressionStrategy
+  original_tokens?: number
+  compressed_tokens?: number
+  savings_percent?: number
+}
+
+export const COMPRESSION_STRATEGIES: { id: CompressionStrategy; name: string; description: string; savings: string }[] = [
+  { id: 'none', name: 'None', description: 'No compression (default)', savings: '0%' },
+  { id: 'auto', name: 'Auto', description: 'Smart selection based on content', savings: '15-60%' },
+  { id: 'json', name: 'JSON Minify', description: 'Whitespace removal, key shortening', savings: '15-30%' },
+  { id: 'toon', name: 'TOON', description: 'Token-Oriented Object Notation for arrays', savings: '40-60%' },
+  { id: 'yaml', name: 'YAML', description: 'Fewer delimiters for nested objects', savings: '10-25%' },
+  { id: 'aisp', name: 'AISP', description: 'AI Symbolic Protocol for math notation', savings: 'Clarity boost' },
+]

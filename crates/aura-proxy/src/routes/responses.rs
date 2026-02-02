@@ -8,9 +8,12 @@
 //! Non-streaming responses with `temperature=0` are cached in Redis if available.
 //! To bypass caching, set the `X-Cache-Control: no-cache` header.
 
-use aura_core::{cache, metrics, ProviderError};
+use aura_core::{cache, compression, metrics, ProviderError};
 use aura_db::NewRequestLog;
-use aura_types::{CreateResponseRequest, ResponseStatus, StreamEvent};
+use aura_types::{
+    ConsistencyStrategy, CreateResponseRequest, InputItem, PromptAugmenter, ResponseStatus,
+    StreamEvent,
+};
 use axum::{
     extract::State,
     http::{header::HeaderMap, StatusCode},
@@ -155,6 +158,9 @@ pub async fn create_response(
         model = %request.model,
         stream = %request.stream,
         api_key_id = ?auth_context.as_ref().map(|c| c.api_key.id),
+        has_validation = request.validation.is_some(),
+        has_consistency = request.consistency.is_some(),
+        has_compression = request.compression.is_some(),
         "Creating response"
     );
 

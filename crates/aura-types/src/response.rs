@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::compression::CompressionConfig;
 use crate::consistency::{ConsistencyConfig, ConsistencyMetadata};
 use crate::item::{InputItem, Item};
 use crate::validation::{ValidationConfig, ValidationMetadata};
@@ -472,6 +473,11 @@ pub struct CreateResponseRequest {
     /// Enables cross-model response consistency
     #[serde(skip_serializing_if = "Option::is_none")]
     pub consistency: Option<ConsistencyConfig>,
+
+    /// Compression configuration (Aura extension)
+    /// Enables prompt compression to reduce token usage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compression: Option<CompressionConfig>,
 }
 
 impl CreateResponseRequest {
@@ -492,6 +498,7 @@ impl CreateResponseRequest {
             metadata: None,
             validation: None,
             consistency: None,
+            compression: None,
         }
     }
 
@@ -545,6 +552,12 @@ impl CreateResponseRequest {
     /// Set consistency configuration
     pub fn with_consistency(mut self, consistency: ConsistencyConfig) -> Self {
         self.consistency = Some(consistency);
+        self
+    }
+
+    /// Set compression configuration
+    pub fn with_compression(mut self, compression: CompressionConfig) -> Self {
+        self.compression = Some(compression);
         self
     }
 }

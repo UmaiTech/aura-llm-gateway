@@ -37,6 +37,8 @@ export default function App() {
     getValidationConfig,
     consistencyStrategy,
     setConsistencyStrategy,
+    compressionStrategy,
+    setCompressionStrategy,
     createConversation,
     selectConversation,
     deleteConversation,
@@ -46,14 +48,20 @@ export default function App() {
     getCurrentConversation,
   } = useChatStore()
 
-  // Create API instance with routing strategy and validation config
+  // Get configs from store
   const validationConfig = getValidationConfig()
-  const api = new AuraAPI(
-    import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1` : '/v1',
-    API_KEY,
+  const consistencyConfig = useChatStore.getState().getConsistencyConfig()
+  const compressionConfig = useChatStore.getState().getCompressionConfig()
+
+  // Create API instance with all strategy configs
+  const api = new AuraAPI({
+    baseUrl: import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1` : '/v1',
+    apiKey: API_KEY,
     routingStrategy,
-    validationConfig
-  )
+    validationConfig,
+    consistencyConfig,
+    compressionConfig,
+  })
 
   const currentConversation = getCurrentConversation()
   const messages = currentConversation?.messages || []
@@ -564,12 +572,6 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           agentMode={agentMode}
           onAgentModeChange={setAgentMode}
-          routingStrategy={routingStrategy}
-          onRoutingStrategyChange={setRoutingStrategy}
-          validationStrategy={validationStrategy}
-          onValidationStrategyChange={setValidationStrategy}
-          consistencyStrategy={consistencyStrategy}
-          onConsistencyStrategyChange={setConsistencyStrategy}
         />
 
         {/* Chat area */}
@@ -582,6 +584,14 @@ export default function App() {
           model={selectedModel}
           models={AVAILABLE_MODELS}
           onModelChange={handleModelChange}
+          routingStrategy={routingStrategy}
+          onRoutingStrategyChange={setRoutingStrategy}
+          validationStrategy={validationStrategy}
+          onValidationStrategyChange={setValidationStrategy}
+          consistencyStrategy={consistencyStrategy}
+          onConsistencyStrategyChange={setConsistencyStrategy}
+          compressionStrategy={compressionStrategy}
+          onCompressionStrategyChange={setCompressionStrategy}
         />
       </div>
     </div>
