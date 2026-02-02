@@ -15,6 +15,10 @@ import {
   GithubLine,
   ArrowLeftLine,
   ArrowRightLine,
+  Building4Line,
+  Group2Line,
+  User2Line,
+  DirectionsLine,
 } from '@mingcute/react'
 
 interface NavItem {
@@ -45,10 +49,19 @@ const navigation: NavGroup[] = [
     ],
   },
   {
+    label: 'Organization',
+    items: [
+      { name: 'Organizations', href: '/organizations', icon: Building4Line },
+      { name: 'Teams', href: '/teams', icon: Group2Line },
+      { name: 'End Users', href: '/end-users', icon: User2Line },
+    ],
+  },
+  {
     label: 'Manage',
     items: [
       { name: 'API Keys', href: '/keys', icon: Key2Line },
       { name: 'Providers', href: '/providers', icon: ServerLine },
+      { name: 'Routing', href: '/routing', icon: DirectionsLine },
       { name: 'Logs', href: '/logs', icon: DocumentsLine },
       { name: 'Settings', href: '/settings', icon: Settings1Line },
     ],

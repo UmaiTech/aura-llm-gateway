@@ -88,6 +88,12 @@ pub struct CreateEndUserRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateOrganizationRequest {
+    pub name: Option<String>,
+    pub settings: Option<serde_json::Value>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     pub error: ErrorDetail,
@@ -141,18 +147,34 @@ async fn create_organization(
     Ok((StatusCode::CREATED, Json(org)))
 }
 
-async fn list_organizations(State(_state): State<AppState>) -> impl IntoResponse {
-    // TODO: Implement proper list with pagination
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(ErrorResponse {
-            error: ErrorDetail {
-                code: "not_implemented".to_string(),
-                message: "List organizations not yet implemented. Use find_by_id or get_by_user."
-                    .to_string(),
-            },
-        }),
-    )
+async fn list_organizations(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<Organization>>, (StatusCode, Json<ErrorResponse>)> {
+    let pool = state.db_pool().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "database_unavailable".to_string(),
+                    message: "Database not configured".to_string(),
+                },
+            }),
+        )
+    })?;
+
+    let orgs = OrganizationRepo::list_all(pool, 100, 0).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "list_failed".to_string(),
+                    message: format!("Failed to list organizations: {}", e),
+                },
+            }),
+        )
+    })?;
+
+    Ok(Json(orgs))
 }
 
 async fn get_organization(
@@ -200,36 +222,73 @@ async fn get_organization(
 }
 
 async fn update_organization(
-    State(_state): State<AppState>,
-    Path(_org_id): Path<Uuid>,
-    Json(_req): Json<CreateOrganizationRequest>,
-) -> impl IntoResponse {
-    // TODO: Implement update
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(ErrorResponse {
-            error: ErrorDetail {
-                code: "not_implemented".to_string(),
-                message: "Update organization not yet implemented".to_string(),
-            },
-        }),
+    State(state): State<AppState>,
+    Path(org_id): Path<Uuid>,
+    Json(req): Json<UpdateOrganizationRequest>,
+) -> Result<Json<Organization>, (StatusCode, Json<ErrorResponse>)> {
+    let pool = state.db_pool().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "database_unavailable".to_string(),
+                    message: "Database not configured".to_string(),
+                },
+            }),
+        )
+    })?;
+
+    let org = OrganizationRepo::update(
+        pool,
+        org_id,
+        req.name.as_deref(),
+        req.settings.as_ref(),
     )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "update_failed".to_string(),
+                    message: format!("Failed to update organization: {}", e),
+                },
+            }),
+        )
+    })?;
+
+    Ok(Json(org))
 }
 
 async fn delete_organization(
-    State(_state): State<AppState>,
-    Path(_org_id): Path<Uuid>,
-) -> impl IntoResponse {
-    // TODO: Implement delete
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(ErrorResponse {
-            error: ErrorDetail {
-                code: "not_implemented".to_string(),
-                message: "Delete organization not yet implemented".to_string(),
-            },
-        }),
-    )
+    State(state): State<AppState>,
+    Path(org_id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let pool = state.db_pool().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "database_unavailable".to_string(),
+                    message: "Database not configured".to_string(),
+                },
+            }),
+        )
+    })?;
+
+    OrganizationRepo::delete(pool, org_id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: ErrorDetail {
+                    code: "delete_failed".to_string(),
+                    message: format!("Failed to delete organization: {}", e),
+                },
+            }),
+        )
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
