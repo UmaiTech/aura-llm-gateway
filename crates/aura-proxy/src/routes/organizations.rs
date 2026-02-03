@@ -162,17 +162,19 @@ async fn list_organizations(
         )
     })?;
 
-    let orgs = OrganizationRepo::list_all(pool, 100, 0).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
-                error: ErrorDetail {
-                    code: "list_failed".to_string(),
-                    message: format!("Failed to list organizations: {}", e),
-                },
-            }),
-        )
-    })?;
+    let orgs = OrganizationRepo::list_all(pool, 100, 0)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: ErrorDetail {
+                        code: "list_failed".to_string(),
+                        message: format!("Failed to list organizations: {}", e),
+                    },
+                }),
+            )
+        })?;
 
     Ok(Json(orgs))
 }
@@ -238,24 +240,19 @@ async fn update_organization(
         )
     })?;
 
-    let org = OrganizationRepo::update(
-        pool,
-        org_id,
-        req.name.as_deref(),
-        req.settings.as_ref(),
-    )
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
-                error: ErrorDetail {
-                    code: "update_failed".to_string(),
-                    message: format!("Failed to update organization: {}", e),
-                },
-            }),
-        )
-    })?;
+    let org = OrganizationRepo::update(pool, org_id, req.name.as_deref(), req.settings.as_ref())
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: ErrorDetail {
+                        code: "update_failed".to_string(),
+                        message: format!("Failed to update organization: {}", e),
+                    },
+                }),
+            )
+        })?;
 
     Ok(Json(org))
 }

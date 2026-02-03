@@ -5,12 +5,7 @@
 //! - Routing configuration
 //! - System health and metrics
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
@@ -23,7 +18,10 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/costs", get(get_cost_stats))
         // Routing configuration
         .route("/admin/routing/rules", get(list_routing_rules))
-        .route("/admin/routing/rules", axum::routing::post(create_routing_rule))
+        .route(
+            "/admin/routing/rules",
+            axum::routing::post(create_routing_rule),
+        )
 }
 
 // ============================================================================
@@ -117,9 +115,7 @@ pub struct CreateRoutingRuleRequest {
 // Dashboard Stats Endpoints
 // ============================================================================
 
-async fn get_overview_stats(
-    State(_state): State<AppState>,
-) -> Json<OverviewStats> {
+async fn get_overview_stats(State(_state): State<AppState>) -> Json<OverviewStats> {
     // Return mock data for now - real implementation would query the database
     Json(OverviewStats {
         total_requests: 24832,
@@ -133,9 +129,7 @@ async fn get_overview_stats(
     })
 }
 
-async fn get_usage_stats(
-    State(_state): State<AppState>,
-) -> Json<UsageStats> {
+async fn get_usage_stats(State(_state): State<AppState>) -> Json<UsageStats> {
     // Return mock data for now
     Json(UsageStats {
         period: "7d".to_string(),
@@ -186,9 +180,7 @@ async fn get_usage_stats(
     })
 }
 
-async fn get_cost_stats(
-    State(_state): State<AppState>,
-) -> Json<CostStats> {
+async fn get_cost_stats(State(_state): State<AppState>) -> Json<CostStats> {
     // Return mock data for now
     Json(CostStats {
         period: "7d".to_string(),
@@ -244,9 +236,7 @@ async fn get_cost_stats(
 // Routing Configuration Endpoints
 // ============================================================================
 
-async fn list_routing_rules(
-    State(_state): State<AppState>,
-) -> Json<Vec<RoutingRule>> {
+async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingRule>> {
     // Return mock routing rules - real implementation would query database
     Json(vec![
         RoutingRule {
@@ -256,12 +246,10 @@ async fn list_routing_rules(
             strategy: "cost_based".to_string(),
             priority: 1,
             enabled: true,
-            conditions: vec![
-                RoutingCondition {
-                    condition_type: "input_tokens".to_string(),
-                    value: "< 500".to_string(),
-                },
-            ],
+            conditions: vec![RoutingCondition {
+                condition_type: "input_tokens".to_string(),
+                value: "< 500".to_string(),
+            }],
             actions: vec![
                 RoutingAction {
                     provider: "openai".to_string(),
@@ -308,12 +296,10 @@ async fn list_routing_rules(
             strategy: "fallback".to_string(),
             priority: 10,
             enabled: true,
-            conditions: vec![
-                RoutingCondition {
-                    condition_type: "on_error".to_string(),
-                    value: "true".to_string(),
-                },
-            ],
+            conditions: vec![RoutingCondition {
+                condition_type: "on_error".to_string(),
+                value: "true".to_string(),
+            }],
             actions: vec![
                 RoutingAction {
                     provider: "openai".to_string(),
@@ -341,7 +327,10 @@ async fn create_routing_rule(
 ) -> (StatusCode, Json<RoutingRule>) {
     // Return mock created rule - real implementation would store in database
     let rule = RoutingRule {
-        id: format!("rule_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()),
+        id: format!(
+            "rule_{}",
+            uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
+        ),
         name: req.name,
         description: req.description,
         strategy: req.strategy,
