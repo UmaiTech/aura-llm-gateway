@@ -12,6 +12,9 @@ import {
   ArrowDownLine,
   CheckLine,
   AlertLine,
+  DirectionsLine,
+  FileZipLine,
+  ServerLine,
 } from '@mingcute/react'
 
 // Mock data - will be replaced with API calls
@@ -55,6 +58,21 @@ const providers = [
   { name: 'Anthropic', status: 'healthy', latency: 456 },
   { name: 'Google', status: 'degraded', latency: 892 },
 ]
+
+const routingStats = [
+  { strategy: 'round_robin', requests: 8900, percentage: 35.8 },
+  { strategy: 'cost_based', requests: 7200, percentage: 29.0 },
+  { strategy: 'weighted', requests: 4200, percentage: 16.9 },
+  { strategy: 'latency_based', requests: 3100, percentage: 12.5 },
+  { strategy: 'fallback', requests: 1447, percentage: 5.8 },
+]
+
+const gatewayFeatures = {
+  cacheHitRate: 68.5,
+  compressionRatio: 42,
+  dataSaved: '1.2 GB',
+  avgCompressionOverhead: 12,
+}
 
 const recentRequests = [
   { id: 'aura_8f2a3d7e', provider: 'openai', model: 'gpt-4o', status: 'completed', cost: 0.02, latency: 234 },
@@ -173,6 +191,119 @@ export function DashboardPage() {
                   </div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Gateway Features Row */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Routing Strategy Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <DirectionsLine className="h-4 w-4 text-primary" />
+                Routing Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {routingStats.map((stat) => (
+                <div key={stat.strategy} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="capitalize">{stat.strategy.replace('_', ' ')}</span>
+                    <span className="text-muted-foreground">{stat.percentage}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ width: `${stat.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Cache Performance */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <ServerLine className="h-4 w-4 text-primary" />
+                Cache Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center">
+                <div className="relative w-32 h-32">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle
+                      className="text-muted stroke-current"
+                      strokeWidth="10"
+                      fill="transparent"
+                      r="40"
+                      cx="50"
+                      cy="50"
+                    />
+                    <circle
+                      className="text-success stroke-current"
+                      strokeWidth="10"
+                      strokeLinecap="round"
+                      fill="transparent"
+                      r="40"
+                      cx="50"
+                      cy="50"
+                      strokeDasharray={`${gatewayFeatures.cacheHitRate * 2.51} 251`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold">{gatewayFeatures.cacheHitRate}%</span>
+                    <span className="text-xs text-muted-foreground">Hit Rate</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-4 text-center text-sm">
+                <div>
+                  <p className="font-semibold text-success">16,984</p>
+                  <p className="text-xs text-muted-foreground">Cache Hits</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground">7,863</p>
+                  <p className="text-xs text-muted-foreground">Cache Misses</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Compression Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <FileZipLine className="h-4 w-4 text-primary" />
+                Compression Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted/50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-green-400">{gatewayFeatures.compressionRatio}%</p>
+                  <p className="text-xs text-muted-foreground">Avg Ratio</p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg text-center">
+                  <p className="text-2xl font-bold">{gatewayFeatures.dataSaved}</p>
+                  <p className="text-xs text-muted-foreground">Data Saved</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Compression Overhead</span>
+                <span className="font-mono">{gatewayFeatures.avgCompressionOverhead}ms avg</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Algorithm</span>
+                <Badge variant="secondary">gzip</Badge>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Requests Compressed</span>
+                <span className="font-mono">18,234</span>
+              </div>
             </CardContent>
           </Card>
         </div>

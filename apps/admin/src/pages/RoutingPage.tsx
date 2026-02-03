@@ -20,7 +20,7 @@ interface RoutingRule {
   id: string
   name: string
   description: string
-  strategy: 'round_robin' | 'cost_based' | 'latency_based' | 'intent_based' | 'fallback'
+  strategy: 'round_robin' | 'cost_based' | 'latency_based' | 'intent_based' | 'fallback' | 'random' | 'weighted'
   priority: number
   enabled: boolean
   conditions: {
@@ -120,14 +120,53 @@ const mockRules: RoutingRule[] = [
       avgLatency: 890,
     },
   },
+  {
+    id: 'rule_5',
+    name: 'Weighted Distribution',
+    description: 'Distribute traffic with custom weights',
+    strategy: 'weighted',
+    priority: 4,
+    enabled: true,
+    conditions: [],
+    actions: [
+      { provider: 'openai', model: 'gpt-4o', weight: 50 },
+      { provider: 'anthropic', model: 'claude-3-sonnet', weight: 35 },
+      { provider: 'google', model: 'gemini-pro', weight: 15 },
+    ],
+    stats: {
+      requestsRouted: 4200,
+      costSaved: 78.90,
+      avgLatency: 380,
+    },
+  },
+  {
+    id: 'rule_6',
+    name: 'Random Selection',
+    description: 'Random provider for A/B testing',
+    strategy: 'random',
+    priority: 5,
+    enabled: false,
+    conditions: [{ type: 'tag', value: 'experiment' }],
+    actions: [
+      { provider: 'openai', model: 'gpt-4o' },
+      { provider: 'anthropic', model: 'claude-3-opus' },
+    ],
+    stats: {
+      requestsRouted: 890,
+      costSaved: 0,
+      avgLatency: 560,
+    },
+  },
 ]
 
-const strategyInfo: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  round_robin: { label: 'Round Robin', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: <DirectionsLine className="w-4 h-4" /> },
-  cost_based: { label: 'Cost Based', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: <CoinLine className="w-4 h-4" /> },
-  latency_based: { label: 'Latency Based', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <TimeLine className="w-4 h-4" /> },
-  intent_based: { label: 'Intent Based', color: 'bg-violet-500/20 text-violet-400 border-violet-500/30', icon: <AiLine className="w-4 h-4" /> },
-  fallback: { label: 'Fallback', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: <Settings1Line className="w-4 h-4" /> },
+const strategyInfo: Record<string, { label: string; color: string; icon: React.ReactNode; description: string }> = {
+  round_robin: { label: 'Round Robin', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: <DirectionsLine className="w-4 h-4" />, description: 'Distribute requests evenly across providers' },
+  cost_based: { label: 'Cost Based', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: <CoinLine className="w-4 h-4" />, description: 'Route to cheapest provider based on model pricing' },
+  latency_based: { label: 'Latency Based', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <TimeLine className="w-4 h-4" />, description: 'Route to fastest provider based on response times' },
+  intent_based: { label: 'Intent Based', color: 'bg-violet-500/20 text-violet-400 border-violet-500/30', icon: <AiLine className="w-4 h-4" />, description: 'Route based on request complexity and intent' },
+  fallback: { label: 'Fallback', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: <Settings1Line className="w-4 h-4" />, description: 'Try providers in sequence on failure' },
+  random: { label: 'Random', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30', icon: <DirectionsLine className="w-4 h-4" />, description: 'Randomly select from available providers' },
+  weighted: { label: 'Weighted', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30', icon: <ChartBarLine className="w-4 h-4" />, description: 'Route based on configured weights per provider' },
 }
 
 export function RoutingPage() {
@@ -384,6 +423,8 @@ export function RoutingPage() {
                 <label className="text-sm font-medium mb-1 block">Strategy</label>
                 <select className="w-full px-3 py-2 bg-background border border-border rounded-md">
                   <option value="round_robin">Round Robin</option>
+                  <option value="weighted">Weighted</option>
+                  <option value="random">Random</option>
                   <option value="cost_based">Cost Based</option>
                   <option value="latency_based">Latency Based</option>
                   <option value="intent_based">Intent Based</option>
@@ -437,6 +478,8 @@ export function RoutingPage() {
                   defaultValue={editingRule.strategy}
                 >
                   <option value="round_robin">Round Robin</option>
+                  <option value="weighted">Weighted</option>
+                  <option value="random">Random</option>
                   <option value="cost_based">Cost Based</option>
                   <option value="latency_based">Latency Based</option>
                   <option value="intent_based">Intent Based</option>

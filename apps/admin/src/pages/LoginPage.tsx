@@ -5,7 +5,9 @@ import { useAuthStore } from '@/stores'
 import { Key2Line, EyeLine, EyeCloseLine } from '@mingcute/react'
 
 export function LoginPage() {
-  const [key, setKey] = useState('')
+  // Pre-fill admin key from env var in development for convenience
+  const defaultKey = import.meta.env.VITE_ADMIN_KEY || ''
+  const [key, setKey] = useState(defaultKey)
   const [showKey, setShowKey] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -35,11 +37,11 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-gradient-to-br from-aura-500 to-indigo-500 p-[2px] mb-4 shadow-glow">
-            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-card">
-              <span className="font-bold text-3xl gradient-text">A</span>
-            </div>
-          </div>
+          <img
+            src="/logo-glow.svg"
+            alt="Aura"
+            className="h-24 w-24 mb-4"
+          />
           <h1 className="text-2xl font-bold">Aura Gateway</h1>
           <p className="text-muted-foreground mt-1">Admin Dashboard</p>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
 import { useSettingsStore } from '@/stores'
 import { cn } from '@/lib/utils'
 import {
@@ -12,9 +12,12 @@ import {
   SunLine,
   MoonLine,
   ComputerLine,
+  CheckLine,
+  FileZipLine,
+  BalanceLine,
 } from '@mingcute/react'
 
-type Tab = 'general' | 'rate-limiting' | 'caching' | 'security' | 'appearance'
+type Tab = 'general' | 'rate-limiting' | 'caching' | 'validation' | 'consistency' | 'compression' | 'security' | 'appearance'
 
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('general')
@@ -24,6 +27,9 @@ export function SettingsPage() {
     { id: 'general', name: 'General', icon: Settings1Line },
     { id: 'rate-limiting', name: 'Rate Limiting', icon: FlashLine },
     { id: 'caching', name: 'Caching', icon: ServerLine },
+    { id: 'validation', name: 'Validation', icon: CheckLine },
+    { id: 'consistency', name: 'Consistency', icon: BalanceLine },
+    { id: 'compression', name: 'Compression', icon: FileZipLine },
     { id: 'security', name: 'Security', icon: ShieldLine },
     { id: 'appearance', name: 'Appearance', icon: PaletteLine },
   ]
@@ -152,6 +158,160 @@ export function SettingsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Cache Bypass Header</label>
                     <Input defaultValue="X-Cache-Bypass" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {activeTab === 'validation' && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Request Validation</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <label className="flex items-center gap-3">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm">Enable request validation</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Validation Strategy</label>
+                      <select className="w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring">
+                        <option value="strict">Strict - Reject invalid requests</option>
+                        <option value="lenient">Lenient - Warn but allow</option>
+                        <option value="none">None - No validation</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground">How to handle requests that don't match the schema</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Max Input Tokens</label>
+                      <Input type="number" defaultValue="128000" />
+                      <p className="text-xs text-muted-foreground">Maximum tokens allowed in a single request</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Max Output Tokens</label>
+                      <Input type="number" defaultValue="16000" />
+                    </div>
+                    <label className="flex items-center gap-3">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm">Validate tool definitions</span>
+                    </label>
+                    <label className="flex items-center gap-3">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm">Validate JSON schemas in tool parameters</span>
+                    </label>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Content Filtering</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <label className="flex items-center gap-3">
+                      <input type="checkbox" className="rounded" />
+                      <span className="text-sm">Enable content filtering</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Blocked Keywords</label>
+                      <Input placeholder="Enter comma-separated keywords" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {activeTab === 'consistency' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Response Consistency</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Consistency Strategy</label>
+                    <select className="w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring">
+                      <option value="none">None - Default provider behavior</option>
+                      <option value="deterministic">Deterministic - Force temperature=0</option>
+                      <option value="seed">Seed-based - Use consistent seed values</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">Control response reproducibility across requests</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Default Seed</label>
+                    <Input type="number" placeholder="12345" />
+                    <p className="text-xs text-muted-foreground">Used when seed-based consistency is enabled</p>
+                  </div>
+                  <label className="flex items-center gap-3">
+                    <input type="checkbox" className="rounded" />
+                    <span className="text-sm">Log seed values for reproducibility</span>
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input type="checkbox" className="rounded" />
+                    <span className="text-sm">Override user-provided temperature when deterministic</span>
+                  </label>
+
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Note:</strong> Consistency settings affect cacheability. Deterministic responses are more likely to cache effectively.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {activeTab === 'compression' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Response Compression</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <label className="flex items-center gap-3">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-sm">Enable response compression</span>
+                  </label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Compression Algorithm</label>
+                    <select className="w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring">
+                      <option value="gzip">gzip (recommended)</option>
+                      <option value="br">Brotli</option>
+                      <option value="deflate">Deflate</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Compression Level</label>
+                    <Input type="number" defaultValue="6" min="1" max="9" />
+                    <p className="text-xs text-muted-foreground">1 (fastest) to 9 (best compression)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Minimum Size (bytes)</label>
+                    <Input type="number" defaultValue="1024" />
+                    <p className="text-xs text-muted-foreground">Only compress responses larger than this</p>
+                  </div>
+                  <label className="flex items-center gap-3">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-sm">Include compression metadata in response</span>
+                  </label>
+
+                  <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Compression Stats (24h)</span>
+                      <Badge variant="success">Active</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-lg font-semibold">42%</p>
+                        <p className="text-xs text-muted-foreground">Avg Ratio</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold">1.2 GB</p>
+                        <p className="text-xs text-muted-foreground">Data Saved</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold">12ms</p>
+                        <p className="text-xs text-muted-foreground">Avg Overhead</p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

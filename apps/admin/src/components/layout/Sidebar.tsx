@@ -88,11 +88,11 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b px-4">
           <NavLink to="/" className="flex items-center gap-3">
-            <div className="relative h-9 w-9 overflow-hidden rounded-lg bg-gradient-to-br from-aura-500 to-indigo-500 p-[1px]">
-              <div className="flex h-full w-full items-center justify-center rounded-[7px] bg-card">
-                <span className="font-bold text-lg gradient-text">A</span>
-              </div>
-            </div>
+            <img
+              src="/favicon.svg"
+              alt="Aura"
+              className="h-9 w-9 rounded-lg"
+            />
             {!sidebarCollapsed && (
               <div className="flex flex-col">
                 <span className="font-semibold text-sm">Aura</span>
