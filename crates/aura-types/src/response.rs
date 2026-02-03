@@ -7,7 +7,10 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::compression::CompressionConfig;
+use crate::consistency::{ConsistencyConfig, ConsistencyMetadata};
 use crate::item::{InputItem, Item};
+use crate::validation::{ValidationConfig, ValidationMetadata};
 
 /// Status of a response in the Open Responses API
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, ToSchema)]
@@ -205,6 +208,16 @@ pub struct Response {
     /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+
+    /// Validation results (Aura extension)
+    /// Contains confidence scores and validation status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validation: Option<ValidationMetadata>,
+
+    /// Consistency metadata (Aura extension)
+    /// Contains information about consistency strategies applied
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consistency: Option<ConsistencyMetadata>,
 }
 
 fn default_object_type() -> String {
@@ -231,6 +244,8 @@ impl Response {
             incomplete_reason: None,
             previous_response_id: None,
             metadata: None,
+            validation: None,
+            consistency: None,
         }
     }
 
@@ -281,6 +296,8 @@ pub struct ResponseBuilder {
     previous_response_id: Option<String>,
     metadata: Option<serde_json::Value>,
     created_at: Option<i64>,
+    validation: Option<ValidationMetadata>,
+    consistency: Option<ConsistencyMetadata>,
 }
 
 impl ResponseBuilder {
@@ -297,6 +314,8 @@ impl ResponseBuilder {
             previous_response_id: None,
             metadata: None,
             created_at: None,
+            validation: None,
+            consistency: None,
         }
     }
 
@@ -362,6 +381,18 @@ impl ResponseBuilder {
         self
     }
 
+    /// Set validation metadata
+    pub fn validation(mut self, validation: ValidationMetadata) -> Self {
+        self.validation = Some(validation);
+        self
+    }
+
+    /// Set consistency metadata
+    pub fn consistency(mut self, consistency: ConsistencyMetadata) -> Self {
+        self.consistency = Some(consistency);
+        self
+    }
+
     /// Build the response
     pub fn build(self) -> Response {
         Response {
@@ -378,6 +409,8 @@ impl ResponseBuilder {
             incomplete_reason: self.incomplete_reason,
             previous_response_id: self.previous_response_id,
             metadata: self.metadata,
+            validation: self.validation,
+            consistency: self.consistency,
         }
     }
 }
@@ -430,6 +463,21 @@ pub struct CreateResponseRequest {
     /// Additional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+
+    /// Validation configuration (Aura extension)
+    /// Enables response quality scoring and validation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validation: Option<ValidationConfig>,
+
+    /// Consistency configuration (Aura extension)
+    /// Enables cross-model response consistency
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consistency: Option<ConsistencyConfig>,
+
+    /// Compression configuration (Aura extension)
+    /// Enables prompt compression to reduce token usage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compression: Option<CompressionConfig>,
 }
 
 impl CreateResponseRequest {
@@ -448,6 +496,9 @@ impl CreateResponseRequest {
             tool_choice: None,
             user: None,
             metadata: None,
+            validation: None,
+            consistency: None,
+            compression: None,
         }
     }
 
@@ -489,6 +540,24 @@ impl CreateResponseRequest {
     /// Set previous response ID for conversation continuation
     pub fn with_previous_response(mut self, id: impl Into<String>) -> Self {
         self.previous_response_id = Some(id.into());
+        self
+    }
+
+    /// Set validation configuration
+    pub fn with_validation(mut self, validation: ValidationConfig) -> Self {
+        self.validation = Some(validation);
+        self
+    }
+
+    /// Set consistency configuration
+    pub fn with_consistency(mut self, consistency: ConsistencyConfig) -> Self {
+        self.consistency = Some(consistency);
+        self
+    }
+
+    /// Set compression configuration
+    pub fn with_compression(mut self, compression: CompressionConfig) -> Self {
+        self.compression = Some(compression);
         self
     }
 }

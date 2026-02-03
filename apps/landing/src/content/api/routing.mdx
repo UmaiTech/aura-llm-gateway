@@ -1,0 +1,679 @@
+---
+title: Smart Routing
+description: Intelligent request routing with load balancing, failover, and multi-objective optimization
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Expandable } from '../../components/mdx'
+
+# Smart Routing
+
+Aura provides intelligent routing to distribute requests across multiple provider endpoints, with support for load balancing, automatic failover, region-based routing, trait-based routing, and cost optimization.
+
+<Callout type="info">
+Smart routing enables high availability and cost optimization without code changes. Configure your routing strategy once, and Aura handles the rest.
+</Callout>
+
+## Routing Strategies
+
+Aura supports 12 routing strategies across two categories:
+
+### Standard Strategies
+
+| Strategy | Description | Best For |
+|----------|-------------|----------|
+| `round_robin` | Distribute requests evenly in order | Even load distribution |
+| `weighted` | Distribute based on endpoint weights | Capacity-based distribution |
+| `random` | Random selection from available endpoints | Simple load balancing |
+| `least_latency` | Route to endpoint with best health/success rate | Performance optimization |
+| `region_based` | Route based on geographic proximity | Low latency, data residency |
+| `priority` | Route to lowest priority healthy endpoint | Failover scenarios |
+| `trait_based` | Route based on model capabilities | Task-specific routing |
+| `cost_optimized` | Route to cheapest capable endpoint | Budget optimization |
+
+### Agentic Strategies
+
+| Strategy | Description | Best For |
+|----------|-------------|----------|
+| `tool_aware` | Route based on tools requested | Agentic workflows with tools |
+| `context_adaptive` | Route based on input token count | Long-context conversations |
+| `sticky_session` | Maintain endpoint affinity per conversation | Multi-turn agent sessions |
+| `reasoning_depth` | Route complex reasoning to thinking models | Chain-of-thought tasks |
+
+## Configuration
+
+Configure routing in your `aura.yaml` file:
+
+<CodeBlock language="yaml" title="aura.yaml">
+{`routing:
+  # Default routing strategy
+  strategy: weighted
+
+  # Default region for region-based routing
+  default_region: us-east
+
+  # Optimization goal for multi-objective routing
+  optimization_goal: balanced  # min_cost, min_latency, max_quality, balanced
+
+  # Required model traits for trait-based routing
+  required_traits:
+    - code
+    - tool_use
+
+  # Custom weights for multi-objective routing
+  weights:
+    cost: 0.4
+    latency: 0.3
+    quality: 0.3
+
+  # Health tracking configuration
+  health:
+    failure_threshold: 5        # Consecutive failures to mark unhealthy
+    recovery_timeout: 30s       # Wait time before retrying unhealthy endpoint
+    success_threshold: 2        # Successes needed to mark healthy again
+    rate_limit_is_failure: false  # Don't count rate limits as failures
+
+  # Fallback configuration
+  fallback:
+    enabled: true
+    max_attempts: 3
+    on_rate_limit: true
+    on_timeout: true
+    on_auth_error: false
+    retry_delay: 100ms
+    chains:
+      openai:
+        - anthropic
+        - google
+      anthropic:
+        - openai
+        - google
+
+  # Per-provider endpoint configurations
+  endpoints:
+    openai:
+      - id: openai-primary
+        name: "Primary OpenAI"
+        api_key_ref: "env:OPENAI_API_KEY"
+        weight: 2
+        priority: 0
+        region: us-east
+        tags:
+          - production
+          - high-capacity
+        rate_limit_rpm: 3500
+
+      - id: openai-secondary
+        name: "Secondary OpenAI"
+        api_key_ref: "env:OPENAI_API_KEY_2"
+        weight: 1
+        priority: 1
+        region: us-west
+        tags:
+          - production
+
+    anthropic:
+      - id: anthropic-primary
+        name: "Anthropic Primary"
+        api_key_ref: "env:ANTHROPIC_API_KEY"
+        weight: 1
+        priority: 0
+        region: us-east`}
+</CodeBlock>
+
+## Load Balancing
+
+### Round Robin
+
+Distributes requests evenly across endpoints in sequence:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: round_robin
+  endpoints:
+    openai:
+      - id: key-1
+        api_key_ref: "env:OPENAI_API_KEY_1"
+      - id: key-2
+        api_key_ref: "env:OPENAI_API_KEY_2"
+      - id: key-3
+        api_key_ref: "env:OPENAI_API_KEY_3"`}
+</CodeBlock>
+
+### Weighted Distribution
+
+Route more traffic to higher-capacity endpoints:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: weighted
+  endpoints:
+    openai:
+      - id: high-capacity
+        api_key_ref: "env:OPENAI_API_KEY_ENTERPRISE"
+        weight: 80   # Gets 80% of traffic
+      - id: standard
+        api_key_ref: "env:OPENAI_API_KEY_STANDARD"
+        weight: 20   # Gets 20% of traffic`}
+</CodeBlock>
+
+<Callout type="tip">
+Use weighted distribution when you have API keys with different rate limits or want to gradually roll out a new endpoint.
+</Callout>
+
+## Automatic Failover
+
+The health tracker uses a circuit breaker pattern to detect unhealthy endpoints:
+
+```
+Healthy → (failures exceed threshold) → Unhealthy
+    ↑                                       ↓
+    ← ← ← (recovery timeout + success) ← Half-Open
+```
+
+<CodeBlock language="yaml" title="Health Configuration">
+{`routing:
+  health:
+    failure_threshold: 5      # Open circuit after 5 consecutive failures
+    recovery_timeout: 30s     # Wait 30s before trying again
+    success_threshold: 2      # Close circuit after 2 successes
+    rate_limit_is_failure: false  # Rate limits are expected, not failures`}
+</CodeBlock>
+
+### Fallback Chains
+
+Define automatic fallback paths when primary providers fail:
+
+<CodeBlock language="yaml">
+{`routing:
+  fallback:
+    enabled: true
+    max_attempts: 3
+    on_rate_limit: true      # Fallback on 429 errors
+    on_timeout: true         # Fallback on timeouts
+    on_auth_error: false     # Don't retry auth failures
+    chains:
+      openai:
+        - anthropic    # First fallback
+        - google       # Second fallback
+      anthropic:
+        - openai
+        - google`}
+</CodeBlock>
+
+When OpenAI is unavailable, requests automatically route to Anthropic, then Google.
+
+## Region-Based Routing
+
+Route requests to the nearest endpoint for lower latency:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: region_based
+  default_region: us-east
+
+  endpoints:
+    openai:
+      - id: us-east-endpoint
+        region: us-east
+        tags: ["region:us-east"]
+
+      - id: eu-west-endpoint
+        region: eu-west
+        base_url: "https://api.openai.eu"  # Regional endpoint
+        tags: ["region:eu-west"]
+
+      - id: ap-northeast-endpoint
+        region: ap-northeast
+        tags: ["region:ap-northeast"]`}
+</CodeBlock>
+
+### Available Regions
+
+| Region | Identifier | Location |
+|--------|------------|----------|
+| US East | `us-east` | Virginia |
+| US West | `us-west` | Oregon |
+| EU West | `eu-west` | Ireland |
+| EU Central | `eu-central` | Frankfurt |
+| Asia Pacific Northeast | `ap-northeast` | Tokyo |
+| Asia Pacific Southeast | `ap-southeast` | Singapore |
+| Asia Pacific South | `ap-south` | Sydney |
+
+<Callout type="info">
+Aura automatically estimates latency between regions. Same-region routing adds 0ms penalty, while cross-continental routing may add 100-200ms.
+</Callout>
+
+## Trait-Based Routing
+
+Route requests based on model capabilities:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: trait_based
+  required_traits:
+    - code          # Good at coding
+    - tool_use      # Supports function calling
+    - fast          # Low latency`}
+</CodeBlock>
+
+### Available Traits
+
+| Trait | Description | Example Models |
+|-------|-------------|----------------|
+| `code` | Code generation/understanding | Claude Sonnet, GPT-4o |
+| `creative` | Creative writing | Claude Opus, GPT-4 |
+| `analysis` | Data analysis, reasoning | GPT-4o, Gemini Pro |
+| `math` | Mathematical calculations | o1, Claude Opus |
+| `vision` | Image understanding | GPT-4o, Claude Sonnet, Gemini |
+| `fast` | Low latency responses | GPT-4o-mini, Gemini Flash, Haiku |
+| `cheap` | Cost-effective | GPT-4o-mini, Gemini Flash, Haiku |
+| `long_context` | Large context window | Claude (200K), Gemini (1M+) |
+| `instruction` | Complex instructions | Claude Sonnet, GPT-4o |
+| `conversational` | Multi-turn dialogue | All models |
+| `tool_use` | Function/tool calling | GPT-4o, Claude, Gemini |
+| `summarization` | Text summarization | All models |
+| `translation` | Language translation | All models |
+| `structured_output` | JSON mode | GPT-4o, Claude, Gemini |
+| `research` | Factual queries | Claude Opus, GPT-4 |
+| `reasoning` | Extended thinking/CoT | o1, Claude with thinking |
+
+<Expandable title="Default Model Profiles">
+<CodeBlock language="yaml">
+{`# OpenAI
+gpt-4o:
+  traits: [code, analysis, vision, tool_use, instruction, structured_output]
+  cost: $2.50/$10.00 per 1M tokens
+  latency: ~800ms
+
+gpt-4o-mini:
+  traits: [fast, cheap, tool_use, structured_output]
+  cost: $0.15/$0.60 per 1M tokens
+  latency: ~400ms
+
+o1:
+  traits: [reasoning, math, code, analysis]
+  cost: $15.00/$60.00 per 1M tokens
+  latency: ~5000ms
+
+# Anthropic
+claude-sonnet-4:
+  traits: [code, analysis, reasoning, tool_use, long_context]
+  cost: $3.00/$15.00 per 1M tokens
+  latency: ~600ms
+
+claude-opus-4:
+  traits: [code, creative, analysis, reasoning, research, long_context]
+  cost: $15.00/$75.00 per 1M tokens
+  latency: ~1500ms
+
+claude-3-5-haiku:
+  traits: [fast, cheap, code, tool_use]
+  cost: $0.80/$4.00 per 1M tokens
+  latency: ~300ms
+
+# Google
+gemini-2.0-flash:
+  traits: [fast, cheap, vision, tool_use]
+  cost: $0.075/$0.30 per 1M tokens
+  latency: ~250ms
+
+gemini-2.0-pro:
+  traits: [code, analysis, reasoning, long_context]
+  cost: $1.25/$5.00 per 1M tokens
+  latency: ~800ms`}
+</CodeBlock>
+</Expandable>
+
+## Cost-Optimized Routing
+
+Automatically route to the cheapest model that meets your requirements:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: cost_optimized
+  required_traits:
+    - code          # Must support coding
+    - tool_use      # Must support function calling
+  # Routes to cheapest model that has these traits`}
+</CodeBlock>
+
+<Callout type="warning">
+Cost-optimized routing will select models that meet at least 50% of required traits. Be specific with your traits to ensure quality.
+</Callout>
+
+## Multi-Objective Optimization
+
+Balance multiple goals simultaneously:
+
+<CodeBlock language="yaml">
+{`routing:
+  optimization_goal: balanced  # or min_cost, min_latency, max_quality
+
+  # Custom weights (normalized automatically)
+  weights:
+    cost: 0.4       # 40% weight on cost
+    latency: 0.3    # 30% weight on latency
+    quality: 0.3    # 30% weight on quality`}
+</CodeBlock>
+
+### Optimization Goals
+
+| Goal | Weights | Best For |
+|------|---------|----------|
+| `min_cost` | Cost: 100% | Budget-constrained workloads |
+| `min_latency` | Latency: 100% | Real-time applications |
+| `max_quality` | Quality: 100% | Complex tasks requiring best models |
+| `balanced` | Equal weights | General-purpose routing |
+
+## Endpoint Configuration
+
+Each endpoint can be configured with:
+
+<CodeBlock language="yaml">
+{`endpoints:
+  openai:
+    - id: ep-1                    # Unique identifier (required)
+      name: "Primary OpenAI"       # Human-readable name
+      api_key: "sk-..."           # Direct API key (not recommended)
+      api_key_ref: "env:KEY"      # Reference to env var (recommended)
+      base_url: "https://..."     # Custom API URL
+      weight: 2                   # Weight for load balancing (1-100)
+      priority: 0                 # Priority for failover (lower = higher)
+      enabled: true               # Enable/disable this endpoint
+      region: us-east             # Region for region-based routing
+      tags:                       # Tags for filtering/grouping
+        - production
+        - high-capacity
+      rate_limit_rpm: 3500        # Rate limit (requests/minute)
+      max_concurrent: 100         # Max concurrent requests`}
+</CodeBlock>
+
+<Callout type="tip">
+Use `api_key_ref: "env:VAR_NAME"` instead of hardcoding API keys. This allows secure secret management with environment variables or Kubernetes secrets.
+</Callout>
+
+## Monitoring
+
+Routing decisions are included in response metadata:
+
+<CodeBlock language="json">
+{`{
+  "id": "resp_abc123",
+  "metadata": {
+    "aura": {
+      "provider": "openai",
+      "endpoint_id": "openai-primary",
+      "is_fallback": false,
+      "fallback_depth": 0,
+      "routing_strategy": "weighted",
+      "latency_ms": 342
+    }
+  }
+}`}
+</CodeBlock>
+
+### Health Status API
+
+Check endpoint health via the admin API:
+
+<CodeBlock language="bash">
+{`curl https://api.aura.dev/admin/health \\
+  -H "Authorization: Bearer $AURA_ADMIN_KEY"`}
+</CodeBlock>
+
+<CodeBlock language="json" title="Response">
+{`{
+  "endpoints": {
+    "openai-primary": {
+      "state": "healthy",
+      "success_count": 1520,
+      "failure_count": 3,
+      "consecutive_failures": 0,
+      "success_rate": 0.998
+    },
+    "openai-secondary": {
+      "state": "half_open",
+      "success_count": 890,
+      "failure_count": 12,
+      "consecutive_failures": 0,
+      "last_error": "Connection timeout"
+    }
+  }
+}`}
+</CodeBlock>
+
+## Agentic Routing Strategies
+
+Aura provides specialized routing strategies designed for agentic AI workflows with tools, long-context conversations, and complex reasoning tasks.
+
+### Tool-Aware Routing
+
+Routes requests based on the tools being used. Different models excel at different tool categories:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: tool_aware
+
+  # Tool-to-model preferences
+  tool_routing:
+    code_execution:
+      preferred_models:
+        - claude-sonnet-4
+        - gpt-4o
+      required_traits: [code, tool_use]
+
+    web_search:
+      preferred_models:
+        - gemini-2.0-flash
+        - gpt-4o-mini
+      required_traits: [fast, tool_use]
+
+    data_analysis:
+      preferred_models:
+        - claude-opus-4
+        - gpt-4o
+      required_traits: [analysis, code]
+
+    image_processing:
+      preferred_models:
+        - gpt-4o
+        - gemini-2.0-pro
+      required_traits: [vision]`}
+</CodeBlock>
+
+#### Tool Categories
+
+| Category | Tools | Recommended Models |
+|----------|-------|-------------------|
+| `code_execution` | execute_code, run_command | Claude Sonnet, GPT-4o |
+| `web_search` | search, browse | Gemini Flash, GPT-4o-mini |
+| `data_analysis` | analyze, query_data | Claude Opus, GPT-4o |
+| `image_processing` | analyze_image, generate_image | GPT-4o, Gemini Pro |
+| `file_system` | read_file, write_file | Claude Sonnet, GPT-4o |
+| `api_calls` | http_request, webhook | Any model with tool_use |
+| `calculator` | calculate, math | Any model |
+| `memory` | remember, recall | Claude (long context) |
+
+<Callout type="tip">
+Tool-aware routing automatically detects tools in your request and routes to the model best suited for those tools. No configuration needed for common tools.
+</Callout>
+
+### Context-Adaptive Routing
+
+Routes based on input token count to ensure requests stay within model context windows:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: context_adaptive
+
+  context_routing:
+    # Small context (< 4K tokens) - use fast models
+    small:
+      max_tokens: 4000
+      preferred_models:
+        - gpt-4o-mini
+        - gemini-2.0-flash
+        - claude-3-5-haiku
+
+    # Medium context (4K-32K) - use standard models
+    medium:
+      max_tokens: 32000
+      preferred_models:
+        - gpt-4o
+        - claude-sonnet-4
+        - gemini-2.0-pro
+
+    # Large context (32K-128K) - use long-context models
+    large:
+      max_tokens: 128000
+      preferred_models:
+        - claude-sonnet-4
+        - gpt-4o
+
+    # Very large context (128K+) - use extended context models
+    xlarge:
+      preferred_models:
+        - claude-sonnet-4    # 200K context
+        - gemini-2.0-pro      # 1M+ context`}
+</CodeBlock>
+
+<Callout type="info">
+Context-adaptive routing estimates token count from your input and routes to a model with sufficient context window. This prevents context overflow errors and optimizes cost for shorter requests.
+</Callout>
+
+### Sticky Session Routing
+
+Maintains endpoint affinity within a conversation for consistency:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: sticky_session
+
+  session:
+    # Use previous_response_id for session tracking
+    tracking: response_id
+
+    # Optional: custom session header
+    # header: X-Session-ID
+
+    # Fallback if preferred endpoint unavailable
+    fallback_strategy: least_latency
+
+    # Session timeout (route anywhere after this)
+    timeout: 30m`}
+</CodeBlock>
+
+When a request includes `previous_response_id`, Aura routes to the same endpoint that handled the previous response. This ensures:
+
+- **Consistent model behavior** across conversation turns
+- **Cache efficiency** when providers cache conversation state
+- **Predictable responses** for multi-turn agentic workflows
+
+<CodeBlock language="json" title="Request with session tracking">
+{`{
+  "model": "gpt-4o",
+  "previous_response_id": "resp_abc123",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "Continue from where we left off..."
+    }
+  ]
+}`}
+</CodeBlock>
+
+### Reasoning-Depth Routing
+
+Routes complex reasoning tasks to models with extended thinking capabilities:
+
+<CodeBlock language="yaml">
+{`routing:
+  strategy: reasoning_depth
+
+  reasoning:
+    # Patterns that trigger deep reasoning routing
+    triggers:
+      - "step by step"
+      - "think carefully"
+      - "explain your reasoning"
+      - "analyze this"
+      - "compare and contrast"
+
+    # Models for deep reasoning tasks
+    deep_reasoning_models:
+      - o1                    # OpenAI reasoning model
+      - claude-opus-4         # With extended thinking
+
+    # Models for standard tasks
+    standard_models:
+      - gpt-4o
+      - claude-sonnet-4
+      - gemini-2.0-pro`}
+</CodeBlock>
+
+Reasoning-depth routing automatically detects when a task requires extended thinking:
+
+| Signal | Routing Decision |
+|--------|-----------------|
+| `requires_reasoning: true` in request | Deep reasoning model |
+| Reasoning trigger phrases detected | Deep reasoning model |
+| Math/logic problem patterns | Deep reasoning model |
+| Simple chat/completion | Standard model |
+
+<Callout type="warning">
+Deep reasoning models (like o1) have higher latency and cost. Use reasoning-depth routing when you need thorough analysis, not for every request.
+</Callout>
+
+## Combining Strategies
+
+You can combine agentic strategies with standard strategies:
+
+<CodeBlock language="yaml">
+{`routing:
+  # Primary strategy for agentic requests
+  strategy: tool_aware
+
+  # Fallback to cost optimization for simple requests
+  fallback_strategy: cost_optimized
+
+  # Enable sticky sessions for multi-turn conversations
+  session:
+    enabled: true
+    tracking: response_id
+
+  # Context-based model selection
+  context_routing:
+    enabled: true
+
+  # Health-based failover
+  health:
+    failure_threshold: 5
+    recovery_timeout: 30s`}
+</CodeBlock>
+
+## Best Practices
+
+1. **Start with round-robin** - Simple and effective for most use cases
+
+2. **Use weighted for capacity** - When endpoints have different rate limits
+
+3. **Configure fallbacks** - Always have backup providers for critical applications
+
+4. **Set appropriate thresholds** - 5 consecutive failures is a good default
+
+5. **Don't count rate limits as failures** - Rate limits are expected behavior
+
+6. **Use region-based for latency** - Especially for real-time chat applications
+
+7. **Monitor endpoint health** - Track success rates and fallback frequency
+
+8. **Test failover** - Periodically verify fallback chains work correctly
+
+9. **Use tool-aware for agents** - When your application uses multiple tools
+
+10. **Enable sticky sessions** - For multi-turn agentic conversations
+
+11. **Use context-adaptive** - When handling variable-length inputs
+
+12. **Reserve reasoning-depth** - Only for tasks that truly need extended thinking

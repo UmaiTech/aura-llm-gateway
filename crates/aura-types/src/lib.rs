@@ -40,9 +40,12 @@
 //! assert_eq!(response.text(), "Hi there!");
 //! ```
 
+pub mod compression;
+pub mod consistency;
 pub mod item;
 pub mod response;
 pub mod stream;
+pub mod validation;
 
 // Re-export commonly used types at the crate root for convenience
 pub use item::{
@@ -56,6 +59,24 @@ pub use response::{
 };
 
 pub use stream::{RateLimitInfo, SseMessage, StreamError, StreamEvent};
+
+pub use validation::{
+    HeuristicAnalyzer, LogprobsData, SelectionCriteria, TokenLogprob, TopLogprob, ValidationConfig,
+    ValidationMetadata, ValidationStrategy,
+};
+
+pub use consistency::{
+    AdaptiveFewShotConfig, ConsistencyConfig, ConsistencyExample, ConsistencyMetadata,
+    ConsistencyStrategy, DefaultCalibrations, DefaultConstitution, EnsembleVotes, FeedbackResponse,
+    FeedbackSampleSummary, FeedbackSignal, FeedbackStats, Formality, ListFeedbackQuery,
+    ListFeedbackResponse, ModelCalibration, ModelQuirk, PromptAugmenter, StyleProfile,
+    SubmitFeedbackRequest, Tone, Verbosity,
+};
+
+pub use compression::{
+    AispConfig, AispSymbolSet, CompressionAnalysis, CompressionConfig, CompressionMetadata,
+    CompressionStrategy, DataFormat, SemanticFormat, StructureType, ToonConfig, YamlConfig,
+};
 
 /// Returns the crate version
 pub fn version() -> &'static str {

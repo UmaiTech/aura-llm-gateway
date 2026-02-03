@@ -1,6 +1,25 @@
 # git-cliff configuration for changelog generation
 # https://git-cliff.org/docs/configuration
 
+[bump]
+# Configures automatic version bumping based on conventional commits
+# https://git-cliff.org/docs/configuration/bump
+features_always_bump_minor = true
+breaking_always_bump_major = true
+
+# Detect breaking changes in commit body
+detect_breaking_from_body = true
+
+# Custom patterns to bump minor (in addition to feat)
+# These patterns match significant changes that warrant minor bump
+custom_minor_increment_regex = "^(feat|perf|refactor)\\(.+\\)!?:"
+
+# Custom patterns to bump patch
+custom_patch_increment_regex = "^(fix|docs|style|test|chore)\\(.+\\)?:"
+
+# Initial version if no tags exist
+initial_version = "0.1.0"
+
 [changelog]
 # Changelog header
 header = """

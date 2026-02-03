@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Send, Square, Paperclip, ChevronDown, Check } from 'lucide-react'
+import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive } from 'lucide-react'
 import { cn } from '../lib/utils'
-import type { Model } from '../lib/types'
+import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
+import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES } from '../lib/types'
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>
@@ -12,6 +13,14 @@ interface ChatInputProps {
   model: Model
   models: Model[]
   onModelChange: (model: Model) => void
+  routingStrategy: RoutingStrategy
+  onRoutingStrategyChange: (strategy: RoutingStrategy) => void
+  validationStrategy: ValidationStrategy
+  onValidationStrategyChange: (strategy: ValidationStrategy) => void
+  consistencyStrategy: ConsistencyStrategy
+  onConsistencyStrategyChange: (strategy: ConsistencyStrategy) => void
+  compressionStrategy: CompressionStrategy
+  onCompressionStrategyChange: (strategy: CompressionStrategy) => void
 }
 
 export function ChatInput({
@@ -23,11 +32,21 @@ export function ChatInput({
   model,
   models,
   onModelChange,
+  routingStrategy,
+  onRoutingStrategyChange,
+  validationStrategy,
+  onValidationStrategyChange,
+  consistencyStrategy,
+  onConsistencyStrategyChange,
+  compressionStrategy,
+  onCompressionStrategyChange,
 }: ChatInputProps) {
   const [input, setInput] = useState('')
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
+  const [activeDropdown, setActiveDropdown] = useState<'routing' | 'validation' | 'consistency' | 'compression' | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const strategyDropdownRef = useRef<HTMLDivElement>(null)
 
   // Auto-resize textarea
   useEffect(() => {
@@ -38,19 +57,22 @@ export function ChatInput({
     }
   }, [input])
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setModelDropdownOpen(false)
       }
+      if (strategyDropdownRef.current && !strategyDropdownRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null)
+      }
     }
 
-    if (modelDropdownOpen) {
+    if (modelDropdownOpen || activeDropdown) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [modelDropdownOpen])
+  }, [modelDropdownOpen, activeDropdown])
 
   const handleSubmit = useCallback(async () => {
     if (!input.trim() || isLoading || disabled) return
@@ -83,9 +105,215 @@ export function ChatInput({
   const providerOrder: Array<'openai' | 'anthropic' | 'google'> = ['openai', 'anthropic', 'google']
   const providerLabels = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google' }
 
+  const currentRouting = ROUTING_STRATEGIES.find(s => s.id === routingStrategy) || ROUTING_STRATEGIES[0]
+  const currentValidation = VALIDATION_STRATEGIES.find(s => s.id === validationStrategy) || VALIDATION_STRATEGIES[0]
+  const currentConsistency = CONSISTENCY_STRATEGIES.find(s => s.id === consistencyStrategy) || CONSISTENCY_STRATEGIES[0]
+  const currentCompression = COMPRESSION_STRATEGIES.find(s => s.id === compressionStrategy) || COMPRESSION_STRATEGIES[0]
+
   return (
     <div className="border-t border-border/50 glass p-4">
       <div className="max-w-3xl mx-auto">
+        {/* Strategy options row */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap" ref={strategyDropdownRef}>
+          {/* Routing */}
+          <div className="relative">
+            <button
+              onClick={() => setActiveDropdown(activeDropdown === 'routing' ? null : 'routing')}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
+                routingStrategy !== 'round_robin'
+                  ? "bg-primary-500/10 text-primary-400 border border-primary-500/30"
+                  : "text-muted-foreground hover:bg-secondary border border-transparent"
+              )}
+              title={`Routing: ${currentRouting.name}`}
+            >
+              <Route className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{currentRouting.name}</span>
+              <ChevronDown className={cn("h-3 w-3", activeDropdown === 'routing' && "rotate-180")} />
+            </button>
+            {activeDropdown === 'routing' && (
+              <div className="absolute bottom-full left-0 mb-2 w-64 max-h-72 overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="p-2">
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                    Routing Strategy
+                  </div>
+                  {ROUTING_STRATEGIES.map((strategy) => (
+                    <button
+                      key={strategy.id}
+                      onClick={() => {
+                        onRoutingStrategyChange(strategy.id)
+                        setActiveDropdown(null)
+                      }}
+                      className={cn(
+                        "w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-left text-xs hover:bg-secondary transition-colors",
+                        strategy.id === routingStrategy && "bg-primary-500/10"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className={cn("font-medium", strategy.id === routingStrategy && "text-primary-400")}>
+                          {strategy.name}
+                        </div>
+                        <div className="text-muted-foreground truncate">{strategy.description}</div>
+                      </div>
+                      {strategy.id === routingStrategy && <Check className="h-3.5 w-3.5 text-primary-400 mt-0.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Compression */}
+          <div className="relative">
+            <button
+              onClick={() => setActiveDropdown(activeDropdown === 'compression' ? null : 'compression')}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
+                compressionStrategy !== 'none'
+                  ? "bg-aura-500/10 text-aura-400 border border-aura-500/30"
+                  : "text-muted-foreground hover:bg-secondary border border-transparent"
+              )}
+              title={`Compression: ${currentCompression.name}`}
+            >
+              <FileArchive className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{currentCompression.name}</span>
+              <ChevronDown className={cn("h-3 w-3", activeDropdown === 'compression' && "rotate-180")} />
+            </button>
+            {activeDropdown === 'compression' && (
+              <div className="absolute bottom-full left-0 mb-2 w-72 max-h-72 overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="p-2">
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                    Prompt Compression
+                  </div>
+                  {COMPRESSION_STRATEGIES.map((strategy) => (
+                    <button
+                      key={strategy.id}
+                      onClick={() => {
+                        onCompressionStrategyChange(strategy.id)
+                        setActiveDropdown(null)
+                      }}
+                      className={cn(
+                        "w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-left text-xs hover:bg-secondary transition-colors",
+                        strategy.id === compressionStrategy && "bg-aura-500/10"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("font-medium", strategy.id === compressionStrategy && "text-aura-400")}>
+                            {strategy.name}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {strategy.savings}
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground">{strategy.description}</div>
+                      </div>
+                      {strategy.id === compressionStrategy && <Check className="h-3.5 w-3.5 text-aura-400 mt-0.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Validation */}
+          <div className="relative">
+            <button
+              onClick={() => setActiveDropdown(activeDropdown === 'validation' ? null : 'validation')}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
+                validationStrategy !== 'none'
+                  ? "bg-green-500/10 text-green-400 border border-green-500/30"
+                  : "text-muted-foreground hover:bg-secondary border border-transparent"
+              )}
+              title={`Validation: ${currentValidation.name}`}
+            >
+              <Shield className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{currentValidation.name}</span>
+              <ChevronDown className={cn("h-3 w-3", activeDropdown === 'validation' && "rotate-180")} />
+            </button>
+            {activeDropdown === 'validation' && (
+              <div className="absolute bottom-full left-0 mb-2 w-64 max-h-72 overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="p-2">
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                    Response Validation
+                  </div>
+                  {VALIDATION_STRATEGIES.map((strategy) => (
+                    <button
+                      key={strategy.id}
+                      onClick={() => {
+                        onValidationStrategyChange(strategy.id)
+                        setActiveDropdown(null)
+                      }}
+                      className={cn(
+                        "w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-left text-xs hover:bg-secondary transition-colors",
+                        strategy.id === validationStrategy && "bg-green-500/10"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className={cn("font-medium", strategy.id === validationStrategy && "text-green-400")}>
+                          {strategy.name}
+                        </div>
+                        <div className="text-muted-foreground truncate">{strategy.description}</div>
+                      </div>
+                      {strategy.id === validationStrategy && <Check className="h-3.5 w-3.5 text-green-400 mt-0.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Consistency */}
+          <div className="relative">
+            <button
+              onClick={() => setActiveDropdown(activeDropdown === 'consistency' ? null : 'consistency')}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
+                consistencyStrategy !== 'none'
+                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                  : "text-muted-foreground hover:bg-secondary border border-transparent"
+              )}
+              title={`Consistency: ${currentConsistency.name}`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{currentConsistency.name}</span>
+              <ChevronDown className={cn("h-3 w-3", activeDropdown === 'consistency' && "rotate-180")} />
+            </button>
+            {activeDropdown === 'consistency' && (
+              <div className="absolute bottom-full left-0 mb-2 w-72 max-h-72 overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="p-2">
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                    Response Consistency
+                  </div>
+                  {CONSISTENCY_STRATEGIES.map((strategy) => (
+                    <button
+                      key={strategy.id}
+                      onClick={() => {
+                        onConsistencyStrategyChange(strategy.id)
+                        setActiveDropdown(null)
+                      }}
+                      className={cn(
+                        "w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-left text-xs hover:bg-secondary transition-colors",
+                        strategy.id === consistencyStrategy && "bg-amber-500/10"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className={cn("font-medium", strategy.id === consistencyStrategy && "text-amber-400")}>
+                          {strategy.name}
+                        </div>
+                        <div className="text-muted-foreground">{strategy.description}</div>
+                      </div>
+                      {strategy.id === consistencyStrategy && <Check className="h-3.5 w-3.5 text-amber-400 mt-0.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Main input area */}
         <div className={cn(
           "relative flex items-end gap-2 rounded-2xl border border-border bg-secondary/50 p-2 transition-all shadow-premium",
           "focus-within:border-primary-500/50 focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:shadow-premium-lg"

@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { useChatStore } from './stores/chatStore'
 import { generateId } from './lib/utils'
-import { api } from './lib/api'
+import { AuraAPI } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
 import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
@@ -30,6 +30,15 @@ export default function App() {
     systemPrompt,
     agentMode,
     setAgentMode,
+    routingStrategy,
+    setRoutingStrategy,
+    validationStrategy,
+    setValidationStrategy,
+    getValidationConfig,
+    consistencyStrategy,
+    setConsistencyStrategy,
+    compressionStrategy,
+    setCompressionStrategy,
     createConversation,
     selectConversation,
     deleteConversation,
@@ -38,6 +47,21 @@ export default function App() {
     setModel,
     getCurrentConversation,
   } = useChatStore()
+
+  // Get configs from store
+  const validationConfig = getValidationConfig()
+  const consistencyConfig = useChatStore.getState().getConsistencyConfig()
+  const compressionConfig = useChatStore.getState().getCompressionConfig()
+
+  // Create API instance with all strategy configs
+  const api = new AuraAPI({
+    baseUrl: import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1` : '/v1',
+    apiKey: API_KEY,
+    routingStrategy,
+    validationConfig,
+    consistencyConfig,
+    compressionConfig,
+  })
 
   const currentConversation = getCurrentConversation()
   const messages = currentConversation?.messages || []
@@ -178,7 +202,7 @@ export default function App() {
             fullResponse: response
           })
 
-          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId })
+          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, rawResponse: event.response })
         } else if (event.type === 'response.failed' || event.type === 'error') {
           const errorMessage =
             event.error?.message ||
@@ -273,6 +297,7 @@ export default function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Routing-Strategy': routingStrategy,
             ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
           },
           body: JSON.stringify(request),
@@ -294,6 +319,7 @@ export default function App() {
         let usage: MessageUsage | undefined
         let aura: AuraMetadata | undefined
         let responseId: string | undefined
+        let rawResponse: unknown
 
         try {
           while (true) {
@@ -389,6 +415,9 @@ export default function App() {
                         latencyMs: metadata.aura.latency_ms,
                       }
                     }
+
+                    // Capture raw response for debugging
+                    rawResponse = event.response
                   }
                 } catch {
                   // Skip invalid JSON
@@ -400,7 +429,7 @@ export default function App() {
           reader.releaseLock()
         }
 
-        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId })
+        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, rawResponse })
 
         // No tool calls - we're done
         if (toolCalls.length === 0) {
@@ -456,7 +485,7 @@ export default function App() {
 
       setError(`Agent stopped after ${maxRoundtrips} tool roundtrips`)
     },
-    [model, systemPrompt, addMessage, updateMessage]
+    [model, systemPrompt, routingStrategy, addMessage, updateMessage]
   )
 
   const handleSendMessage = useCallback(
@@ -559,6 +588,14 @@ export default function App() {
           model={selectedModel}
           models={AVAILABLE_MODELS}
           onModelChange={handleModelChange}
+          routingStrategy={routingStrategy}
+          onRoutingStrategyChange={setRoutingStrategy}
+          validationStrategy={validationStrategy}
+          onValidationStrategyChange={setValidationStrategy}
+          consistencyStrategy={consistencyStrategy}
+          onConsistencyStrategyChange={setConsistencyStrategy}
+          compressionStrategy={compressionStrategy}
+          onCompressionStrategyChange={setCompressionStrategy}
         />
       </div>
     </div>

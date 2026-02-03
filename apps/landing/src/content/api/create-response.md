@@ -27,6 +27,65 @@ POST /v1/responses
 | `tools` | array | No | Available tools/functions |
 | `tool_choice` | string/object | No | How to select tools |
 | `previous_response_id` | string | No | Continue a conversation |
+| `validation` | object | No | Response validation configuration |
+| `consistency` | object | No | Cross-model consistency configuration |
+| `compression` | object | No | Prompt compression configuration |
+
+### Request Headers
+
+| Header | Type | Description |
+|--------|------|-------------|
+| `Authorization` | string | Bearer token for authentication |
+| `X-Routing-Strategy` | string | Load balancing strategy (see below) |
+
+### Routing Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `round_robin` | Distribute evenly across endpoints (default) |
+| `weighted` | Route based on endpoint weights |
+| `least_latency` | Route to healthiest endpoint |
+| `cost_optimized` | Route to cheapest capable model |
+| `tool_aware` | Route based on tools in request |
+| `context_adaptive` | Route based on input token count |
+| `reasoning_depth` | Route complex reasoning to thinking models |
+
+### Validation Configuration
+
+```json
+{
+  "validation": {
+    "strategy": "logprobs",
+    "min_confidence": 0.7,
+    "n": 3,
+    "selection": "highest_confidence"
+  }
+}
+```
+
+### Consistency Configuration
+
+```json
+{
+  "consistency": {
+    "strategy": "constitutional",
+    "principles": ["Be concise", "Use technical terms"],
+    "apply_calibration": true
+  }
+}
+```
+
+### Compression Configuration
+
+```json
+{
+  "compression": {
+    "enabled": true,
+    "data_format": "toon",
+    "auto_select": false
+  }
+}
+```
 
 ### Input Items
 
@@ -116,8 +175,61 @@ curl -X POST http://localhost:8080/v1/responses \
   "metadata": {
     "aura": {
       "provider": "openai",
-      "gateway_version": "0.1.7",
-      "latency_ms": 312
+      "gateway_version": "0.2.8",
+      "latency_ms": 312,
+      "request_id": "aura_abc123",
+      "routing_strategy": "round_robin"
+    }
+  }
+}
+```
+
+### Full Response with All Gateway Features
+
+When using validation, consistency, and compression:
+
+```json
+{
+  "id": "resp_oai_d46d074d-4991-4637-9fec-9026c6c9c211",
+  "object": "response",
+  "model": "gpt-5.2",
+  "status": "completed",
+  "output": [...],
+  "usage": {
+    "input_tokens": 264,
+    "output_tokens": 1563,
+    "total_tokens": 1827,
+    "cost_usd": 0.03258
+  },
+  "metadata": {
+    "aura": {
+      "provider": "openai",
+      "gateway_version": "0.2.8",
+      "latency_ms": 3208,
+      "request_id": "aura_1a7aa7ef-5203-48bd-b6ca-6a36f1aeaccb",
+      "routing_strategy": "round_robin",
+      "validation": {
+        "strategy": "logprobs",
+        "n": 3,
+        "min_confidence": 0.7,
+        "selection": "highestconfidence"
+      },
+      "consistency": {
+        "strategy": "modelcalibration"
+      },
+      "compression_enabled": true,
+      "compression_config": {
+        "data_format": "toon",
+        "semantic_format": "natural"
+      },
+      "compression": {
+        "original_tokens": 95,
+        "compressed_tokens": 35,
+        "ratio": 0.368,
+        "savings_percent": 63.2,
+        "strategies": ["toon"],
+        "latency_ms": 12
+      }
     }
   }
 }

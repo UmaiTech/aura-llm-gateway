@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { WelcomeScreen } from './WelcomeScreen'
-import type { Message, Model } from '../lib/types'
+import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
 
 interface ChatContainerProps {
   messages: Message[]
@@ -13,6 +13,14 @@ interface ChatContainerProps {
   model: Model
   models: Model[]
   onModelChange: (model: Model) => void
+  routingStrategy: RoutingStrategy
+  onRoutingStrategyChange: (strategy: RoutingStrategy) => void
+  validationStrategy: ValidationStrategy
+  onValidationStrategyChange: (strategy: ValidationStrategy) => void
+  consistencyStrategy: ConsistencyStrategy
+  onConsistencyStrategyChange: (strategy: ConsistencyStrategy) => void
+  compressionStrategy: CompressionStrategy
+  onCompressionStrategyChange: (strategy: CompressionStrategy) => void
 }
 
 export function ChatContainer({
@@ -24,6 +32,14 @@ export function ChatContainer({
   model,
   models,
   onModelChange,
+  routingStrategy,
+  onRoutingStrategyChange,
+  validationStrategy,
+  onValidationStrategyChange,
+  consistencyStrategy,
+  onConsistencyStrategyChange,
+  compressionStrategy,
+  onCompressionStrategyChange,
 }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -75,6 +91,14 @@ export function ChatContainer({
         model={model}
         models={models}
         onModelChange={onModelChange}
+        routingStrategy={routingStrategy}
+        onRoutingStrategyChange={onRoutingStrategyChange}
+        validationStrategy={validationStrategy}
+        onValidationStrategyChange={onValidationStrategyChange}
+        consistencyStrategy={consistencyStrategy}
+        onConsistencyStrategyChange={onConsistencyStrategyChange}
+        compressionStrategy={compressionStrategy}
+        onCompressionStrategyChange={onCompressionStrategyChange}
       />
     </div>
   )

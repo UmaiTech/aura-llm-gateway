@@ -28,7 +28,16 @@ See [Client SDKs](./sdks.md) for detailed SDK documentation.
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/v1/responses` | Create a response (streaming or non-streaming) |
+| POST | `/v1/feedback` | Submit feedback on a response |
+| GET | `/v1/feedback` | List feedback samples |
+| GET | `/v1/feedback/stats` | Get feedback statistics |
+| GET | `/v1/feedback/{id}` | Get a feedback sample |
+| DELETE | `/v1/feedback/{id}` | Delete a feedback sample |
 | GET | `/health` | Health check endpoint |
+
+See [Feedback API](./feedback.md) for adaptive few-shot learning documentation.
+
+See [Compression API](./compression.md) for prompt compression and token reduction.
 
 ## Response Enrichment
 

@@ -15,7 +15,6 @@ export function Header({
   agentMode,
   onAgentModeChange,
 }: HeaderProps) {
-
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/50 glass px-4 shadow-premium">
       <div className="flex items-center gap-3">

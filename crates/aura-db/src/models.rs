@@ -662,3 +662,174 @@ impl std::str::FromStr for ApiKeyScopeType {
         }
     }
 }
+
+// ============================================================================
+// Feedback Sample Models (for adaptive few-shot learning)
+// ============================================================================
+
+/// Feedback type for response samples
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackType {
+    Approved,
+    Rejected,
+}
+
+impl std::fmt::Display for FeedbackType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FeedbackType::Approved => write!(f, "approved"),
+            FeedbackType::Rejected => write!(f, "rejected"),
+        }
+    }
+}
+
+impl std::str::FromStr for FeedbackType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "approved" => Ok(FeedbackType::Approved),
+            "rejected" => Ok(FeedbackType::Rejected),
+            _ => Err(format!("Unknown feedback type: {}", s)),
+        }
+    }
+}
+
+/// Feedback sample record - stores user-reinforced response examples
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedbackSample {
+    pub id: Uuid,
+    pub organization_id: Option<Uuid>,
+
+    /// The user input/query
+    pub input_text: String,
+    /// The model response
+    pub output_text: String,
+    /// Model that generated this response
+    pub model_id: Option<String>,
+
+    /// User feedback (approved = good example, rejected = bad example)
+    pub feedback: String,
+    /// Optional reason for feedback
+    pub feedback_reason: Option<String>,
+    /// User who provided feedback
+    pub feedback_by: Option<String>,
+
+    /// Tags for categorization and retrieval
+    pub tags: Vec<String>,
+    /// Category for grouping (e.g., "customer_support", "code", "technical")
+    pub category: Option<String>,
+
+    /// Reference to original response
+    pub response_id: Option<String>,
+    pub conversation_id: Option<Uuid>,
+
+    /// Quality metrics
+    pub confidence_score: Option<f32>,
+    pub use_count: i32,
+
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl FeedbackSample {
+    /// Check if this is an approved (good) sample
+    pub fn is_approved(&self) -> bool {
+        self.feedback == "approved"
+    }
+
+    /// Check if this is a rejected (bad) sample
+    pub fn is_rejected(&self) -> bool {
+        self.feedback == "rejected"
+    }
+}
+
+/// New feedback sample for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewFeedbackSample {
+    pub organization_id: Option<Uuid>,
+    pub input_text: String,
+    pub output_text: String,
+    pub model_id: Option<String>,
+    pub feedback: String,
+    pub feedback_reason: Option<String>,
+    pub feedback_by: Option<String>,
+    pub tags: Vec<String>,
+    pub category: Option<String>,
+    pub response_id: Option<String>,
+    pub conversation_id: Option<Uuid>,
+    pub confidence_score: Option<f32>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+impl NewFeedbackSample {
+    /// Create a new approved sample
+    pub fn approved(input: String, output: String) -> Self {
+        Self {
+            organization_id: None,
+            input_text: input,
+            output_text: output,
+            model_id: None,
+            feedback: "approved".to_string(),
+            feedback_reason: None,
+            feedback_by: None,
+            tags: vec![],
+            category: None,
+            response_id: None,
+            conversation_id: None,
+            confidence_score: None,
+            metadata: None,
+        }
+    }
+
+    /// Create a new rejected sample
+    pub fn rejected(input: String, output: String, reason: Option<String>) -> Self {
+        Self {
+            organization_id: None,
+            input_text: input,
+            output_text: output,
+            model_id: None,
+            feedback: "rejected".to_string(),
+            feedback_reason: reason,
+            feedback_by: None,
+            tags: vec![],
+            category: None,
+            response_id: None,
+            conversation_id: None,
+            confidence_score: None,
+            metadata: None,
+        }
+    }
+
+    /// Set organization
+    pub fn with_organization(mut self, org_id: Uuid) -> Self {
+        self.organization_id = Some(org_id);
+        self
+    }
+
+    /// Set tags
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Set category
+    pub fn with_category(mut self, category: String) -> Self {
+        self.category = Some(category);
+        self
+    }
+
+    /// Set model
+    pub fn with_model(mut self, model_id: String) -> Self {
+        self.model_id = Some(model_id);
+        self
+    }
+
+    /// Set feedback by
+    pub fn with_feedback_by(mut self, user: String) -> Self {
+        self.feedback_by = Some(user);
+        self
+    }
+}

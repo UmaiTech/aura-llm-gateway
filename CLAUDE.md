@@ -20,14 +20,25 @@ Rust-based LLM proxy implementing the Open Responses API specification for agent
 ```
 /crates/
   aura-types/     # Shared type definitions (Open Responses API types)
+    src/
+      compression.rs   # Compression config types
+      consistency.rs   # Response consistency types
+      validation.rs    # Response validation types
   aura-core/      # Core business logic (providers, routing, caching)
+    src/
+      compression/     # Prompt compression (TOON, YAML, AISP, JSON)
+      provider/        # LLM providers (OpenAI, Anthropic, Google)
+      router/          # Smart routing with health tracking
   aura-proxy/     # Main server binary (Axum routes, middleware)
   aura-db/        # Database models and queries (SQLx)
 /apps/
   chat/           # React chat playground (Vite + React 18)
-  landing/        # Marketing landing page (Vite + React)
+  landing/        # Marketing landing page (Vite + React, MDX docs)
 /docs/            # Documentation
+  api/            # API documentation (Markdown)
 /migrations/      # SQLx database migrations
+/sdks/
+  python/         # Python SDK (aura-llm on PyPI)
 ```
 
 ## Development Commands
@@ -108,6 +119,41 @@ pub trait Provider: Send + Sync {
 - Use `#[tokio::test]` for async tests
 - Mock external APIs with `wiremock`
 - Use `insta` for snapshot testing of JSON responses
+
+### Compression Module
+The compression system reduces token usage with multiple strategies:
+- **JSON Minification** (15-30% savings): Whitespace removal, key shortening
+- **TOON** (40-60% savings): Token-Oriented Object Notation for uniform arrays
+- **YAML** (10-25% savings): Fewer delimiters for nested objects
+- **AISP** (clarity boost): AI Symbolic Protocol for mathematical notation
+
+```rust
+use aura_core::compression::{SmartCompressor, Compressor};
+
+let compressor = SmartCompressor::builder()
+    .auto_select(true)
+    .build();
+let result = compressor.compress(input)?;
+```
+
+### Validation Module
+Response validation reduces hallucinations:
+- `logprobs`: Token-level confidence (OpenAI only)
+- `best_of_n`: Generate N responses, select best
+- `self_consistency`: Pick most consistent answer
+- `confidence_threshold`: Reject below threshold
+
+### Feedback API
+Adaptive few-shot learning from user feedback:
+- `POST /v1/feedback`: Submit thumbs up/down with optional text
+- `GET /v1/feedback`: List feedback samples for few-shot injection
+- Positive feedback automatically sampled for context
+
+### Consistency Module
+Cross-model response normalization:
+- Style profiles for consistent tone/format
+- Constitutional AI principles
+- Model calibration for alignment
 
 ## Open Responses API
 

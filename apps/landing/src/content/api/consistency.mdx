@@ -1,0 +1,503 @@
+---
+title: Response Consistency
+description: Ensure consistent responses across different LLM providers and models
+---
+
+import { Callout, CodeBlock, Expandable } from '../../components/mdx'
+
+# Response Consistency
+
+Aura provides response consistency strategies to ensure uniform output quality and style across different LLM providers. Different models have unique behaviors and tendencies - Aura normalizes these to deliver predictable, consistent responses.
+
+<Callout type="info">
+Response consistency is an Aura extension to the Open Responses API. It implements techniques from Constitutional AI, model calibration research, and prompt engineering to normalize outputs across providers.
+</Callout>
+
+## The Problem
+
+When using multiple LLM providers, you'll notice differences:
+
+| Behavior | GPT Models | Claude Models | Gemini Models |
+|----------|-----------|---------------|---------------|
+| Apologies | Sometimes | Often | Rarely |
+| Preambles | Brief | Lengthy | Variable |
+| Hedging | Moderate | Low | High |
+| Formatting | Consistent | Verbose | Needs guidance |
+
+Aura's consistency strategies address these variations automatically.
+
+## Consistency Strategies
+
+| Strategy | Description | Best For |
+|----------|-------------|----------|
+| `none` | No consistency enforcement (default) | Maximum speed |
+| `constitutional` | Inject guiding principles | Behavior control |
+| `reference_anchoring` | Match style of example response | Brand voice |
+| `model_calibration` | Apply model-specific corrections | Multi-provider apps |
+| `format_schema` | Force structured JSON output | API responses |
+| `few_shot_priming` | Prime with input/output examples | Consistent formatting |
+| `style_profile` | Apply tone/formality settings | User-facing content |
+| `semantic_normalization` | Two-pass extraction and formatting | Data extraction |
+| `ensemble_voting` | Query multiple models, find consensus | Critical decisions |
+
+## Quick Start
+
+Add consistency to any request:
+
+<CodeBlock language="json" title="Request with consistency">
+{`{
+  "model": "claude-sonnet-4-20250514",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "Explain the difference between TCP and UDP"
+    }
+  ],
+  "consistency": {
+    "strategy": "constitutional",
+    "principles": [
+      "Be concise and direct",
+      "Avoid unnecessary preambles",
+      "Use bullet points for comparisons"
+    ]
+  }
+}`}
+</CodeBlock>
+
+The response includes consistency metadata:
+
+<CodeBlock language="json" title="Response with consistency metadata">
+{`{
+  "id": "resp_abc123",
+  "model": "claude-sonnet-4-20250514",
+  "status": "completed",
+  "output": [...],
+  "consistency": {
+    "strategy": "constitutional",
+    "calibration_applied": false,
+    "principles_injected": 3
+  }
+}`}
+</CodeBlock>
+
+## Constitutional AI
+
+Based on Anthropic's research, constitutional AI injects guiding principles that shape model behavior:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [...],
+  "consistency": {
+    "strategy": "constitutional",
+    "principles": [
+      "Only state facts you are confident about",
+      "Clearly distinguish between facts and opinions",
+      "If uncertain, explicitly state uncertainty",
+      "Do not fabricate information or sources",
+      "Get to the point immediately",
+      "Avoid unnecessary preambles like 'Great question!'",
+      "End with the answer, not 'Hope this helps!'"
+    ]
+  }
+}`}
+</CodeBlock>
+
+### Built-in Principle Sets
+
+Aura provides preset principle collections:
+
+<CodeBlock language="json" title="Using preset principles">
+{`{
+  "consistency": {
+    "strategy": "constitutional",
+    "principles": "concise"  // or "factual", "technical", "helpful"
+  }
+}`}
+</CodeBlock>
+
+| Preset | Focus |
+|--------|-------|
+| `concise` | Direct answers, no fluff |
+| `factual` | Accuracy, uncertainty handling |
+| `technical` | Precise terminology, code examples |
+| `helpful` | Actionable advice, anticipate needs |
+
+## Model Calibration
+
+Automatically adjust for known model-specific behaviors:
+
+<CodeBlock language="json">
+{`{
+  "model": "claude-sonnet-4-20250514",
+  "input": [...],
+  "consistency": {
+    "strategy": "model_calibration",
+    "apply_calibration": true
+  }
+}`}
+</CodeBlock>
+
+### Known Model Quirks
+
+Aura detects and corrects these behaviors:
+
+| Quirk | Affected Models | Correction |
+|-------|----------------|------------|
+| `excessive_apologies` | Claude | "Do not apologize unless you made an error" |
+| `unnecessary_preamble` | Claude, Gemini | "Start directly with the answer" |
+| `excessive_hedging` | Gemini | "Be confident when you know the answer" |
+| `unnecessary_disclaimers` | Gemini | "Skip disclaimers unless required" |
+| `closing_phrases` | GPT | "End with content, not pleasantries" |
+| `repeats_question` | Various | "Do not repeat the question back" |
+
+<Callout type="tip">
+Enable `apply_calibration: true` with any strategy to automatically apply model-specific corrections on top of your chosen strategy.
+</Callout>
+
+## Style Profile
+
+Define consistent tone, formality, and formatting:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [...],
+  "consistency": {
+    "strategy": "style_profile",
+    "style_profile": {
+      "tone": "professional",
+      "formality": "formal",
+      "verbosity": "concise",
+      "use_markdown": true,
+      "use_bullet_points": true,
+      "format_code": true,
+      "max_length": 500
+    }
+  }
+}`}
+</CodeBlock>
+
+### Style Options
+
+**Tone:**
+- `professional` - Business appropriate
+- `friendly` - Warm and approachable
+- `neutral` - Objective and balanced
+- `authoritative` - Confident and expert
+- `empathetic` - Understanding and supportive
+
+**Formality:**
+- `formal` - Complete sentences, proper language
+- `standard` - Professional but accessible
+- `casual` - Conversational, relaxed
+
+**Verbosity:**
+- `concise` - Short, direct responses
+- `balanced` - Sufficient detail without excess
+- `detailed` - Comprehensive explanations
+
+### Built-in Style Presets
+
+<CodeBlock language="json">
+{`{
+  "consistency": {
+    "strategy": "style_profile",
+    "style_profile": "technical"  // or "conversational", "academic"
+  }
+}`}
+</CodeBlock>
+
+## Reference Anchoring
+
+Provide an example response to match:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "What are the benefits of TypeScript?"
+    }
+  ],
+  "consistency": {
+    "strategy": "reference_anchoring",
+    "reference_response": "TypeScript adds static typing to JavaScript, catching errors at compile time rather than runtime. Key benefits:\\n\\n- **Type Safety**: Catch bugs before deployment\\n- **Better IDE Support**: Autocomplete and refactoring\\n- **Self-Documenting**: Types serve as documentation\\n\\nTradeoff: Initial setup complexity and learning curve."
+  }
+}`}
+</CodeBlock>
+
+The model will match the structure, tone, and formatting of your reference.
+
+## Few-Shot Priming
+
+Prime with input/output examples for consistent formatting:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "Compare REST and GraphQL"
+    }
+  ],
+  "consistency": {
+    "strategy": "few_shot_priming",
+    "examples": [
+      {
+        "input": "Compare Python and JavaScript",
+        "output": "| Aspect | Python | JavaScript |\\n|--------|--------|------------|\\n| Typing | Dynamic | Dynamic |\\n| Use Case | Backend, ML | Full-stack |\\n| Syntax | Indentation | C-style |"
+      },
+      {
+        "input": "Compare Docker and VMs",
+        "output": "| Aspect | Docker | VMs |\\n|--------|--------|-----|\\n| Isolation | Process | Full |\\n| Startup | Seconds | Minutes |\\n| Size | MBs | GBs |"
+      }
+    ]
+  }
+}`}
+</CodeBlock>
+
+## Format Schema
+
+Force structured JSON output:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "List 3 programming languages and their primary use cases"
+    }
+  ],
+  "consistency": {
+    "strategy": "format_schema",
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "use_case": { "type": "string" },
+              "popularity": { "type": "string", "enum": ["high", "medium", "low"] }
+            },
+            "required": ["name", "use_case"]
+          }
+        }
+      }
+    }
+  }
+}`}
+</CodeBlock>
+
+## Ensemble Voting
+
+Query multiple models and return the consensus:
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "What is the time complexity of binary search?"
+    }
+  ],
+  "consistency": {
+    "strategy": "ensemble_voting",
+    "models": ["gpt-4o", "claude-sonnet-4-20250514", "gemini-1.5-pro"]
+  }
+}`}
+</CodeBlock>
+
+<CodeBlock language="json" title="Ensemble response">
+{`{
+  "consistency": {
+    "strategy": "ensemble_voting",
+    "ensemble_votes": {
+      "models": ["gpt-4o", "claude-sonnet-4-20250514", "gemini-1.5-pro"],
+      "selected_model": "gpt-4o",
+      "agreement_score": 0.95,
+      "selection_reason": "Highest semantic similarity to consensus"
+    }
+  }
+}`}
+</CodeBlock>
+
+<Callout type="warning">
+Ensemble voting queries multiple models, increasing latency and cost proportionally to the number of models.
+</Callout>
+
+## Configuration
+
+### YAML Configuration
+
+<CodeBlock language="yaml" title="aura.yaml">
+{`consistency:
+  # Default strategy for all requests
+  default_strategy: none
+
+  # Constitutional defaults
+  constitutional:
+    default_principles:
+      - "Be concise and direct"
+      - "Avoid unnecessary preambles"
+
+  # Model calibration
+  calibration:
+    enabled: true
+    models:
+      "claude-*":
+        quirks: [excessive_apologies, unnecessary_preamble]
+      "gemini-*":
+        quirks: [excessive_hedging, unnecessary_disclaimers]
+      "gpt-*":
+        quirks: [closing_phrases]
+
+  # Per-model defaults
+  model_overrides:
+    "gpt-4o":
+      default_strategy: none
+    "claude-sonnet-4-20250514":
+      default_strategy: model_calibration
+      apply_calibration: true`}
+</CodeBlock>
+
+### Request-Level Override
+
+Any request can override the default configuration:
+
+<CodeBlock language="json">
+{`{
+  "model": "claude-sonnet-4-20250514",
+  "input": [...],
+  "consistency": {
+    "strategy": "style_profile",
+    "style_profile": {
+      "tone": "friendly",
+      "formality": "casual",
+      "verbosity": "balanced"
+    },
+    "apply_calibration": true
+  }
+}`}
+</CodeBlock>
+
+## Best Practices
+
+1. **Start with no consistency** - Only add when you notice inconsistencies
+
+2. **Use calibration for multi-provider apps** - Enable `apply_calibration` when routing across providers
+
+3. **Use constitutional for behavior control** - When you need specific behavioral guardrails
+
+4. **Use style_profile for user-facing content** - Ensures consistent brand voice
+
+5. **Use few_shot_priming for structured output** - Most reliable for consistent formatting
+
+6. **Reserve ensemble_voting for critical decisions** - High accuracy but high cost
+
+7. **Combine strategies** - Use calibration with any other strategy for best results
+
+## Performance Considerations
+
+| Strategy | Latency Impact | Cost Impact |
+|----------|---------------|-------------|
+| `none` | None | None |
+| `constitutional` | Minimal | Minimal |
+| `model_calibration` | Minimal | None |
+| `style_profile` | Minimal | Minimal |
+| `reference_anchoring` | Minimal | Minimal |
+| `few_shot_priming` | Slight (longer prompt) | Slight |
+| `format_schema` | Minimal | None |
+| `semantic_normalization` | ~2x (two passes) | ~2x |
+| `ensemble_voting` | ~Nx (N models) | ~Nx |
+
+## Example Use Cases
+
+### Customer Support Bot
+
+<CodeBlock language="json">
+{`{
+  "model": "claude-sonnet-4-20250514",
+  "input": [{
+    "type": "message",
+    "role": "user",
+    "content": "How do I reset my password?"
+  }],
+  "consistency": {
+    "strategy": "style_profile",
+    "style_profile": {
+      "tone": "friendly",
+      "formality": "standard",
+      "verbosity": "concise"
+    },
+    "apply_calibration": true
+  }
+}`}
+</CodeBlock>
+
+### Technical Documentation
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [{
+    "type": "message",
+    "role": "user",
+    "content": "Document the authentication flow"
+  }],
+  "consistency": {
+    "strategy": "constitutional",
+    "principles": [
+      "Use precise technical terminology",
+      "Include code examples where relevant",
+      "Document error cases and edge conditions",
+      "Use markdown formatting consistently"
+    ]
+  }
+}`}
+</CodeBlock>
+
+### Data Extraction
+
+<CodeBlock language="json">
+{`{
+  "model": "gpt-4o",
+  "input": [{
+    "type": "message",
+    "role": "user",
+    "content": "Extract product details: 'Apple MacBook Pro 14\" M3 Pro, 18GB RAM, 512GB SSD - $1,999'"
+  }],
+  "consistency": {
+    "strategy": "format_schema",
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "specs": {
+          "type": "object",
+          "properties": {
+            "screen_size": { "type": "string" },
+            "processor": { "type": "string" },
+            "ram": { "type": "string" },
+            "storage": { "type": "string" }
+          }
+        },
+        "price": { "type": "number" }
+      }
+    }
+  }
+}`}
+</CodeBlock>

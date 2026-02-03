@@ -8,9 +8,12 @@
 //! Non-streaming responses with `temperature=0` are cached in Redis if available.
 //! To bypass caching, set the `X-Cache-Control: no-cache` header.
 
-use aura_core::{cache, metrics, ProviderError};
+use aura_core::{cache, compression, metrics, ProviderError};
 use aura_db::NewRequestLog;
-use aura_types::{CreateResponseRequest, ResponseStatus, StreamEvent};
+use aura_types::{
+    CompressionMetadata, ConsistencyStrategy, CreateResponseRequest, InputItem, PromptAugmenter,
+    ResponseStatus, StreamEvent,
+};
 use axum::{
     extract::State,
     http::{header::HeaderMap, StatusCode},
@@ -30,6 +33,9 @@ use crate::AppState;
 
 /// Header to bypass response caching
 const CACHE_CONTROL_HEADER: &str = "x-cache-control";
+
+/// Header to specify routing strategy
+const ROUTING_STRATEGY_HEADER: &str = "x-routing-strategy";
 
 /// Creates the responses router
 pub fn router() -> Router<AppState> {
@@ -102,6 +108,226 @@ fn should_bypass_cache(headers: &HeaderMap) -> bool {
         .unwrap_or(false)
 }
 
+/// Extract routing strategy from headers
+fn extract_routing_strategy(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(ROUTING_STRATEGY_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.to_string())
+}
+
+/// Result of preprocessing a request
+struct PreprocessResult {
+    request: CreateResponseRequest,
+    compression_metadata: Option<CompressionMetadata>,
+    /// Original input content before compression (for logging)
+    original_input: Option<String>,
+    /// Compressed input content (for logging)
+    compressed_input: Option<String>,
+}
+
+/// Preprocess request with compression and consistency augmentation
+fn preprocess_request(mut request: CreateResponseRequest) -> PreprocessResult {
+    let mut compression_metadata: Option<CompressionMetadata> = None;
+    let mut original_input_log: Option<String> = None;
+    let mut compressed_input_log: Option<String> = None;
+
+    // Apply compression to input items if configured
+    if let Some(ref config) = request.compression {
+        if config.enabled {
+            let start = std::time::Instant::now();
+            let mut compressed_input = Vec::new();
+            let mut total_original_tokens: u32 = 0;
+            let mut total_compressed_tokens: u32 = 0;
+            let mut strategies_used: Vec<aura_types::CompressionStrategy> = Vec::new();
+            let mut all_original_content = Vec::new();
+            let mut all_compressed_content = Vec::new();
+
+            for item in &request.input {
+                match item {
+                    InputItem::Message { role, content } => {
+                        // Extract text content for compression
+                        let text = match content {
+                            aura_types::InputContent::Text(s) => s.clone(),
+                            aura_types::InputContent::Parts(parts) => {
+                                // Concatenate text parts for compression
+                                parts
+                                    .iter()
+                                    .filter_map(|p| {
+                                        if let aura_types::ContentPart::Text { text } = p {
+                                            Some(text.as_str())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            }
+                        };
+
+                        // Compress the content
+                        match compression::compress(&text, config) {
+                            Ok(output) => {
+                                // Store for logging
+                                all_original_content.push(text.clone());
+                                all_compressed_content.push(output.content.clone());
+
+                                // Accumulate token counts
+                                if let Some(orig) = output.metadata.original_tokens {
+                                    total_original_tokens += orig;
+                                }
+                                if let Some(comp) = output.metadata.compressed_tokens {
+                                    total_compressed_tokens += comp;
+                                }
+
+                                // Collect strategies used
+                                for strategy in &output.metadata.strategies {
+                                    if !strategies_used.contains(strategy) {
+                                        strategies_used.push(*strategy);
+                                    }
+                                }
+
+                                // Log original vs compressed (truncated for readability)
+                                let ratio = output.metadata.ratio.unwrap_or(1.0);
+                                if ratio < 1.0 {
+                                    let original_preview: String = text.chars().take(200).collect();
+                                    let compressed_preview: String =
+                                        output.content.chars().take(200).collect();
+                                    debug!(
+                                        original_tokens = ?output.metadata.original_tokens,
+                                        compressed_tokens = ?output.metadata.compressed_tokens,
+                                        ratio = ?ratio,
+                                        strategies = ?output.metadata.strategies,
+                                        original_preview = %original_preview,
+                                        compressed_preview = %compressed_preview,
+                                        "Compressed message content"
+                                    );
+                                }
+                                compressed_input.push(InputItem::Message {
+                                    role: *role,
+                                    content: aura_types::InputContent::Text(output.content),
+                                });
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Compression failed, using original content");
+                                compressed_input.push(item.clone());
+                            }
+                        }
+                    }
+                    other => compressed_input.push(other.clone()),
+                }
+            }
+            request.input = compressed_input;
+
+            // Build compression metadata
+            let latency_ms = start.elapsed().as_millis() as u32;
+            let ratio = if total_original_tokens > 0 {
+                Some(total_compressed_tokens as f32 / total_original_tokens as f32)
+            } else {
+                None
+            };
+
+            compression_metadata = Some(CompressionMetadata {
+                original_tokens: if total_original_tokens > 0 {
+                    Some(total_original_tokens)
+                } else {
+                    None
+                },
+                compressed_tokens: if total_compressed_tokens > 0 {
+                    Some(total_compressed_tokens)
+                } else {
+                    None
+                },
+                ratio,
+                strategies: strategies_used,
+                latency_ms: Some(latency_ms),
+                aisp_symbols: None,
+                bytes_saved: None,
+            });
+
+            // Store original and compressed content for logging
+            original_input_log = Some(all_original_content.join("\n---\n"));
+            compressed_input_log = Some(all_compressed_content.join("\n---\n"));
+
+            info!(
+                original_tokens = ?total_original_tokens,
+                compressed_tokens = ?total_compressed_tokens,
+                ratio = ?ratio,
+                latency_ms = %latency_ms,
+                "Compression applied to request"
+            );
+        }
+    }
+
+    // Apply consistency augmentation to instructions if configured
+    if let Some(ref config) = request.consistency {
+        match config.strategy {
+            ConsistencyStrategy::None => {}
+            ConsistencyStrategy::Constitutional => {
+                if let Some(ref principles) = config.principles {
+                    let augmented = PromptAugmenter::with_constitution(
+                        request.instructions.as_deref(),
+                        principles,
+                    );
+                    request.instructions = Some(augmented);
+                    debug!(
+                        principles_count = principles.len(),
+                        "Applied constitutional consistency"
+                    );
+                }
+            }
+            ConsistencyStrategy::StyleProfile => {
+                if let Some(ref style) = config.style_profile {
+                    let augmented =
+                        PromptAugmenter::with_style(request.instructions.as_deref(), style);
+                    request.instructions = Some(augmented);
+                    debug!("Applied style profile consistency");
+                }
+            }
+            ConsistencyStrategy::ReferenceAnchoring => {
+                if let Some(ref reference) = config.reference_response {
+                    let augmented =
+                        PromptAugmenter::with_reference(request.instructions.as_deref(), reference);
+                    request.instructions = Some(augmented);
+                    debug!("Applied reference anchoring consistency");
+                }
+            }
+            ConsistencyStrategy::FewShotPriming => {
+                if let Some(ref examples) = config.examples {
+                    let augmented =
+                        PromptAugmenter::with_examples(request.instructions.as_deref(), examples);
+                    request.instructions = Some(augmented);
+                    debug!(
+                        examples_count = examples.len(),
+                        "Applied few-shot priming consistency"
+                    );
+                }
+            }
+            ConsistencyStrategy::ModelCalibration => {
+                // Get default calibration for the model
+                let calibration = aura_types::DefaultCalibrations::for_model(&request.model);
+                let augmented = PromptAugmenter::with_calibration(
+                    request.instructions.as_deref(),
+                    &calibration,
+                );
+                request.instructions = Some(augmented);
+                debug!(model = %request.model, "Applied model calibration consistency");
+            }
+            _ => {
+                // Other strategies not yet implemented
+                debug!(strategy = ?config.strategy, "Consistency strategy not yet implemented");
+            }
+        }
+    }
+
+    PreprocessResult {
+        request,
+        compression_metadata,
+        original_input: original_input_log,
+        compressed_input: compressed_input_log,
+    }
+}
+
 /// Create a response (streaming or non-streaming)
 ///
 /// This is the main endpoint for generating LLM responses. Set `stream: true` for
@@ -137,6 +363,9 @@ pub async fn create_response(
     // Extract auth context (may not be present in dev mode)
     let auth_context = auth.map(|Extension(ctx)| ctx);
 
+    // Extract routing strategy from header
+    let routing_strategy = extract_routing_strategy(&headers);
+
     // Enforce scope requirement for authenticated requests
     if let Some(ref auth) = auth_context {
         if !auth.has_scope("responses:create") && !auth.has_scope("*") {
@@ -155,8 +384,41 @@ pub async fn create_response(
         model = %request.model,
         stream = %request.stream,
         api_key_id = ?auth_context.as_ref().map(|c| c.api_key.id),
+        has_validation = request.validation.is_some(),
+        has_consistency = request.consistency.is_some(),
+        has_compression = request.compression.is_some(),
         "Creating response"
     );
+
+    // Preprocess request with compression and consistency
+    let preprocess_result = preprocess_request(request);
+    let request = preprocess_result.request;
+    let compression_metadata = preprocess_result.compression_metadata;
+    let original_input = preprocess_result.original_input;
+    let compressed_input = preprocess_result.compressed_input;
+
+    // Build compression log metadata if compression was applied
+    let compression_log_metadata: Option<serde_json::Value> = compression_metadata.as_ref().map(|cm| {
+        let mut obj = serde_json::json!({
+            "original_tokens": cm.original_tokens,
+            "compressed_tokens": cm.compressed_tokens,
+            "ratio": cm.ratio,
+            "strategies": cm.strategies.iter().map(|s| format!("{:?}", s).to_lowercase()).collect::<Vec<_>>(),
+            "latency_ms": cm.latency_ms,
+        });
+        // Add truncated content previews (first 500 chars to avoid huge logs)
+        if let Some(ref orig) = original_input {
+            let preview: String = orig.chars().take(500).collect();
+            obj["original_preview"] = serde_json::json!(preview);
+            obj["original_length"] = serde_json::json!(orig.len());
+        }
+        if let Some(ref comp) = compressed_input {
+            let preview: String = comp.chars().take(500).collect();
+            obj["compressed_preview"] = serde_json::json!(preview);
+            obj["compressed_length"] = serde_json::json!(comp.len());
+        }
+        obj
+    });
 
     // Get the provider for this request
     let provider = state.get_provider(&request.model).ok_or_else(|| {
@@ -207,6 +469,9 @@ pub async fn create_response(
         let auth_for_stream = auth_context.clone();
         let auth_for_enrich = auth_context.clone();
         let start_for_stream = start;
+        let compression_metadata_for_stream = compression_metadata.clone();
+        let compression_log_for_stream = compression_log_metadata.clone();
+        let routing_strategy_for_stream = routing_strategy.clone();
 
         // Convert to SSE stream, enriching terminal events
         let sse_stream = stream.then(move |result| {
@@ -217,6 +482,9 @@ pub async fn create_response(
             let model_id_clone = model_id.clone();
             let auth_clone = auth_for_stream.clone();
             let auth_enrich_clone = auth_for_enrich.clone();
+            let compression_meta_clone = compression_metadata_for_stream.clone();
+            let compression_log_clone = compression_log_for_stream.clone();
+            let routing_strategy_clone = routing_strategy_for_stream.clone();
 
             async move {
                 match result {
@@ -233,11 +501,32 @@ pub async fn create_response(
                                         latency_ms,
                                         auth_enrich_clone.as_ref(),
                                         Some(&request_clone),
+                                        compression_meta_clone.as_ref(),
+                                        routing_strategy_clone.as_deref(),
                                     )
                                     .await;
 
                                 // Log completed response
                                 let usage = response.usage.as_ref();
+
+                                // Merge response metadata with compression log
+                                let log_metadata = match (
+                                    response.metadata.clone(),
+                                    compression_log_clone.clone(),
+                                ) {
+                                    (Some(mut resp_meta), Some(comp_meta)) => {
+                                        if let Some(obj) = resp_meta.as_object_mut() {
+                                            obj.insert("compression_log".to_string(), comp_meta);
+                                        }
+                                        Some(resp_meta)
+                                    }
+                                    (Some(resp_meta), None) => Some(resp_meta),
+                                    (None, Some(comp_meta)) => {
+                                        Some(serde_json::json!({"compression_log": comp_meta}))
+                                    }
+                                    (None, None) => None,
+                                };
+
                                 let log = NewRequestLog {
                                     response_id: request_id_clone.clone(),
                                     conversation_id,
@@ -257,7 +546,7 @@ pub async fn create_response(
                                     status: "completed".to_string(),
                                     error_code: None,
                                     error_message: None,
-                                    metadata: response.metadata.clone(),
+                                    metadata: log_metadata,
                                 };
 
                                 // Save response and record API key usage
@@ -548,6 +837,8 @@ pub async fn create_response(
                 latency_ms,
                 auth_context.as_ref(),
                 Some(&request),
+                compression_metadata.as_ref(),
+                routing_strategy.as_deref(),
             )
             .await;
 
@@ -615,6 +906,20 @@ pub async fn create_response(
         // Log successful request to database
         let usage = response.usage.as_ref();
         let cost_usd = usage.and_then(|u| u.cost_usd);
+
+        // Merge response metadata with compression log metadata
+        let log_metadata = match (response.metadata.clone(), compression_log_metadata.clone()) {
+            (Some(mut resp_meta), Some(comp_meta)) => {
+                if let Some(obj) = resp_meta.as_object_mut() {
+                    obj.insert("compression_log".to_string(), comp_meta);
+                }
+                Some(resp_meta)
+            }
+            (Some(resp_meta), None) => Some(resp_meta),
+            (None, Some(comp_meta)) => Some(serde_json::json!({"compression_log": comp_meta})),
+            (None, None) => None,
+        };
+
         let log = NewRequestLog {
             response_id: request_id,
             conversation_id,
@@ -637,7 +942,7 @@ pub async fn create_response(
             .to_string(),
             error_code: None,
             error_message: None,
-            metadata: response.metadata.clone(),
+            metadata: log_metadata,
         };
 
         // CRITICAL: Clone AFTER enrichment to preserve usage/cost data

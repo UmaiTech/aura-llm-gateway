@@ -39,6 +39,7 @@ flowchart TB
 
 - **One API for all providers**: Use the same request format for OpenAI, Anthropic, and Google
 - **Automatic cost tracking**: Every response includes exact USD cost
+- **Smart routing**: Load balancing, failover, region-based, and trait-based routing
 - **Built-in observability**: Latency, provider info, and metadata on every request
 - **Multi-tenant ready**: Organizations, teams, projects with scoped API keys
 - **Secure by default**: API key authentication with encrypted provider credentials
@@ -325,6 +326,55 @@ On a 2-CPU instance:
 - **Vertical**: Add more CPU cores (linear throughput increase)
 - **Bottleneck**: Usually provider rate limits, not Aura
 
+## Smart Routing
+
+Aura includes intelligent routing to distribute requests across multiple endpoints:
+
+```mermaid
+flowchart TB
+    subgraph Request
+        A[Incoming Request]
+    end
+
+    subgraph Router["Smart Router"]
+        B[Strategy Selection]
+        C[Health Check]
+        D[Load Balancer]
+    end
+
+    subgraph Endpoints["Provider Endpoints"]
+        E[OpenAI Key 1]
+        F[OpenAI Key 2]
+        G[Anthropic]
+        H[Google]
+    end
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E & F & G & H
+```
+
+**Routing Strategies:**
+
+| Strategy | Use Case |
+|----------|----------|
+| `round_robin` | Even distribution across endpoints |
+| `weighted` | Capacity-based distribution |
+| `region_based` | Low latency routing |
+| `trait_based` | Task-specific model selection |
+| `cost_optimized` | Budget optimization |
+| `priority` | Failover scenarios |
+
+**Key Features:**
+
+- **Circuit Breaker**: Automatically detects and routes around unhealthy endpoints
+- **Fallback Chains**: Automatic failover to backup providers (OpenAI → Anthropic → Google)
+- **Load Balancing**: Distribute across multiple API keys per provider
+- **Multi-Objective**: Balance cost, latency, and quality with custom weights
+
+See the [Smart Routing guide](/docs/api/routing) for configuration details.
+
 ## Providers
 
 Each LLM provider has a different API. Aura handles this with a provider pattern:
@@ -375,6 +425,7 @@ Aura normalizes all provider errors to a standard format:
 ## Learn More
 
 - [API Reference](/docs/api) - Complete API documentation
+- [Smart Routing](/docs/api/routing) - Load balancing, failover, and intelligent routing
 - [Providers](/docs/providers/openai) - Provider-specific details
 - [Cost Tracking](/docs/api/cost-tracking) - How cost calculation works
 - [Roadmap](/docs/roadmap) - Planned features and timeline

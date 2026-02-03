@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Conversation, Message } from '../lib/types'
+import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity, CompressionStrategy, CompressionConfig } from '../lib/types'
 import { generateId } from '../lib/utils'
 
 interface ChatState {
@@ -14,6 +14,18 @@ interface ChatState {
   agentMode: boolean
   enabledTools: string[]
   theme: 'light' | 'dark' | 'system'
+  routingStrategy: RoutingStrategy
+  validationStrategy: ValidationStrategy
+  validationN: number
+  validationMinConfidence: number
+  validationSelection: SelectionCriteria
+  consistencyStrategy: ConsistencyStrategy
+  consistencyPrinciples: string[]
+  consistencyStyleTone: Tone
+  consistencyStyleFormality: Formality
+  consistencyStyleVerbosity: Verbosity
+  consistencyApplyCalibration: boolean
+  compressionStrategy: CompressionStrategy
 
   // Actions
   createConversation: () => string
@@ -32,6 +44,21 @@ interface ChatState {
   setAgentMode: (enabled: boolean) => void
   toggleTool: (toolName: string) => void
   setTheme: (theme: 'light' | 'dark' | 'system') => void
+  setRoutingStrategy: (strategy: RoutingStrategy) => void
+  setValidationStrategy: (strategy: ValidationStrategy) => void
+  setValidationN: (n: number) => void
+  setValidationMinConfidence: (confidence: number) => void
+  setValidationSelection: (selection: SelectionCriteria) => void
+  getValidationConfig: () => ValidationConfig | undefined
+  setConsistencyStrategy: (strategy: ConsistencyStrategy) => void
+  setConsistencyPrinciples: (principles: string[]) => void
+  setConsistencyStyleTone: (tone: Tone) => void
+  setConsistencyStyleFormality: (formality: Formality) => void
+  setConsistencyStyleVerbosity: (verbosity: Verbosity) => void
+  setConsistencyApplyCalibration: (apply: boolean) => void
+  getConsistencyConfig: () => ConsistencyConfig | undefined
+  setCompressionStrategy: (strategy: CompressionStrategy) => void
+  getCompressionConfig: () => CompressionConfig | undefined
 
   // Computed
   getCurrentConversation: () => Conversation | null
@@ -48,6 +75,18 @@ export const useChatStore = create<ChatState>()(
       agentMode: false,
       enabledTools: [],
       theme: 'system',
+      routingStrategy: 'round_robin',
+      validationStrategy: 'none',
+      validationN: 3,
+      validationMinConfidence: 0.7,
+      validationSelection: 'highest_confidence',
+      consistencyStrategy: 'none',
+      consistencyPrinciples: [],
+      consistencyStyleTone: 'neutral',
+      consistencyStyleFormality: 'standard',
+      consistencyStyleVerbosity: 'balanced',
+      consistencyApplyCalibration: false,
+      compressionStrategy: 'none',
 
       // Conversation actions
       createConversation: () => {
@@ -206,6 +245,111 @@ export const useChatStore = create<ChatState>()(
 
       setTheme: (theme) => set({ theme }),
 
+      setRoutingStrategy: (routingStrategy) => set({ routingStrategy }),
+
+      setValidationStrategy: (validationStrategy) => set({ validationStrategy }),
+
+      setValidationN: (validationN) => set({ validationN }),
+
+      setValidationMinConfidence: (validationMinConfidence) => set({ validationMinConfidence }),
+
+      setValidationSelection: (validationSelection) => set({ validationSelection }),
+
+      getValidationConfig: () => {
+        const { validationStrategy, validationN, validationMinConfidence, validationSelection } = get()
+        if (validationStrategy === 'none') {
+          return undefined
+        }
+        return {
+          strategy: validationStrategy,
+          n: validationN,
+          min_confidence: validationMinConfidence,
+          selection: validationSelection,
+          include_logprobs: validationStrategy === 'logprobs',
+          top_logprobs: validationStrategy === 'logprobs' ? 5 : undefined,
+        }
+      },
+
+      setConsistencyStrategy: (consistencyStrategy) => set({ consistencyStrategy }),
+
+      setConsistencyPrinciples: (consistencyPrinciples) => set({ consistencyPrinciples }),
+
+      setConsistencyStyleTone: (consistencyStyleTone) => set({ consistencyStyleTone }),
+
+      setConsistencyStyleFormality: (consistencyStyleFormality) => set({ consistencyStyleFormality }),
+
+      setConsistencyStyleVerbosity: (consistencyStyleVerbosity) => set({ consistencyStyleVerbosity }),
+
+      setConsistencyApplyCalibration: (consistencyApplyCalibration) => set({ consistencyApplyCalibration }),
+
+      getConsistencyConfig: () => {
+        const {
+          consistencyStrategy,
+          consistencyPrinciples,
+          consistencyStyleTone,
+          consistencyStyleFormality,
+          consistencyStyleVerbosity,
+          consistencyApplyCalibration,
+        } = get()
+
+        if (consistencyStrategy === 'none') {
+          return undefined
+        }
+
+        const config: ConsistencyConfig = {
+          strategy: consistencyStrategy,
+          apply_calibration: consistencyApplyCalibration,
+        }
+
+        if (consistencyStrategy === 'constitutional' && consistencyPrinciples.length > 0) {
+          config.principles = consistencyPrinciples
+        }
+
+        if (consistencyStrategy === 'style_profile') {
+          config.style_profile = {
+            tone: consistencyStyleTone,
+            formality: consistencyStyleFormality,
+            verbosity: consistencyStyleVerbosity,
+            use_markdown: true,
+            use_bullet_points: true,
+            format_code: true,
+          }
+        }
+
+        return config
+      },
+
+      setCompressionStrategy: (compressionStrategy) => set({ compressionStrategy }),
+
+      getCompressionConfig: () => {
+        const { compressionStrategy } = get()
+        if (compressionStrategy === 'none') {
+          return undefined
+        }
+
+        // Map UI strategy to backend CompressionConfig format
+        const baseConfig = {
+          enabled: true,
+          token_cleanup: true,
+          minify_json: true,
+        }
+
+        switch (compressionStrategy) {
+          case 'auto':
+            return { ...baseConfig, auto_select: true }
+          case 'json':
+            return { ...baseConfig, data_format: 'json_compact' as const }
+          case 'toon':
+            return { ...baseConfig, data_format: 'toon' as const }
+          case 'yaml':
+            return { ...baseConfig, data_format: 'yaml' as const }
+          case 'aisp':
+            return { ...baseConfig, semantic_format: 'aisp' as const }
+          default:
+            return baseConfig
+        }
+      },
+
       // Computed
       getCurrentConversation: () => {
         const { conversations, currentConversationId } = get()
@@ -223,6 +367,18 @@ export const useChatStore = create<ChatState>()(
         agentMode: state.agentMode,
         enabledTools: state.enabledTools,
         theme: state.theme,
+        routingStrategy: state.routingStrategy,
+        validationStrategy: state.validationStrategy,
+        validationN: state.validationN,
+        validationMinConfidence: state.validationMinConfidence,
+        validationSelection: state.validationSelection,
+        consistencyStrategy: state.consistencyStrategy,
+        consistencyPrinciples: state.consistencyPrinciples,
+        consistencyStyleTone: state.consistencyStyleTone,
+        consistencyStyleFormality: state.consistencyStyleFormality,
+        consistencyStyleVerbosity: state.consistencyStyleVerbosity,
+        consistencyApplyCalibration: state.consistencyApplyCalibration,
+        compressionStrategy: state.compressionStrategy,
       }),
     }
   )

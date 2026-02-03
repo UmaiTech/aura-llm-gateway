@@ -4,6 +4,7 @@
 //! including provider implementations, routing, caching, and load balancing.
 
 pub mod cache;
+pub mod compression;
 pub mod config;
 pub mod cost;
 pub mod crypto;
@@ -12,9 +13,15 @@ pub mod metrics;
 pub mod provider;
 pub mod rate_limit;
 pub mod redis;
+pub mod router;
 pub mod state;
 
 pub use cache::{CacheError, CacheHit, CacheStats, ResponseCache};
+pub use compression::{
+    compress, AispEncoder, AispError, CompressedOutput, CompressionError, Compressor,
+    JsonCompressor, JsonError, SmartCompressor, SmartCompressorBuilder, ToonEncoder, ToonError,
+    YamlConverter, YamlError,
+};
 pub use config::{
     AdminConfig, Config, ConfigBuilder, ConfigError, DatabaseConfig, LoggingConfig, ProviderConfig,
     RedisConfig, ServerConfig,
@@ -26,6 +33,13 @@ pub use provider::{
 };
 pub use rate_limit::{RateLimitError, RateLimitResult, RateLimiter};
 pub use redis::{RedisError, RedisPool};
+pub use router::{
+    EndpointConfig, EndpointHealth, EndpointPool, EndpointPoolBuilder, FallbackChain,
+    FallbackChainBuilder, FallbackConfig, HealthConfig, HealthState, HealthTracker, ModelMapping,
+    ModelProfile, ModelTrait, MultiObjectiveSelector, OptimizationGoal, ProviderEndpoint,
+    ProviderEndpointBuilder, Region, RoutingConfig, RoutingDecision, RoutingStrategy,
+    RoutingWeights, SmartRouter, SmartRouterBuilder, StrategySelector,
+};
 pub use state::{AppState, AppStateBuilder};
 
 /// Returns the crate version

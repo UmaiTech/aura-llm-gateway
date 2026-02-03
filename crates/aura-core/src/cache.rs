@@ -563,6 +563,8 @@ mod tests {
             usage: None,
             previous_response_id: None,
             metadata: None,
+            validation: None,
+            consistency: None,
         };
         assert!(ResponseCache::should_cache_response(&good_response));
 
