@@ -26,6 +26,7 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const [copied, setCopied] = useState(false)
 
   // Debug logging for usage data
   if (!isUser && !isStreaming) {
@@ -38,10 +39,16 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
     })
   }
 
+  const handleCopyMessage = async () => {
+    await navigator.clipboard.writeText(message.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div
       className={cn(
-        "flex gap-4",
+        "flex gap-4 group/message",
         isUser ? "flex-row-reverse" : "flex-row"
       )}
     >
@@ -68,17 +75,18 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
           isUser && "flex flex-col items-end"
         )}
       >
-        <div
-          className={cn(
-            "rounded-2xl px-4 py-3 shadow-premium",
-            isUser
-              ? "bg-primary-500 text-white rounded-tr-md"
-              : "bg-secondary/80 backdrop-blur-sm rounded-tl-md"
-          )}
-        >
-          {isUser ? (
-            <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          ) : (
+        <div className="relative">
+          <div
+            className={cn(
+              "rounded-2xl px-4 py-3 shadow-premium",
+              isUser
+                ? "bg-primary-500 text-white rounded-tr-md"
+                : "bg-secondary/80 backdrop-blur-sm rounded-tl-md"
+            )}
+          >
+            {isUser ? (
+              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            ) : (
             <div className="space-y-3">
               {/* Tool Invocations - only render when present */}
               {message.toolInvocations && message.toolInvocations.length > 0 && (
@@ -125,6 +133,26 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
                 {isStreaming && <TypingIndicator />}
               </div>
             </div>
+          )}
+          </div>
+
+          {/* Copy button - appears on hover */}
+          {message.content && !isStreaming && (
+            <button
+              onClick={handleCopyMessage}
+              className={cn(
+                "absolute top-2 opacity-0 group-hover/message:opacity-100 transition-opacity",
+                "p-1.5 rounded-md bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200",
+                isUser ? "left-2" : "right-2"
+              )}
+              title="Copy message"
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-green-400" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </button>
           )}
         </div>
 
@@ -387,6 +415,14 @@ interface UsageDisplayProps {
     gatewayVersion: string
     latencyMs?: number
     requestId?: string
+    compression?: {
+      original_tokens?: number
+      compressed_tokens?: number
+      ratio?: number
+      savings_percent?: number
+      strategies?: string[]
+      latency_ms?: number
+    }
   }
   responseId?: string
   rawResponse?: unknown
@@ -398,7 +434,16 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
   const [feedback, setFeedback] = useState<FeedbackState>('none')
   const [reason, setReason] = useState('')
   const [showRaw, setShowRaw] = useState(false)
+  const [rawCopied, setRawCopied] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleCopyRaw = async () => {
+    if (rawResponse) {
+      await navigator.clipboard.writeText(JSON.stringify(rawResponse, null, 2))
+      setRawCopied(true)
+      setTimeout(() => setRawCopied(false), 2000)
+    }
+  }
 
   // Focus textarea when modal opens
   useEffect(() => {
@@ -496,6 +541,20 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
         <span className="flex items-center gap-1 text-green-400">
           <Coins className="h-3 w-3" />
           <span>${usage.cost.toFixed(4)}</span>
+        </span>
+      )}
+
+      {/* Compression stats */}
+      {aura?.compression && aura.compression.savings_percent !== undefined && aura.compression.savings_percent > 0 && (
+        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+          <Zap className="h-3 w-3" />
+          <span className="font-medium">{aura.compression.savings_percent.toFixed(1)}%</span>
+          <span>saved</span>
+          {aura.compression.original_tokens && aura.compression.compressed_tokens && (
+            <span className="text-muted-foreground ml-1">
+              ({aura.compression.original_tokens} → {aura.compression.compressed_tokens})
+            </span>
+          )}
         </span>
       )}
 
@@ -603,7 +662,7 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
       )}
 
       {/* Raw Response Button */}
-      {rawResponse && (
+      {rawResponse !== undefined && (
         <button
           onClick={() => setShowRaw(!showRaw)}
           className={cn(
@@ -620,17 +679,36 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
       )}
 
       {/* Raw Response Panel */}
-      {showRaw && rawResponse && (
+      {showRaw && rawResponse !== undefined && (
         <div className="absolute left-0 right-0 top-full mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="bg-gray-900 border border-border rounded-lg shadow-lg overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-border">
               <span className="text-xs font-medium text-muted-foreground">Raw API Response</span>
-              <button
-                onClick={() => setShowRaw(false)}
-                className="p-1 hover:bg-secondary-foreground/10 rounded transition-colors"
-              >
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyRaw}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                  title="Copy JSON"
+                >
+                  {rawCopied ? (
+                    <>
+                      <Check className="h-3 w-3 text-green-400" />
+                      <span className="text-green-400">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowRaw(false)}
+                  className="p-1 hover:bg-secondary-foreground/10 rounded transition-colors"
+                >
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </div>
             </div>
             <pre className="text-xs p-3 overflow-x-auto max-h-80 overflow-y-auto text-gray-300 font-mono">
               {JSON.stringify(rawResponse, null, 2)}

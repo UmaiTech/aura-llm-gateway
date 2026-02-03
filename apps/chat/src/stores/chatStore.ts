@@ -326,10 +326,27 @@ export const useChatStore = create<ChatState>()(
         if (compressionStrategy === 'none') {
           return undefined
         }
-        return {
-          strategy: compressionStrategy,
-          preserve_structure: true,
-          min_savings_threshold: 0.1,
+
+        // Map UI strategy to backend CompressionConfig format
+        const baseConfig = {
+          enabled: true,
+          token_cleanup: true,
+          minify_json: true,
+        }
+
+        switch (compressionStrategy) {
+          case 'auto':
+            return { ...baseConfig, auto_select: true }
+          case 'json':
+            return { ...baseConfig, data_format: 'json_compact' as const }
+          case 'toon':
+            return { ...baseConfig, data_format: 'toon' as const }
+          case 'yaml':
+            return { ...baseConfig, data_format: 'yaml' as const }
+          case 'aisp':
+            return { ...baseConfig, semantic_format: 'aisp' as const }
+          default:
+            return baseConfig
         }
       },
 

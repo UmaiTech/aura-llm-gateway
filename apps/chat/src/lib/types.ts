@@ -18,6 +18,43 @@ export interface MessageUsage {
   cost?: number  // Cost in USD (based on model pricing)
 }
 
+// Compression metadata from the gateway
+export interface CompressionMetadata {
+  original_tokens?: number
+  compressed_tokens?: number
+  ratio?: number
+  savings_percent?: number
+  strategies?: string[]
+  latency_ms?: number
+}
+
+// Validation metadata in response
+export interface ValidationMetadataResponse {
+  strategy: string
+  n?: number
+  min_confidence?: number
+  selection?: string
+  include_logprobs?: boolean
+}
+
+// Consistency metadata in response
+export interface ConsistencyMetadataResponse {
+  strategy: string
+  apply_calibration?: boolean
+  has_principles?: boolean
+  principles_count?: number
+  has_style_profile?: boolean
+  has_examples?: boolean
+  examples_count?: number
+}
+
+// Compression config in response
+export interface CompressionConfigResponse {
+  data_format: string
+  semantic_format: string
+  auto_select?: boolean
+}
+
 // Aura gateway enrichment metadata
 export interface AuraMetadata {
   provider: string      // e.g., "openai", "anthropic", "google"
@@ -27,6 +64,12 @@ export interface AuraMetadata {
   endpointId?: string   // Routing endpoint ID
   routingStrategy?: string // Routing strategy used
   isFallback?: boolean  // Whether this was a fallback
+  compression?: CompressionMetadata // Compression stats if applied
+  // Gateway features
+  validation?: ValidationMetadataResponse
+  consistency?: ConsistencyMetadataResponse
+  compression_enabled?: boolean
+  compression_config?: CompressionConfigResponse
 }
 
 // Routing strategies available
@@ -339,7 +382,7 @@ export const CONSTITUTIONAL_PRESETS: { id: string; name: string; principles: str
   },
 ]
 
-// Compression strategies for token reduction
+// Compression strategies for token reduction (UI selection)
 export type CompressionStrategy =
   | 'none'
   | 'auto'
@@ -348,17 +391,22 @@ export type CompressionStrategy =
   | 'yaml'
   | 'aisp'
 
-export interface CompressionConfig {
-  strategy: CompressionStrategy
-  preserve_structure?: boolean
-  min_savings_threshold?: number
-}
+// Data format for the backend
+export type DataFormat = 'json' | 'json_compact' | 'yaml' | 'toon' | 'markdown'
 
-export interface CompressionMetadata {
-  strategy: CompressionStrategy
-  original_tokens?: number
-  compressed_tokens?: number
-  savings_percent?: number
+// Semantic format for the backend
+export type SemanticFormat = 'natural' | 'aisp' | 'pseudocode'
+
+// Compression config sent to the backend (matches Rust CompressionConfig)
+export interface CompressionConfig {
+  enabled: boolean
+  data_format?: DataFormat
+  semantic_format?: SemanticFormat
+  auto_select?: boolean
+  target_ratio?: number
+  token_budget?: number
+  token_cleanup?: boolean
+  minify_json?: boolean
 }
 
 export const COMPRESSION_STRATEGIES: { id: CompressionStrategy; name: string; description: string; savings: string }[] = [

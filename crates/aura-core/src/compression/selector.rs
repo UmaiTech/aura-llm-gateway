@@ -6,6 +6,8 @@
 //! - AISP for rule-based instructions
 //! - JSON minification as fallback
 
+use tracing::debug;
+
 use aura_types::{
     CompressionAnalysis, CompressionConfig, CompressionStrategy, DataFormat, SemanticFormat,
     StructureType,
@@ -29,6 +31,15 @@ static RULE_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         Regex::new(r"(?i)\bensure\s+that\b").unwrap(),
     ]
 });
+
+/// Result of smart compression with strategy info.
+#[derive(Debug, Clone)]
+pub struct SmartCompressionResult {
+    /// Compressed content
+    pub content: String,
+    /// Strategies that were actually applied
+    pub strategies: Vec<CompressionStrategy>,
+}
 
 /// Smart compressor that automatically selects the best strategy.
 #[derive(Debug, Clone)]
@@ -117,32 +128,65 @@ impl SmartCompressor {
         }
     }
 
-    /// Compress content using the best strategy.
-    pub fn compress_smart(&self, input: &str) -> Result<String, super::CompressionError> {
+    /// Compress content using the best strategy, returning strategies used.
+    pub fn compress_smart(
+        &self,
+        input: &str,
+    ) -> Result<SmartCompressionResult, super::CompressionError> {
         let analysis = self.analyze(input);
+        let mut strategies = Vec::new();
 
         // Apply semantic compression if rules detected
         let processed = if analysis.has_rules && self.config.semantic_format == SemanticFormat::Aisp
         {
+            strategies.push(CompressionStrategy::Aisp);
             self.aisp.compress(input)?
         } else {
             input.to_string()
         };
 
         // Try to parse as JSON for data format compression
-        if let Ok(value) = serde_json::from_str::<Value>(&processed) {
-            return self.compress_value(&value, &analysis);
+        // Trim whitespace to help with JSON detection
+        let trimmed = processed.trim();
+        if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+            debug!(
+                data_format = ?self.config.data_format,
+                has_uniform_arrays = %analysis.has_uniform_arrays,
+                structure_type = ?analysis.structure_type,
+                "Parsed content as JSON, applying data format compression"
+            );
+            return self.compress_value_with_strategy(&value, &analysis, strategies);
         }
 
-        // Return processed text (may have AISP applied)
-        Ok(processed)
+        // Log why JSON parsing failed for debugging
+        debug!(
+            input_len = %processed.len(),
+            starts_with = ?processed.chars().take(20).collect::<String>(),
+            "Content not parsed as JSON, applying token cleanup only"
+        );
+
+        // If no strategies were applied, mark as token cleanup
+        if strategies.is_empty() {
+            strategies.push(CompressionStrategy::TokenCleanup);
+        }
+
+        Ok(SmartCompressionResult {
+            content: processed,
+            strategies,
+        })
     }
 
-    fn compress_value(
+    /// Legacy method for Compressor trait compatibility
+    fn compress_smart_legacy(&self, input: &str) -> Result<String, super::CompressionError> {
+        Ok(self.compress_smart(input)?.content)
+    }
+
+    fn compress_value_with_strategy(
         &self,
         value: &Value,
         analysis: &CompressionAnalysis,
-    ) -> Result<String, super::CompressionError> {
+        mut strategies: Vec<CompressionStrategy>,
+    ) -> Result<SmartCompressionResult, super::CompressionError> {
         // Choose format based on config or analysis
         let format = if self.config.auto_select {
             analysis.recommended_format
@@ -150,16 +194,45 @@ impl SmartCompressor {
             self.config.data_format
         };
 
-        match format {
-            DataFormat::Toon if analysis.has_uniform_arrays => {
-                self.toon.compress(&serde_json::to_string(value).unwrap())
+        let content = match format {
+            DataFormat::Toon => {
+                // Try TOON compression - works best with uniform arrays but can handle any JSON
+                match self.toon.compress(&serde_json::to_string(value).unwrap()) {
+                    Ok(compressed) => {
+                        strategies.push(CompressionStrategy::Toon);
+                        compressed
+                    }
+                    Err(e) => {
+                        // Fallback to JSON minify if TOON fails
+                        debug!(error = %e, "TOON compression failed, falling back to JSON minify");
+                        strategies.push(CompressionStrategy::JsonMinify);
+                        self.json.compress(&serde_json::to_string(value).unwrap())?
+                    }
+                }
             }
-            DataFormat::Yaml => self.yaml.compress(&serde_json::to_string(value).unwrap()),
+            DataFormat::Yaml => {
+                strategies.push(CompressionStrategy::Yaml);
+                self.yaml.compress(&serde_json::to_string(value).unwrap())?
+            }
             DataFormat::Markdown if analysis.structure_type == StructureType::Tabular => {
-                self.to_markdown_table(value)
+                strategies.push(CompressionStrategy::Markdown);
+                self.to_markdown_table(value)?
             }
-            _ => self.json.compress(&serde_json::to_string(value).unwrap()),
+            _ => {
+                strategies.push(CompressionStrategy::JsonMinify);
+                self.json.compress(&serde_json::to_string(value).unwrap())?
+            }
+        };
+
+        // If multiple strategies were used, add Hybrid indicator
+        if strategies.len() > 1 {
+            strategies.push(CompressionStrategy::Hybrid);
         }
+
+        Ok(SmartCompressionResult {
+            content,
+            strategies,
+        })
     }
 
     fn detect_rules(&self, input: &str) -> bool {
@@ -280,10 +353,11 @@ impl Default for SmartCompressor {
 
 impl Compressor for SmartCompressor {
     fn compress(&self, input: &str) -> Result<String, super::CompressionError> {
-        self.compress_smart(input)
+        self.compress_smart_legacy(input)
     }
 
     fn strategy(&self) -> CompressionStrategy {
+        // This is a fallback; prefer using compress_smart() directly
         CompressionStrategy::Hybrid
     }
 }
@@ -392,7 +466,8 @@ mod tests {
 
         let result = compressor.compress_smart(input).unwrap();
         // Should use TOON format
-        assert!(result.contains("[3]{"));
+        assert!(result.content.contains("[3]{"));
+        assert!(result.strategies.contains(&CompressionStrategy::Toon));
     }
 
     #[test]
@@ -407,8 +482,17 @@ mod tests {
 
         let result = compressor.compress_smart(input).unwrap();
         // Should use YAML format
-        assert!(result.contains("user:"), "Expected 'user:' in:\n{}", result);
-        assert!(result.contains("Alice"), "Expected 'Alice' in:\n{}", result);
+        assert!(
+            result.content.contains("user:"),
+            "Expected 'user:' in:\n{}",
+            result.content
+        );
+        assert!(
+            result.content.contains("Alice"),
+            "Expected 'Alice' in:\n{}",
+            result.content
+        );
+        assert!(result.strategies.contains(&CompressionStrategy::Yaml));
     }
 
     #[test]
@@ -423,7 +507,8 @@ mod tests {
 
         let result = compressor.compress_smart(input).unwrap();
         // Should apply AISP transformation
-        assert!(result.contains('⇒'));
+        assert!(result.content.contains('⇒'));
+        assert!(result.strategies.contains(&CompressionStrategy::Aisp));
     }
 
     #[test]

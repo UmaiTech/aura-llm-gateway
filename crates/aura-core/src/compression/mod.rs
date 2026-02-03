@@ -16,7 +16,7 @@ mod yaml;
 
 pub use aisp::{AispEncoder, AispError};
 pub use json::{JsonCompressor, JsonError};
-pub use selector::{SmartCompressor, SmartCompressorBuilder};
+pub use selector::{SmartCompressionResult, SmartCompressor, SmartCompressorBuilder};
 pub use toon::{ToonEncoder, ToonError};
 pub use yaml::{YamlConverter, YamlError};
 
@@ -71,25 +71,27 @@ pub fn compress(
     if !config.enabled {
         return Ok(CompressedOutput {
             content: input.to_string(),
+            original_content: None,
             metadata: CompressionMetadata::none(),
         });
     }
 
     let compressor = SmartCompressor::from_config(config);
-    let compressed = compressor.compress(input)?;
-    let compressed_tokens = estimate_tokens(&compressed);
+    let result = compressor.compress_smart(input)?;
+    let compressed_tokens = estimate_tokens(&result.content);
 
-    let mut metadata = CompressionMetadata {
+    let metadata = CompressionMetadata {
         original_tokens: Some(original_tokens),
         compressed_tokens: Some(compressed_tokens),
         ratio: Some(compressed_tokens as f32 / original_tokens as f32),
         latency_ms: Some(start.elapsed().as_millis() as u32),
+        strategies: result.strategies,
         ..Default::default()
     };
-    metadata.add_strategy(compressor.strategy());
 
     Ok(CompressedOutput {
-        content: compressed,
+        content: result.content,
+        original_content: Some(input.to_string()),
         metadata,
     })
 }
@@ -99,6 +101,8 @@ pub fn compress(
 pub struct CompressedOutput {
     /// Compressed content
     pub content: String,
+    /// Original content before compression (for logging)
+    pub original_content: Option<String>,
     /// Metadata about compression
     pub metadata: CompressionMetadata,
 }

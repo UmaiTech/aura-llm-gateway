@@ -352,6 +352,72 @@ impl AppState {
             aura_metadata_obj["end_user"] = user;
         }
 
+        // Add gateway features metadata from request
+        if let Some(req) = request {
+            // Add validation config if present
+            if let Some(ref validation) = req.validation {
+                let mut validation_obj = serde_json::json!({
+                    "strategy": format!("{:?}", validation.strategy).to_lowercase(),
+                });
+                if let Some(n) = validation.n {
+                    validation_obj["n"] = serde_json::json!(n);
+                }
+                if let Some(min_conf) = validation.min_confidence {
+                    validation_obj["min_confidence"] = serde_json::json!(min_conf);
+                }
+                if let Some(ref selection) = validation.selection {
+                    validation_obj["selection"] =
+                        serde_json::json!(format!("{:?}", selection).to_lowercase());
+                }
+                if validation.include_logprobs == Some(true) {
+                    validation_obj["include_logprobs"] = serde_json::json!(true);
+                }
+                aura_metadata_obj["validation"] = validation_obj;
+            }
+
+            // Add consistency config if present
+            if let Some(ref consistency) = req.consistency {
+                let mut consistency_obj = serde_json::json!({
+                    "strategy": format!("{:?}", consistency.strategy).to_lowercase(),
+                });
+                if consistency.apply_calibration {
+                    consistency_obj["apply_calibration"] = serde_json::json!(true);
+                }
+                if consistency.principles.is_some() {
+                    consistency_obj["has_principles"] = serde_json::json!(true);
+                    consistency_obj["principles_count"] = serde_json::json!(consistency
+                        .principles
+                        .as_ref()
+                        .map(|p| p.len())
+                        .unwrap_or(0));
+                }
+                if consistency.style_profile.is_some() {
+                    consistency_obj["has_style_profile"] = serde_json::json!(true);
+                }
+                if consistency.examples.is_some() {
+                    consistency_obj["has_examples"] = serde_json::json!(true);
+                    consistency_obj["examples_count"] = serde_json::json!(consistency
+                        .examples
+                        .as_ref()
+                        .map(|e| e.len())
+                        .unwrap_or(0));
+                }
+                aura_metadata_obj["consistency"] = consistency_obj;
+            }
+
+            // Add compression config indicator (actual stats added in enrich_response_with_latency)
+            if let Some(ref compression) = req.compression {
+                if compression.enabled {
+                    aura_metadata_obj["compression_enabled"] = serde_json::json!(true);
+                    aura_metadata_obj["compression_config"] = serde_json::json!({
+                        "data_format": format!("{:?}", compression.data_format).to_lowercase(),
+                        "semantic_format": format!("{:?}", compression.semantic_format).to_lowercase(),
+                        "auto_select": compression.auto_select,
+                    });
+                }
+            }
+        }
+
         let aura_metadata = serde_json::json!({
             "aura": aura_metadata_obj
         });
@@ -386,16 +452,62 @@ impl AppState {
         latency_ms: u64,
         auth_context: Option<&crate::routes::AuthContext>,
         request: Option<&aura_types::CreateResponseRequest>,
+        compression_metadata: Option<&aura_types::CompressionMetadata>,
+        routing_strategy: Option<&str>,
     ) -> aura_types::Response {
         let mut response = self
             .enrich_response(response, request_id, auth_context, request)
             .await;
 
-        // Add latency to aura metadata
+        // Add latency, routing, and compression to aura metadata
         if let Some(ref mut metadata) = response.metadata {
             if let Some(aura) = metadata.get_mut("aura") {
                 if let Some(obj) = aura.as_object_mut() {
                     obj.insert("latency_ms".to_string(), serde_json::json!(latency_ms));
+
+                    // Add routing strategy if specified
+                    if let Some(strategy) = routing_strategy {
+                        obj.insert("routing_strategy".to_string(), serde_json::json!(strategy));
+                    }
+
+                    // Add compression metadata if present
+                    if let Some(compression) = compression_metadata {
+                        let mut compression_obj = serde_json::Map::new();
+
+                        if let Some(orig) = compression.original_tokens {
+                            compression_obj
+                                .insert("original_tokens".to_string(), serde_json::json!(orig));
+                        }
+                        if let Some(comp) = compression.compressed_tokens {
+                            compression_obj
+                                .insert("compressed_tokens".to_string(), serde_json::json!(comp));
+                        }
+                        if let Some(ratio) = compression.ratio {
+                            compression_obj.insert("ratio".to_string(), serde_json::json!(ratio));
+                            // Calculate savings percentage
+                            let savings = (1.0 - ratio) * 100.0;
+                            compression_obj
+                                .insert("savings_percent".to_string(), serde_json::json!(savings));
+                        }
+                        if !compression.strategies.is_empty() {
+                            let strategies: Vec<String> = compression
+                                .strategies
+                                .iter()
+                                .map(|s| format!("{:?}", s).to_lowercase())
+                                .collect();
+                            compression_obj
+                                .insert("strategies".to_string(), serde_json::json!(strategies));
+                        }
+                        if let Some(latency) = compression.latency_ms {
+                            compression_obj
+                                .insert("latency_ms".to_string(), serde_json::json!(latency));
+                        }
+
+                        obj.insert(
+                            "compression".to_string(),
+                            serde_json::Value::Object(compression_obj),
+                        );
+                    }
                 }
             }
         }
