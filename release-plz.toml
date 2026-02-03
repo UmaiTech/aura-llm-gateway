@@ -25,15 +25,6 @@ semver_check = false
 pr_labels = ["release"]
 pr_draft = false
 
-# Commit message for release PR
-release_commits = "chore: release v{{ version }}"
-
-# Always create release even if only build/ci commits (for consistency)
-release_always = false
-
-# Dependencies update - bump workspace version when any package changes
-dependencies_update = true
-
 # Individual package configuration
 # publish = false prevents publishing to crates.io
 # All packages contribute to workspace version bumps
