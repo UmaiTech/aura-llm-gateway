@@ -10,7 +10,7 @@ git_tag_enable = true
 git_release_enable = true
 # Changelog update strategy
 changelog_update = true
-# Changelog configuration
+# Changelog configuration (git-cliff)
 changelog_config = "cliff.toml"
 # Release name for workspace releases
 git_release_name = "Aura LLM Gateway v{{ version }}"
@@ -20,6 +20,19 @@ allow_dirty = false
 
 # Semver check disabled (not publishing to crates.io)
 semver_check = false
+
+# PR settings
+pr_labels = ["release"]
+pr_draft = false
+
+# Commit message for release PR
+release_commits = "chore: release v{{ version }}"
+
+# Always create release even if only build/ci commits (for consistency)
+release_always = false
+
+# Dependencies update - bump workspace version when any package changes
+dependencies_update = true
 
 # Individual package configuration
 # publish = false prevents publishing to crates.io

@@ -204,7 +204,7 @@ fn preprocess_request(mut request: CreateResponseRequest) -> PreprocessResult {
                                     );
                                 }
                                 compressed_input.push(InputItem::Message {
-                                    role: role.clone(),
+                                    role: *role,
                                     content: aura_types::InputContent::Text(output.content),
                                 });
                             }

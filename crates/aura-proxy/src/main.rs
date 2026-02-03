@@ -445,6 +445,7 @@ impl AppState {
     }
 
     /// Enrich a Response with cost, timing, and request ID information
+    #[allow(clippy::too_many_arguments)]
     pub async fn enrich_response_with_latency(
         &self,
         response: aura_types::Response,
