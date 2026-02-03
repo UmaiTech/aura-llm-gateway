@@ -35,29 +35,28 @@ features_always_increment_minor = true
 [[package]]
 name = "aura-types"
 publish = false
-# Changes to types trigger version bumps
 release = true
-# No individual GitHub release for this package
 git_release_enable = false
+git_tag_enable = false
 
 [[package]]
 name = "aura-db"
 publish = false
-# Changes to db trigger version bumps
 release = true
 git_release_enable = false
+git_tag_enable = false
 
 [[package]]
 name = "aura-core"
 publish = false
-# Changes to core (providers, etc.) trigger version bumps
 release = true
 git_release_enable = false
+git_tag_enable = false
 
 [[package]]
 name = "aura-proxy"
 publish = false
-# This is the main package - enable releases for it
 release = true
-# Only this package creates GitHub releases
+# Only this package creates the GitHub release and tag
 git_release_enable = true
+git_tag_enable = true
