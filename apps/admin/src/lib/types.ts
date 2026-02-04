@@ -175,3 +175,60 @@ export interface RoutingRule {
   conditions: RoutingCondition[]
   actions: RoutingAction[]
 }
+
+// Time range for dashboard queries
+export type TimeRange = '24h' | '2d' | '3d' | '4d' | '5d' | '6d' | '7d'
+
+// Dynamic stats that support time range filtering
+export interface DynamicStats {
+  total_requests: number
+  input_tokens: number
+  output_tokens: number
+  cached_tokens: number
+  total_cost: number
+  avg_latency: number
+  success_rate: number
+  period: string
+}
+
+// Insights page types
+export interface InsightsStats {
+  total_requests: number
+  total_tokens: number
+  total_cost: number
+  avg_latency: number
+  tool_calls: number
+  // Comparison with previous period
+  requests_change: number
+  tokens_change: number
+  cost_change: number
+  latency_change: number
+  tool_calls_change: number
+}
+
+export interface ModelCostStats {
+  model_id: string
+  model_name: string | null
+  total_cost: number
+  request_count: number
+  percentage: number
+}
+
+export interface ToolUsageStats {
+  tool_name: string
+  call_count: number
+  percentage: number
+}
+
+export interface HeatmapData {
+  day_of_week: number // 0-6, 0 = Monday
+  hour_of_day: number // 0-23
+  request_count: number
+  intensity: number // 0-5 scale
+}
+
+export interface TokenUsageTimeline {
+  timestamp: string
+  input_tokens: number
+  output_tokens: number
+}

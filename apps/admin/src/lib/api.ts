@@ -12,7 +12,15 @@ import type {
   OrganizationSummary,
   ApiKeySummary,
   RoutingRule,
+  TimeRange,
+  DynamicStats,
+  InsightsStats,
+  ModelCostStats,
+  ToolUsageStats,
+  HeatmapData,
+  TokenUsageTimeline,
 } from './types'
+import { useAuthStore } from '@/stores'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
@@ -27,6 +35,14 @@ class ApiError extends Error {
   }
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const adminKey = useAuthStore.getState().adminKey
+  if (adminKey) {
+    return { Authorization: `Bearer ${adminKey}` }
+  }
+  return {}
+}
+
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
@@ -34,6 +50,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   })
@@ -53,6 +70,11 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 // Dashboard Stats
 export async function getOverviewStats(): Promise<OverviewStats> {
   return fetchApi<OverviewStats>('/admin/stats/overview')
+}
+
+// Dashboard Stats with time range
+export async function getDynamicStats(period: TimeRange = '24h'): Promise<DynamicStats> {
+  return fetchApi<DynamicStats>(`/admin/stats/dynamic?period=${period}`)
 }
 
 export async function getUsageStats(): Promise<UsageStats> {
@@ -116,6 +138,27 @@ export async function createRoutingRule(
     method: 'POST',
     body: JSON.stringify(rule),
   })
+}
+
+// Insights Stats
+export async function getInsightsStats(period: TimeRange = '7d'): Promise<InsightsStats> {
+  return fetchApi<InsightsStats>(`/admin/stats/insights?period=${period}`)
+}
+
+export async function getModelCosts(period: TimeRange = '7d'): Promise<ModelCostStats[]> {
+  return fetchApi<ModelCostStats[]>(`/admin/stats/model-costs?period=${period}`)
+}
+
+export async function getToolUsage(period: TimeRange = '7d'): Promise<ToolUsageStats[]> {
+  return fetchApi<ToolUsageStats[]>(`/admin/stats/tool-usage?period=${period}`)
+}
+
+export async function getUsageHeatmap(period: TimeRange = '7d'): Promise<HeatmapData[]> {
+  return fetchApi<HeatmapData[]>(`/admin/stats/heatmap?period=${period}`)
+}
+
+export async function getTokenTimeline(period: TimeRange = '7d'): Promise<TokenUsageTimeline[]> {
+  return fetchApi<TokenUsageTimeline[]>(`/admin/stats/token-timeline?period=${period}`)
 }
 
 // Helper to check API availability

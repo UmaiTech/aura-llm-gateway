@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         // Dashboard stats
         .route("/admin/stats/overview", get(get_overview_stats))
+        .route("/admin/stats/dynamic", get(get_dynamic_stats))
         .route("/admin/stats/usage", get(get_usage_stats))
         .route("/admin/stats/costs", get(get_cost_stats))
         .route("/admin/stats/providers", get(get_provider_health))
@@ -31,6 +32,12 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/routing", get(get_routing_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
+        // Insights endpoints
+        .route("/admin/stats/insights", get(get_insights_stats))
+        .route("/admin/stats/model-costs", get(get_model_costs))
+        .route("/admin/stats/tool-usage", get(get_tool_usage))
+        .route("/admin/stats/heatmap", get(get_usage_heatmap))
+        .route("/admin/stats/token-timeline", get(get_token_timeline))
         // Request logs for dev logs page
         .route("/admin/logs/recent", get(get_recent_logs))
         // Routing configuration
@@ -257,6 +264,92 @@ pub struct LogsQuery {
     pub offset: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PeriodQuery {
+    pub period: Option<String>, // 24h, 2d, 3d, 4d, 5d, 6d, 7d
+}
+
+impl PeriodQuery {
+    /// Convert period string to PostgreSQL interval
+    fn to_interval(&self) -> &'static str {
+        match self.period.as_deref() {
+            Some("24h") | Some("1d") => "24 hours",
+            Some("2d") => "2 days",
+            Some("3d") => "3 days",
+            Some("4d") => "4 days",
+            Some("5d") => "5 days",
+            Some("6d") => "6 days",
+            Some("7d") => "7 days",
+            _ => "24 hours", // default
+        }
+    }
+
+    /// Get the period string for response
+    fn period_str(&self) -> &str {
+        self.period.as_deref().unwrap_or("24h")
+    }
+}
+
+// Dynamic stats with configurable time range
+#[derive(Debug, Serialize)]
+pub struct DynamicStats {
+    pub total_requests: i64,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub cached_tokens: i64,
+    pub total_cost: f64,
+    pub avg_latency: i32,
+    pub success_rate: f64,
+    pub period: String,
+}
+
+// Insights page types
+#[derive(Debug, Serialize)]
+pub struct InsightsStats {
+    pub total_requests: i64,
+    pub total_tokens: i64,
+    pub total_cost: f64,
+    pub avg_latency: i32,
+    pub tool_calls: i64,
+    // Comparison with previous period (percentage change)
+    pub requests_change: f64,
+    pub tokens_change: f64,
+    pub cost_change: f64,
+    pub latency_change: f64,
+    pub tool_calls_change: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ModelCostStats {
+    pub model_id: String,
+    pub model_name: Option<String>,
+    pub total_cost: f64,
+    pub request_count: i64,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ToolUsageStats {
+    pub tool_name: String,
+    pub call_count: i64,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct HeatmapData {
+    pub day_of_week: i32, // 0-6, 0 = Monday
+    pub hour_of_day: i32, // 0-23
+    pub request_count: i64,
+    pub intensity: i32, // 0-5 scale
+}
+
+#[derive(Debug, Serialize)]
+pub struct TokenUsageTimeline {
+    pub timestamp: String,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+}
+
 // ============================================================================
 // Helper to get db pool
 // ============================================================================
@@ -414,22 +507,23 @@ async fn get_cost_stats(
 
     let total_cost: f64 = provider_rows
         .iter()
-        .map(|r| r.get::<f64, _>("total_cost"))
+        .filter_map(|r| r.try_get::<f64, _>("total_cost").ok())
         .sum();
 
     let by_provider: Vec<ProviderCost> = provider_rows
         .iter()
-        .map(|row| {
-            let cost: f64 = row.get("total_cost");
-            ProviderCost {
-                provider: row.get("provider_name"),
+        .filter_map(|row| {
+            let provider_name: Option<String> = row.try_get("provider_name").ok();
+            let cost: f64 = row.try_get("total_cost").unwrap_or(0.0);
+            provider_name.map(|provider| ProviderCost {
+                provider,
                 cost,
                 percentage: if total_cost > 0.0 {
                     (cost / total_cost * 100.0 * 100.0).round() / 100.0
                 } else {
                     0.0
                 },
-            }
+            })
         })
         .collect();
 
@@ -443,10 +537,13 @@ async fn get_cost_stats(
 
     let by_model: Vec<ModelCost> = model_rows
         .iter()
-        .map(|row| ModelCost {
-            model: row.get("model_id"),
-            cost: row.get("total_cost"),
-            requests: row.get("request_count"),
+        .filter_map(|row| {
+            let model: Option<String> = row.try_get("model_id").ok();
+            model.map(|m| ModelCost {
+                model: m,
+                cost: row.try_get("total_cost").unwrap_or(0.0),
+                requests: row.try_get("request_count").unwrap_or(0),
+            })
         })
         .collect();
 
@@ -479,19 +576,25 @@ async fn get_provider_health(
 
     let providers: Vec<ProviderHealth> = rows
         .iter()
-        .map(|row| ProviderHealth {
-            provider_name: row.get("provider_name"),
-            display_name: row.get("display_name"),
-            is_enabled: row.get("is_enabled"),
-            total_requests: row.try_get("total_requests").unwrap_or(0),
-            successful_requests: row.try_get("successful_requests").unwrap_or(0),
-            failed_requests: row.try_get("failed_requests").unwrap_or(0),
-            success_rate: row.try_get::<f64, _>("success_rate").unwrap_or(100.0),
-            avg_latency_ms: row.try_get("avg_latency_ms").unwrap_or(0),
-            p95_latency_ms: row.try_get("p95_latency_ms").unwrap_or(0),
-            total_tokens: row.try_get("total_tokens").unwrap_or(0),
-            total_cost: row.try_get("total_cost").unwrap_or(0.0),
-            health_status: row.get("health_status"),
+        .filter_map(|row| {
+            // provider_name should not be NULL after fix, but be defensive
+            let provider_name: Option<String> = row.try_get("provider_name").ok();
+            provider_name.map(|name| ProviderHealth {
+                provider_name: name,
+                display_name: row.try_get("display_name").ok().flatten(),
+                is_enabled: row.try_get("is_enabled").unwrap_or(false),
+                total_requests: row.try_get("total_requests").unwrap_or(0),
+                successful_requests: row.try_get("successful_requests").unwrap_or(0),
+                failed_requests: row.try_get("failed_requests").unwrap_or(0),
+                success_rate: row.try_get::<f64, _>("success_rate").unwrap_or(100.0),
+                avg_latency_ms: row.try_get("avg_latency_ms").unwrap_or(0),
+                p95_latency_ms: row.try_get("p95_latency_ms").unwrap_or(0),
+                total_tokens: row.try_get("total_tokens").unwrap_or(0),
+                total_cost: row.try_get("total_cost").unwrap_or(0.0),
+                health_status: row
+                    .try_get("health_status")
+                    .unwrap_or_else(|_| "unknown".to_string()),
+            })
         })
         .collect();
 
@@ -518,12 +621,12 @@ async fn get_cache_stats(
         })?;
 
     Ok(Json(CacheStats {
-        cache_hits: row.get("cache_hits"),
-        cache_misses: row.get("cache_misses"),
-        total_requests: row.get("total_requests"),
+        cache_hits: row.try_get("cache_hits").unwrap_or(0),
+        cache_misses: row.try_get("cache_misses").unwrap_or(0),
+        total_requests: row.try_get("total_requests").unwrap_or(0),
         hit_rate: row.try_get::<f64, _>("hit_rate").unwrap_or(0.0),
-        total_cached_tokens: row.get("total_cached_tokens"),
-        estimated_savings: row.get("estimated_savings"),
+        total_cached_tokens: row.try_get("total_cached_tokens").unwrap_or(0),
+        estimated_savings: row.try_get::<f64, _>("estimated_savings").unwrap_or(0.0),
     }))
 }
 
@@ -676,23 +779,23 @@ async fn get_recent_logs(
         .map(|row| RecentLog {
             id: row.get("id"),
             response_id: row.get("response_id"),
-            conversation_id: row.get("conversation_id"),
+            conversation_id: row.try_get("conversation_id").ok().flatten(),
             provider_name: row.get("provider_name"),
             model_id: row.get("model_id"),
-            user_id: row.get("user_id"),
-            input_tokens: row.get("input_tokens"),
-            output_tokens: row.get("output_tokens"),
-            cached_tokens: row.get("cached_tokens"),
-            reasoning_tokens: row.get("reasoning_tokens"),
-            cost_usd: row.try_get("cost_usd").ok(),
-            latency_ms: row.get("latency_ms"),
+            user_id: row.try_get("user_id").ok().flatten(),
+            input_tokens: row.try_get("input_tokens").ok().flatten(),
+            output_tokens: row.try_get("output_tokens").ok().flatten(),
+            cached_tokens: row.try_get("cached_tokens").ok().flatten(),
+            reasoning_tokens: row.try_get("reasoning_tokens").ok().flatten(),
+            cost_usd: row.try_get("cost_usd").ok().flatten(),
+            latency_ms: row.try_get("latency_ms").ok().flatten(),
             status: row.get("status"),
-            error_code: row.get("error_code"),
-            error_message: row.get("error_message"),
-            routing_strategy: row.get("routing_strategy"),
-            cache_hit: row.get("cache_hit"),
-            has_reasoning: row.get("has_reasoning"),
-            compressed: row.get("compressed"),
+            error_code: row.try_get("error_code").ok().flatten(),
+            error_message: row.try_get("error_message").ok().flatten(),
+            routing_strategy: row.try_get("routing_strategy").ok().flatten(),
+            cache_hit: row.try_get("cache_hit").unwrap_or(false),
+            has_reasoning: row.try_get("has_reasoning").unwrap_or(false),
+            compressed: row.try_get("compressed").ok().flatten(),
             created_at: row.get("created_at"),
         })
         .collect();
@@ -897,4 +1000,410 @@ async fn create_routing_rule(
     };
 
     (StatusCode::CREATED, Json(rule))
+}
+
+// ============================================================================
+// Dynamic Stats with Time Range
+// ============================================================================
+
+async fn get_dynamic_stats(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<DynamicStats>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let interval = params.to_interval();
+    let query = format!(
+        r#"
+        SELECT
+            COUNT(*) as total_requests,
+            COALESCE(SUM(input_tokens), 0) as input_tokens,
+            COALESCE(SUM(output_tokens), 0) as output_tokens,
+            COALESCE(SUM(cached_tokens), 0) as cached_tokens,
+            COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
+            COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
+            CASE WHEN COUNT(*) > 0
+                THEN (COUNT(*) FILTER (WHERE status = 'completed')::FLOAT / COUNT(*) * 100)::FLOAT8
+                ELSE 100.0
+            END as success_rate
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+        "#,
+        interval
+    );
+
+    let row = sqlx::query(&query).fetch_one(pool).await.map_err(|e| {
+        tracing::error!("Failed to fetch dynamic stats: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
+
+    Ok(Json(DynamicStats {
+        total_requests: row.try_get("total_requests").unwrap_or(0),
+        input_tokens: row.try_get("input_tokens").unwrap_or(0),
+        output_tokens: row.try_get("output_tokens").unwrap_or(0),
+        cached_tokens: row.try_get("cached_tokens").unwrap_or(0),
+        total_cost: row.try_get("total_cost").unwrap_or(0.0),
+        avg_latency: row.try_get("avg_latency").unwrap_or(0),
+        success_rate: row.try_get("success_rate").unwrap_or(100.0),
+        period: params.period_str().to_string(),
+    }))
+}
+
+// ============================================================================
+// Insights Endpoints
+// ============================================================================
+
+async fn get_insights_stats(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<InsightsStats>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let interval = params.to_interval();
+
+    // Current period stats
+    let current_query = format!(
+        r#"
+        SELECT
+            COUNT(*) as total_requests,
+            COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
+            COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
+            COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
+            0::BIGINT as tool_calls
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+        "#,
+        interval
+    );
+
+    // Previous period stats (for comparison)
+    let previous_query = format!(
+        r#"
+        SELECT
+            COUNT(*) as total_requests,
+            COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
+            COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
+            COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
+            0::BIGINT as tool_calls
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{0}' - INTERVAL '{0}'
+          AND created_at < NOW() - INTERVAL '{0}'
+        "#,
+        interval
+    );
+
+    let current = sqlx::query(&current_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch current insights stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let previous = sqlx::query(&previous_query).fetch_one(pool).await.ok();
+
+    let current_requests: i64 = current.try_get("total_requests").unwrap_or(0);
+    let current_tokens: i64 = current.try_get("total_tokens").unwrap_or(0);
+    let current_cost: f64 = current.try_get("total_cost").unwrap_or(0.0);
+    let current_latency: i32 = current.try_get("avg_latency").unwrap_or(0);
+    let current_tools: i64 = current.try_get("tool_calls").unwrap_or(0);
+
+    let (prev_requests, prev_tokens, prev_cost, prev_latency, prev_tools) = previous
+        .map(|row| {
+            (
+                row.try_get::<i64, _>("total_requests").unwrap_or(0),
+                row.try_get::<i64, _>("total_tokens").unwrap_or(0),
+                row.try_get::<f64, _>("total_cost").unwrap_or(0.0),
+                row.try_get::<i32, _>("avg_latency").unwrap_or(0),
+                row.try_get::<i64, _>("tool_calls").unwrap_or(0),
+            )
+        })
+        .unwrap_or((0, 0, 0.0, 0, 0));
+
+    // Calculate percentage changes
+    let calc_change = |current: f64, previous: f64| -> f64 {
+        if previous > 0.0 {
+            ((current - previous) / previous * 100.0 * 10.0).round() / 10.0
+        } else if current > 0.0 {
+            100.0
+        } else {
+            0.0
+        }
+    };
+
+    Ok(Json(InsightsStats {
+        total_requests: current_requests,
+        total_tokens: current_tokens,
+        total_cost: current_cost,
+        avg_latency: current_latency,
+        tool_calls: current_tools,
+        requests_change: calc_change(current_requests as f64, prev_requests as f64),
+        tokens_change: calc_change(current_tokens as f64, prev_tokens as f64),
+        cost_change: calc_change(current_cost, prev_cost),
+        latency_change: calc_change(current_latency as f64, prev_latency as f64),
+        tool_calls_change: calc_change(current_tools as f64, prev_tools as f64),
+    }))
+}
+
+async fn get_model_costs(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<Vec<ModelCostStats>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let interval = params.to_interval();
+    let query = format!(
+        r#"
+        WITH model_stats AS (
+            SELECT
+                model_id,
+                COUNT(*) as request_count,
+                COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost
+            FROM request_logs
+            WHERE created_at >= NOW() - INTERVAL '{}'
+            GROUP BY model_id
+        ),
+        total AS (
+            SELECT COALESCE(SUM(total_cost), 0)::FLOAT8 as total FROM model_stats
+        )
+        SELECT
+            ms.model_id,
+            mp.model_name,
+            ms.total_cost,
+            ms.request_count,
+            CASE WHEN t.total > 0
+                THEN (ms.total_cost / t.total * 100)::FLOAT8
+                ELSE 0
+            END as percentage
+        FROM model_stats ms
+        CROSS JOIN total t
+        LEFT JOIN model_pricing mp ON mp.model_id = ms.model_id
+        WHERE ms.total_cost > 0
+        ORDER BY ms.total_cost DESC
+        LIMIT 10
+        "#,
+        interval
+    );
+
+    let rows = sqlx::query(&query).fetch_all(pool).await.map_err(|e| {
+        tracing::error!("Failed to fetch model costs: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
+
+    let models: Vec<ModelCostStats> = rows
+        .iter()
+        .filter_map(|row| {
+            let model_id: Option<String> = row.try_get("model_id").ok();
+            model_id.map(|id| ModelCostStats {
+                model_id: id,
+                model_name: row.try_get("model_name").ok().flatten(),
+                total_cost: row.try_get("total_cost").unwrap_or(0.0),
+                request_count: row.try_get("request_count").unwrap_or(0),
+                percentage: row.try_get("percentage").unwrap_or(0.0),
+            })
+        })
+        .collect();
+
+    Ok(Json(models))
+}
+
+async fn get_tool_usage(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<Vec<ToolUsageStats>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let interval = params.to_interval();
+
+    // Tool usage is stored in metadata JSONB - extract tool calls
+    let query = format!(
+        r#"
+        WITH tool_data AS (
+            SELECT
+                jsonb_array_elements_text(metadata->'tools_used') as tool_name
+            FROM request_logs
+            WHERE created_at >= NOW() - INTERVAL '{}'
+              AND metadata ? 'tools_used'
+              AND jsonb_array_length(metadata->'tools_used') > 0
+        ),
+        tool_counts AS (
+            SELECT
+                tool_name,
+                COUNT(*) as call_count
+            FROM tool_data
+            GROUP BY tool_name
+        ),
+        total AS (
+            SELECT COALESCE(SUM(call_count), 1)::FLOAT8 as total FROM tool_counts
+        )
+        SELECT
+            tc.tool_name,
+            tc.call_count,
+            (tc.call_count::FLOAT8 / t.total * 100)::FLOAT8 as percentage
+        FROM tool_counts tc
+        CROSS JOIN total t
+        ORDER BY tc.call_count DESC
+        LIMIT 10
+        "#,
+        interval
+    );
+
+    let rows = sqlx::query(&query)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+    let tools: Vec<ToolUsageStats> = rows
+        .iter()
+        .filter_map(|row| {
+            let tool_name: Option<String> = row.try_get("tool_name").ok();
+            tool_name.map(|name| ToolUsageStats {
+                tool_name: name,
+                call_count: row.try_get("call_count").unwrap_or(0),
+                percentage: row.try_get("percentage").unwrap_or(0.0),
+            })
+        })
+        .collect();
+
+    Ok(Json(tools))
+}
+
+async fn get_usage_heatmap(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<Vec<HeatmapData>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let interval = params.to_interval();
+    let query = format!(
+        r#"
+        WITH hourly_data AS (
+            SELECT
+                EXTRACT(ISODOW FROM created_at)::INT - 1 as day_of_week,
+                EXTRACT(HOUR FROM created_at)::INT as hour_of_day,
+                COUNT(*) as request_count
+            FROM request_logs
+            WHERE created_at >= NOW() - INTERVAL '{}'
+            GROUP BY day_of_week, hour_of_day
+        ),
+        max_count AS (
+            SELECT COALESCE(MAX(request_count), 1) as max_val FROM hourly_data
+        )
+        SELECT
+            h.day_of_week,
+            h.hour_of_day,
+            h.request_count,
+            LEAST(5, (h.request_count::FLOAT / m.max_val * 5)::INT) as intensity
+        FROM hourly_data h
+        CROSS JOIN max_count m
+        ORDER BY h.day_of_week, h.hour_of_day
+        "#,
+        interval
+    );
+
+    let rows = sqlx::query(&query)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+    let heatmap: Vec<HeatmapData> = rows
+        .iter()
+        .map(|row| HeatmapData {
+            day_of_week: row.try_get("day_of_week").unwrap_or(0),
+            hour_of_day: row.try_get("hour_of_day").unwrap_or(0),
+            request_count: row.try_get("request_count").unwrap_or(0),
+            intensity: row.try_get("intensity").unwrap_or(0),
+        })
+        .collect();
+
+    Ok(Json(heatmap))
+}
+
+async fn get_token_timeline(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<Vec<TokenUsageTimeline>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let interval = params.to_interval();
+
+    // Determine the grouping interval based on period
+    let group_interval = match params.period.as_deref() {
+        Some("24h") | Some("1d") => "1 hour",
+        Some("2d") | Some("3d") => "2 hours",
+        _ => "6 hours",
+    };
+
+    let query = format!(
+        r#"
+        WITH time_buckets AS (
+            SELECT
+                DATE_TRUNC('hour', created_at) -
+                    (EXTRACT(HOUR FROM created_at)::INT % {}) * INTERVAL '1 hour' as bucket,
+                COALESCE(SUM(input_tokens), 0) as input_tokens,
+                COALESCE(SUM(output_tokens), 0) as output_tokens
+            FROM request_logs
+            WHERE created_at >= NOW() - INTERVAL '{}'
+            GROUP BY bucket
+        )
+        SELECT
+            bucket as timestamp,
+            input_tokens,
+            output_tokens
+        FROM time_buckets
+        ORDER BY bucket
+        "#,
+        match group_interval {
+            "1 hour" => 1,
+            "2 hours" => 2,
+            _ => 6,
+        },
+        interval
+    );
+
+    let rows = sqlx::query(&query)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+    let timeline: Vec<TokenUsageTimeline> = rows
+        .iter()
+        .map(|row| {
+            let timestamp: DateTime<Utc> = row.try_get("timestamp").unwrap_or_else(|_| Utc::now());
+            TokenUsageTimeline {
+                timestamp: timestamp.to_rfc3339(),
+                input_tokens: row.try_get("input_tokens").unwrap_or(0),
+                output_tokens: row.try_get("output_tokens").unwrap_or(0),
+            }
+        })
+        .collect();
+
+    Ok(Json(timeline))
 }

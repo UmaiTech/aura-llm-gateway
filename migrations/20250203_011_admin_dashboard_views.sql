@@ -102,7 +102,7 @@ WITH provider_stats AS (
     GROUP BY provider_name
 )
 SELECT
-    ps.provider_name,
+    p.name as provider_name,
     p.display_name,
     p.is_enabled,
     ps.total_requests,
@@ -202,7 +202,7 @@ SELECT
     END as hit_rate,
     COALESCE(SUM(cached_tokens), 0) as total_cached_tokens,
     -- Estimated savings (cached tokens * avg cost per token)
-    COALESCE(SUM(cached_tokens) * 0.000001, 0) as estimated_savings
+    COALESCE(SUM(cached_tokens) * 0.000001, 0)::FLOAT8 as estimated_savings
 FROM cache_data;
 
 -- ============================================================================
@@ -229,9 +229,9 @@ SELECT
     rl.error_message,
     -- Gateway metadata
     rl.metadata->>'routing_strategy' as routing_strategy,
-    CASE WHEN rl.cached_tokens > 0 THEN true ELSE false END as cache_hit,
-    rl.reasoning_tokens > 0 as has_reasoning,
-    (rl.metadata->>'compressed')::BOOLEAN as compressed,
+    COALESCE(rl.cached_tokens, 0) > 0 as cache_hit,
+    COALESCE(rl.reasoning_tokens, 0) > 0 as has_reasoning,
+    COALESCE((rl.metadata->>'compressed')::BOOLEAN, false) as compressed,
     rl.metadata as full_metadata,
     rl.created_at
 FROM request_logs rl

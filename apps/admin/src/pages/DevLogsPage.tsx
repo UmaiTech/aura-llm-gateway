@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, Badge, Input } from '@/components/ui'
-import { cn, formatDuration, formatCurrency } from '@/lib/utils'
+import { cn, formatDuration, formatCurrency, formatRelativeTime, formatNumber } from '@/lib/utils'
 import { animateStaggered, animateExpand, animateCollapse } from '@/lib/animations'
 import {
   SearchLine,
@@ -14,185 +14,90 @@ import {
   ToolLine,
   BrainLine,
   FileZipLine,
+  Loading3Line,
+  Table2Line,
+  CodeLine,
+  CheckLine,
 } from '@mingcute/react'
+import { getRecentLogs, type RecentLog } from '@/lib/api'
 
-interface GatewayMetadata {
-  request_id: string
-  model: string
-  provider: string
-  gateway_version: string
-  latency_ms: number
-  routing_strategy?: string
-  cache_hit?: boolean
-  compression?: {
-    algorithm: string
-    original_size: number
-    compressed_size: number
-    ratio: number
-  }
-  agentic: {
-    output_items_count: number
-    has_tool_calls: boolean
-    tool_calls_count?: number
-    tools_used?: string[]
-    requires_action?: boolean
-    has_reasoning?: boolean
-    reasoning_tokens?: number
-  }
-  tenant?: {
-    api_key_id: string
-    organization_id?: string
-    organization_name?: string
-    team_id?: string
-    project_id?: string
-  }
+type ViewMode = 'table' | 'json'
+type DetailTab = 'details' | 'json'
+
+// JSON Syntax Highlighter component
+function JsonHighlight({ data }: { data: unknown }) {
+  const json = JSON.stringify(data, null, 2)
+
+  // Simple syntax highlighting
+  const highlighted = json
+    .replace(/"([^"]+)":/g, '<span class="text-purple-400">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="text-green-400">"$1"</span>')
+    .replace(/: (\d+\.?\d*)/g, ': <span class="text-cyan-400">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="text-yellow-400">$1</span>')
+    .replace(/: (null)/g, ': <span class="text-gray-500">$1</span>')
+
+  return (
+    <pre
+      className="text-xs font-mono whitespace-pre-wrap break-all"
+      dangerouslySetInnerHTML={{ __html: highlighted }}
+    />
+  )
 }
-
-interface LogEntry {
-  id: string
-  timestamp: string
-  requestId: string
-  provider: string
-  model: string
-  status: 'completed' | 'failed' | 'in_progress'
-  inputTokens: number
-  outputTokens: number
-  cost: number
-  latency: number
-  toolCalls: number
-  routingStrategy?: string
-  cacheHit?: boolean
-  hasReasoning?: boolean
-  compressed?: boolean
-  error?: string
-  request?: object
-  response?: {
-    id: string
-    status: string
-    output: object[]
-    usage?: {
-      input_tokens: number
-      output_tokens: number
-      total_tokens: number
-      cost_usd: number
-    }
-    metadata?: {
-      aura: GatewayMetadata
-    }
-  }
-}
-
-const routingStrategies = ['round_robin', 'cost_based', 'latency_based', 'random', 'weighted', 'fallback']
-const tools = ['web_search', 'calculator', 'code_interpreter', 'file_browser']
-
-// Mock data with full gateway metadata
-const mockLogs: LogEntry[] = Array.from({ length: 50 }, (_, i) => {
-  const provider = ['openai', 'anthropic', 'google'][Math.floor(Math.random() * 3)]
-  const model = ['gpt-4o', 'claude-3-opus', 'gemini-pro', 'gpt-4o-mini'][Math.floor(Math.random() * 4)]
-  const inputTokens = Math.floor(Math.random() * 2000) + 100
-  const outputTokens = Math.floor(Math.random() * 1000) + 50
-  const latency = Math.floor(Math.random() * 2000) + 100
-  const cost = Math.random() * 0.1
-  const hasToolCalls = Math.random() > 0.7
-  const toolCallCount = hasToolCalls ? Math.floor(Math.random() * 3) + 1 : 0
-  const usedTools = hasToolCalls ? tools.slice(0, toolCallCount) : []
-  const hasReasoning = Math.random() > 0.8
-  const cacheHit = Math.random() > 0.7
-  const routingStrategy = routingStrategies[Math.floor(Math.random() * routingStrategies.length)]
-  const compressed = Math.random() > 0.6
-  const requestId = `aura_${Math.random().toString(36).substring(2, 10)}`
-
-  return {
-    id: String(i + 1),
-    timestamp: new Date(Date.now() - i * 60000 * Math.random() * 10).toISOString(),
-    requestId,
-    provider,
-    model,
-    status: Math.random() > 0.1 ? 'completed' : 'failed',
-    inputTokens,
-    outputTokens,
-    cost,
-    latency,
-    toolCalls: toolCallCount,
-    routingStrategy,
-    cacheHit,
-    hasReasoning,
-    compressed,
-    error: Math.random() > 0.9 ? 'Rate limit exceeded' : undefined,
-    request: {
-      model,
-      input: [{ type: 'message', role: 'user', content: 'Hello, how are you?' }],
-      temperature: 0.7,
-      tools: hasToolCalls ? usedTools.map(t => ({ type: 'function', name: t })) : undefined,
-    },
-    response: {
-      id: `resp_${Math.random().toString(36).substring(2, 10)}`,
-      status: 'completed',
-      output: [
-        { type: 'message', role: 'assistant', content: [{ type: 'text', text: 'I am doing well, thank you!' }] },
-        ...(hasToolCalls ? usedTools.map(t => ({ type: 'function_call', name: t, call_id: `call_${Math.random().toString(36).substring(2, 6)}`, arguments: '{}' })) : []),
-      ],
-      usage: {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        total_tokens: inputTokens + outputTokens,
-        cost_usd: cost,
-      },
-      metadata: {
-        aura: {
-          request_id: requestId,
-          model,
-          provider,
-          gateway_version: '0.3.0',
-          latency_ms: latency,
-          routing_strategy: routingStrategy,
-          cache_hit: cacheHit,
-          compression: compressed ? {
-            algorithm: 'gzip',
-            original_size: 2048,
-            compressed_size: 512,
-            ratio: 0.25,
-          } : undefined,
-          agentic: {
-            output_items_count: 1 + toolCallCount,
-            has_tool_calls: hasToolCalls,
-            tool_calls_count: hasToolCalls ? toolCallCount : undefined,
-            tools_used: hasToolCalls ? usedTools : undefined,
-            requires_action: hasToolCalls,
-            has_reasoning: hasReasoning,
-            reasoning_tokens: hasReasoning ? Math.floor(Math.random() * 500) + 100 : undefined,
-          },
-          tenant: {
-            api_key_id: `key_${Math.random().toString(36).substring(2, 8)}`,
-            organization_id: `org_${Math.random().toString(36).substring(2, 8)}`,
-            organization_name: 'Acme Corp',
-          },
-        },
-      },
-    },
-  }
-})
 
 export function DevLogsPage() {
-  const [logs] = useState<LogEntry[]>(mockLogs)
+  const [logs, setLogs] = useState<RecentLog[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isLive, setIsLive] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [detailTab, setDetailTab] = useState<DetailTab>('details')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
   const expandedRef = useRef<HTMLDivElement>(null)
 
+  // Fetch logs on mount and when refreshing
+  const fetchLogs = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getRecentLogs({ limit: 100 })
+      setLogs(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load logs')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    if (tableRef.current) {
+    fetchLogs()
+  }, [])
+
+  // Live polling
+  useEffect(() => {
+    if (!isLive) return
+
+    const interval = setInterval(() => {
+      fetchLogs()
+    }, 5000) // Poll every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [isLive])
+
+  useEffect(() => {
+    if (!loading && tableRef.current) {
       const rows = tableRef.current.querySelectorAll('.log-row')
       animateStaggered(rows, 'fadeInUp', 30)
     }
-  }, [])
+  }, [loading, logs])
 
   const filteredLogs = logs.filter(
     (log) =>
-      log.requestId.toLowerCase().includes(search.toLowerCase()) ||
-      log.provider.toLowerCase().includes(search.toLowerCase()) ||
-      log.model.toLowerCase().includes(search.toLowerCase())
+      log.response_id.toLowerCase().includes(search.toLowerCase()) ||
+      log.provider_name.toLowerCase().includes(search.toLowerCase()) ||
+      log.model_id.toLowerCase().includes(search.toLowerCase())
   )
 
   const handleExpand = (id: string) => {
@@ -212,6 +117,64 @@ export function DevLogsPage() {
     }
   }, [expandedId])
 
+  const handleCopy = (text: string, id?: string) => {
+    navigator.clipboard.writeText(text)
+    if (id) {
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    }
+  }
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(filteredLogs, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dev-logs-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex flex-col h-screen">
+        <Header
+          title="Dev Logs"
+          description="Raw request and response data for debugging"
+        />
+        <div className="flex-1 p-6 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loading3Line className="h-5 w-5 animate-spin" />
+            <span>Loading logs...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && logs.length === 0) {
+    return (
+      <div className="flex flex-col h-screen">
+        <Header
+          title="Dev Logs"
+          description="Raw request and response data for debugging"
+        />
+        <div className="flex-1 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-destructive mb-2">{error}</p>
+            <p className="text-sm text-muted-foreground">
+              Make sure the gateway is running and the database is configured.
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={fetchLogs}>
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <Header
@@ -219,6 +182,33 @@ export function DevLogsPage() {
         description="Raw request and response data for debugging"
         actions={
           <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  'p-1.5 rounded-md transition-all',
+                  viewMode === 'table'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+                title="Table View"
+              >
+                <Table2Line className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('json')}
+                className={cn(
+                  'p-1.5 rounded-md transition-all',
+                  viewMode === 'json'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+                title="JSON View"
+              >
+                <CodeLine className="h-4 w-4" />
+              </button>
+            </div>
             <Button
               variant={isLive ? 'default' : 'outline'}
               size="sm"
@@ -228,7 +218,7 @@ export function DevLogsPage() {
               <span className={cn('w-2 h-2 rounded-full', isLive ? 'bg-success' : 'bg-muted-foreground')} />
               {isLive ? 'Live' : 'Paused'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
               <DownloadLine className="h-4 w-4" />
               Export
             </Button>
@@ -250,194 +240,444 @@ export function DevLogsPage() {
             <FilterLine className="h-4 w-4" />
             Filters
           </Button>
-          <Button variant="ghost" size="sm" className="gap-2">
-            <Refresh1Line className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+            onClick={fetchLogs}
+            disabled={loading}
+          >
+            <Refresh1Line className={cn('h-4 w-4', loading && 'animate-spin')} />
             Refresh
           </Button>
         </div>
 
-        {/* Logs Table */}
+        {/* Logs Display */}
         <Card className="flex-1 overflow-hidden">
           <CardContent className="p-0 h-full overflow-auto">
-            <div ref={tableRef}>
-              <table className="w-full">
-                <thead className="sticky top-0 bg-card z-10">
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="p-3 font-medium w-8"></th>
-                    <th className="p-3 font-medium">Timestamp</th>
-                    <th className="p-3 font-medium">Request ID</th>
-                    <th className="p-3 font-medium">Provider</th>
-                    <th className="p-3 font-medium">Model</th>
-                    <th className="p-3 font-medium">Routing</th>
-                    <th className="p-3 font-medium">Status</th>
-                    <th className="p-3 font-medium text-center">Features</th>
-                    <th className="p-3 font-medium text-right">Tokens</th>
-                    <th className="p-3 font-medium text-right">Cost</th>
-                    <th className="p-3 font-medium text-right">Latency</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {filteredLogs.map((log) => (
-                    <>
-                      <tr
-                        key={log.id}
-                        onClick={() => handleExpand(log.id)}
-                        className={cn(
-                          'log-row border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer',
-                          expandedId === log.id && 'bg-muted/50'
-                        )}
-                      >
-                        <td className="p-3">
-                          <ArrowDownLine
-                            className={cn(
-                              'h-4 w-4 text-muted-foreground transition-transform',
-                              expandedId === log.id && 'rotate-180'
-                            )}
-                          />
-                        </td>
-                        <td className="p-3 text-muted-foreground">
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </td>
-                        <td className="p-3 font-mono text-xs">{log.requestId}</td>
-                        <td className="p-3 capitalize">{log.provider}</td>
-                        <td className="p-3">{log.model}</td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {log.routingStrategy?.replace('_', ' ')}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <Badge variant={log.status === 'completed' ? 'success' : 'destructive'}>
-                            {log.status}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center justify-center gap-1">
-                            {log.cacheHit && (
-                              <span title="Cache Hit" className="p-1 rounded bg-green-500/20 text-green-400">
-                                <DirectionsLine className="h-3 w-3" />
-                              </span>
-                            )}
-                            {log.toolCalls > 0 && (
-                              <span title={`${log.toolCalls} tool calls`} className="p-1 rounded bg-blue-500/20 text-blue-400">
-                                <ToolLine className="h-3 w-3" />
-                              </span>
-                            )}
-                            {log.hasReasoning && (
-                              <span title="Reasoning" className="p-1 rounded bg-violet-500/20 text-violet-400">
-                                <BrainLine className="h-3 w-3" />
-                              </span>
-                            )}
-                            {log.compressed && (
-                              <span title="Compressed" className="p-1 rounded bg-orange-500/20 text-orange-400">
-                                <FileZipLine className="h-3 w-3" />
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3 text-right font-mono text-xs">
-                          {log.inputTokens} / {log.outputTokens}
-                        </td>
-                        <td className="p-3 text-right font-mono text-xs">
-                          {formatCurrency(log.cost)}
-                        </td>
-                        <td className="p-3 text-right font-mono text-xs">
-                          {formatDuration(log.latency)}
+            {viewMode === 'table' ? (
+              /* Table View */
+              <div ref={tableRef}>
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="p-3 font-medium w-8"></th>
+                      <th className="p-3 font-medium">Timestamp</th>
+                      <th className="p-3 font-medium">Request ID</th>
+                      <th className="p-3 font-medium">Provider</th>
+                      <th className="p-3 font-medium">Model</th>
+                      <th className="p-3 font-medium">Routing</th>
+                      <th className="p-3 font-medium">Status</th>
+                      <th className="p-3 font-medium text-center">Features</th>
+                      <th className="p-3 font-medium text-right">Tokens</th>
+                      <th className="p-3 font-medium text-right">Cost</th>
+                      <th className="p-3 font-medium text-right">Latency</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {filteredLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-12 text-center text-muted-foreground">
+                          {search ? 'No logs match your search' : 'No logs available'}
                         </td>
                       </tr>
-                      {expandedId === log.id && (
-                        <tr>
-                          <td colSpan={11} className="p-0">
-                            <div ref={expandedRef} className="bg-muted/30 border-b overflow-hidden">
-                              {/* Gateway Metadata Summary */}
-                              {log.response?.metadata?.aura && (
-                                <div className="p-4 border-b border-border/50">
-                                  <h4 className="text-sm font-medium mb-3">Gateway Metadata</h4>
-                                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-xs">
-                                    <div className="space-y-1">
-                                      <p className="text-muted-foreground">Routing Strategy</p>
-                                      <p className="font-medium">{log.response.metadata.aura.routing_strategy || 'default'}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <p className="text-muted-foreground">Cache</p>
-                                      <p className="font-medium">{log.response.metadata.aura.cache_hit ? 'Hit' : 'Miss'}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <p className="text-muted-foreground">Gateway Version</p>
-                                      <p className="font-medium">v{log.response.metadata.aura.gateway_version}</p>
-                                    </div>
-                                    {log.response.metadata.aura.compression && (
-                                      <>
-                                        <div className="space-y-1">
-                                          <p className="text-muted-foreground">Compression</p>
-                                          <p className="font-medium">{log.response.metadata.aura.compression.algorithm}</p>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <p className="text-muted-foreground">Compression Ratio</p>
-                                          <p className="font-medium">{(log.response.metadata.aura.compression.ratio * 100).toFixed(0)}%</p>
-                                        </div>
-                                      </>
-                                    )}
-                                    {log.response.metadata.aura.agentic.has_tool_calls && (
-                                      <div className="space-y-1">
-                                        <p className="text-muted-foreground">Tools Used</p>
-                                        <p className="font-medium">{log.response.metadata.aura.agentic.tools_used?.join(', ')}</p>
-                                      </div>
-                                    )}
-                                    {log.response.metadata.aura.agentic.has_reasoning && (
-                                      <div className="space-y-1">
-                                        <p className="text-muted-foreground">Reasoning Tokens</p>
-                                        <p className="font-medium">{log.response.metadata.aura.agentic.reasoning_tokens}</p>
-                                      </div>
-                                    )}
-                                    {log.response.metadata.aura.tenant && (
-                                      <div className="space-y-1">
-                                        <p className="text-muted-foreground">Organization</p>
-                                        <p className="font-medium">{log.response.metadata.aura.tenant.organization_name || log.response.metadata.aura.tenant.organization_id}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              {/* Request/Response JSON */}
-                              <div className="p-4 grid grid-cols-2 gap-4">
-                                <div>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <h4 className="text-sm font-medium">Request</h4>
-                                    <Button variant="ghost" size="icon-sm">
-                                      <CopyLine className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                  <pre className="text-xs bg-card p-3 rounded-lg overflow-auto max-h-48 font-mono">
-                                    {JSON.stringify(log.request, null, 2)}
-                                  </pre>
-                                </div>
-                                <div>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <h4 className="text-sm font-medium">Response</h4>
-                                    <Button variant="ghost" size="icon-sm">
-                                      <CopyLine className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                  <pre className="text-xs bg-card p-3 rounded-lg overflow-auto max-h-48 font-mono">
-                                    {JSON.stringify(log.response, null, 2)}
-                                  </pre>
-                                </div>
+                    ) : (
+                      filteredLogs.map((log) => (
+                        <>
+                          <tr
+                            key={log.id}
+                            onClick={() => handleExpand(log.id)}
+                            className={cn(
+                              'log-row border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer',
+                              expandedId === log.id && 'bg-muted/50'
+                            )}
+                          >
+                            <td className="p-3">
+                              <ArrowDownLine
+                                className={cn(
+                                  'h-4 w-4 text-muted-foreground transition-transform',
+                                  expandedId === log.id && 'rotate-180'
+                                )}
+                              />
+                            </td>
+                            <td className="p-3 text-muted-foreground">
+                              {formatRelativeTime(log.created_at)}
+                            </td>
+                            <td className="p-3 font-mono text-xs">
+                              {log.response_id.slice(0, 16)}...
+                            </td>
+                            <td className="p-3 capitalize">{log.provider_name}</td>
+                            <td className="p-3">{log.model_id}</td>
+                            <td className="p-3">
+                              <Badge variant="outline" className="text-xs font-mono">
+                                {log.routing_strategy?.replace(/_/g, ' ') || 'default'}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant={log.status === 'completed' ? 'success' : 'destructive'}>
+                                {log.status}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center justify-center gap-1">
+                                {log.cache_hit && (
+                                  <span title="Cache Hit" className="p-1 rounded bg-green-500/20 text-green-400">
+                                    <DirectionsLine className="h-3 w-3" />
+                                  </span>
+                                )}
+                                {log.reasoning_tokens && log.reasoning_tokens > 0 && (
+                                  <span title="Has Tool Calls" className="p-1 rounded bg-blue-500/20 text-blue-400">
+                                    <ToolLine className="h-3 w-3" />
+                                  </span>
+                                )}
+                                {log.has_reasoning && (
+                                  <span title="Reasoning" className="p-1 rounded bg-violet-500/20 text-violet-400">
+                                    <BrainLine className="h-3 w-3" />
+                                  </span>
+                                )}
+                                {log.compressed && (
+                                  <span title="Compressed" className="p-1 rounded bg-orange-500/20 text-orange-400">
+                                    <FileZipLine className="h-3 w-3" />
+                                  </span>
+                                )}
                               </div>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="p-3 text-right font-mono text-xs">
+                              {log.input_tokens ?? 0} / {log.output_tokens ?? 0}
+                            </td>
+                            <td className="p-3 text-right font-mono text-xs">
+                              {log.cost_usd ? formatCurrency(log.cost_usd) : '—'}
+                            </td>
+                            <td className="p-3 text-right font-mono text-xs">
+                              {log.latency_ms ? formatDuration(log.latency_ms) : '—'}
+                            </td>
+                          </tr>
+                          {expandedId === log.id && (
+                            <tr>
+                              <td colSpan={11} className="p-0">
+                                <div ref={expandedRef} className="bg-muted/30 border-b overflow-hidden">
+                                  {/* Tab Navigation */}
+                                  <div className="flex items-center gap-1 p-2 border-b border-border/50 bg-muted/20">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setDetailTab('details') }}
+                                      className={cn(
+                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                                        detailTab === 'details'
+                                          ? 'bg-background text-foreground shadow-sm'
+                                          : 'text-muted-foreground hover:text-foreground'
+                                      )}
+                                    >
+                                      Details
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setDetailTab('json') }}
+                                      className={cn(
+                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                                        detailTab === 'json'
+                                          ? 'bg-background text-foreground shadow-sm'
+                                          : 'text-muted-foreground hover:text-foreground'
+                                      )}
+                                    >
+                                      Raw JSON
+                                    </button>
+                                  </div>
+
+                                  {detailTab === 'details' ? (
+                                    <>
+                                      {/* Gateway Metadata Summary */}
+                                      <div className="p-4 border-b border-border/50">
+                                        <h4 className="text-sm font-medium mb-3">Request Details</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-xs">
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Response ID</p>
+                                            <p className="font-mono text-xs break-all">{log.response_id}</p>
+                                          </div>
+                                          {log.conversation_id && (
+                                            <div className="space-y-1">
+                                              <p className="text-muted-foreground">Conversation ID</p>
+                                              <p className="font-mono text-xs break-all">{log.conversation_id}</p>
+                                            </div>
+                                          )}
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Provider</p>
+                                            <p className="font-medium capitalize">{log.provider_name}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Model</p>
+                                            <p className="font-medium">{log.model_id}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Routing Strategy</p>
+                                            <p className="font-medium">{log.routing_strategy?.replace(/_/g, ' ') || 'default'}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Status</p>
+                                            <Badge variant={log.status === 'completed' ? 'success' : 'destructive'} className="text-xs">
+                                              {log.status}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Token & Cost Details */}
+                                      <div className="p-4 border-b border-border/50">
+                                        <h4 className="text-sm font-medium mb-3">Usage & Performance</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-xs">
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Input Tokens</p>
+                                            <p className="font-medium font-mono">{formatNumber(log.input_tokens ?? 0)}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Output Tokens</p>
+                                            <p className="font-medium font-mono">{formatNumber(log.output_tokens ?? 0)}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Cached Tokens</p>
+                                            <p className="font-medium font-mono">{formatNumber(log.cached_tokens ?? 0)}</p>
+                                          </div>
+                                          {log.reasoning_tokens && log.reasoning_tokens > 0 && (
+                                            <div className="space-y-1">
+                                              <p className="text-muted-foreground">Reasoning Tokens</p>
+                                              <p className="font-medium font-mono">{formatNumber(log.reasoning_tokens)}</p>
+                                            </div>
+                                          )}
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Total Cost</p>
+                                            <p className="font-medium font-mono">{log.cost_usd ? formatCurrency(log.cost_usd) : '—'}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Latency</p>
+                                            <p className="font-medium font-mono">{log.latency_ms ? formatDuration(log.latency_ms) : '—'}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Cache</p>
+                                            <p className={cn('font-medium', log.cache_hit ? 'text-green-400' : 'text-muted-foreground')}>
+                                              {log.cache_hit ? 'Hit' : 'Miss'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Additional Info */}
+                                      <div className="p-4 border-b border-border/50">
+                                        <h4 className="text-sm font-medium mb-3">Additional Information</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                          {log.user_id && (
+                                            <div className="space-y-1">
+                                              <p className="text-muted-foreground">User ID</p>
+                                              <p className="font-mono text-xs">{log.user_id}</p>
+                                            </div>
+                                          )}
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Timestamp</p>
+                                            <p className="font-medium">{new Date(log.created_at).toLocaleString()}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Has Reasoning</p>
+                                            <p className="font-medium">{log.has_reasoning ? 'Yes' : 'No'}</p>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p className="text-muted-foreground">Compressed</p>
+                                            <p className="font-medium">{log.compressed ? 'Yes' : 'No'}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Error Information */}
+                                      {(log.error_code || log.error_message) && (
+                                        <div className="p-4 border-b border-border/50">
+                                          <h4 className="text-sm font-medium mb-3 text-destructive">Error Information</h4>
+                                          <div className="p-3 bg-destructive/10 rounded-lg space-y-2">
+                                            {log.error_code && (
+                                              <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-muted-foreground">Code:</span>
+                                                <span className="font-mono text-destructive">{log.error_code}</span>
+                                              </div>
+                                            )}
+                                            {log.error_message && (
+                                              <p className="text-xs text-destructive">{log.error_message}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    /* Raw JSON View */
+                                    <div className="p-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-medium">Raw JSON</h4>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="gap-2 h-7 text-xs"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleCopy(JSON.stringify(log, null, 2), `json-${log.id}`)
+                                          }}
+                                        >
+                                          {copiedId === `json-${log.id}` ? (
+                                            <>
+                                              <CheckLine className="h-3 w-3 text-green-400" />
+                                              Copied!
+                                            </>
+                                          ) : (
+                                            <>
+                                              <CopyLine className="h-3 w-3" />
+                                              Copy JSON
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                      <div className="bg-background/50 border rounded-lg p-4 max-h-[400px] overflow-auto">
+                                        <JsonHighlight data={log} />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Actions */}
+                                  <div className="p-4 flex items-center gap-4 bg-muted/20">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleCopy(log.response_id, `resp-${log.id}`)
+                                      }}
+                                    >
+                                      {copiedId === `resp-${log.id}` ? (
+                                        <>
+                                          <CheckLine className="h-3 w-3 text-green-400" />
+                                          Copied!
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CopyLine className="h-3 w-3" />
+                                          Copy Response ID
+                                        </>
+                                      )}
+                                    </Button>
+                                    {log.conversation_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleCopy(log.conversation_id!, `conv-${log.id}`)
+                                        }}
+                                      >
+                                        {copiedId === `conv-${log.id}` ? (
+                                          <>
+                                            <CheckLine className="h-3 w-3 text-green-400" />
+                                            Copied!
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CopyLine className="h-3 w-3" />
+                                            Copy Conversation ID
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* JSON View */
+              <div className="p-4 space-y-2" ref={tableRef}>
+                {filteredLogs.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    {search ? 'No logs match your search' : 'No logs available'}
+                  </div>
+                ) : (
+                  filteredLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className={cn(
+                        'log-row border rounded-lg overflow-hidden transition-colors',
+                        expandedId === log.id ? 'border-primary/50 bg-muted/30' : 'border-border hover:border-border/80'
                       )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    >
+                      {/* Collapsed Header */}
+                      <div
+                        onClick={() => handleExpand(log.id)}
+                        className="flex items-center gap-4 p-3 cursor-pointer hover:bg-muted/30"
+                      >
+                        <ArrowDownLine
+                          className={cn(
+                            'h-4 w-4 text-muted-foreground transition-transform flex-shrink-0',
+                            expandedId === log.id && 'rotate-180'
+                          )}
+                        />
+                        <Badge variant={log.status === 'completed' ? 'success' : 'destructive'} className="flex-shrink-0">
+                          {log.status}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          {formatRelativeTime(log.created_at)}
+                        </span>
+                        <span className="font-mono text-xs truncate flex-1">
+                          {log.response_id}
+                        </span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 capitalize">
+                          {log.provider_name}
+                        </span>
+                        <span className="text-xs flex-shrink-0">
+                          {log.model_id}
+                        </span>
+                      </div>
+
+                      {/* Expanded JSON */}
+                      {expandedId === log.id && (
+                        <div ref={expandedRef} className="border-t border-border/50">
+                          <div className="flex items-center justify-between p-3 bg-muted/20">
+                            <span className="text-xs font-medium text-muted-foreground">Raw JSON Data</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 h-7 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCopy(JSON.stringify(log, null, 2), `json-${log.id}`)
+                              }}
+                            >
+                              {copiedId === `json-${log.id}` ? (
+                                <>
+                                  <CheckLine className="h-3 w-3 text-green-400" />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <CopyLine className="h-3 w-3" />
+                                  Copy
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          <div className="p-4 max-h-[500px] overflow-auto bg-background/30">
+                            <JsonHighlight data={log} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <div className="text-sm text-muted-foreground flex-shrink-0">
           Showing {filteredLogs.length} of {logs.length} requests
+          {loading && <span className="ml-2">(updating...)</span>}
         </div>
       </div>
     </div>

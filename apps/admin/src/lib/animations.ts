@@ -89,7 +89,7 @@ export function animateNumber(
     value: endValue,
     duration,
     easing: 'easeOutExpo',
-    round: 1,
+    // Don't round - let the format function handle precision
     update: () => {
       element.textContent = format ? format(obj.value) : obj.value.toString()
     },
