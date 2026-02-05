@@ -193,6 +193,7 @@ dependencies = [
  "redis",
  "serde",
  "serde_json",
+ "sqlx",
  "tokio",
  "tower",
  "tower-http",

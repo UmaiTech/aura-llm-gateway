@@ -1,5 +1,6 @@
 //! API routes for the Aura LLM Gateway
 
+pub mod admin;
 pub mod auth;
 pub mod conversations;
 pub mod feedback;
@@ -36,6 +37,8 @@ pub fn app_router() -> Router<AppState> {
         .merge(auth::router())
         // Organization management endpoints
         .merge(organizations::router())
+        // Admin dashboard endpoints
+        .merge(admin::router())
         // OpenAPI documentation and Swagger UI
         .merge(openapi::router())
 }

@@ -234,6 +234,38 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     }
 
+    // Admin routes use separate admin key authentication
+    if path.starts_with("/admin") {
+        // Get admin key from environment
+        let admin_key = std::env::var("AURA_ADMIN_KEY").unwrap_or_default();
+
+        // If no admin key configured, allow access in development
+        if admin_key.is_empty() {
+            return Ok(next.run(request).await);
+        }
+
+        // Check Bearer token matches admin key
+        let auth_header = request
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|h| h.to_str().ok());
+
+        match auth_header {
+            Some(h) if h.starts_with("Bearer ") => {
+                let token = &h[7..];
+                if token == admin_key {
+                    return Ok(next.run(request).await);
+                }
+                warn!("Invalid admin key provided");
+                return Err(AuthError::invalid_key());
+            }
+            _ => {
+                warn!("Admin route missing Authorization header");
+                return Err(AuthError::missing_auth());
+            }
+        }
+    }
+
     // Get Authorization header
     let auth_header = request
         .headers()

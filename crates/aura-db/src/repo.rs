@@ -995,6 +995,53 @@ impl OrganizationRepo {
         Ok(orgs)
     }
 
+    /// List all organizations with pagination
+    pub async fn list_all(
+        pool: &DbPool,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Organization>, DbError> {
+        let orgs = sqlx::query_as::<_, Organization>(
+            r#"
+            SELECT * FROM organizations
+            ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
+            "#,
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(orgs)
+    }
+
+    /// Update organization
+    pub async fn update(
+        pool: &DbPool,
+        id: Uuid,
+        name: Option<&str>,
+        settings: Option<&serde_json::Value>,
+    ) -> Result<Organization, DbError> {
+        let org = sqlx::query_as::<_, Organization>(
+            r#"
+            UPDATE organizations
+            SET name = COALESCE($2, name),
+                settings = COALESCE($3, settings),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            "#,
+        )
+        .bind(id)
+        .bind(name)
+        .bind(settings)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(org)
+    }
+
     /// Delete organization
     pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
         sqlx::query("DELETE FROM organizations WHERE id = $1")

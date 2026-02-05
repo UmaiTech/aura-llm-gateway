@@ -2,6 +2,7 @@
 	docker-build docker-run docker-compose-up docker-compose-down docker-compose-down-v \
 	docker-compose-logs docker-compose-ps docker-deps \
 	chat chat-build chat-install landing landing-build landing-install \
+	admin admin-build admin-install admin-preview \
 	apps apps-install apps-build dev-all
 
 # Default target
@@ -241,21 +242,40 @@ landing-install: ## Install landing page dependencies
 landing-preview: ## Preview the landing page production build
 	cd apps/landing && npm run preview
 
-# All Apps
-apps-install: chat-install landing-install ## Install all app dependencies
+# Admin Dashboard (port 5173)
+admin: ## Run the admin dashboard in development mode
+	cd apps/admin && npm run dev
 
-apps-build: chat-build landing-build ## Build all apps for production
+admin-build: ## Build the admin dashboard for production
+	cd apps/admin && npm run build
+
+admin-install: ## Install admin dashboard dependencies
+	cd apps/admin && npm install
+
+admin-preview: ## Preview the admin dashboard production build
+	cd apps/admin && npm run preview
+
+admin-lint: ## Lint the admin dashboard
+	cd apps/admin && npm run lint
+
+# All Apps
+apps-install: chat-install landing-install admin-install ## Install all app dependencies
+
+apps-build: chat-build landing-build admin-build ## Build all apps for production
 
 apps: ## Run all frontend apps (in background)
 	@echo "Starting Chat app on http://localhost:3000..."
 	@cd apps/chat && npm run dev &
 	@echo "Starting Landing page on http://localhost:3001..."
 	@cd apps/landing && npm run dev &
+	@echo "Starting Admin dashboard on http://localhost:5173..."
+	@cd apps/admin && npm run dev &
 	@echo "✓ Apps started. Use 'make apps-stop' to stop them."
 
 apps-stop: ## Stop all frontend apps
 	@pkill -f "vite.*apps/chat" || true
 	@pkill -f "vite.*apps/landing" || true
+	@pkill -f "vite.*apps/admin" || true
 	@echo "✓ Apps stopped"
 
 # Full Development Stack
@@ -267,11 +287,14 @@ dev-all: ## Run gateway + all frontend apps
 	@cd apps/chat && npm run dev &
 	@echo "Starting Landing page on http://localhost:3001..."
 	@cd apps/landing && npm run dev &
+	@echo "Starting Admin dashboard on http://localhost:5173..."
+	@cd apps/admin && npm run dev &
 	@echo ""
 	@echo "✓ Full stack started:"
 	@echo "  - Gateway:  http://localhost:8080"
 	@echo "  - Chat:     http://localhost:3000"
 	@echo "  - Landing:  http://localhost:3001"
+	@echo "  - Admin:    http://localhost:5173"
 	@echo ""
 	@echo "Use 'make dev-stop' to stop all services."
 
@@ -279,4 +302,5 @@ dev-stop: ## Stop all development services
 	@pkill -f "aura-proxy" || true
 	@pkill -f "vite.*apps/chat" || true
 	@pkill -f "vite.*apps/landing" || true
+	@pkill -f "vite.*apps/admin" || true
 	@echo "✓ All services stopped"
