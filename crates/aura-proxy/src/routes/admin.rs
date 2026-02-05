@@ -48,8 +48,14 @@ pub fn router() -> Router<AppState> {
         )
         // Organizations
         .route("/admin/organizations", get(list_organizations))
+        // Teams
+        .route("/admin/teams", get(list_teams))
         // API Keys
         .route("/admin/api-keys", get(list_api_keys))
+        // End Users
+        .route("/admin/end-users", get(list_end_users))
+        // Providers (full detail)
+        .route("/admin/providers", get(list_providers))
 }
 
 // ============================================================================
@@ -189,7 +195,20 @@ pub struct RecentLog {
     pub cache_hit: bool,
     pub has_reasoning: bool,
     pub compressed: Option<bool>,
+    // Tool call metadata
+    pub has_tool_calls: bool,
+    pub tool_calls_count: i32,
+    pub tools_used: Vec<String>,
+    pub tool_calls_data: Vec<ToolCallData>,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToolCallData {
+    pub name: String,
+    pub arguments: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -203,6 +222,21 @@ pub struct OrganizationSummary {
     pub total_tokens: i64,
     pub total_cost: f64,
     pub total_requests: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TeamSummary {
+    pub id: Uuid,
+    pub organization_id: Uuid,
+    pub organization_name: String,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub monthly_token_limit: Option<i64>,
+    pub current_month_tokens: i64,
+    pub member_count: i64,
+    pub project_count: i64,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]
@@ -221,6 +255,56 @@ pub struct ApiKeySummary {
     pub total_output_tokens: i64,
     pub total_cost: f64,
     pub usage_percentage: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EndUserSummary {
+    pub id: Uuid,
+    pub organization_id: Uuid,
+    pub organization_name: String,
+    pub organization_slug: String,
+    pub external_id: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub total_input_tokens: i64,
+    pub total_output_tokens: i64,
+    pub total_tokens: i64,
+    pub total_cost_usd: f64,
+    pub request_count: i64,
+    pub current_month_tokens: i64,
+    pub monthly_token_limit: Option<i64>,
+    pub rate_limit_rpm: Option<i32>,
+    pub is_blocked: bool,
+    pub first_seen_at: Option<DateTime<Utc>>,
+    pub last_seen_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProviderSummary {
+    pub provider_name: String,
+    pub display_name: Option<String>,
+    pub is_enabled: bool,
+    pub api_base_url: Option<String>,
+    pub requests_24h: i64,
+    pub successful_24h: i64,
+    pub failed_24h: i64,
+    pub success_rate: f64,
+    pub avg_latency_ms: i32,
+    pub p95_latency_ms: i32,
+    pub p99_latency_ms: i32,
+    pub min_latency_ms: i32,
+    pub max_latency_ms: i32,
+    pub last_request_at: Option<DateTime<Utc>>,
+    pub input_tokens_24h: i64,
+    pub output_tokens_24h: i64,
+    pub tokens_24h: i64,
+    pub cost_24h: f64,
+    pub all_time_requests: i64,
+    pub all_time_cost: f64,
+    pub health_status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -462,14 +546,18 @@ async fn get_usage_stats(
         .into_iter()
         .map(|row| {
             let date: NaiveDate = row.get("date");
-            let total_tokens: i64 = row.get("total_tokens");
+            // total_tokens may be NUMERIC from SQL SUM
+            let total_tokens: i64 = row
+                .try_get::<i64, _>("total_tokens")
+                .or_else(|_| row.try_get::<f64, _>("total_tokens").map(|f| f as i64))
+                .unwrap_or(0);
             // Estimate input/output split (typically ~60% input, 40% output)
             let input_estimate = (total_tokens as f64 * 0.6) as i64;
             let output_estimate = total_tokens - input_estimate;
 
             UsageDataPoint {
                 timestamp: date.to_string(),
-                requests: row.get("request_count"),
+                requests: row.try_get("request_count").unwrap_or(0),
                 input_tokens: input_estimate,
                 output_tokens: output_estimate,
             }
@@ -651,14 +739,20 @@ async fn get_routing_stats(
 
     let stats: Vec<RoutingStats> = rows
         .iter()
-        .map(|row| RoutingStats {
-            routing_strategy: row.get("routing_strategy"),
-            request_count: row.get("request_count"),
-            total_tokens: row.get("total_tokens"),
-            total_cost: row.get("total_cost"),
-            avg_latency_ms: row.get("avg_latency_ms"),
-            successful_requests: row.get("successful_requests"),
-            failed_requests: row.get("failed_requests"),
+        .map(|row| {
+            let total_tokens: i64 = row
+                .try_get::<i64, _>("total_tokens")
+                .or_else(|_| row.try_get::<f64, _>("total_tokens").map(|f| f as i64))
+                .unwrap_or(0);
+            RoutingStats {
+                routing_strategy: row.get("routing_strategy"),
+                request_count: row.try_get("request_count").unwrap_or(0),
+                total_tokens,
+                total_cost: row.try_get("total_cost").unwrap_or(0.0),
+                avg_latency_ms: row.try_get("avg_latency_ms").unwrap_or(0),
+                successful_requests: row.try_get("successful_requests").unwrap_or(0),
+                failed_requests: row.try_get("failed_requests").unwrap_or(0),
+            }
         })
         .collect();
 
@@ -688,13 +782,17 @@ async fn get_hourly_timeline(
         .iter()
         .map(|row| {
             let hour: DateTime<Utc> = row.get("hour");
+            let total_tokens: i64 = row
+                .try_get::<i64, _>("total_tokens")
+                .or_else(|_| row.try_get::<f64, _>("total_tokens").map(|f| f as i64))
+                .unwrap_or(0);
             TimelinePoint {
                 timestamp: hour.to_rfc3339(),
-                request_count: row.get("request_count"),
-                total_tokens: row.get("total_tokens"),
-                total_cost: row.get("total_cost"),
-                avg_latency_ms: row.get("avg_latency_ms"),
-                error_count: row.get("error_count"),
+                request_count: row.try_get("request_count").unwrap_or(0),
+                total_tokens,
+                total_cost: row.try_get("total_cost").unwrap_or(0.0),
+                avg_latency_ms: row.try_get("avg_latency_ms").unwrap_or(0),
+                error_count: row.try_get("error_count").unwrap_or(0),
             }
         })
         .collect();
@@ -725,13 +823,17 @@ async fn get_daily_timeline(
         .iter()
         .map(|row| {
             let date: NaiveDate = row.get("date");
+            let total_tokens: i64 = row
+                .try_get::<i64, _>("total_tokens")
+                .or_else(|_| row.try_get::<f64, _>("total_tokens").map(|f| f as i64))
+                .unwrap_or(0);
             TimelinePoint {
                 timestamp: date.to_string(),
-                request_count: row.get("request_count"),
-                total_tokens: row.get("total_tokens"),
-                total_cost: row.get("total_cost"),
-                avg_latency_ms: row.get("avg_latency_ms"),
-                error_count: row.get("error_count"),
+                request_count: row.try_get("request_count").unwrap_or(0),
+                total_tokens,
+                total_cost: row.try_get("total_cost").unwrap_or(0.0),
+                avg_latency_ms: row.try_get("avg_latency_ms").unwrap_or(0),
+                error_count: row.try_get("error_count").unwrap_or(0),
             }
         })
         .collect();
@@ -776,27 +878,49 @@ async fn get_recent_logs(
 
     let logs: Vec<RecentLog> = rows
         .iter()
-        .map(|row| RecentLog {
-            id: row.get("id"),
-            response_id: row.get("response_id"),
-            conversation_id: row.try_get("conversation_id").ok().flatten(),
-            provider_name: row.get("provider_name"),
-            model_id: row.get("model_id"),
-            user_id: row.try_get("user_id").ok().flatten(),
-            input_tokens: row.try_get("input_tokens").ok().flatten(),
-            output_tokens: row.try_get("output_tokens").ok().flatten(),
-            cached_tokens: row.try_get("cached_tokens").ok().flatten(),
-            reasoning_tokens: row.try_get("reasoning_tokens").ok().flatten(),
-            cost_usd: row.try_get("cost_usd").ok().flatten(),
-            latency_ms: row.try_get("latency_ms").ok().flatten(),
-            status: row.get("status"),
-            error_code: row.try_get("error_code").ok().flatten(),
-            error_message: row.try_get("error_message").ok().flatten(),
-            routing_strategy: row.try_get("routing_strategy").ok().flatten(),
-            cache_hit: row.try_get("cache_hit").unwrap_or(false),
-            has_reasoning: row.try_get("has_reasoning").unwrap_or(false),
-            compressed: row.try_get("compressed").ok().flatten(),
-            created_at: row.get("created_at"),
+        .map(|row| {
+            // Parse tools_used from JSONB array
+            let tools_used: Vec<String> = row
+                .try_get::<Option<serde_json::Value>, _>("tools_used")
+                .ok()
+                .flatten()
+                .and_then(|v| serde_json::from_value(v).ok())
+                .unwrap_or_default();
+
+            // Parse tool_calls_data from JSONB array
+            let tool_calls_data: Vec<ToolCallData> = row
+                .try_get::<Option<serde_json::Value>, _>("tool_calls_data")
+                .ok()
+                .flatten()
+                .and_then(|v| serde_json::from_value(v).ok())
+                .unwrap_or_default();
+
+            RecentLog {
+                id: row.get("id"),
+                response_id: row.get("response_id"),
+                conversation_id: row.try_get("conversation_id").ok().flatten(),
+                provider_name: row.get("provider_name"),
+                model_id: row.get("model_id"),
+                user_id: row.try_get("user_id").ok().flatten(),
+                input_tokens: row.try_get("input_tokens").ok().flatten(),
+                output_tokens: row.try_get("output_tokens").ok().flatten(),
+                cached_tokens: row.try_get("cached_tokens").ok().flatten(),
+                reasoning_tokens: row.try_get("reasoning_tokens").ok().flatten(),
+                cost_usd: row.try_get("cost_usd").ok().flatten(),
+                latency_ms: row.try_get("latency_ms").ok().flatten(),
+                status: row.get("status"),
+                error_code: row.try_get("error_code").ok().flatten(),
+                error_message: row.try_get("error_message").ok().flatten(),
+                routing_strategy: row.try_get("routing_strategy").ok().flatten(),
+                cache_hit: row.try_get("cache_hit").unwrap_or(false),
+                has_reasoning: row.try_get("has_reasoning").unwrap_or(false),
+                compressed: row.try_get("compressed").ok().flatten(),
+                has_tool_calls: row.try_get("has_tool_calls").unwrap_or(false),
+                tool_calls_count: row.try_get("tool_calls_count").unwrap_or(0),
+                tools_used,
+                tool_calls_data,
+                created_at: row.get("created_at"),
+            }
         })
         .collect();
 
@@ -828,20 +952,89 @@ async fn list_organizations(
 
     let orgs: Vec<OrganizationSummary> = rows
         .iter()
-        .map(|row| OrganizationSummary {
-            id: row.get("organization_id"),
-            name: row.get("organization_name"),
-            slug: row.get("slug"),
-            api_key_count: row.get("api_key_count"),
-            team_count: row.get("team_count"),
-            end_user_count: row.get("end_user_count"),
-            total_tokens: row.get("total_tokens"),
-            total_cost: row.get("total_cost"),
-            total_requests: row.get("total_requests"),
+        .map(|row| {
+            // total_tokens may be NUMERIC from SQL SUM, so try i64 first, then f64
+            let total_tokens: i64 = row
+                .try_get::<i64, _>("total_tokens")
+                .or_else(|_| row.try_get::<f64, _>("total_tokens").map(|f| f as i64))
+                .unwrap_or(0);
+
+            OrganizationSummary {
+                id: row.get("organization_id"),
+                name: row.get("organization_name"),
+                slug: row.get("slug"),
+                api_key_count: row.try_get("api_key_count").unwrap_or(0),
+                team_count: row.try_get("team_count").unwrap_or(0),
+                end_user_count: row.try_get("end_user_count").unwrap_or(0),
+                total_tokens,
+                total_cost: row.try_get("total_cost").unwrap_or(0.0),
+                total_requests: row.try_get("total_requests").unwrap_or(0),
+            }
         })
         .collect();
 
     Ok(Json(orgs))
+}
+
+// ============================================================================
+// Teams Endpoint
+// ============================================================================
+
+async fn list_teams(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TeamSummary>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            t.id as team_id,
+            t.organization_id,
+            o.name as organization_name,
+            t.name as team_name,
+            t.slug,
+            t.description,
+            t.monthly_token_limit,
+            t.current_month_tokens,
+            t.created_at,
+            COALESCE((SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id), 0) as member_count,
+            COALESCE((SELECT COUNT(*) FROM projects p WHERE p.team_id = t.id), 0) as project_count
+        FROM teams t
+        JOIN organizations o ON o.id = t.organization_id
+        ORDER BY o.name, t.name
+        "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch teams: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
+
+    let teams: Vec<TeamSummary> = rows
+        .iter()
+        .map(|row| TeamSummary {
+            id: row.get("team_id"),
+            organization_id: row.get("organization_id"),
+            organization_name: row.get("organization_name"),
+            name: row.get("team_name"),
+            slug: row.get("slug"),
+            description: row.try_get("description").ok().flatten(),
+            monthly_token_limit: row.try_get("monthly_token_limit").ok().flatten(),
+            current_month_tokens: row.try_get("current_month_tokens").unwrap_or(0),
+            member_count: row.try_get("member_count").unwrap_or(0),
+            project_count: row.try_get("project_count").unwrap_or(0),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    Ok(Json(teams))
 }
 
 // ============================================================================
@@ -888,6 +1081,114 @@ async fn list_api_keys(
         .collect();
 
     Ok(Json(keys))
+}
+
+// ============================================================================
+// End Users Endpoint
+// ============================================================================
+
+async fn list_end_users(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<EndUserSummary>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let rows = sqlx::query(r#"SELECT * FROM v_end_users LIMIT 100"#)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch end users: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let users: Vec<EndUserSummary> = rows
+        .iter()
+        .map(|row| EndUserSummary {
+            id: row.get("id"),
+            organization_id: row.get("organization_id"),
+            organization_name: row.get("organization_name"),
+            organization_slug: row.get("organization_slug"),
+            external_id: row.get("external_id"),
+            name: row.try_get("name").ok().flatten(),
+            email: row.try_get("email").ok().flatten(),
+            total_input_tokens: row.try_get("total_input_tokens").unwrap_or(0),
+            total_output_tokens: row.try_get("total_output_tokens").unwrap_or(0),
+            total_tokens: row.try_get("total_tokens").unwrap_or(0),
+            total_cost_usd: row.try_get("total_cost_usd").unwrap_or(0.0),
+            request_count: row.try_get("request_count").unwrap_or(0),
+            current_month_tokens: row.try_get("current_month_tokens").unwrap_or(0),
+            monthly_token_limit: row.try_get("monthly_token_limit").ok().flatten(),
+            rate_limit_rpm: row.try_get("rate_limit_rpm").ok().flatten(),
+            is_blocked: row.try_get("is_blocked").unwrap_or(false),
+            first_seen_at: row.try_get("first_seen_at").ok().flatten(),
+            last_seen_at: row.try_get("last_seen_at").ok().flatten(),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    Ok(Json(users))
+}
+
+// ============================================================================
+// Providers Endpoint (detailed view)
+// ============================================================================
+
+async fn list_providers(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ProviderSummary>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let rows = sqlx::query(r#"SELECT * FROM v_providers"#)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch providers: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let providers: Vec<ProviderSummary> = rows
+        .iter()
+        .map(|row| ProviderSummary {
+            provider_name: row.get("provider_name"),
+            display_name: row.try_get("display_name").ok().flatten(),
+            is_enabled: row.try_get("is_enabled").unwrap_or(false),
+            api_base_url: row.try_get("api_base_url").ok().flatten(),
+            requests_24h: row.try_get("requests_24h").unwrap_or(0),
+            successful_24h: row.try_get("successful_24h").unwrap_or(0),
+            failed_24h: row.try_get("failed_24h").unwrap_or(0),
+            success_rate: row.try_get("success_rate").unwrap_or(100.0),
+            avg_latency_ms: row.try_get("avg_latency_ms").unwrap_or(0),
+            p95_latency_ms: row.try_get("p95_latency_ms").unwrap_or(0),
+            p99_latency_ms: row.try_get("p99_latency_ms").unwrap_or(0),
+            min_latency_ms: row.try_get("min_latency_ms").unwrap_or(0),
+            max_latency_ms: row.try_get("max_latency_ms").unwrap_or(0),
+            last_request_at: row.try_get("last_request_at").ok().flatten(),
+            input_tokens_24h: row.try_get("input_tokens_24h").unwrap_or(0),
+            output_tokens_24h: row.try_get("output_tokens_24h").unwrap_or(0),
+            tokens_24h: row.try_get("tokens_24h").unwrap_or(0),
+            cost_24h: row.try_get("cost_24h").unwrap_or(0.0),
+            all_time_requests: row.try_get("all_time_requests").unwrap_or(0),
+            all_time_cost: row.try_get("all_time_cost").unwrap_or(0.0),
+            health_status: row
+                .try_get("health_status")
+                .unwrap_or_else(|_| "unknown".to_string()),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect();
+
+    Ok(Json(providers))
 }
 
 // ============================================================================

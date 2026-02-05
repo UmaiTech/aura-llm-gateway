@@ -38,7 +38,7 @@ function JsonHighlight({ data }: { data: unknown }) {
 
   return (
     <pre
-      className="text-xs font-mono whitespace-pre-wrap break-all"
+      className="text-xs font-mono whitespace-pre overflow-x-auto"
       dangerouslySetInnerHTML={{ __html: highlighted }}
     />
   )
@@ -325,8 +325,8 @@ export function DevLogsPage() {
                                     <DirectionsLine className="h-3 w-3" />
                                   </span>
                                 )}
-                                {log.reasoning_tokens && log.reasoning_tokens > 0 && (
-                                  <span title="Has Tool Calls" className="p-1 rounded bg-blue-500/20 text-blue-400">
+                                {log.has_tool_calls && (
+                                  <span title={`Tool Calls: ${log.tools_used?.join(', ') || 'unknown'}`} className="p-1 rounded bg-blue-500/20 text-blue-400">
                                     <ToolLine className="h-3 w-3" />
                                   </span>
                                 )}
@@ -458,6 +458,23 @@ export function DevLogsPage() {
                                         </div>
                                       </div>
 
+                                      {/* Tool Calls */}
+                                      {log.has_tool_calls && (
+                                        <div className="p-4 border-b border-border/50">
+                                          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                                            <ToolLine className="h-4 w-4 text-blue-400" />
+                                            Tool Calls ({log.tool_calls_count})
+                                          </h4>
+                                          <div className="flex flex-wrap gap-2">
+                                            {log.tools_used?.map((tool, idx) => (
+                                              <Badge key={idx} variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                                {tool}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
                                       {/* Additional Info */}
                                       <div className="p-4 border-b border-border/50">
                                         <h4 className="text-sm font-medium mb-3">Additional Information</h4>
@@ -528,7 +545,7 @@ export function DevLogsPage() {
                                           )}
                                         </Button>
                                       </div>
-                                      <div className="bg-background/50 border rounded-lg p-4 max-h-[400px] overflow-auto">
+                                      <div className="bg-background/50 border rounded-lg p-4 max-h-[400px] overflow-y-auto overflow-x-auto">
                                         <JsonHighlight data={log} />
                                       </div>
                                     </div>
@@ -662,7 +679,7 @@ export function DevLogsPage() {
                               )}
                             </Button>
                           </div>
-                          <div className="p-4 max-h-[500px] overflow-auto bg-background/30">
+                          <div className="p-4 max-h-[500px] overflow-y-auto overflow-x-auto bg-background/30">
                             <JsonHighlight data={log} />
                           </div>
                         </div>

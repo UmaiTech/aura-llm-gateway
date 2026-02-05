@@ -239,6 +239,23 @@ impl AppState {
             .map(|fc| fc.name.as_str())
             .collect();
 
+        // Extract detailed tool call data with arguments
+        let tool_calls_data: Vec<serde_json::Value> = response
+            .output
+            .iter()
+            .filter_map(|item| item.as_function_call())
+            .map(|fc| {
+                // Parse arguments from JSON string to Value
+                let args: serde_json::Value = serde_json::from_str(&fc.arguments)
+                    .unwrap_or(serde_json::Value::String(fc.arguments.clone()));
+                serde_json::json!({
+                    "name": fc.name,
+                    "arguments": args,
+                    "call_id": fc.call_id,
+                })
+            })
+            .collect();
+
         let tool_calls_count = tool_calls.len();
         let has_tool_calls = tool_calls_count > 0;
 
@@ -262,6 +279,7 @@ impl AppState {
         if has_tool_calls {
             agentic["tool_calls_count"] = serde_json::json!(tool_calls_count);
             agentic["tools_used"] = serde_json::json!(tool_calls);
+            agentic["tool_calls_data"] = serde_json::json!(tool_calls_data);
             agentic["requires_action"] = serde_json::json!(requires_action);
         }
 

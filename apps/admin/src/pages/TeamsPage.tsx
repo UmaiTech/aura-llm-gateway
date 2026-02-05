@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -12,101 +12,54 @@ import {
   EditLine,
   CheckLine,
   CloseLine,
-  ChartBarLine,
+  AiLine,
+  Loading3Line,
+  Refresh1Line,
+  Building4Line,
 } from '@mingcute/react'
-
-interface Team {
-  id: string
-  organizationId: string
-  organizationName: string
-  name: string
-  slug: string
-  description: string
-  projectsCount: number
-  membersCount: number
-  monthlyTokenLimit: number | null
-  currentMonthTokens: number
-  totalRequests: number
-  status: 'active' | 'over_limit'
-  createdAt: string
-}
-
-const mockTeams: Team[] = [
-  {
-    id: 'team_1',
-    organizationId: 'org_1',
-    organizationName: 'Acme Corporation',
-    name: 'Product Engineering',
-    slug: 'product-eng',
-    description: 'Main product development team',
-    projectsCount: 5,
-    membersCount: 12,
-    monthlyTokenLimit: 5000000,
-    currentMonthTokens: 3200000,
-    totalRequests: 15000,
-    status: 'active',
-    createdAt: '2025-06-20',
-  },
-  {
-    id: 'team_2',
-    organizationId: 'org_1',
-    organizationName: 'Acme Corporation',
-    name: 'Customer Success',
-    slug: 'customer-success',
-    description: 'Customer support and success',
-    projectsCount: 3,
-    membersCount: 8,
-    monthlyTokenLimit: 2000000,
-    currentMonthTokens: 1850000,
-    totalRequests: 8500,
-    status: 'active',
-    createdAt: '2025-07-01',
-  },
-  {
-    id: 'team_3',
-    organizationId: 'org_1',
-    organizationName: 'Acme Corporation',
-    name: 'Research',
-    slug: 'research',
-    description: 'AI research and experimentation',
-    projectsCount: 4,
-    membersCount: 5,
-    monthlyTokenLimit: 10000000,
-    currentMonthTokens: 10500000,
-    totalRequests: 21000,
-    status: 'over_limit',
-    createdAt: '2025-08-15',
-  },
-  {
-    id: 'team_4',
-    organizationId: 'org_2',
-    organizationName: 'TechStart Inc',
-    name: 'Development',
-    slug: 'dev',
-    description: 'Core development team',
-    projectsCount: 5,
-    membersCount: 6,
-    monthlyTokenLimit: null,
-    currentMonthTokens: 890000,
-    totalRequests: 4200,
-    status: 'active',
-    createdAt: '2025-09-05',
-  },
-]
+import { getTeams, getOrganizations, type TeamSummary, type OrganizationSummary } from '@/lib/api'
 
 export function TeamsPage() {
+  const [teams, setTeams] = useState<TeamSummary[]>([])
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [orgFilter, setOrgFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+  const [editingTeam, setEditingTeam] = useState<TeamSummary | null>(null)
 
-  const organizations = [...new Set(mockTeams.map((t) => t.organizationName))]
+  const fetchData = async () => {
+    try {
+      const [teamsData, orgsData] = await Promise.all([
+        getTeams().catch(() => []),
+        getOrganizations().catch(() => []),
+      ])
+      setTeams(teamsData)
+      setOrganizations(orgsData)
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }
 
-  const filteredTeams = mockTeams.filter((team) => {
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    fetchData()
+  }
+
+  // Get unique organization names for filter
+  const orgNames = [...new Set(teams.map((t) => t.organization_name))]
+
+  const filteredTeams = teams.filter((team) => {
     const matchesSearch =
       team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       team.slug.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesOrg = orgFilter === 'all' || team.organizationName === orgFilter
+    const matchesOrg = orgFilter === 'all' || team.organization_name === orgFilter
     return matchesSearch && matchesOrg
   })
 
@@ -116,11 +69,15 @@ export function TeamsPage() {
   }
 
   const getUsageColor = (current: number, limit: number | null) => {
-    if (!limit) return 'bg-violet-500'
+    if (!limit) return 'bg-primary'
     const percent = (current / limit) * 100
     if (percent >= 100) return 'bg-red-500'
     if (percent >= 80) return 'bg-yellow-500'
     return 'bg-green-500'
+  }
+
+  const isOverLimit = (current: number, limit: number | null) => {
+    return limit !== null && current > limit
   }
 
   const formatTokens = (tokens: number) => {
@@ -129,16 +86,48 @@ export function TeamsPage() {
     return tokens.toString()
   }
 
+  // Calculate totals
+  const totals = {
+    teams: teams.length,
+    members: teams.reduce((acc, t) => acc + t.member_count, 0),
+    projects: teams.reduce((acc, t) => acc + t.project_count, 0),
+    overLimit: teams.filter((t) => isOverLimit(t.current_month_tokens, t.monthly_token_limit)).length,
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full">
+        <Header title="Teams" description="Manage teams and their token budgets" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loading3Line className="h-5 w-5 animate-spin" />
+            <span>Loading teams...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       <Header
         title="Teams"
         description="Manage teams and their token budgets"
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>
-            <AddLine className="w-4 h-4 mr-2" />
-            Create Team
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <AddLine className="w-4 h-4 mr-2" />
+              Create Team
+            </Button>
+          </div>
         }
       />
 
@@ -160,7 +149,7 @@ export function TeamsPage() {
             className="px-3 py-2 bg-background border border-border rounded-md text-sm"
           >
             <option value="all">All Organizations</option>
-            {organizations.map((org) => (
+            {orgNames.map((org) => (
               <option key={org} value={org}>
                 {org}
               </option>
@@ -169,7 +158,7 @@ export function TeamsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -177,7 +166,7 @@ export function TeamsPage() {
                   <Group2Line className="w-5 h-5 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">{mockTeams.length}</p>
+                  <p className="text-2xl font-semibold">{totals.teams}</p>
                   <p className="text-sm text-muted-foreground">Total Teams</p>
                 </div>
               </div>
@@ -187,12 +176,23 @@ export function TeamsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <FolderLine className="w-5 h-5 text-blue-400" />
+                  <User2Line className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">
-                    {mockTeams.reduce((acc, t) => acc + t.projectsCount, 0)}
-                  </p>
+                  <p className="text-2xl font-semibold">{totals.members}</p>
+                  <p className="text-sm text-muted-foreground">Total Members</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <FolderLine className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold">{totals.projects}</p>
                   <p className="text-sm text-muted-foreground">Total Projects</p>
                 </div>
               </div>
@@ -202,12 +202,10 @@ export function TeamsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-red-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-red-400" />
+                  <AiLine className="w-5 h-5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">
-                    {mockTeams.filter((t) => t.status === 'over_limit').length}
-                  </p>
+                  <p className="text-2xl font-semibold">{totals.overLimit}</p>
                   <p className="text-sm text-muted-foreground">Over Limit</p>
                 </div>
               </div>
@@ -221,88 +219,103 @@ export function TeamsPage() {
             <CardTitle>All Teams</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {filteredTeams.map((team) => (
-                <div
-                  key={team.id}
-                  className="p-4 bg-card-alt rounded-lg border border-border/50 hover:border-border transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-500/20 rounded-lg">
-                        <Group2Line className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{team.name}</h3>
-                          {team.status === 'over_limit' && (
-                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                              Over Limit
-                            </Badge>
-                          )}
+            {filteredTeams.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Group2Line className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-1">No Teams Found</p>
+                <p className="text-sm">
+                  {searchQuery || orgFilter !== 'all'
+                    ? 'No teams match your criteria.'
+                    : 'Create your first team to get started.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredTeams.map((team) => {
+                  const overLimit = isOverLimit(team.current_month_tokens, team.monthly_token_limit)
+                  return (
+                    <div
+                      key={team.id}
+                      className="p-4 bg-card-alt rounded-lg border border-border/50 hover:border-border transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-500/20 rounded-lg">
+                            <Group2Line className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold">{team.name}</h3>
+                              {overLimit && (
+                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                                  Over Limit
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Building4Line className="h-3 w-3" />
+                              {team.organization_name} / {team.slug}
+                            </p>
+                            {team.description && (
+                              <p className="text-xs text-muted-foreground mt-1">{team.description}</p>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {team.organizationName} / {team.slug}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">{team.description}</p>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => setEditingTeam(team)}>
+                            <EditLine className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <DeleteLine className="w-4 h-4 text-red-400" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4 mb-3">
+                        <div className="flex items-center gap-2">
+                          <User2Line className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">{team.member_count} members</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FolderLine className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">{team.project_count} projects</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <AiLine className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">{formatTokens(team.current_month_tokens)} tokens this month</span>
+                        </div>
+                      </div>
+
+                      {/* Token Usage Bar */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">Token Usage</span>
+                          <span className={cn(overLimit && 'text-red-400')}>
+                            {formatTokens(team.current_month_tokens)} /{' '}
+                            {team.monthly_token_limit ? formatTokens(team.monthly_token_limit) : 'Unlimited'}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              'h-full transition-all',
+                              getUsageColor(team.current_month_tokens, team.monthly_token_limit)
+                            )}
+                            style={{
+                              width: `${
+                                team.monthly_token_limit
+                                  ? Math.min(getUsagePercent(team.current_month_tokens, team.monthly_token_limit), 100)
+                                  : 30
+                              }%`,
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => setEditingTeam(team)}>
-                        <EditLine className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <DeleteLine className="w-4 h-4 text-red-400" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-4 mb-3">
-                    <div className="flex items-center gap-2">
-                      <FolderLine className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{team.projectsCount} projects</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <User2Line className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{team.membersCount} members</span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Requests:</span>{' '}
-                      {team.totalRequests.toLocaleString()}
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">This Month:</span>{' '}
-                      {formatTokens(team.currentMonthTokens)} tokens
-                    </div>
-                  </div>
-
-                  {/* Token Usage Bar */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Token Usage</span>
-                      <span>
-                        {formatTokens(team.currentMonthTokens)} /{' '}
-                        {team.monthlyTokenLimit ? formatTokens(team.monthlyTokenLimit) : 'Unlimited'}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={cn('h-full transition-all', getUsageColor(team.currentMonthTokens, team.monthlyTokenLimit))}
-                        style={{
-                          width: `${team.monthlyTokenLimit ? getUsagePercent(team.currentMonthTokens, team.monthlyTokenLimit) : 30}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {filteredTeams.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  No teams found matching your criteria.
-                </div>
-              )}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -323,9 +336,11 @@ export function TeamsPage() {
               <div>
                 <label className="text-sm font-medium mb-1 block">Organization</label>
                 <select className="w-full px-3 py-2 bg-background border border-border rounded-md">
-                  <option>Acme Corporation</option>
-                  <option>TechStart Inc</option>
-                  <option>Beta Labs</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -378,13 +393,13 @@ export function TeamsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Description</label>
-                <Input defaultValue={editingTeam.description} />
+                <Input defaultValue={editingTeam.description || ''} />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Monthly Token Limit</label>
                 <Input
                   type="number"
-                  defaultValue={editingTeam.monthlyTokenLimit || ''}
+                  defaultValue={editingTeam.monthly_token_limit || ''}
                   placeholder="Unlimited"
                 />
               </div>

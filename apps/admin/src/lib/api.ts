@@ -10,6 +10,7 @@ import type {
   TimelinePoint,
   RecentLog,
   OrganizationSummary,
+  TeamSummary,
   ApiKeySummary,
   RoutingRule,
   TimeRange,
@@ -19,6 +20,8 @@ import type {
   ToolUsageStats,
   HeatmapData,
   TokenUsageTimeline,
+  EndUserSummary,
+  ProviderSummary,
 } from './types'
 import { useAuthStore } from '@/stores'
 
@@ -121,9 +124,24 @@ export async function getOrganizations(): Promise<OrganizationSummary[]> {
   return fetchApi<OrganizationSummary[]>('/admin/organizations')
 }
 
+// Teams
+export async function getTeams(): Promise<TeamSummary[]> {
+  return fetchApi<TeamSummary[]>('/admin/teams')
+}
+
 // API Keys
 export async function getApiKeys(): Promise<ApiKeySummary[]> {
   return fetchApi<ApiKeySummary[]>('/admin/api-keys')
+}
+
+// End Users
+export async function getEndUsers(): Promise<EndUserSummary[]> {
+  return fetchApi<EndUserSummary[]>('/admin/end-users')
+}
+
+// Providers (detailed view)
+export async function getProviders(): Promise<ProviderSummary[]> {
+  return fetchApi<ProviderSummary[]>('/admin/providers')
 }
 
 // Routing Rules

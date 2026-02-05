@@ -10,75 +10,15 @@ import {
   DeleteLine,
   CheckLine,
   SearchLine,
+  Refresh1Line,
 } from '@mingcute/react'
-
-interface ApiKey {
-  id: string
-  name: string
-  key: string
-  prefix: string
-  createdAt: string
-  lastUsed: string | null
-  requests: number
-  status: 'active' | 'inactive' | 'rate_limited'
-  rateLimit: number
-  permissions: string[]
-}
-
-// Mock data
-const mockKeys: ApiKey[] = [
-  {
-    id: '1',
-    name: 'Production API',
-    key: 'sk-aura-prod-xxxxxxxxxxxxxxxxxxxx',
-    prefix: 'sk-aura-prod',
-    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    lastUsed: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-    requests: 12847,
-    status: 'active',
-    rateLimit: 1000,
-    permissions: ['read', 'write', 'stream'],
-  },
-  {
-    id: '2',
-    name: 'Staging API',
-    key: 'sk-aura-stage-xxxxxxxxxxxxxxxxxxxx',
-    prefix: 'sk-aura-stage',
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-    lastUsed: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    requests: 3421,
-    status: 'active',
-    rateLimit: 500,
-    permissions: ['read', 'write', 'stream'],
-  },
-  {
-    id: '3',
-    name: 'Development',
-    key: 'sk-aura-dev-xxxxxxxxxxxxxxxxxxxx',
-    prefix: 'sk-aura-dev',
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    lastUsed: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    requests: 842,
-    status: 'rate_limited',
-    rateLimit: 100,
-    permissions: ['read', 'write'],
-  },
-  {
-    id: '4',
-    name: 'Old Integration',
-    key: 'sk-aura-old-xxxxxxxxxxxxxxxxxxxx',
-    prefix: 'sk-aura-old',
-    createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-    lastUsed: null,
-    requests: 0,
-    status: 'inactive',
-    rateLimit: 1000,
-    permissions: ['read'],
-  },
-]
+import { getApiKeys } from '@/lib/api'
+import type { ApiKeySummary } from '@/lib/types'
 
 export function KeysPage() {
-  const [keys, setKeys] = useState<ApiKey[]>(mockKeys)
+  const [keys, setKeys] = useState<ApiKeySummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
@@ -87,73 +27,119 @@ export function KeysPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
 
+  const fetchKeys = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getApiKeys()
+      setKeys(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch API keys')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    if (tableRef.current) {
+    fetchKeys()
+  }, [])
+
+  useEffect(() => {
+    if (tableRef.current && !loading) {
       const rows = tableRef.current.querySelectorAll('.key-row')
       animateStaggered(rows, 'fadeInUp', 50)
     }
-  }, [keys])
+  }, [keys, loading])
 
   const filteredKeys = keys.filter(
     (key) =>
       key.name.toLowerCase().includes(search.toLowerCase()) ||
-      key.prefix.toLowerCase().includes(search.toLowerCase())
+      key.key_id.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleCopy = async (key: ApiKey) => {
-    await copyToClipboard(key.key)
+  const handleCopy = async (key: ApiKeySummary) => {
+    await copyToClipboard(key.key_id)
     setCopiedId(key.id)
     setTimeout(() => setCopiedId(null), 2000)
   }
 
   const handleCreate = () => {
-    const newKey: ApiKey = {
-      id: String(Date.now()),
-      name: newKeyName || 'New API Key',
-      key: `sk-aura-${Math.random().toString(36).substring(2, 10)}-${'x'.repeat(20)}`,
-      prefix: `sk-aura-${Math.random().toString(36).substring(2, 6)}`,
-      createdAt: new Date().toISOString(),
-      lastUsed: null,
-      requests: 0,
-      status: 'active',
-      rateLimit: parseInt(newKeyRateLimit) || 1000,
-      permissions: ['read', 'write', 'stream'],
-    }
-    setKeys([newKey, ...keys])
-    setCreatedKey(newKey.key)
+    // TODO: Implement actual API call to create key
+    const newKeyId = `aura_live_${Math.random().toString(36).substring(2, 14)}`
+    setCreatedKey(newKeyId)
     setNewKeyName('')
     setNewKeyRateLimit('1000')
   }
 
-  const handleDelete = (id: string) => {
-    setKeys(keys.filter((key) => key.id !== id))
-  }
-
-  const getStatusBadge = (status: ApiKey['status']) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
         return <Badge variant="success">Active</Badge>
       case 'inactive':
         return <Badge variant="muted">Inactive</Badge>
-      case 'rate_limited':
-        return <Badge variant="warning">Rate Limited</Badge>
+      case 'revoked':
+        return <Badge variant="destructive">Revoked</Badge>
+      default:
+        return <Badge variant="secondary">{status}</Badge>
     }
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount)
+  }
+
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`
+    if (tokens >= 1000) return `${(tokens / 1000).toFixed(0)}K`
+    return tokens.toString()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full">
+        <Header title="API Keys" description="Manage your gateway API keys" />
+        <div className="flex-1 flex items-center justify-center">
+          <Refresh1Line className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col h-full">
+        <Header title="API Keys" description="Manage your gateway API keys" />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <p className="text-red-400">{error}</p>
+          <Button onClick={fetchKeys}>Retry</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       <Header
         title="API Keys"
         description="Manage your gateway API keys"
         actions={
-          <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-            <AddLine className="h-4 w-4" />
-            Create Key
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={fetchKeys}>
+              <Refresh1Line className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+              <AddLine className="h-4 w-4" />
+              Create Key
+            </Button>
+          </div>
         }
       />
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* Search */}
         <div className="flex items-center gap-4">
           <Input
@@ -176,73 +162,127 @@ export function KeysPage() {
                     <th className="p-4 font-medium">Key</th>
                     <th className="p-4 font-medium">Status</th>
                     <th className="p-4 font-medium text-right">Requests</th>
+                    <th className="p-4 font-medium text-right">Tokens</th>
+                    <th className="p-4 font-medium text-right">Cost</th>
                     <th className="p-4 font-medium">Last Used</th>
                     <th className="p-4 font-medium text-right">Rate Limit</th>
                     <th className="p-4 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredKeys.map((key) => (
-                    <tr key={key.id} className="key-row border-b border-border/50 hover:bg-muted/50 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-primary/10 p-2">
-                            <Key2Line className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{key.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Created {formatRelativeTime(key.createdAt)}
-                            </p>
-                          </div>
-                        </div>
+                  {filteredKeys.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                        {keys.length === 0
+                          ? 'No API keys found. Create one to get started.'
+                          : 'No keys match your search.'}
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
-                            {key.prefix}...
-                          </code>
+                    </tr>
+                  ) : (
+                    filteredKeys.map((key) => (
+                      <tr key={key.id} className="key-row border-b border-border/50 hover:bg-muted/50 transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-lg bg-primary/10 p-2">
+                              <Key2Line className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{key.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Created {formatRelativeTime(key.created_at)}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
+                              {key.key_id.substring(0, 15)}...
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleCopy(key)}
+                              className="text-muted-foreground"
+                            >
+                              {copiedId === key.id ? (
+                                <CheckLine className="h-4 w-4 text-success" />
+                              ) : (
+                                <CopyLine className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                        <td className="p-4">{getStatusBadge(key.status)}</td>
+                        <td className="p-4 text-right font-mono text-sm">
+                          {formatNumber(key.total_requests)}
+                        </td>
+                        <td className="p-4 text-right font-mono text-sm">
+                          {formatTokens(key.total_input_tokens + key.total_output_tokens)}
+                        </td>
+                        <td className="p-4 text-right font-mono text-sm">
+                          {formatCurrency(key.total_cost)}
+                        </td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {key.last_used_at ? formatRelativeTime(key.last_used_at) : 'Never'}
+                        </td>
+                        <td className="p-4 text-right font-mono text-sm">
+                          {key.rate_limit_rpm ? `${formatNumber(key.rate_limit_rpm)}/min` : '-'}
+                        </td>
+                        <td className="p-4">
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => handleCopy(key)}
-                            className="text-muted-foreground"
+                            className="text-muted-foreground hover:text-destructive"
                           >
-                            {copiedId === key.id ? (
-                              <CheckLine className="h-4 w-4 text-success" />
-                            ) : (
-                              <CopyLine className="h-4 w-4" />
-                            )}
+                            <DeleteLine className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </td>
-                      <td className="p-4">{getStatusBadge(key.status)}</td>
-                      <td className="p-4 text-right font-mono text-sm">
-                        {formatNumber(key.requests)}
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {key.lastUsed ? formatRelativeTime(key.lastUsed) : 'Never'}
-                      </td>
-                      <td className="p-4 text-right font-mono text-sm">
-                        {formatNumber(key.rateLimit)}/min
-                      </td>
-                      <td className="p-4">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => handleDelete(key.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <DeleteLine className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </CardContent>
         </Card>
+
+        {/* Usage Progress for keys with limits */}
+        {keys.some(k => k.monthly_token_limit) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Token Limits</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {keys
+                  .filter(k => k.monthly_token_limit)
+                  .map((key) => (
+                    <div key={key.id} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>{key.name}</span>
+                        <span className="text-muted-foreground">
+                          {formatTokens(key.current_month_tokens)} / {formatTokens(key.monthly_token_limit || 0)}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            (key.usage_percentage || 0) > 90
+                              ? 'bg-red-500'
+                              : (key.usage_percentage || 0) > 75
+                              ? 'bg-yellow-500'
+                              : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(key.usage_percentage || 0, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Create Key Dialog */}
         {showCreateDialog && (
@@ -272,6 +312,7 @@ export function KeysPage() {
                       onClick={() => {
                         setShowCreateDialog(false)
                         setCreatedKey(null)
+                        fetchKeys() // Refresh the list
                       }}
                     >
                       Done

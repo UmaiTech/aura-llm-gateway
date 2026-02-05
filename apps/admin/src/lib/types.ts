@@ -122,7 +122,18 @@ export interface RecentLog {
   cache_hit: boolean
   has_reasoning: boolean
   compressed: boolean | null
+  // Tool call metadata
+  has_tool_calls: boolean
+  tool_calls_count: number
+  tools_used: string[]
+  tool_calls_data: ToolCallData[]
   created_at: string
+}
+
+export interface ToolCallData {
+  name: string
+  arguments: unknown
+  call_id?: string
 }
 
 export interface OrganizationSummary {
@@ -135,6 +146,20 @@ export interface OrganizationSummary {
   total_tokens: number
   total_cost: number
   total_requests: number
+}
+
+export interface TeamSummary {
+  id: string
+  organization_id: string
+  organization_name: string
+  name: string
+  slug: string
+  description: string | null
+  monthly_token_limit: number | null
+  current_month_tokens: number
+  member_count: number
+  project_count: number
+  created_at: string
 }
 
 export interface ApiKeySummary {
@@ -231,4 +256,54 @@ export interface TokenUsageTimeline {
   timestamp: string
   input_tokens: number
   output_tokens: number
+}
+
+// End Users page types
+export interface EndUserSummary {
+  id: string
+  organization_id: string
+  organization_name: string
+  organization_slug: string
+  external_id: string
+  name: string | null
+  email: string | null
+  total_input_tokens: number
+  total_output_tokens: number
+  total_tokens: number
+  total_cost_usd: number
+  request_count: number
+  current_month_tokens: number
+  monthly_token_limit: number | null
+  rate_limit_rpm: number | null
+  is_blocked: boolean
+  first_seen_at: string | null
+  last_seen_at: string | null
+  created_at: string
+}
+
+// Providers page types (detailed view)
+export interface ProviderSummary {
+  provider_name: string
+  display_name: string | null
+  is_enabled: boolean
+  api_base_url: string | null
+  requests_24h: number
+  successful_24h: number
+  failed_24h: number
+  success_rate: number
+  avg_latency_ms: number
+  p95_latency_ms: number
+  p99_latency_ms: number
+  min_latency_ms: number
+  max_latency_ms: number
+  last_request_at: string | null
+  input_tokens_24h: number
+  output_tokens_24h: number
+  tokens_24h: number
+  cost_24h: number
+  all_time_requests: number
+  all_time_cost: number
+  health_status: 'healthy' | 'degraded' | 'inactive' | 'no_data' | 'disabled'
+  created_at: string
+  updated_at: string
 }

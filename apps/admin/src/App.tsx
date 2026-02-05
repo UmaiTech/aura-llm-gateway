@@ -6,7 +6,6 @@ import {
   KeysPage,
   PlaygroundPage,
   DevLogsPage,
-  LogsPage,
   InsightsPage,
   HarnessPage,
   ProvidersPage,
@@ -58,7 +57,6 @@ function App() {
         <Route path="/keys" element={<KeysPage />} />
         <Route path="/providers" element={<ProvidersPage />} />
         <Route path="/routing" element={<RoutingPage />} />
-        <Route path="/logs" element={<LogsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

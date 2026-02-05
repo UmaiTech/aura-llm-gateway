@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui'
-import { cn, formatDuration, formatCurrency } from '@/lib/utils'
+import { cn, formatDuration, formatCurrency, formatNumber, formatRelativeTime } from '@/lib/utils'
 import {
   AiLine,
   Message1Line,
-  Settings1Line,
   BugLine,
   PlayLine,
   SearchLine,
@@ -13,7 +12,18 @@ import {
   CloseLine,
   ClockLine,
   CoinLine,
+  User2Line,
+  BrainLine,
+  ToolLine,
+  Package2Line,
+  Sparkles2Line,
+  Loading3Line,
+  Refresh1Line,
+  ShieldLine,
+  ArrowDownLine,
+  InformationLine,
 } from '@mingcute/react'
+import { getRecentLogs, getToolUsage, type RecentLog, type ToolUsageStats } from '@/lib/api'
 
 type Tab = 'traces' | 'prompts' | 'tools' | 'guardrails'
 
@@ -33,80 +43,233 @@ interface Trace {
   id: string
   sessionId: string
   status: 'completed' | 'failed'
+  provider: string
+  model: string
   totalLatency: number
   totalCost: number
+  inputTokens: number
+  outputTokens: number
   steps: TraceStep[]
   createdAt: string
+  // Tool call info
+  hasToolCalls: boolean
+  toolCallsCount: number
+  toolsUsed: string[]
 }
 
-const mockTraces: Trace[] = [
-  {
-    id: '1',
-    sessionId: 'aura_8f2a3d7e',
-    status: 'completed',
-    totalLatency: 2340,
-    totalCost: 0.045,
-    createdAt: new Date().toISOString(),
-    steps: [
-      { id: '1', type: 'user', content: 'What is the weather in Tokyo and convert to Celsius?' },
-      { id: '2', type: 'reasoning', content: 'I need to get the weather and convert the temperature.', latency: 234, tokens: 45 },
-      { id: '3', type: 'tool_call', content: 'get_weather', toolName: 'get_weather', input: { location: 'Tokyo, Japan' }, latency: 156, status: 'success' },
-      { id: '4', type: 'tool_result', content: '{"temp": 72, "unit": "F", "condition": "Partly Cloudy"}' },
-      { id: '5', type: 'tool_call', content: 'calculate', toolName: 'calculate', input: { expr: '(72 - 32) * 5/9' }, latency: 12, status: 'success' },
-      { id: '6', type: 'tool_result', content: '{"result": 22.22}' },
-      { id: '7', type: 'assistant', content: 'The current temperature in Tokyo is 22°C (72°F) with partly cloudy conditions.', latency: 189, tokens: 89 },
-    ],
-  },
-  {
-    id: '2',
-    sessionId: 'aura_7e1b2c9a',
-    status: 'failed',
-    totalLatency: 12300,
-    totalCost: 0.023,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    steps: [
-      { id: '1', type: 'user', content: 'Book a table at the best restaurant in SF' },
-      { id: '2', type: 'reasoning', content: 'I need to search for restaurants and then book.', latency: 340, tokens: 52 },
-      { id: '3', type: 'tool_call', content: 'web_search', toolName: 'web_search', input: { query: 'best restaurants SF 2024' }, latency: 1200, status: 'success' },
-      { id: '4', type: 'tool_result', content: '{"results": [...]}' },
-      { id: '5', type: 'tool_call', content: 'book_restaurant', toolName: 'book_restaurant', input: { name: 'Atelier Crenn' }, latency: 30000, status: 'error' },
-    ],
-  },
-]
+// Convert RecentLog to Trace format
+function logToTrace(log: RecentLog): Trace {
+  const steps: TraceStep[] = []
 
-const mockPrompts = [
-  { id: '1', name: 'Customer Support v2.3', status: 'active', uses: 1234, lastEdited: '2 days ago' },
-  { id: '2', name: 'Code Assistant v1.1', status: 'testing', uses: 567, lastEdited: '1 week ago' },
-  { id: '3', name: 'Sales Agent', status: 'draft', uses: 0, lastEdited: 'just now' },
-]
+  // Simulate a user message step
+  steps.push({
+    id: `${log.id}-user`,
+    type: 'user',
+    content: 'User request (content not stored)',
+  })
 
-const mockTools = [
-  { id: '1', name: 'web_search', enabled: true, calls: 4521, avgLatency: 890, successRate: 98.2 },
-  { id: '2', name: 'calculate', enabled: true, calls: 2341, avgLatency: 12, successRate: 99.9 },
-  { id: '3', name: 'get_weather', enabled: true, calls: 1567, avgLatency: 156, successRate: 95.1 },
-  { id: '4', name: 'code_execute', enabled: false, calls: 823, avgLatency: 2340, successRate: 87.3 },
-]
+  // If there's reasoning
+  if (log.has_reasoning && log.reasoning_tokens && log.reasoning_tokens > 0) {
+    steps.push({
+      id: `${log.id}-reasoning`,
+      type: 'reasoning',
+      content: 'Model reasoning (content not stored)',
+      tokens: log.reasoning_tokens,
+    })
+  }
+
+  // Add tool call steps if tools were used
+  if (log.has_tool_calls && log.tool_calls_data && log.tool_calls_data.length > 0) {
+    log.tool_calls_data.forEach((toolCall, index) => {
+      // Tool call step with arguments
+      steps.push({
+        id: `${log.id}-tool-call-${index}`,
+        type: 'tool_call',
+        content: `Calling ${toolCall.name}`,
+        toolName: toolCall.name,
+        input: toolCall.arguments as object,
+        status: 'success',
+      })
+      // Tool result step (results not stored)
+      steps.push({
+        id: `${log.id}-tool-result-${index}`,
+        type: 'tool_result',
+        content: `Result from ${toolCall.name}`,
+        toolName: toolCall.name,
+        status: 'success',
+      })
+    })
+  } else if (log.has_tool_calls && log.tools_used && log.tools_used.length > 0) {
+    // Fallback for logs without tool_calls_data
+    log.tools_used.forEach((toolName, index) => {
+      steps.push({
+        id: `${log.id}-tool-call-${index}`,
+        type: 'tool_call',
+        content: `Calling ${toolName}`,
+        toolName: toolName,
+        status: 'success',
+      })
+      steps.push({
+        id: `${log.id}-tool-result-${index}`,
+        type: 'tool_result',
+        content: `Result from ${toolName}`,
+        toolName: toolName,
+        status: 'success',
+      })
+    })
+  }
+
+  // Assistant response
+  steps.push({
+    id: `${log.id}-assistant`,
+    type: 'assistant',
+    content: log.has_tool_calls
+      ? `Response after ${log.tool_calls_count} tool call${log.tool_calls_count > 1 ? 's' : ''}`
+      : 'Assistant response (content not stored)',
+    latency: log.latency_ms ?? undefined,
+    tokens: log.output_tokens ?? undefined,
+  })
+
+  return {
+    id: log.id,
+    sessionId: log.response_id,
+    status: log.status === 'completed' ? 'completed' : 'failed',
+    provider: log.provider_name,
+    model: log.model_id,
+    totalLatency: log.latency_ms ?? 0,
+    totalCost: log.cost_usd ?? 0,
+    inputTokens: log.input_tokens ?? 0,
+    outputTokens: log.output_tokens ?? 0,
+    steps,
+    createdAt: log.created_at,
+    hasToolCalls: log.has_tool_calls,
+    toolCallsCount: log.tool_calls_count,
+    toolsUsed: log.tools_used ?? [],
+  }
+}
+
+// Step icon component
+function StepIcon({ type }: { type: TraceStep['type'] }) {
+  switch (type) {
+    case 'user':
+      return <User2Line className="h-4 w-4 text-blue-400" />
+    case 'reasoning':
+      return <BrainLine className="h-4 w-4 text-purple-400" />
+    case 'tool_call':
+      return <ToolLine className="h-4 w-4 text-orange-400" />
+    case 'tool_result':
+      return <Package2Line className="h-4 w-4 text-green-400" />
+    case 'assistant':
+      return <Sparkles2Line className="h-4 w-4 text-primary" />
+  }
+}
 
 export function HarnessPage() {
   const [activeTab, setActiveTab] = useState<Tab>('traces')
   const [selectedTrace, setSelectedTrace] = useState<Trace | null>(null)
   const [search, setSearch] = useState('')
+  const [filterToolCalls, setFilterToolCalls] = useState<'all' | 'with-tools' | 'no-tools'>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'failed'>('all')
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
+
+  const toggleStep = (stepId: string) => {
+    setExpandedSteps(prev => {
+      const next = new Set(prev)
+      if (next.has(stepId)) {
+        next.delete(stepId)
+      } else {
+        next.add(stepId)
+      }
+      return next
+    })
+  }
+
+  // API state
+  const [loading, setLoading] = useState(true)
+  const [traces, setTraces] = useState<Trace[]>([])
+  const [tools, setTools] = useState<ToolUsageStats[]>([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Fetch data
+  const fetchData = async () => {
+    try {
+      const [logs, toolStats] = await Promise.all([
+        getRecentLogs({ limit: 50 }).catch(() => []),
+        getToolUsage('7d').catch(() => []),
+      ])
+
+      // Convert logs to traces
+      setTraces(logs.map(logToTrace))
+      setTools(toolStats)
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    fetchData()
+  }
 
   const tabs: { id: Tab; name: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'traces', name: 'Traces', icon: BugLine },
     { id: 'prompts', name: 'Prompts', icon: Message1Line },
-    { id: 'tools', name: 'Tools', icon: Settings1Line },
-    { id: 'guardrails', name: 'Guardrails', icon: AiLine },
+    { id: 'tools', name: 'Tools', icon: ToolLine },
+    { id: 'guardrails', name: 'Guardrails', icon: ShieldLine },
   ]
 
-  const getStepIcon = (type: TraceStep['type']) => {
-    switch (type) {
-      case 'user': return <span className="text-blue-500">👤</span>
-      case 'reasoning': return <span className="text-purple-500">🧠</span>
-      case 'tool_call': return <span className="text-orange-500">🔧</span>
-      case 'tool_result': return <span className="text-green-500">📦</span>
-      case 'assistant': return <span className="text-primary">✨</span>
-    }
+  // Calculate summary stats
+  const stats = {
+    totalTraces: traces.length,
+    withToolCalls: traces.filter(t => t.hasToolCalls).length,
+    totalToolCalls: traces.reduce((acc, t) => acc + t.toolCallsCount, 0),
+    uniqueTools: [...new Set(traces.flatMap(t => t.toolsUsed))].length,
+    successRate: traces.length > 0
+      ? (traces.filter(t => t.status === 'completed').length / traces.length * 100).toFixed(1)
+      : '0',
+    avgLatency: traces.length > 0
+      ? Math.round(traces.reduce((acc, t) => acc + t.totalLatency, 0) / traces.length)
+      : 0,
+    totalCost: traces.reduce((acc, t) => acc + t.totalCost, 0),
+    totalTokens: traces.reduce((acc, t) => acc + t.inputTokens + t.outputTokens, 0),
+  }
+
+  // Filter traces by search and filters
+  const filteredTraces = traces.filter((trace) => {
+    const matchesSearch =
+      trace.sessionId.toLowerCase().includes(search.toLowerCase()) ||
+      trace.provider.toLowerCase().includes(search.toLowerCase()) ||
+      trace.model.toLowerCase().includes(search.toLowerCase()) ||
+      trace.toolsUsed.some(t => t.toLowerCase().includes(search.toLowerCase()))
+
+    const matchesToolFilter =
+      filterToolCalls === 'all' ||
+      (filterToolCalls === 'with-tools' && trace.hasToolCalls) ||
+      (filterToolCalls === 'no-tools' && !trace.hasToolCalls)
+
+    const matchesStatus =
+      filterStatus === 'all' || trace.status === filterStatus
+
+    return matchesSearch && matchesToolFilter && matchesStatus
+  })
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen">
+        <Header title="Agentic Harness" description="Debug and tune your AI agent workflows" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loading3Line className="h-5 w-5 animate-spin" />
+            <span>Loading harness data...</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -138,43 +301,139 @@ export function HarnessPage() {
           {activeTab === 'traces' && (
             <>
               {/* Trace List */}
-              <div className="w-96 border-r overflow-y-auto p-4 space-y-3">
-                <Input
-                  placeholder="Search traces..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  icon={<SearchLine className="h-4 w-4" />}
-                />
-                {mockTraces.map((trace) => (
-                  <Card
-                    key={trace.id}
-                    onClick={() => setSelectedTrace(trace)}
-                    className={cn(
-                      'cursor-pointer transition-all',
-                      selectedTrace?.id === trace.id && 'ring-2 ring-primary'
-                    )}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <code className="text-xs font-mono">{trace.sessionId}</code>
-                        <Badge variant={trace.status === 'completed' ? 'success' : 'destructive'}>
-                          {trace.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <ClockLine className="h-3 w-3" />
-                          {formatDuration(trace.totalLatency)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <CoinLine className="h-3 w-3" />
-                          {formatCurrency(trace.totalCost)}
-                        </span>
-                        <span>{trace.steps.length} steps</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="w-[420px] border-r overflow-y-auto p-4 space-y-3">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-4 gap-2 p-3 bg-muted/30 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-lg font-semibold">{stats.totalTraces}</p>
+                    <p className="text-xs text-muted-foreground">Traces</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-semibold text-orange-400">{stats.withToolCalls}</p>
+                    <p className="text-xs text-muted-foreground">With Tools</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-semibold text-green-400">{stats.successRate}%</p>
+                    <p className="text-xs text-muted-foreground">Success</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-semibold">{formatCurrency(stats.totalCost)}</p>
+                    <p className="text-xs text-muted-foreground">Cost</p>
+                  </div>
+                </div>
+
+                {/* Search and Filters */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search traces or tools..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      icon={<SearchLine className="h-4 w-4" />}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                    >
+                      <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={filterToolCalls}
+                      onChange={(e) => setFilterToolCalls(e.target.value as typeof filterToolCalls)}
+                      className="flex-1 text-xs px-2 py-1.5 bg-background border border-border rounded-md"
+                    >
+                      <option value="all">All Traces</option>
+                      <option value="with-tools">With Tool Calls</option>
+                      <option value="no-tools">No Tool Calls</option>
+                    </select>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+                      className="flex-1 text-xs px-2 py-1.5 bg-background border border-border rounded-md"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="completed">Completed</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Showing {filteredTraces.length} of {traces.length} traces
+                </p>
+
+                {filteredTraces.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BugLine className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No traces found</p>
+                  </div>
+                ) : (
+                  filteredTraces.map((trace) => (
+                    <Card
+                      key={trace.id}
+                      onClick={() => setSelectedTrace(trace)}
+                      className={cn(
+                        'cursor-pointer transition-all hover:border-primary/50',
+                        selectedTrace?.id === trace.id && 'ring-2 ring-primary'
+                      )}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <code className="text-xs font-mono truncate max-w-[180px]">
+                            {trace.sessionId.slice(0, 20)}...
+                          </code>
+                          <div className="flex items-center gap-2">
+                            {trace.hasToolCalls && (
+                              <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
+                                <ToolLine className="h-3 w-3 mr-1" />
+                                {trace.toolCallsCount}
+                              </Badge>
+                            )}
+                            <Badge variant={trace.status === 'completed' ? 'success' : 'destructive'}>
+                              {trace.status}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                          <span className="capitalize">{trace.provider}</span>
+                          <span>·</span>
+                          <span>{trace.model}</span>
+                        </div>
+                        {trace.hasToolCalls && trace.toolsUsed.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {trace.toolsUsed.map((tool, idx) => (
+                              <span key={idx} className="text-xs px-1.5 py-0.5 bg-muted rounded font-mono">
+                                {tool}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <ClockLine className="h-3 w-3" />
+                            {formatDuration(trace.totalLatency)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <CoinLine className="h-3 w-3" />
+                            {formatCurrency(trace.totalCost)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <AiLine className="h-3 w-3" />
+                            {formatNumber(trace.inputTokens + trace.outputTokens)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-2">
+                          {formatRelativeTime(trace.createdAt)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
 
               {/* Trace Detail */}
@@ -182,7 +441,10 @@ export function HarnessPage() {
                 {selectedTrace ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-semibold">Trace: {selectedTrace.sessionId}</h2>
+                      <div>
+                        <h2 className="text-lg font-semibold">Trace Details</h2>
+                        <p className="text-sm text-muted-foreground font-mono">{selectedTrace.sessionId}</p>
+                      </div>
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="gap-2">
                           <PlayLine className="h-4 w-4" />
@@ -192,54 +454,204 @@ export function HarnessPage() {
                       </div>
                     </div>
 
+                    {/* Trace Metadata */}
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground text-xs">Provider</p>
+                            <p className="font-medium capitalize">{selectedTrace.provider}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Model</p>
+                            <p className="font-medium">{selectedTrace.model}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Total Latency</p>
+                            <p className="font-medium font-mono">{formatDuration(selectedTrace.totalLatency)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Total Cost</p>
+                            <p className="font-medium font-mono">{formatCurrency(selectedTrace.totalCost)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Input Tokens</p>
+                            <p className="font-medium font-mono">{formatNumber(selectedTrace.inputTokens)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Output Tokens</p>
+                            <p className="font-medium font-mono">{formatNumber(selectedTrace.outputTokens)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Status</p>
+                            <Badge variant={selectedTrace.status === 'completed' ? 'success' : 'destructive'}>
+                              {selectedTrace.status}
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Created</p>
+                            <p className="font-medium">{new Date(selectedTrace.createdAt).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Tool Calls Summary */}
+                    {selectedTrace.hasToolCalls && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <ToolLine className="h-4 w-4 text-orange-400" />
+                            Tool Calls ({selectedTrace.toolCallsCount})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex flex-wrap gap-2">
+                            {selectedTrace.toolsUsed.map((tool, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg"
+                              >
+                                <ToolLine className="h-4 w-4 text-orange-400" />
+                                <span className="font-mono text-sm">{tool}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Trace Steps */}
                     <div className="space-y-2">
-                      {selectedTrace.steps.map((step, index) => (
-                        <div key={step.id} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-lg">
-                              {getStepIcon(step.type)}
-                            </div>
-                            {index < selectedTrace.steps.length - 1 && (
-                              <div className="w-px flex-1 bg-border my-1" />
-                            )}
-                          </div>
-                          <Card className="flex-1">
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <Badge variant="secondary" className="capitalize">
-                                  {step.type.replace('_', ' ')}
-                                </Badge>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  {step.latency && <span>{formatDuration(step.latency)}</span>}
-                                  {step.tokens && <span>{step.tokens} tokens</span>}
-                                  {step.status && (
-                                    step.status === 'success' ? (
-                                      <CheckLine className="h-4 w-4 text-success" />
-                                    ) : (
-                                      <CloseLine className="h-4 w-4 text-destructive" />
-                                    )
-                                  )}
-                                </div>
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        Execution Steps ({selectedTrace.steps.length})
+                      </h3>
+                      {selectedTrace.steps.map((step, index) => {
+                        const isExpanded = expandedSteps.has(step.id)
+                        const isToolStep = step.type === 'tool_call' || step.type === 'tool_result'
+
+                        return (
+                          <div key={step.id} className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                              <div className={cn(
+                                'w-8 h-8 rounded-full flex items-center justify-center',
+                                step.type === 'tool_call' ? 'bg-orange-500/20' :
+                                step.type === 'tool_result' ? 'bg-green-500/20' :
+                                step.type === 'reasoning' ? 'bg-purple-500/20' :
+                                step.type === 'user' ? 'bg-blue-500/20' :
+                                'bg-primary/20'
+                              )}>
+                                <StepIcon type={step.type} />
                               </div>
-                              {step.toolName && (
-                                <p className="text-sm font-mono text-primary mb-2">{step.toolName}()</p>
+                              {index < selectedTrace.steps.length - 1 && (
+                                <div className="w-px flex-1 bg-border my-1" />
                               )}
-                              {step.input && (
-                                <pre className="text-xs bg-muted p-2 rounded mb-2 overflow-auto">
-                                  {JSON.stringify(step.input, null, 2)}
-                                </pre>
+                            </div>
+                            <Card
+                              className={cn(
+                                'flex-1 transition-all',
+                                isToolStep && 'cursor-pointer hover:border-primary/50'
                               )}
-                              <p className="text-sm whitespace-pre-wrap">{step.content}</p>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      ))}
+                              onClick={() => isToolStep && toggleStep(step.id)}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="secondary"
+                                      className={cn(
+                                        'capitalize',
+                                        step.type === 'tool_call' && 'bg-orange-500/20 text-orange-400',
+                                        step.type === 'tool_result' && 'bg-green-500/20 text-green-400',
+                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-400'
+                                      )}
+                                    >
+                                      {step.type.replace('_', ' ')}
+                                    </Badge>
+                                    {step.toolName && (
+                                      <code className="text-sm font-mono text-primary">{step.toolName}()</code>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    {step.latency && (
+                                      <span className="flex items-center gap-1">
+                                        <ClockLine className="h-3 w-3" />
+                                        {formatDuration(step.latency)}
+                                      </span>
+                                    )}
+                                    {step.tokens && (
+                                      <span className="flex items-center gap-1">
+                                        <AiLine className="h-3 w-3" />
+                                        {step.tokens} tokens
+                                      </span>
+                                    )}
+                                    {step.status && (
+                                      step.status === 'success' ? (
+                                        <CheckLine className="h-4 w-4 text-success" />
+                                      ) : (
+                                        <CloseLine className="h-4 w-4 text-destructive" />
+                                      )
+                                    )}
+                                    {isToolStep && (
+                                      <ArrowDownLine className={cn(
+                                        'h-4 w-4 transition-transform',
+                                        isExpanded && 'rotate-180'
+                                      )} />
+                                    )}
+                                  </div>
+                                </div>
+
+                                <p className="text-sm text-muted-foreground">{step.content}</p>
+
+                                {/* Expanded content for tool steps */}
+                                {isExpanded && isToolStep && (
+                                  <div className="mt-4 space-y-3 border-t pt-4">
+                                    {step.type === 'tool_call' && (
+                                      <>
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-1">Input Arguments</p>
+                                          {step.input ? (
+                                            <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto font-mono">
+                                              {JSON.stringify(step.input, null, 2)}
+                                            </pre>
+                                          ) : (
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                                              <InformationLine className="h-4 w-4" />
+                                              <span>Input arguments not stored. Enable response logging to capture tool inputs.</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                    {step.type === 'tool_result' && (
+                                      <>
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-1">Output Result</p>
+                                          {step.output ? (
+                                            <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto font-mono">
+                                              {JSON.stringify(step.output, null, 2)}
+                                            </pre>
+                                          ) : (
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                                              <InformationLine className="h-4 w-4" />
+                                              <span>Tool results not stored. Results are returned to the client but not persisted.</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <BugLine className="h-12 w-12 mb-4" />
+                    <BugLine className="h-12 w-12 mb-4 opacity-50" />
                     <p>Select a trace to view details</p>
                   </div>
                 )}
@@ -256,25 +668,10 @@ export function HarnessPage() {
                   New Prompt
                 </Button>
               </div>
-              <div className="grid gap-4">
-                {mockPrompts.map((prompt) => (
-                  <Card key={prompt.id}>
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium">{prompt.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {prompt.uses} uses · Last edited {prompt.lastEdited}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant={prompt.status === 'active' ? 'success' : prompt.status === 'testing' ? 'warning' : 'muted'}>
-                          {prompt.status}
-                        </Badge>
-                        <Button variant="outline" size="sm">Edit</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Message1Line className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-1">Prompt Management</p>
+                <p className="text-sm">Coming soon - manage and version your prompts</p>
               </div>
             </div>
           )}
@@ -283,45 +680,66 @@ export function HarnessPage() {
             <div className="flex-1 p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <Input placeholder="Search tools..." className="max-w-sm" icon={<SearchLine className="h-4 w-4" />} />
-                <Button className="gap-2">
-                  <Settings1Line className="h-4 w-4" />
-                  Add Tool
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+                  </Button>
+                  <Button className="gap-2">
+                    <ToolLine className="h-4 w-4" />
+                    Add Tool
+                  </Button>
+                </div>
               </div>
-              <Card>
-                <CardContent className="p-0">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b text-left text-sm text-muted-foreground">
-                        <th className="p-4 font-medium">Tool</th>
-                        <th className="p-4 font-medium">Status</th>
-                        <th className="p-4 font-medium text-right">Calls</th>
-                        <th className="p-4 font-medium text-right">Avg Latency</th>
-                        <th className="p-4 font-medium text-right">Success Rate</th>
-                        <th className="p-4 font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockTools.map((tool) => (
-                        <tr key={tool.id} className="border-b border-border/50">
-                          <td className="p-4 font-mono text-sm">{tool.name}</td>
-                          <td className="p-4">
-                            <Badge variant={tool.enabled ? 'success' : 'muted'}>
-                              {tool.enabled ? 'Enabled' : 'Disabled'}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-right">{tool.calls.toLocaleString()}</td>
-                          <td className="p-4 text-right">{formatDuration(tool.avgLatency)}</td>
-                          <td className="p-4 text-right">{tool.successRate}%</td>
-                          <td className="p-4">
-                            <Button variant="ghost" size="sm">Configure</Button>
-                          </td>
+
+              {tools.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <ToolLine className="h-12 w-12 mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-1">No Tool Usage Data</p>
+                  <p className="text-sm">Tool usage statistics will appear here once tools are used</p>
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b text-left text-sm text-muted-foreground">
+                          <th className="p-4 font-medium">Tool</th>
+                          <th className="p-4 font-medium text-right">Calls</th>
+                          <th className="p-4 font-medium text-right">Usage %</th>
+                          <th className="p-4 font-medium">Distribution</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
+                      </thead>
+                      <tbody>
+                        {tools.map((tool) => (
+                          <tr key={tool.tool_name} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <ToolLine className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-mono text-sm">{tool.tool_name}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right font-mono">{formatNumber(tool.call_count)}</td>
+                            <td className="p-4 text-right font-mono">{tool.percentage.toFixed(1)}%</td>
+                            <td className="p-4">
+                              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full transition-all"
+                                  style={{ width: `${tool.percentage}%` }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
 
@@ -329,7 +747,10 @@ export function HarnessPage() {
             <div className="flex-1 p-6 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Execution Limits</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ClockLine className="h-4 w-4" />
+                    Execution Limits
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -355,20 +776,46 @@ export function HarnessPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Loop Detection</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ShieldLine className="h-4 w-4" />
+                    Loop Detection
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <label className="flex items-center gap-3">
-                    <input type="checkbox" defaultChecked className="rounded" />
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded border-border" />
                     <span className="text-sm">Detect repeated tool calls with same parameters</span>
                   </label>
-                  <label className="flex items-center gap-3">
-                    <input type="checkbox" defaultChecked className="rounded" />
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded border-border" />
                     <span className="text-sm">Auto-terminate after 3 identical calls</span>
                   </label>
-                  <label className="flex items-center gap-3">
-                    <input type="checkbox" defaultChecked className="rounded" />
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded border-border" />
                     <span className="text-sm">Log suspected infinite loops</span>
+                  </label>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BrainLine className="h-4 w-4" />
+                    Content Safety
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" defaultChecked className="rounded border-border" />
+                    <span className="text-sm">Enable content moderation</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" className="rounded border-border" />
+                    <span className="text-sm">Block sensitive data in tool outputs</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" className="rounded border-border" />
+                    <span className="text-sm">Require human approval for certain actions</span>
                   </label>
                 </CardContent>
               </Card>
