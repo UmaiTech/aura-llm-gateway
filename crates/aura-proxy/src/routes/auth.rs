@@ -570,9 +570,9 @@ pub struct ListApiKeysResponse {
 )]
 pub async fn list_api_keys(
     State(state): State<AppState>,
-    // TODO: Extract user from auth context
+    request: Request<Body>,
 ) -> Result<Json<ListApiKeysResponse>, (StatusCode, Json<AuthError>)> {
-    let _pool = state.db_pool().ok_or_else(|| {
+    let pool = state.db_pool().ok_or_else(|| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(AuthError {
@@ -584,10 +584,47 @@ pub async fn list_api_keys(
         )
     })?;
 
-    // TODO: Filter by user_id from auth context
-    // For now, return empty list if no user context
-    let keys: Vec<ApiKeyInfo> = vec![];
+    // Extract auth context from request extensions (set by auth middleware)
+    let auth_context = request.extensions().get::<AuthContext>().cloned();
 
+    let keys = if let Some(auth) = &auth_context {
+        // If the key is scoped to an organization, list org keys
+        if let Some(org_id) = auth.tenant.organization_id {
+            ApiKeyRepo::get_by_organization(pool, org_id)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(AuthError {
+                            error: AuthErrorInner {
+                                code: "list_failed".to_string(),
+                                message: format!("Failed to list API keys: {}", e),
+                            },
+                        }),
+                    )
+                })?
+        } else if let Some(ref user_id) = auth.user_id {
+            // Otherwise filter by user
+            ApiKeyRepo::get_by_user(pool, user_id).await.map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthError {
+                        error: AuthErrorInner {
+                            code: "list_failed".to_string(),
+                            message: format!("Failed to list API keys: {}", e),
+                        },
+                    }),
+                )
+            })?
+        } else {
+            vec![]
+        }
+    } else {
+        // No auth context (dev mode) - return empty
+        vec![]
+    };
+
+    let keys: Vec<ApiKeyInfo> = keys.into_iter().map(ApiKeyInfo::from).collect();
     Ok(Json(ListApiKeysResponse { keys }))
 }
 
