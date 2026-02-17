@@ -833,3 +833,104 @@ impl NewFeedbackSample {
         self
     }
 }
+
+// ============================================================================
+// Harness Models
+// ============================================================================
+
+/// A system prompt in the harness prompt library
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct HarnessPrompt {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub content: String,
+    pub version: i32,
+    pub is_active: bool,
+    pub tags: Vec<String>,
+    pub category: Option<String>,
+    pub use_count: i64,
+    pub organization_id: Option<Uuid>,
+    pub created_by: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Request to create a new harness prompt
+#[derive(Debug, Deserialize)]
+pub struct NewHarnessPrompt {
+    pub name: String,
+    pub description: Option<String>,
+    pub content: String,
+    pub tags: Option<Vec<String>>,
+    pub category: Option<String>,
+    pub organization_id: Option<Uuid>,
+    pub created_by: Option<String>,
+}
+
+/// Request to update an existing harness prompt
+#[derive(Debug, Deserialize)]
+pub struct UpdateHarnessPrompt {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub content: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub category: Option<String>,
+    pub is_active: Option<bool>,
+    pub change_note: Option<String>,
+}
+
+/// A version record for a harness prompt
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct HarnessPromptVersion {
+    pub id: Uuid,
+    pub prompt_id: Uuid,
+    pub version: i32,
+    pub content: String,
+    pub change_note: Option<String>,
+    pub created_by: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Guardrails configuration for agent execution
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct HarnessGuardrails {
+    pub id: Uuid,
+    pub organization_id: Option<Uuid>,
+    // Execution limits
+    pub max_tool_calls: i32,
+    pub max_execution_time_secs: i32,
+    pub max_tokens: i32,
+    pub max_cost_usd: f64,
+    // Loop detection
+    pub detect_repeated_calls: bool,
+    pub auto_terminate_loops: bool,
+    pub max_identical_calls: i32,
+    pub log_suspected_loops: bool,
+    // Content safety
+    pub enable_content_moderation: bool,
+    pub block_sensitive_data: bool,
+    pub require_human_approval: bool,
+    // Timestamps
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Request to update guardrails configuration
+#[derive(Debug, Deserialize)]
+pub struct UpdateHarnessGuardrails {
+    // Execution limits
+    pub max_tool_calls: Option<i32>,
+    pub max_execution_time_secs: Option<i32>,
+    pub max_tokens: Option<i32>,
+    pub max_cost_usd: Option<f64>,
+    // Loop detection
+    pub detect_repeated_calls: Option<bool>,
+    pub auto_terminate_loops: Option<bool>,
+    pub max_identical_calls: Option<i32>,
+    pub log_suspected_loops: Option<bool>,
+    // Content safety
+    pub enable_content_moderation: Option<bool>,
+    pub block_sensitive_data: Option<bool>,
+    pub require_human_approval: Option<bool>,
+}

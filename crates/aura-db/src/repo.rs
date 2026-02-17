@@ -1991,3 +1991,277 @@ pub struct FeedbackSampleStats {
     pub rejected: u64,
     pub total_uses: u64,
 }
+
+// ============================================================================
+// Harness Prompt Repository
+// ============================================================================
+
+pub struct HarnessPromptRepo;
+
+impl HarnessPromptRepo {
+    /// List all prompts, optionally filtered by organization
+    pub async fn list(
+        pool: &DbPool,
+        org_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<HarnessPrompt>, DbError> {
+        let prompts = if let Some(org_id) = org_id {
+            sqlx::query_as::<_, HarnessPrompt>(
+                r#"
+                SELECT * FROM harness_prompts
+                WHERE organization_id = $1
+                ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(org_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, HarnessPrompt>(
+                r#"
+                SELECT * FROM harness_prompts
+                ORDER BY updated_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+            )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?
+        };
+
+        Ok(prompts)
+    }
+
+    /// Get a single prompt by ID
+    pub async fn get_by_id(pool: &DbPool, id: Uuid) -> Result<Option<HarnessPrompt>, DbError> {
+        let prompt =
+            sqlx::query_as::<_, HarnessPrompt>("SELECT * FROM harness_prompts WHERE id = $1")
+                .bind(id)
+                .fetch_optional(pool)
+                .await?;
+
+        Ok(prompt)
+    }
+
+    /// Create a new prompt
+    pub async fn create(pool: &DbPool, new: NewHarnessPrompt) -> Result<HarnessPrompt, DbError> {
+        let tags = new.tags.unwrap_or_default();
+        let prompt = sqlx::query_as::<_, HarnessPrompt>(
+            r#"
+            INSERT INTO harness_prompts (name, description, content, tags, category, organization_id, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+            "#,
+        )
+        .bind(&new.name)
+        .bind(&new.description)
+        .bind(&new.content)
+        .bind(&tags)
+        .bind(&new.category)
+        .bind(new.organization_id)
+        .bind(&new.created_by)
+        .fetch_one(pool)
+        .await?;
+
+        // Insert initial version
+        sqlx::query(
+            r#"
+            INSERT INTO harness_prompt_versions (prompt_id, version, content, change_note, created_by)
+            VALUES ($1, 1, $2, 'Initial version', $3)
+            "#,
+        )
+        .bind(prompt.id)
+        .bind(&prompt.content)
+        .bind(&new.created_by)
+        .execute(pool)
+        .await?;
+
+        Ok(prompt)
+    }
+
+    /// Update a prompt and create a version record
+    pub async fn update(
+        pool: &DbPool,
+        id: Uuid,
+        update: UpdateHarnessPrompt,
+    ) -> Result<Option<HarnessPrompt>, DbError> {
+        // Fetch existing to get current version
+        let existing = match Self::get_by_id(pool, id).await? {
+            Some(p) => p,
+            None => return Ok(None),
+        };
+
+        let new_version = if update.content.is_some() {
+            existing.version + 1
+        } else {
+            existing.version
+        };
+
+        let prompt = sqlx::query_as::<_, HarnessPrompt>(
+            r#"
+            UPDATE harness_prompts SET
+                name = COALESCE($2, name),
+                description = COALESCE($3, description),
+                content = COALESCE($4, content),
+                tags = COALESCE($5, tags),
+                category = COALESCE($6, category),
+                is_active = COALESCE($7, is_active),
+                version = $8,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            "#,
+        )
+        .bind(id)
+        .bind(&update.name)
+        .bind(&update.description)
+        .bind(&update.content)
+        .bind(&update.tags)
+        .bind(&update.category)
+        .bind(update.is_active)
+        .bind(new_version)
+        .fetch_optional(pool)
+        .await?;
+
+        // If content changed, record a version
+        if let (Some(ref prompt), Some(ref new_content)) = (&prompt, &update.content) {
+            sqlx::query(
+                r#"
+                INSERT INTO harness_prompt_versions (prompt_id, version, content, change_note)
+                VALUES ($1, $2, $3, $4)
+                "#,
+            )
+            .bind(prompt.id)
+            .bind(new_version)
+            .bind(new_content)
+            .bind(&update.change_note)
+            .execute(pool)
+            .await?;
+        }
+
+        Ok(prompt)
+    }
+
+    /// Delete a prompt
+    pub async fn delete(pool: &DbPool, id: Uuid) -> Result<bool, DbError> {
+        let result = sqlx::query("DELETE FROM harness_prompts WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Get version history for a prompt
+    pub async fn get_versions(
+        pool: &DbPool,
+        prompt_id: Uuid,
+    ) -> Result<Vec<HarnessPromptVersion>, DbError> {
+        let versions = sqlx::query_as::<_, HarnessPromptVersion>(
+            r#"
+            SELECT * FROM harness_prompt_versions
+            WHERE prompt_id = $1
+            ORDER BY version DESC
+            "#,
+        )
+        .bind(prompt_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(versions)
+    }
+
+    /// Increment use count
+    pub async fn increment_use_count(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
+        sqlx::query("UPDATE harness_prompts SET use_count = use_count + 1 WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Harness Guardrails Repository
+// ============================================================================
+
+pub struct HarnessGuardrailsRepo;
+
+impl HarnessGuardrailsRepo {
+    /// Get guardrails for an organization (or global if org_id is None)
+    pub async fn get(
+        pool: &DbPool,
+        org_id: Option<Uuid>,
+    ) -> Result<Option<HarnessGuardrails>, DbError> {
+        let guardrails = if let Some(org_id) = org_id {
+            sqlx::query_as::<_, HarnessGuardrails>(
+                "SELECT * FROM harness_guardrails WHERE organization_id = $1",
+            )
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, HarnessGuardrails>(
+                "SELECT * FROM harness_guardrails WHERE organization_id IS NULL",
+            )
+            .fetch_optional(pool)
+            .await?
+        };
+
+        Ok(guardrails)
+    }
+
+    /// Upsert guardrails configuration
+    pub async fn upsert(
+        pool: &DbPool,
+        org_id: Option<Uuid>,
+        update: UpdateHarnessGuardrails,
+    ) -> Result<HarnessGuardrails, DbError> {
+        let guardrails = sqlx::query_as::<_, HarnessGuardrails>(
+            r#"
+            INSERT INTO harness_guardrails (
+                organization_id,
+                max_tool_calls, max_execution_time_secs, max_tokens, max_cost_usd,
+                detect_repeated_calls, auto_terminate_loops, max_identical_calls, log_suspected_loops,
+                enable_content_moderation, block_sensitive_data, require_human_approval
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (organization_id) DO UPDATE SET
+                max_tool_calls = COALESCE($2, harness_guardrails.max_tool_calls),
+                max_execution_time_secs = COALESCE($3, harness_guardrails.max_execution_time_secs),
+                max_tokens = COALESCE($4, harness_guardrails.max_tokens),
+                max_cost_usd = COALESCE($5, harness_guardrails.max_cost_usd),
+                detect_repeated_calls = COALESCE($6, harness_guardrails.detect_repeated_calls),
+                auto_terminate_loops = COALESCE($7, harness_guardrails.auto_terminate_loops),
+                max_identical_calls = COALESCE($8, harness_guardrails.max_identical_calls),
+                log_suspected_loops = COALESCE($9, harness_guardrails.log_suspected_loops),
+                enable_content_moderation = COALESCE($10, harness_guardrails.enable_content_moderation),
+                block_sensitive_data = COALESCE($11, harness_guardrails.block_sensitive_data),
+                require_human_approval = COALESCE($12, harness_guardrails.require_human_approval),
+                updated_at = NOW()
+            RETURNING *
+            "#,
+        )
+        .bind(org_id)
+        .bind(update.max_tool_calls)
+        .bind(update.max_execution_time_secs)
+        .bind(update.max_tokens)
+        .bind(update.max_cost_usd)
+        .bind(update.detect_repeated_calls)
+        .bind(update.auto_terminate_loops)
+        .bind(update.max_identical_calls)
+        .bind(update.log_suspected_loops)
+        .bind(update.enable_content_moderation)
+        .bind(update.block_sensitive_data)
+        .bind(update.require_human_approval)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(guardrails)
+    }
+}

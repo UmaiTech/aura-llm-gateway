@@ -56,6 +56,29 @@ pub fn router() -> Router<AppState> {
         .route("/admin/end-users", get(list_end_users))
         // Providers (full detail)
         .route("/admin/providers", get(list_providers))
+        // Harness - Traces
+        .route("/admin/harness/traces", get(list_harness_traces))
+        .route("/admin/harness/traces/{id}", get(get_harness_trace))
+        // Harness - Prompts
+        .route(
+            "/admin/harness/prompts",
+            get(list_harness_prompts).post(create_harness_prompt),
+        )
+        .route(
+            "/admin/harness/prompts/{id}",
+            get(get_harness_prompt)
+                .put(update_harness_prompt)
+                .delete(delete_harness_prompt),
+        )
+        .route(
+            "/admin/harness/prompts/{id}/history",
+            get(get_harness_prompt_history),
+        )
+        // Harness - Guardrails
+        .route(
+            "/admin/harness/guardrails",
+            get(get_harness_guardrails).put(update_harness_guardrails),
+        )
 }
 
 // ============================================================================
@@ -1707,4 +1730,621 @@ async fn get_token_timeline(
         .collect();
 
     Ok(Json(timeline))
+}
+
+// ============================================================================
+// Harness - Traces
+// ============================================================================
+
+/// Trace summary for the harness traces list
+#[derive(Debug, Serialize)]
+pub struct HarnessTrace {
+    pub id: String,
+    pub session_id: String,
+    pub status: String,
+    pub provider: String,
+    pub model: String,
+    pub total_latency_ms: i32,
+    pub total_cost: f64,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub has_tool_calls: bool,
+    pub tool_calls_count: i32,
+    pub tools_used: Vec<String>,
+    pub has_reasoning: bool,
+    pub created_at: String,
+}
+
+/// Detailed trace with execution steps
+#[derive(Debug, Serialize)]
+pub struct HarnessTraceDetail {
+    #[serde(flatten)]
+    pub trace: HarnessTrace,
+    pub tool_calls_data: serde_json::Value,
+    pub full_metadata: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TracesQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub has_tool_calls: Option<bool>,
+    pub status: Option<String>,
+}
+
+/// List agent traces (requests with agentic metadata)
+async fn list_harness_traces(
+    State(state): State<AppState>,
+    Query(params): Query<TracesQuery>,
+) -> Result<Json<Vec<HarnessTrace>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+    let limit = params.limit.unwrap_or(50).min(200);
+    let offset = params.offset.unwrap_or(0);
+
+    let mut query = String::from(
+        r#"
+        SELECT
+            id, response_id, provider_name, model_id,
+            input_tokens, output_tokens, cost_usd, latency_ms, status,
+            COALESCE(reasoning_tokens, 0) > 0 as has_reasoning,
+            COALESCE((metadata->'aura'->'agentic'->>'has_tool_calls')::BOOLEAN, false) as has_tool_calls,
+            COALESCE((metadata->'aura'->'agentic'->>'tool_calls_count')::INT, 0) as tool_calls_count,
+            metadata->'aura'->'agentic'->'tools_used' as tools_used,
+            created_at
+        FROM request_logs
+        WHERE 1=1
+        "#,
+    );
+
+    if let Some(true) = params.has_tool_calls {
+        query.push_str(
+            " AND COALESCE((metadata->'aura'->'agentic'->>'has_tool_calls')::BOOLEAN, false) = true",
+        );
+    } else if let Some(false) = params.has_tool_calls {
+        query.push_str(
+            " AND COALESCE((metadata->'aura'->'agentic'->>'has_tool_calls')::BOOLEAN, false) = false",
+        );
+    }
+
+    if let Some(ref status) = params.status {
+        query.push_str(&format!(" AND status = '{}'", status.replace('\'', "''")));
+    }
+
+    query.push_str(&format!(
+        " ORDER BY created_at DESC LIMIT {} OFFSET {}",
+        limit, offset
+    ));
+
+    let rows = sqlx::query(&query)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+    let traces: Vec<HarnessTrace> = rows
+        .iter()
+        .map(|row| {
+            let tools_used_json: Option<serde_json::Value> = row.try_get("tools_used").ok();
+            let tools_used: Vec<String> = tools_used_json
+                .and_then(|v| serde_json::from_value(v).ok())
+                .unwrap_or_default();
+            let created_at: DateTime<Utc> =
+                row.try_get("created_at").unwrap_or_else(|_| Utc::now());
+
+            HarnessTrace {
+                id: row
+                    .try_get::<Uuid, _>("id")
+                    .map(|u| u.to_string())
+                    .unwrap_or_default(),
+                session_id: row.try_get::<String, _>("response_id").unwrap_or_default(),
+                status: row.try_get("status").unwrap_or_default(),
+                provider: row.try_get("provider_name").unwrap_or_default(),
+                model: row.try_get("model_id").unwrap_or_default(),
+                total_latency_ms: row.try_get("latency_ms").unwrap_or(0),
+                total_cost: row.try_get("cost_usd").unwrap_or(0.0),
+                input_tokens: row.try_get("input_tokens").unwrap_or(0),
+                output_tokens: row.try_get("output_tokens").unwrap_or(0),
+                has_tool_calls: row.try_get("has_tool_calls").unwrap_or(false),
+                tool_calls_count: row.try_get("tool_calls_count").unwrap_or(0),
+                tools_used,
+                has_reasoning: row.try_get("has_reasoning").unwrap_or(false),
+                created_at: created_at.to_rfc3339(),
+            }
+        })
+        .collect();
+
+    Ok(Json(traces))
+}
+
+/// Get a single trace with full execution details
+async fn get_harness_trace(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<Json<HarnessTraceDetail>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let row = sqlx::query(
+        r#"
+        SELECT
+            id, response_id, provider_name, model_id,
+            input_tokens, output_tokens, cost_usd, latency_ms, status,
+            COALESCE(reasoning_tokens, 0) > 0 as has_reasoning,
+            COALESCE((metadata->'aura'->'agentic'->>'has_tool_calls')::BOOLEAN, false) as has_tool_calls,
+            COALESCE((metadata->'aura'->'agentic'->>'tool_calls_count')::INT, 0) as tool_calls_count,
+            metadata->'aura'->'agentic'->'tools_used' as tools_used,
+            COALESCE(metadata->'aura'->'agentic'->'tool_calls_data', '[]'::jsonb) as tool_calls_data,
+            COALESCE(metadata, '{}'::jsonb) as full_metadata,
+            created_at
+        FROM request_logs
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch trace: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
+
+    let row = row.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Trace not found"})),
+        )
+    })?;
+
+    let tools_used_json: Option<serde_json::Value> = row.try_get("tools_used").ok();
+    let tools_used: Vec<String> = tools_used_json
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
+    let created_at: DateTime<Utc> = row.try_get("created_at").unwrap_or_else(|_| Utc::now());
+
+    let trace = HarnessTrace {
+        id: row
+            .try_get::<Uuid, _>("id")
+            .map(|u| u.to_string())
+            .unwrap_or_default(),
+        session_id: row.try_get::<String, _>("response_id").unwrap_or_default(),
+        status: row.try_get("status").unwrap_or_default(),
+        provider: row.try_get("provider_name").unwrap_or_default(),
+        model: row.try_get("model_id").unwrap_or_default(),
+        total_latency_ms: row.try_get("latency_ms").unwrap_or(0),
+        total_cost: row.try_get("cost_usd").unwrap_or(0.0),
+        input_tokens: row.try_get("input_tokens").unwrap_or(0),
+        output_tokens: row.try_get("output_tokens").unwrap_or(0),
+        has_tool_calls: row.try_get("has_tool_calls").unwrap_or(false),
+        tool_calls_count: row.try_get("tool_calls_count").unwrap_or(0),
+        tools_used,
+        has_reasoning: row.try_get("has_reasoning").unwrap_or(false),
+        created_at: created_at.to_rfc3339(),
+    };
+
+    Ok(Json(HarnessTraceDetail {
+        trace,
+        tool_calls_data: row
+            .try_get("tool_calls_data")
+            .unwrap_or(serde_json::json!([])),
+        full_metadata: row
+            .try_get("full_metadata")
+            .unwrap_or(serde_json::json!({})),
+    }))
+}
+
+// ============================================================================
+// Harness - Prompts
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct PromptsQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// List all prompts in the library
+async fn list_harness_prompts(
+    State(state): State<AppState>,
+    Query(params): Query<PromptsQuery>,
+) -> Result<Json<Vec<aura_db::HarnessPrompt>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+    let limit = params.limit.unwrap_or(50).min(200);
+    let offset = params.offset.unwrap_or(0);
+
+    let prompts = aura_db::HarnessPromptRepo::list(pool, None, limit, offset)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to list prompts: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    Ok(Json(prompts))
+}
+
+/// Get a single prompt by ID
+async fn get_harness_prompt(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<Json<aura_db::HarnessPrompt>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let prompt = aura_db::HarnessPromptRepo::get_by_id(pool, id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get prompt: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Prompt not found"})),
+            )
+        })?;
+
+    Ok(Json(prompt))
+}
+
+/// Create a new prompt
+async fn create_harness_prompt(
+    State(state): State<AppState>,
+    Json(req): Json<aura_db::NewHarnessPrompt>,
+) -> Result<(StatusCode, Json<aura_db::HarnessPrompt>), (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let prompt = aura_db::HarnessPromptRepo::create(pool, req)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create prompt: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    Ok((StatusCode::CREATED, Json(prompt)))
+}
+
+/// Update a prompt
+async fn update_harness_prompt(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+    Json(req): Json<aura_db::UpdateHarnessPrompt>,
+) -> Result<Json<aura_db::HarnessPrompt>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let prompt = aura_db::HarnessPromptRepo::update(pool, id, req)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to update prompt: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Prompt not found"})),
+            )
+        })?;
+
+    Ok(Json(prompt))
+}
+
+/// Delete a prompt
+async fn delete_harness_prompt(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let deleted = aura_db::HarnessPromptRepo::delete(pool, id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to delete prompt: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Prompt not found"})),
+        ))
+    }
+}
+
+/// Get version history for a prompt
+async fn get_harness_prompt_history(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<Json<Vec<aura_db::HarnessPromptVersion>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let versions = aura_db::HarnessPromptRepo::get_versions(pool, id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get prompt history: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    Ok(Json(versions))
+}
+
+// ============================================================================
+// Harness - Guardrails
+// ============================================================================
+
+/// Get current guardrails configuration
+async fn get_harness_guardrails(
+    State(state): State<AppState>,
+) -> Result<Json<aura_db::HarnessGuardrails>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    // Try to get existing config; if none, return defaults
+    match aura_db::HarnessGuardrailsRepo::get(pool, None).await {
+        Ok(Some(guardrails)) => Ok(Json(guardrails)),
+        Ok(None) => {
+            // Return sensible defaults without persisting
+            Ok(Json(aura_db::HarnessGuardrails {
+                id: Uuid::nil(),
+                organization_id: None,
+                max_tool_calls: 10,
+                max_execution_time_secs: 60,
+                max_tokens: 8000,
+                max_cost_usd: 1.00,
+                detect_repeated_calls: true,
+                auto_terminate_loops: true,
+                max_identical_calls: 3,
+                log_suspected_loops: true,
+                enable_content_moderation: true,
+                block_sensitive_data: false,
+                require_human_approval: false,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }))
+        }
+        Err(e) => {
+            tracing::error!("Failed to get guardrails: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            ))
+        }
+    }
+}
+
+/// Update guardrails configuration (upsert)
+async fn update_harness_guardrails(
+    State(state): State<AppState>,
+    Json(req): Json<aura_db::UpdateHarnessGuardrails>,
+) -> Result<Json<aura_db::HarnessGuardrails>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = state.db_pool().ok_or_else(db_unavailable)?;
+
+    let guardrails = aura_db::HarnessGuardrailsRepo::upsert(pool, None, req)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to update guardrails: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    Ok(Json(guardrails))
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tower::ServiceExt;
+
+    fn test_state() -> AppState {
+        let config = aura_core::Config::default();
+        AppState::new(config, None, None)
+    }
+
+    #[tokio::test]
+    async fn test_harness_traces_returns_503_without_db() {
+        let app = router().with_state(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/harness/traces")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_harness_prompts_returns_503_without_db() {
+        let app = router().with_state(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/harness/prompts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_harness_guardrails_returns_503_without_db() {
+        let app = router().with_state(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/harness/guardrails")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_harness_prompt_create_returns_503_without_db() {
+        let app = router().with_state(test_state());
+        let body = serde_json::json!({
+            "name": "Test Prompt",
+            "content": "You are a helpful assistant."
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/harness/prompts")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_harness_guardrails_put_returns_503_without_db() {
+        let app = router().with_state(test_state());
+        let body = serde_json::json!({
+            "max_tool_calls": 5,
+            "max_cost_usd": 0.50
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/admin/harness/guardrails")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn test_routing_rules_returns_mock_data() {
+        let app = router().with_state(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/routing/rules")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_harness_trace_serialization() {
+        let trace = HarnessTrace {
+            id: "test-id".to_string(),
+            session_id: "resp_123".to_string(),
+            status: "completed".to_string(),
+            provider: "openai".to_string(),
+            model: "gpt-4o".to_string(),
+            total_latency_ms: 523,
+            total_cost: 0.0012,
+            input_tokens: 150,
+            output_tokens: 80,
+            has_tool_calls: true,
+            tool_calls_count: 2,
+            tools_used: vec!["web_search".to_string(), "calculate".to_string()],
+            has_reasoning: false,
+            created_at: "2026-02-17T00:00:00Z".to_string(),
+        };
+
+        let json = serde_json::to_value(&trace).unwrap();
+        assert_eq!(json["provider"], "openai");
+        assert_eq!(json["tool_calls_count"], 2);
+        assert_eq!(json["tools_used"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_guardrails_defaults_serialization() {
+        let guardrails = aura_db::HarnessGuardrails {
+            id: Uuid::nil(),
+            organization_id: None,
+            max_tool_calls: 10,
+            max_execution_time_secs: 60,
+            max_tokens: 8000,
+            max_cost_usd: 1.00,
+            detect_repeated_calls: true,
+            auto_terminate_loops: true,
+            max_identical_calls: 3,
+            log_suspected_loops: true,
+            enable_content_moderation: true,
+            block_sensitive_data: false,
+            require_human_approval: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let json = serde_json::to_value(&guardrails).unwrap();
+        assert_eq!(json["max_tool_calls"], 10);
+        assert_eq!(json["max_cost_usd"], 1.0);
+        assert!(json["detect_repeated_calls"].as_bool().unwrap());
+        assert!(!json["block_sensitive_data"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn test_new_prompt_deserialization() {
+        let json = serde_json::json!({
+            "name": "Customer Support",
+            "content": "You are a helpful support agent.",
+            "tags": ["support", "production"],
+            "category": "support"
+        });
+
+        let prompt: aura_db::NewHarnessPrompt = serde_json::from_value(json).unwrap();
+        assert_eq!(prompt.name, "Customer Support");
+        assert_eq!(prompt.tags.unwrap().len(), 2);
+        assert_eq!(prompt.category.unwrap(), "support");
+    }
+
+    #[test]
+    fn test_update_guardrails_deserialization() {
+        let json = serde_json::json!({
+            "max_tool_calls": 5,
+            "max_cost_usd": 0.50,
+            "enable_content_moderation": false
+        });
+
+        let update: aura_db::UpdateHarnessGuardrails = serde_json::from_value(json).unwrap();
+        assert_eq!(update.max_tool_calls.unwrap(), 5);
+        assert_eq!(update.max_cost_usd.unwrap(), 0.50);
+        assert!(!update.enable_content_moderation.unwrap());
+        assert!(update.max_tokens.is_none());
+    }
 }
