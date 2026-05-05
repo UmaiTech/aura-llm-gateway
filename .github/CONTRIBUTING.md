@@ -195,10 +195,14 @@ Releases are automated via `release-plz`:
 - **Questions**: Open a [Discussion](https://github.com/UmaiTech/aura-llm-gateway/discussions)
 - **Bugs**: Open an [Issue](https://github.com/UmaiTech/aura-llm-gateway/issues/new?template=bug_report.md)
 - **Features**: Open an [Issue](https://github.com/UmaiTech/aura-llm-gateway/issues/new?template=feature_request.md)
+- **Security issues**: Please follow [SECURITY.md](../SECURITY.md) — do not open a public issue
 
 ## Code of Conduct
 
-Be respectful, inclusive, and collaborative. We're all here to build great software together.
+This project follows the [Contributor Covenant](https://www.contributor-covenant.org)
+version 2.1. All contributors and community participants are expected to
+abide by it. See [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) for the full
+text and reporting instructions.
 
 ## License
 
