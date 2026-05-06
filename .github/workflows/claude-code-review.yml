@@ -11,7 +11,11 @@ on:
 
 jobs:
   claude-review:
-    # Only run when 'claude-review' label is added or via manual dispatch
+    # Safety model: the only way to trigger this workflow on a contributor's
+    # PR is for someone with write access to add the `claude-review` label.
+    # GitHub restricts label management to users with `triage` or higher
+    # permission, so fork PRs from outside contributors cannot self-trigger
+    # a run that consumes our Claude OAuth token.
     if: |
       github.event_name == 'workflow_dispatch' ||
       github.event.label.name == 'claude-review'

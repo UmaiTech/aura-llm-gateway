@@ -4,7 +4,7 @@
 [![Python SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml)
 [![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway?include_prereleases&label=release)](https://github.com/UmaiTech/aura-llm-gateway/releases)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/UmaiTech/aura-llm-gateway)
+[![Version](https://img.shields.io/badge/version-0.3.1-blue)](https://github.com/UmaiTech/aura-llm-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](Dockerfile)
@@ -17,6 +17,13 @@
 </p>
 
 A high-performance, production-ready LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
+
+> [!WARNING]
+> **Pre-1.0 software.** Aura is under active development. Public APIs, the
+> database schema, and the configuration format may still change between
+> minor releases (`0.x` → `0.y`) without a formal deprecation cycle. Pin to
+> exact versions in production and review the [CHANGELOG](CHANGELOG.md)
+> before upgrading. The API will stabilize at `1.0`.
 
 ## Overview
 
@@ -415,6 +422,12 @@ The TypeScript/JavaScript SDK is planned for a future release.
 
 ## Contributing
 
+We welcome contributions! Please read these documents before getting started:
+
+- [CONTRIBUTING.md](.github/CONTRIBUTING.md) — development setup, commit conventions, PR process
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards (Contributor Covenant 2.1)
+- [CLAUDE.md](CLAUDE.md) — project conventions and architecture notes
+
 We use [Conventional Commits](https://www.conventionalcommits.org/) for automated changelog generation and semantic versioning.
 
 Example commit messages:
@@ -424,11 +437,17 @@ fix(auth): resolve API key validation issue
 docs: update installation instructions
 ```
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed contribution guidelines and [CLAUDE.md](CLAUDE.md) for development conventions.
+## Security
+
+If you believe you have found a security issue, please **do not** open a public
+GitHub issue. See [SECURITY.md](SECURITY.md) for our reporting process and
+disclosure policy.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for the full text. By contributing to
+this project you agree that your contributions will be licensed under the
+same terms.
 
 ## Links
 
