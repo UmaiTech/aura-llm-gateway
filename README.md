@@ -18,6 +18,13 @@
 
 A high-performance, production-ready LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
 
+> [!WARNING]
+> **Pre-1.0 software.** Aura is under active development. Public APIs, the
+> database schema, and the configuration format may still change between
+> minor releases (`0.x` → `0.y`) without a formal deprecation cycle. Pin to
+> exact versions in production and review the [CHANGELOG](CHANGELOG.md)
+> before upgrading. The API will stabilize at `1.0`.
+
 ## Overview
 
 Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI, Anthropic, Google) with built-in load balancing, cost tracking, caching, and observability. It's designed for production deployments requiring high throughput, low latency, and enterprise-grade reliability.

@@ -1,0 +1,21 @@
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+#
+# The Sponsor button will appear once GitHub Sponsors is enabled for the
+# UmaiTech organization. Until then this file is harmless — GitHub simply
+# does not render the button.
+
+github: [UmaiTech]
+
+# Other supported platforms (uncomment and fill in if you set them up):
+# patreon: # Patreon username
+# open_collective: # Open Collective username
+# ko_fi: # Ko-fi username
+# tidelift: # Tidelift platform-name/package-name
+# community_bridge: # Community Bridge project name
+# liberapay: # Liberapay username
+# issuehunt: # IssueHunt username
+# lfx_crowdfunding: # LFX Crowdfunding project name
+# polar: # Polar username
+# buy_me_a_coffee: # Buy Me a Coffee username
+# thanks_dev: # thanks.dev username
+# custom: ['https://example.com/donate']
