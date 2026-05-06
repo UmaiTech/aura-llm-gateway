@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap will be added once a generator is wired up.
+# Sitemap: https://example.com/sitemap.xml

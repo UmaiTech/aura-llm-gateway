@@ -452,6 +452,7 @@ same terms.
 ## Links
 
 - [Open Responses API Specification](https://www.openresponses.org/specification)
+- [Deployment Guide (Vercel)](docs/DEPLOYMENT.md)
 - [Python SDK Documentation](sdks/python/README.md)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Admin App Plan](docs/ADMIN_APP_PLAN.md)

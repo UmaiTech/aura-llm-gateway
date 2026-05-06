@@ -82,6 +82,9 @@ node_modules/
 dist/
 .turbo/
 
+# Vercel CLI artifacts (created by `vercel link`)
+.vercel/
+
 # Lock files for tools
 package-lock.json
 yarn.lock
