@@ -11,6 +11,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/roadmap" element={<RoadmapPage />} />
         <Route path="/docs/roadmap" element={<RoadmapPage />} />
         <Route path="/docs/*" element={<DocsPage />} />
       </Routes>
