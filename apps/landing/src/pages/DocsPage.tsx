@@ -8,7 +8,7 @@ import mermaid from 'mermaid'
 import {
   BookOpen, Zap, Server, Code2, Settings,
   ChevronRight, ChevronLeft, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
-  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical, Home
+  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical, Home, Rocket
 } from 'lucide-react'
 import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
 
@@ -94,7 +94,6 @@ const docSections = [
       { title: 'Quickstart', path: '/docs/quickstart', icon: Zap },
       { title: 'Configuration', path: '/docs/configuration', icon: Settings },
       { title: 'Deployment', path: '/docs/deployment', icon: Server },
-      { title: 'Roadmap', path: '/docs/roadmap', icon: Zap },
     ],
   },
   {
@@ -162,6 +161,12 @@ const docSections = [
     title: 'Concepts',
     items: [
       { title: 'Open Responses API', path: '/docs/concepts/open-responses', icon: BookOpen },
+    ],
+  },
+  {
+    title: 'Project',
+    items: [
+      { title: 'Roadmap', path: '/roadmap', icon: Rocket, standalone: true },
     ],
   },
 ]
@@ -578,7 +583,8 @@ export function DocsPage() {
                 <ul className="space-y-1">
                   {section.items.map((item) => {
                     const isActive = currentPath === item.path
-                    const itemHasContent = hasContent(item.path)
+                    const isStandalone = 'standalone' in item && item.standalone
+                    const itemHasContent = isStandalone || hasContent(item.path)
                     const isExternal = 'external' in item && item.external
 
                     if (isExternal) {

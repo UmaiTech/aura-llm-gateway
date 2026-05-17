@@ -80,6 +80,9 @@ export default function App() {
               <a href="/docs" className="text-gray-400 hover:text-white transition-colors">
                 Docs
               </a>
+              <a href="/roadmap" className="text-gray-400 hover:text-white transition-colors">
+                Roadmap
+              </a>
               <a href="http://localhost:3000" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1">
                 Playground
                 <ExternalLink className="h-3.5 w-3.5" />
