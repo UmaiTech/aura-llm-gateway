@@ -54,6 +54,14 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "playground.aura-llm.dev" }],
+      "destination": "/chat",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!playground/).*)",
