@@ -26,7 +26,7 @@ Every response includes Aura-specific metadata:
   "metadata": {
     "aura": {
       "request_id": "aura_550e8400-e29b-41d4-a716-446655440000",
-      "model": "gpt-4o",
+      "model": "gpt-5.4-mini",
       "provider": "openai",
       "gateway_version": "0.1.7",
       "latency_ms": 523,
@@ -110,8 +110,8 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 | gpt-4.1 | $2.00 | $8.00 | $0.50 |
 | gpt-4.1-mini | $0.40 | $1.60 | $0.10 |
 | gpt-4.1-nano | $0.10 | $0.40 | $0.025 |
-| gpt-4o | $2.50 | $10.00 | $1.25 |
-| gpt-4o-mini | $0.15 | $0.60 | $0.075 |
+| gpt-5.4-mini | $2.50 | $10.00 | $1.25 |
+| gpt-5.4-nano | $0.15 | $0.60 | $0.075 |
 | o1 | $15.00 | $60.00 | $7.50 |
 | o1-pro | $150.00 | $600.00 | $75.00 |
 | o3 | $2.00 | $8.00 | $1.00 |
@@ -125,7 +125,7 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 | claude-opus-4-5 | $15.00 | $75.00 | $1.50 |
 | claude-sonnet-4-5 | $3.00 | $15.00 | $0.30 |
 | claude-haiku-4-5 | $1.00 | $5.00 | $0.10 |
-| claude-3-5-sonnet | $3.00 | $15.00 | $0.30 |
+| claude-sonnet-4-6 | $3.00 | $15.00 | $0.30 |
 | claude-3-5-haiku | $0.80 | $4.00 | $0.08 |
 | claude-3-opus | $15.00 | $75.00 | $1.50 |
 
@@ -154,7 +154,7 @@ cost = (input_tokens / 1M) * input_price
 
 ## Example
 
-For a request using `gpt-4o-mini` with:
+For a request using `gpt-5.4-nano` with:
 - 1,000 input tokens
 - 500 output tokens
 
@@ -209,7 +209,7 @@ use aura_core::{CostCalculator, ModelPricing};
 
 let mut calculator = CostCalculator::new();
 calculator.set_pricing(
-    "gpt-4o",
+    "gpt-5.4-mini",
     ModelPricing::new(2.00, 8.00)  // Custom rates
 );
 ```

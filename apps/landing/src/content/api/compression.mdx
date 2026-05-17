@@ -28,7 +28,7 @@ Enable compression with auto-selection:
 
 <CodeBlock language="json" title="Request with compression">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -207,7 +207,7 @@ YAML is best for deeply nested configuration objects. For arrays, TOON is more e
 
 <CodeBlock language="json" title="System prompt with AISP">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "instructions": "For all user requests, if the user is authenticated then allow access. If not authenticated, reject with error.",
   "input": [...],
   "compression": {
@@ -228,7 +228,7 @@ The instructions will be converted to:
 
 <CodeBlock language="json" title="RAG context with TOON">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",

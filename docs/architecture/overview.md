@@ -227,7 +227,7 @@ Every response is enriched with Aura-specific metadata:
 ```json
 {
   "id": "resp_abc123",
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "status": "completed",
   "output": [...],
   "usage": {
@@ -238,7 +238,7 @@ Every response is enriched with Aura-specific metadata:
   "metadata": {
     "aura": {
       "request_id": "aura_550e8400-e29b-41d4-a716-446655440000",
-      "model": "gpt-4o",
+      "model": "gpt-5.4-mini",
       "provider": "openai",
       "gateway_version": "0.1.7",
       "latency_ms": 523,
@@ -409,7 +409,7 @@ flowchart TD
     H --> I[Client Response]
 
     B -.- B1["Axum extracts request body"]
-    C -.- C1["model → provider mapping<br/>gpt-4o → OpenAIProvider"]
+    C -.- C1["model → provider mapping<br/>gpt-5.4-mini → OpenAIProvider"]
     D -.- D1["Open Responses → Provider format<br/>Add auth headers, format messages"]
     E -.- E1["HTTP request to OpenAI/Anthropic/etc"]
     F -.- F1["Provider format → Open Responses"]

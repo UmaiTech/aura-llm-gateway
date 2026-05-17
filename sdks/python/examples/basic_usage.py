@@ -15,7 +15,7 @@ def simple_completion():
     print("=== Simple Completion ===")
 
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="What is 2 + 2? Answer briefly."
     )
 
@@ -38,7 +38,7 @@ def streaming_completion():
     print("Response: ", end="")
 
     for event in client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="Count from 1 to 5, one number per line.",
         stream=True
     ):
@@ -59,14 +59,14 @@ def conversation_threading():
 
     # First turn
     response1 = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="My favorite color is blue. Remember this."
     )
     print(f"Turn 1: {response1.output_text}")
 
     # Second turn - continues the conversation
     response2 = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="What is my favorite color?",
         previous_response_id=response1.id
     )
@@ -80,7 +80,7 @@ def with_system_instructions():
     print("=== System Instructions ===")
 
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="Hello, how are you?",
         instructions="You are a helpful assistant who responds only in haiku format."
     )

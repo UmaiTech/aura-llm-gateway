@@ -33,7 +33,7 @@ client = AuraClient(
 )
 
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What is the capital of France?"
 )
 print(response.output_text)
@@ -44,7 +44,7 @@ print(response.output_text)
 
 ```python
 for event in client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="Tell me a story",
     stream=True
 ):
@@ -61,7 +61,7 @@ from aura import AsyncAuraClient
 async def main():
     async with AsyncAuraClient() as client:
         response = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             input="Hello!"
         )
         print(response.output_text)
@@ -74,13 +74,13 @@ asyncio.run(main())
 ```python
 # Start a conversation
 response1 = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="My name is Alice."
 )
 
 # Continue with context
 response2 = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What's my name?",
     previous_response_id=response1.id
 )
@@ -107,7 +107,7 @@ weather_tool = Tool.function_tool(
 
 # Request with tools
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What's the weather in Tokyo?",
     tools=[weather_tool]
 )
@@ -122,7 +122,7 @@ if response.has_tool_calls:
 
 ```python
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="Hello!",
     instructions="You are a pirate. Always respond in pirate speak."
 )
@@ -143,7 +143,7 @@ from aura import (
 
 try:
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="Hello"
     )
 except AuthenticationError:
@@ -230,7 +230,7 @@ const client = new AuraClient({
 });
 
 const response = await client.responses.create({
-  model: 'gpt-4o',
+  model: 'gpt-5.4-mini',
   input: 'Hello!',
 });
 

@@ -14,7 +14,7 @@ async def simple_completion():
 
     async with AsyncAuraClient() as client:
         response = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             input="What is the speed of light? Answer in one sentence."
         )
 
@@ -30,7 +30,7 @@ async def streaming_completion():
 
     async with AsyncAuraClient() as client:
         stream = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             input="Tell me a very short story (2-3 sentences) about a cat.",
             stream=True
         )
@@ -54,7 +54,7 @@ async def parallel_requests():
         # Create multiple requests concurrently
         tasks = [
             client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input=f"What is {i} + {i}? Just give the number."
             )
             for i in range(1, 4)

@@ -90,7 +90,7 @@ def tool_calling_example():
 
     # Request that may trigger a tool call
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="What's the weather like in Tokyo?",
         tools=tools
     )
@@ -120,7 +120,7 @@ def multi_tool_example():
     tools = define_tools()
 
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="What's the weather in New York? Also, what is 15 * 7?",
         tools=tools
     )

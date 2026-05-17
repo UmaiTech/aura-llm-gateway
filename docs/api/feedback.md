@@ -96,7 +96,7 @@ curl "http://localhost:8080/v1/feedback?search=python+function"
       "id": "fb_abc123",
       "input": "How do I read a file in Python?",
       "output": "You can use the built-in open() function...",
-      "model_id": "gpt-4o",
+      "model_id": "gpt-5.4-mini",
       "feedback": "approved",
       "reason": "Clear explanation with example",
       "tags": ["helpful", "coding"],
@@ -143,7 +143,7 @@ GET /v1/feedback/{id}
   "id": "fb_abc123",
   "input": "How do I read a file in Python?",
   "output": "You can use the built-in open() function...",
-  "model_id": "gpt-4o",
+  "model_id": "gpt-5.4-mini",
   "feedback": "approved",
   "reason": "Clear explanation with example",
   "tags": ["helpful", "coding"],
@@ -177,7 +177,7 @@ Enable adaptive few-shot in your response request:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "consistency": {
     "strategy": "adaptive_few_shot",
@@ -199,7 +199,7 @@ Enable adaptive few-shot in your response request:
 | `tags` | array | null | Filter examples by tags |
 | `approved_only` | boolean | true | Only use approved samples |
 | `use_selector_model` | boolean | false | Use a smaller model to select relevant examples |
-| `selector_model` | string | null | Model to use for selection (e.g., `gpt-4o-mini`) |
+| `selector_model` | string | null | Model to use for selection (e.g., `gpt-5.4-nano`) |
 
 ## Use Cases
 

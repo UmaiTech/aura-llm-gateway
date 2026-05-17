@@ -72,7 +72,7 @@ class Responses:
         Create a response from the model.
 
         Args:
-            model: The model to use (e.g., "gpt-4o", "claude-3-sonnet")
+            model: The model to use (e.g., "gpt-5.4-mini", "claude-3-sonnet")
             input: The input to the model. Can be:
                 - A string (converted to a user message)
                 - A list of InputMessage objects
@@ -94,21 +94,21 @@ class Responses:
         Example:
             # Simple completion
             response = client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input="What is 2+2?"
             )
             print(response.output_text)
 
             # With tools
             response = client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input="What's the weather in Tokyo?",
                 tools=[weather_tool]
             )
 
             # Streaming
             for event in client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input="Tell me a story",
                 stream=True
             ):
@@ -207,7 +207,7 @@ class AuraClient:
     Example:
         client = AuraClient(api_key="your-key")
         response = client.responses.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             input="Hello, world!"
         )
         print(response.output_text)

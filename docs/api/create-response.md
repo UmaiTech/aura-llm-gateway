@@ -12,7 +12,7 @@ POST /v1/responses
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `model` | string | Yes | Model identifier (e.g., `gpt-4o`, `gpt-4o-mini`) |
+| `model` | string | Yes | Model identifier (e.g., `gpt-5.4-mini`, `gpt-5.4-nano`) |
 | `input` | array | Yes | Array of input items (messages, function outputs) |
 | `instructions` | string | No | System instructions for the model |
 | `stream` | boolean | No | Enable streaming (default: `false`) |
@@ -166,7 +166,7 @@ Reduce token usage with prompt compression:
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "input": [
       {
         "type": "message",
@@ -186,7 +186,7 @@ from aura import AuraClient
 client = AuraClient(base_url="http://localhost:8080")
 
 response = client.responses.create(
-    model="gpt-4o-mini",
+    model="gpt-5.4-nano",
     input="What is 2 + 2?"
 )
 print(response.output_text)  # "2 + 2 equals 4."
@@ -200,7 +200,7 @@ from aura import AsyncAuraClient
 
 async with AsyncAuraClient() as client:
     response = await client.responses.create(
-        model="gpt-4o-mini",
+        model="gpt-5.4-nano",
         input="What is 2 + 2?"
     )
     print(response.output_text)
@@ -213,7 +213,7 @@ async with AsyncAuraClient() as client:
   "id": "resp_oai_chatcmpl-abc123",
   "object": "response",
   "created_at": 1706140800,
-  "model": "gpt-4o-mini",
+  "model": "gpt-5.4-nano",
   "status": "completed",
   "output": [
     {
@@ -354,7 +354,7 @@ When using validation, consistency, and compression, the response metadata inclu
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-5.4-mini",
     "input": [
       {
         "type": "message",
@@ -398,7 +398,7 @@ Submit the tool result to continue:
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-5.4-mini",
     "input": [
       {
         "type": "message",

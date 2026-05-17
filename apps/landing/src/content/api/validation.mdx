@@ -29,7 +29,7 @@ Add validation to any request:
 
 <CodeBlock language="json" title="Request with validation">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -50,7 +50,7 @@ The response includes validation metadata:
 <CodeBlock language="json" title="Response with validation metadata">
 {`{
   "id": "resp_abc123",
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "status": "completed",
   "output": [...],
   "validation": {
@@ -68,7 +68,7 @@ For OpenAI models, you can use token-level log probabilities for precise confide
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "validation": {
     "strategy": "logprobs",
@@ -119,7 +119,7 @@ Generate multiple responses and select the best one:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "validation": {
     "strategy": "best_of_n",
@@ -162,7 +162,7 @@ For reasoning tasks, generate multiple responses and pick the most consistent:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -193,7 +193,7 @@ Reject responses below a confidence threshold:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "validation": {
     "strategy": "confidence_threshold",
@@ -263,7 +263,7 @@ For providers without logprobs, Aura uses heuristic analysis:
 
   # Per-model overrides
   model_overrides:
-    "gpt-4o":
+    "gpt-5.4-mini":
       default_strategy: logprobs
       min_confidence: 0.8
     "claude-sonnet-4":
@@ -276,7 +276,7 @@ Any request can override the default configuration:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "validation": {
     "strategy": "best_of_n",
@@ -323,7 +323,7 @@ For Gemini, best-of-N uses native `candidate_count` which is more efficient than
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [{"type": "message", "role": "user", "content": "What is the LD50 of acetaminophen in mg/kg?"}],
   "validation": {
     "strategy": "logprobs",
@@ -337,7 +337,7 @@ For Gemini, best-of-N uses native `candidate_count` which is more efficient than
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [{"type": "message", "role": "user", "content": "Solve: 3x + 7 = 22"}],
   "validation": {
     "strategy": "self_consistency",
@@ -350,7 +350,7 @@ For Gemini, best-of-N uses native `candidate_count` which is more efficient than
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [{"type": "message", "role": "user", "content": "Write a haiku about programming"}],
   "validation": {
     "strategy": "best_of_n",

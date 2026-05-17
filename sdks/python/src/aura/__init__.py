@@ -10,14 +10,14 @@ Example usage:
 
     # Simple completion
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="What is the capital of France?"
     )
     print(response.output_text)
 
     # Streaming
     for event in client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="Tell me a story",
         stream=True
     ):

@@ -42,19 +42,20 @@ VITE_TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
 ## Available Models
 
 ### OpenAI
-- GPT-4o
-- GPT-4o Mini
-- GPT-4 Turbo
-- GPT-3.5 Turbo
+- GPT-5.5-pro / GPT-5.5
+- GPT-5.4 / GPT-5.4-mini / GPT-5.4-nano
+- o1, o3-mini (reasoning)
+- GPT-4o, GPT-4-turbo (legacy)
 
 ### Anthropic
-- Claude Sonnet 4
-- Claude 3.5 Sonnet
-- Claude 3.5 Haiku
+- Claude Opus 4.7
+- Claude Opus 4.6 / Sonnet 4.6
+- Claude Opus 4.5 / Sonnet 4.5 / Haiku 4.5
+- Claude 3.7 Sonnet, 3.5 Sonnet (legacy)
 
 ### Google
-- Gemini 2.0 Flash
-- Gemini 1.5 Pro
+- Gemini 3 Pro, Gemini 3 Flash
+- Gemini 2.5 Pro, Gemini 2.0 Flash
 
 ## Agent Tools
 
@@ -140,7 +141,7 @@ const response = await fetch(`${API_BASE}/v1/responses`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    model: 'gpt-4o',
+    model: 'gpt-5.4-mini',
     input: [{ type: 'message', role: 'user', content: 'Hello!' }],
     stream: true,
   }),

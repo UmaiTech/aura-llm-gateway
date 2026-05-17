@@ -72,7 +72,7 @@ class AsyncResponses:
         Create a response from the model.
 
         Args:
-            model: The model to use (e.g., "gpt-4o", "claude-3-sonnet")
+            model: The model to use (e.g., "gpt-5.4-mini", "claude-3-sonnet")
             input: The input to the model
             instructions: System instructions for the model
             tools: List of tools the model can use
@@ -91,14 +91,14 @@ class AsyncResponses:
         Example:
             # Simple completion
             response = await client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input="What is 2+2?"
             )
             print(response.output_text)
 
             # Streaming
             async for event in await client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input="Tell me a story",
                 stream=True
             ):
@@ -198,7 +198,7 @@ class AsyncAuraClient:
     Example:
         async with AsyncAuraClient(api_key="your-key") as client:
             response = await client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input="Hello, world!"
             )
             print(response.output_text)

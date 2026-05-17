@@ -45,7 +45,7 @@ client = AuraClient(
 
 # Simple completion
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What is the capital of France?"
 )
 print(response.output_text)
@@ -56,7 +56,7 @@ print(response.output_text)
 
 ```python
 for event in client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="Tell me a short story about a robot",
     stream=True
 ):
@@ -73,7 +73,7 @@ from aura import AsyncAuraClient
 async def main():
     async with AsyncAuraClient() as client:
         response = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             input="Hello, world!"
         )
         print(response.output_text)
@@ -87,7 +87,7 @@ asyncio.run(main())
 async def stream_example():
     async with AsyncAuraClient() as client:
         stream = await client.responses.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             input="Tell me a joke",
             stream=True
         )
@@ -103,13 +103,13 @@ Continue a conversation using `previous_response_id`:
 ```python
 # First message
 response1 = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="My name is Alice."
 )
 
 # Continue the conversation
 response2 = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What is my name?",
     previous_response_id=response1.id
 )
@@ -140,7 +140,7 @@ weather_tool = Tool.function_tool(
 
 # Use the tool
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What's the weather in Tokyo?",
     tools=[weather_tool]
 )
@@ -156,7 +156,7 @@ if response.has_tool_calls:
 
 ```python
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="Who are you?",
     instructions="You are a helpful pirate assistant. Always respond in pirate speak."
 )
@@ -224,7 +224,7 @@ from aura import (
 
 try:
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         input="Hello"
     )
 except AuthenticationError:

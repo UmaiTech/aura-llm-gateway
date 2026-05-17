@@ -87,7 +87,7 @@ def make_request_with_retry(prompt, max_retries=3):
     for attempt in range(max_retries):
         try:
             return client.responses.create(
-                model="gpt-4o",
+                model="gpt-5.4-mini",
                 input=prompt
             )
         except RateLimitError as e:

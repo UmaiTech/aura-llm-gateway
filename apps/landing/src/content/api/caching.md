@@ -42,14 +42,14 @@ LLM responses are **deterministic** only when `temperature=0`. With higher tempe
 ```json
 // Cacheable - deterministic
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": "What is 2+2?",
   "temperature": 0
 }
 
 // Not cached - non-deterministic
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": "Write a poem",
   "temperature": 0.7
 }
@@ -65,7 +65,7 @@ curl -X POST https://api.aura.example/v1/responses \
   -H "X-Cache-Control: no-cache" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-5.4-mini",
     "input": "What is the current time?",
     "temperature": 0
   }'
@@ -118,8 +118,8 @@ Cache performance is tracked via Prometheus metrics:
 
 ```
 # Cache statistics
-aura_cache_hits_total{provider="openai", model="gpt-4o"} 1523
-aura_cache_misses_total{provider="openai", model="gpt-4o"} 347
+aura_cache_hits_total{provider="openai", model="gpt-5.4-mini"} 1523
+aura_cache_misses_total{provider="openai", model="gpt-5.4-mini"} 347
 
 # Cache hit rate = hits / (hits + misses)
 # Example: 1523 / (1523 + 347) = 81.4% hit rate
@@ -156,7 +156,7 @@ Monitor your cache hit rate to estimate savings:
 ```python
 # Good - will be cached
 response = client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="What is the capital of France?",
     temperature=0
 )
@@ -179,7 +179,7 @@ For chat interfaces where users expect real-time feedback, use streaming (which 
 
 ```python
 for event in client.responses.create(
-    model="gpt-4o",
+    model="gpt-5.4-mini",
     input="Tell me a story",
     stream=True
 ):

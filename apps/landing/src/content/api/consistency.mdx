@@ -87,7 +87,7 @@ Based on Anthropic's research, constitutional AI injects guiding principles that
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "consistency": {
     "strategy": "constitutional",
@@ -162,7 +162,7 @@ Define consistent tone, formality, and formatting:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "consistency": {
     "strategy": "style_profile",
@@ -215,7 +215,7 @@ Provide an example response to match:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -238,7 +238,7 @@ Prime with input/output examples for consistent formatting:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -268,7 +268,7 @@ Force structured JSON output:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -305,7 +305,7 @@ Query multiple models and return the consensus:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {
       "type": "message",
@@ -315,7 +315,7 @@ Query multiple models and return the consensus:
   ],
   "consistency": {
     "strategy": "ensemble_voting",
-    "models": ["gpt-4o", "claude-sonnet-4-20250514", "gemini-1.5-pro"]
+    "models": ["gpt-5.4-mini", "claude-sonnet-4-20250514", "gemini-1.5-pro"]
   }
 }`}
 </CodeBlock>
@@ -325,8 +325,8 @@ Query multiple models and return the consensus:
   "consistency": {
     "strategy": "ensemble_voting",
     "ensemble_votes": {
-      "models": ["gpt-4o", "claude-sonnet-4-20250514", "gemini-1.5-pro"],
-      "selected_model": "gpt-4o",
+      "models": ["gpt-5.4-mini", "claude-sonnet-4-20250514", "gemini-1.5-pro"],
+      "selected_model": "gpt-5.4-mini",
       "agreement_score": 0.95,
       "selection_reason": "Highest semantic similarity to consensus"
     }
@@ -366,7 +366,7 @@ Ensemble voting queries multiple models, increasing latency and cost proportiona
 
   # Per-model defaults
   model_overrides:
-    "gpt-4o":
+    "gpt-5.4-mini":
       default_strategy: none
     "claude-sonnet-4-20250514":
       default_strategy: model_calibration
@@ -451,7 +451,7 @@ Any request can override the default configuration:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [{
     "type": "message",
     "role": "user",
@@ -473,7 +473,7 @@ Any request can override the default configuration:
 
 <CodeBlock language="json">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [{
     "type": "message",
     "role": "user",

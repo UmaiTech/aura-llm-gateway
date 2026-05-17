@@ -10,7 +10,7 @@ All API requests must include a valid API key in the `Authorization` header:
 curl -X POST https://api.aura.example/v1/responses \
   -H "Authorization: Bearer aura_live_abc123..." \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "input": [...]}'
+  -d '{"model": "gpt-5.4-mini", "input": [...]}'
 ```
 
 ## API Key Format
@@ -160,7 +160,7 @@ When making requests, include the `user` field to track costs per end-user:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "user": "customer_12345"
 }

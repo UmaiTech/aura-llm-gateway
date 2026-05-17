@@ -18,7 +18,7 @@ Returns metrics in Prometheus text format:
 ```
 # HELP aura_requests_total Total number of requests
 # TYPE aura_requests_total counter
-aura_requests_total{provider="openai",model="gpt-4o",stream="false"} 1523
+aura_requests_total{provider="openai",model="gpt-5.4-mini",stream="false"} 1523
 aura_requests_total{provider="anthropic",model="claude-3-opus",stream="true"} 847
 ```
 

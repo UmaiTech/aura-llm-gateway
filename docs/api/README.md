@@ -89,13 +89,13 @@ Errors follow the Open Responses API format:
 ## Supported Models
 
 ### OpenAI ✅
-- `gpt-4o`, `gpt-4o-mini`
+- `gpt-5.4-mini`, `gpt-5.4-nano`
 - `gpt-4-turbo`, `gpt-3.5-turbo`
 - `o1`, `o1-mini`, `o3-mini`
 
 ### Anthropic ✅
 - `claude-opus-4-5-20251101`, `claude-sonnet-4-5-20250514`
-- `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`
+- `claude-sonnet-4-6`, `claude-haiku-4-5`
 - `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`
 
 ### Google Gemini ✅

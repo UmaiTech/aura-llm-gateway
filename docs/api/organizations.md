@@ -135,7 +135,7 @@ Track costs per customer using the `user` field.
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "user": "customer_123"
 }

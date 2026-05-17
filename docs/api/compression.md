@@ -19,7 +19,7 @@ Enable compression by adding a `compression` object to your request:
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [...],
   "compression": {
     "enabled": true,
@@ -163,7 +163,7 @@ Compression statistics are included in the response:
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-5.4-mini",
     "input": [
       {
         "type": "message",
@@ -191,7 +191,7 @@ curl -X POST http://localhost:8080/v1/responses \
 curl -X POST http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-5.4-mini",
     "instructions": "For all user requests, if the user is authenticated then allow access. If not authenticated, reject with error.",
     "input": [...],
     "compression": {

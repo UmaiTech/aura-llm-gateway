@@ -27,7 +27,7 @@ Your application sends a request to the `/v1/responses` endpoint using the [Open
 
 ```json
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "input": [
     {"type": "message", "role": "user", "content": "Hello!"}
   ]

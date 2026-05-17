@@ -91,7 +91,7 @@ export AURA_MASTER_KEY=$(openssl rand -hex 32)
     code: `POST /v1/responses
 Authorization: Bearer aura_team_...
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "user": "customer_42",
   "input": [...]
 }`,
@@ -188,7 +188,7 @@ const response = await fetch('http://localhost:8080/v1/responses', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    model: 'gpt-4o',
+    model: 'gpt-5.4-mini',
     input: [
       { type: 'message', role: 'user', content: 'Hello!' }
     ],

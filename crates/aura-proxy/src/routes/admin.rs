@@ -1213,7 +1213,7 @@ async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingR
             actions: vec![
                 RoutingAction {
                     provider: "openai".to_string(),
-                    model: "gpt-4o-mini".to_string(),
+                    model: "gpt-5.4-nano".to_string(),
                     weight: Some(70),
                 },
                 RoutingAction {
@@ -1234,7 +1234,7 @@ async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingR
             actions: vec![
                 RoutingAction {
                     provider: "openai".to_string(),
-                    model: "gpt-4o".to_string(),
+                    model: "gpt-5.4-mini".to_string(),
                     weight: Some(40),
                 },
                 RoutingAction {
@@ -1263,7 +1263,7 @@ async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingR
             actions: vec![
                 RoutingAction {
                     provider: "openai".to_string(),
-                    model: "gpt-4o".to_string(),
+                    model: "gpt-5.4-mini".to_string(),
                     weight: None,
                 },
                 RoutingAction {

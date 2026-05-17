@@ -280,12 +280,12 @@ Route requests based on model capabilities:
 <Expandable title="Default Model Profiles">
 <CodeBlock language="yaml">
 {`# OpenAI
-gpt-4o:
+gpt-5.4-mini:
   traits: [code, analysis, vision, tool_use, instruction, structured_output]
   cost: $2.50/$10.00 per 1M tokens
   latency: ~800ms
 
-gpt-4o-mini:
+gpt-5.4-nano:
   traits: [fast, cheap, tool_use, structured_output]
   cost: $0.15/$0.60 per 1M tokens
   latency: ~400ms
@@ -459,24 +459,24 @@ Routes requests based on the tools being used. Different models excel at differe
     code_execution:
       preferred_models:
         - claude-sonnet-4
-        - gpt-4o
+        - gpt-5.4-mini
       required_traits: [code, tool_use]
 
     web_search:
       preferred_models:
         - gemini-2.0-flash
-        - gpt-4o-mini
+        - gpt-5.4-nano
       required_traits: [fast, tool_use]
 
     data_analysis:
       preferred_models:
         - claude-opus-4
-        - gpt-4o
+        - gpt-5.4-mini
       required_traits: [analysis, code]
 
     image_processing:
       preferred_models:
-        - gpt-4o
+        - gpt-5.4-mini
         - gemini-2.0-pro
       required_traits: [vision]`}
 </CodeBlock>
@@ -511,7 +511,7 @@ Routes based on input token count to ensure requests stay within model context w
     small:
       max_tokens: 4000
       preferred_models:
-        - gpt-4o-mini
+        - gpt-5.4-nano
         - gemini-2.0-flash
         - claude-3-5-haiku
 
@@ -519,7 +519,7 @@ Routes based on input token count to ensure requests stay within model context w
     medium:
       max_tokens: 32000
       preferred_models:
-        - gpt-4o
+        - gpt-5.4-mini
         - claude-sonnet-4
         - gemini-2.0-pro
 
@@ -528,7 +528,7 @@ Routes based on input token count to ensure requests stay within model context w
       max_tokens: 128000
       preferred_models:
         - claude-sonnet-4
-        - gpt-4o
+        - gpt-5.4-mini
 
     # Very large context (128K+) - use extended context models
     xlarge:
@@ -571,7 +571,7 @@ When a request includes `previous_response_id`, Aura routes to the same endpoint
 
 <CodeBlock language="json" title="Request with session tracking">
 {`{
-  "model": "gpt-4o",
+  "model": "gpt-5.4-mini",
   "previous_response_id": "resp_abc123",
   "input": [
     {
@@ -607,7 +607,7 @@ Routes complex reasoning tasks to models with extended thinking capabilities:
 
     # Models for standard tasks
     standard_models:
-      - gpt-4o
+      - gpt-5.4-mini
       - claude-sonnet-4
       - gemini-2.0-pro`}
 </CodeBlock>
