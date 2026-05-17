@@ -93,13 +93,18 @@ export default function App() {
               <span className="font-semibold text-xl">Aura</span>
             </div>
             <div className="flex items-center gap-4">
-              <a href="/docs" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://docs.aura-llm.dev" className="text-gray-400 hover:text-white transition-colors">
                 Docs
               </a>
-              <a href="/roadmap" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://roadmap.aura-llm.dev" className="text-gray-400 hover:text-white transition-colors">
                 Roadmap
               </a>
-              <a href="http://localhost:3000" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1">
+              <a
+                href="https://playground.aura-llm.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white transition-colors flex items-center gap-1"
+              >
                 Playground
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
