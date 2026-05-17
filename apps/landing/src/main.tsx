@@ -13,7 +13,7 @@ const isRoadmapHost = hostname.startsWith('roadmap.')
 
 function rootElement() {
   if (isDocsHost) return <Navigate to="/docs" replace />
-  if (isRoadmapHost) return <Navigate to="/roadmap" replace />
+  if (isRoadmapHost) return <RoadmapPage />
   return <App />
 }
 
