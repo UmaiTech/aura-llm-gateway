@@ -1,57 +1,187 @@
+import { useState } from 'react'
 import {
   Sparkles, ArrowRight, Zap, BarChart3,
   Code2, Globe, MessageSquare, BookOpen,
   Github, ExternalLink, Lock, Network, FileSearch,
-  Layers, Minimize2
+  Layers, Minimize2, RotateCcw
 } from 'lucide-react'
 
-const features = [
+interface Feature {
+  icon: typeof Globe
+  title: string
+  description: string
+  code: string
+  docsHref: string
+}
+
+const features: Feature[] = [
   {
     icon: Globe,
     title: '7 Providers',
     description: 'OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, AWS Bedrock — all behind one Open Responses API.',
+    code: `curl /v1/responses -d '{
+  "model": "claude-sonnet-4-5",
+  "input": [{"role": "user",
+    "content": "Hello!"}]
+}'`,
+    docsHref: 'https://docs.aura-llm.dev/docs/providers/anthropic',
   },
   {
     icon: Minimize2,
     title: 'Prompt Compression',
     description: 'TOON, AISP, YAML, and JSON compression strategies cut token usage 40–60% on uniform arrays and nested objects.',
+    code: `let compressor = SmartCompressor::builder()
+    .auto_select(true)
+    .build();
+let result = compressor.compress(input)?;
+// 40-60% fewer tokens`,
+    docsHref: 'https://docs.aura-llm.dev/docs/api/compression',
   },
   {
     icon: Network,
     title: 'Smart Routing',
     description: 'Eight strategies — round-robin, weighted, region-aware, cost-optimized. Circuit breaker fails over to a healthy provider on the same call.',
+    code: `# config.yaml
+routing:
+  strategy: cost_optimized
+  fallback: [openai, anthropic]
+  circuit_breaker:
+    failure_threshold: 3`,
+    docsHref: 'https://docs.aura-llm.dev/docs/api/routing',
   },
   {
     icon: BarChart3,
     title: 'Cost Tracking',
     description: 'Per-request USD on every response. Track input, output, cached, and reasoning tokens across all seven providers.',
+    code: `// Every response includes:
+"usage": {
+  "input_tokens": 1842,
+  "output_tokens": 318,
+  "cost_usd": 0.00732
+}`,
+    docsHref: 'https://docs.aura-llm.dev/docs/api/cost-tracking',
   },
   {
     icon: FileSearch,
     title: 'Response Validation',
     description: 'Logprobs, self-consistency, best-of-N sampling, and confidence thresholds — measurably reduce hallucinations.',
+    code: `{
+  "validation": {
+    "strategy": "best_of_n",
+    "n": 3,
+    "min_confidence": 0.85
+  }
+}`,
+    docsHref: 'https://docs.aura-llm.dev/docs/api/validation',
   },
   {
     icon: Lock,
     title: 'Encrypted Credentials',
     description: 'AES-256-GCM envelope encryption for provider API keys. Master key from KMS or Vault — never written to disk in plaintext.',
+    code: `# Generate master key once
+export AURA_MASTER_KEY=$(openssl rand -hex 32)
+# Provider keys encrypted at rest
+# DEK wrapping per-tenant`,
+    docsHref: 'https://docs.aura-llm.dev/docs/credentials',
   },
   {
     icon: Layers,
     title: 'Multi-Tenancy',
     description: 'Hierarchical org → team → project → end-user model with scoped API keys and per-user cost allocation.',
+    code: `POST /v1/responses
+Authorization: Bearer aura_team_...
+{
+  "model": "gpt-4o",
+  "user": "customer_42",
+  "input": [...]
+}`,
+    docsHref: 'https://docs.aura-llm.dev/docs/organizations',
   },
   {
     icon: Zap,
     title: 'Production Ready',
     description: 'Redis-backed rate limiting and response caching, Prometheus metrics, structured logging, and SSE streaming throughout.',
+    code: `# Prometheus metrics
+curl localhost:8080/metrics
+# aura_requests_total
+# aura_request_duration_seconds
+# aura_tokens_total{provider="..."}`,
+    docsHref: 'https://docs.aura-llm.dev/docs/api/rate-limiting',
   },
   {
     icon: Code2,
     title: 'Self-Hosted in Rust',
     description: 'Single static binary, no runtime deps. Axum + Tokio + reqwest. Built to keep gateway overhead under 10ms.',
+    code: `# Deploy with Helm
+helm install aura \\
+  oci://ghcr.io/umaitech/charts/aura-llm-gateway \\
+  --set secrets.inline.openaiApiKey=sk-...`,
+    docsHref: 'https://github.com/UmaiTech/aura-llm-gateway/blob/main/deploy/charts/aura-llm-gateway/README.md',
   },
 ]
+
+function FeatureCard({ feature }: { feature: Feature }) {
+  const [flipped, setFlipped] = useState(false)
+  const Icon = feature.icon
+
+  return (
+    <button
+      type="button"
+      onClick={() => setFlipped((v) => !v)}
+      className="group relative w-full text-left h-64 [perspective:1200px] focus:outline-none focus-visible:ring-2 focus-visible:ring-aura-400 rounded-2xl"
+      aria-pressed={flipped}
+      aria-label={`${feature.title} — click to ${flipped ? 'hide' : 'show'} example`}
+    >
+      <div
+        className="relative h-full w-full transition-transform duration-500 [transform-style:preserve-3d]"
+        style={{ transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+      >
+        {/* Front */}
+        <div
+          className="absolute inset-0 card flex flex-col cursor-pointer"
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+        >
+          <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-aura-500/20 to-primary-500/20 flex items-center justify-center mb-4 group-hover:from-aura-500/30 group-hover:to-primary-500/30 transition-colors">
+            <Icon className="h-6 w-6 text-aura-400" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+          <p className="text-gray-400 text-sm flex-1">{feature.description}</p>
+          <div className="mt-4 text-xs text-gray-500 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <span>Click for example</span>
+            <ArrowRight className="h-3 w-3" />
+          </div>
+        </div>
+
+        {/* Back */}
+        <div
+          className="absolute inset-0 card flex flex-col cursor-pointer"
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-aura-400">{feature.title}</h3>
+            <RotateCcw className="h-3.5 w-3.5 text-gray-500" />
+          </div>
+          <pre className="flex-1 text-xs font-mono text-gray-300 bg-gray-950/70 rounded-md p-3 overflow-hidden whitespace-pre-wrap leading-relaxed">
+            {feature.code}
+          </pre>
+          <a
+            href={feature.docsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-3 text-xs text-aura-400 hover:text-aura-300 flex items-center gap-1"
+          >
+            Read the docs <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      </div>
+    </button>
+  )
+}
 
 const codeExample = `// Request to Aura Gateway
 const response = await fetch('http://localhost:8080/v1/responses', {
@@ -185,15 +315,12 @@ export default function App() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
-              <div key={feature.title} className="card group">
-                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-aura-500/20 to-primary-500/20 flex items-center justify-center mb-4 group-hover:from-aura-500/30 group-hover:to-primary-500/30 transition-colors">
-                  <feature.icon className="h-6 w-6 text-aura-400" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-gray-400 text-sm">{feature.description}</p>
-              </div>
+              <FeatureCard key={feature.title} feature={feature} />
             ))}
           </div>
+          <p className="text-center text-xs text-gray-500 mt-6">
+            Click any card to see a code example.
+          </p>
         </div>
       </section>
 
