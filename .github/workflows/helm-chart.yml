@@ -68,8 +68,12 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Update dependencies
-        run: helm dependency update deploy/charts/aura-llm-gateway
+      - name: Build dependencies
+        run: |
+          helm dependency update deploy/charts/aura-llm-gateway
+          # helm 3.16 packages .tgz subcharts incorrectly; extract them first
+          cd deploy/charts/aura-llm-gateway/charts && \
+            for f in *.tgz; do tar -xzf "$f" && rm "$f"; done
 
       - name: Package chart
         run: helm package deploy/charts/aura-llm-gateway --destination ./packaged
