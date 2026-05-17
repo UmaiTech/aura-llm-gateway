@@ -94,14 +94,86 @@ docker-compose up -d
 
 For production-scale deployments.
 
-### Helm Chart (Coming Soon)
+### Helm Chart (Recommended for Kubernetes)
+
+Aura ships an official Helm chart published to GitHub Container Registry as an OCI artifact. One command gets a working deployment:
 
 ```bash
-helm repo add aura https://charts.aura.example
-helm install aura aura/aura-llm-gateway \
-  --set openai.apiKey=$OPENAI_API_KEY \
-  --set anthropic.apiKey=$ANTHROPIC_API_KEY
+helm install aura oci://ghcr.io/umaitech/charts/aura-llm-gateway \
+  --version 0.1.0 \
+  --namespace aura --create-namespace \
+  --set secrets.inline.auraMasterKey="$(openssl rand -hex 32)" \
+  --set secrets.inline.openaiApiKey="sk-..."
 ```
+
+#### Production-grade install
+
+Real deployments should manage secrets out-of-band (sealed-secrets, External Secrets Operator, or Vault) instead of putting them in `--set`:
+
+```bash
+# 1. Create the Secret with a real secret manager
+kubectl create secret generic aura-secrets \
+  --namespace aura \
+  --from-literal=AURA_MASTER_KEY="$(openssl rand -hex 32)" \
+  --from-literal=AURA_ADMIN_KEY="..." \
+  --from-literal=OPENAI_API_KEY="sk-..." \
+  --from-literal=DATABASE_URL="postgres://..."
+
+# 2. Install the chart, referencing the Secret
+helm install aura oci://ghcr.io/umaitech/charts/aura-llm-gateway \
+  --version 0.1.0 \
+  --namespace aura \
+  --set secrets.existingSecret=aura-secrets \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set ingress.hosts[0].host=api.example.com \
+  --set ingress.hosts[0].paths[0].path=/ \
+  --set ingress.hosts[0].paths[0].pathType=Prefix \
+  --set autoscaling.enabled=true \
+  --set autoscaling.maxReplicas=10
+```
+
+#### Quick demo with bundled Postgres + Redis
+
+For kind / k3d / minikube — **don't do this in production**:
+
+```bash
+helm install aura oci://ghcr.io/umaitech/charts/aura-llm-gateway \
+  --version 0.1.0 \
+  --namespace aura --create-namespace \
+  --set postgresql.enabled=true \
+  --set redis.enabled=true \
+  --set secrets.inline.auraMasterKey="$(openssl rand -hex 32)" \
+  --set secrets.inline.openaiApiKey="sk-..." \
+  --set secrets.inline.databaseUrl="postgres://aura:aura@aura-postgresql:5432/aura" \
+  --set secrets.inline.redisUrl="redis://aura-redis-master:6379"
+```
+
+#### What the chart installs
+
+| Resource | Purpose |
+|---|---|
+| Deployment | Gateway pod with non-root securityContext, read-only rootfs |
+| Service | ClusterIP on port 8080 |
+| ConfigMap | Non-secret config (host, port, log level) |
+| Secret | Master key, admin key, all 7 provider credentials |
+| Ingress *(optional, off)* | Standard k8s Ingress with TLS |
+| HPA *(optional, off)* | Horizontal pod autoscaling on CPU/memory |
+| ServiceAccount | Dedicated SA with dropped capabilities |
+| PostgreSQL subchart *(optional, off)* | Bitnami chart for demos |
+| Redis subchart *(optional, off)* | Bitnami chart for demos |
+
+#### Configuration
+
+See the [chart README on GitHub](https://github.com/UmaiTech/aura-llm-gateway/blob/main/deploy/charts/aura-llm-gateway/README.md) for the full `values.yaml` schema. Common knobs:
+
+| Key | Default | Notes |
+|---|---|---|
+| `replicaCount` | `1` | Use `autoscaling.enabled` instead for prod traffic |
+| `image.tag` | `""` (chart appVersion) | Pin to a specific gateway version in prod |
+| `service.type` | `ClusterIP` | `LoadBalancer` if you don't use Ingress |
+| `ingress.enabled` | `false` | TLS via cert-manager or your LB |
+| `secrets.existingSecret` | `""` | Strongly preferred in production |
 
 ### Manual Kubernetes Manifests
 
