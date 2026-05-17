@@ -51,28 +51,43 @@ const releases: Release[] = [
     version: 'v0.3.x',
     phase: 'shipped',
     title: 'Multi-Provider Expansion',
-    subtitle: 'Four new providers, smart routing, admin UI — current',
+    subtitle: 'Four new providers, smart routing, prompt compression',
     items: [
       { label: 'Mistral AI provider' },
       { label: 'Ollama local inference' },
       { label: 'HuggingFace TGI provider' },
-      { label: 'AWS Bedrock provider' },
-      { label: 'Smart routing', note: 'load balancing, failover, health tracking' },
+      { label: 'AWS Bedrock provider', note: 'Claude family' },
+      { label: 'Smart routing', note: '8 strategies, circuit breaker, health tracking' },
       { label: 'Admin dashboard foundation' },
       { label: 'TOON, AISP, JSON, YAML prompt compression' },
     ],
   },
   {
     version: 'v0.4.x',
+    phase: 'shipped',
+    title: 'OSS Launch & Distribution',
+    subtitle: 'Public release, Helm chart, PyPI publishing, dedicated domain',
+    items: [
+      { label: 'Open-sourced at github.com/UmaiTech/aura-llm-gateway' },
+      { label: 'Helm chart on ghcr.io', note: 'OCI registry, one-command k8s install' },
+      { label: 'Python SDK published on PyPI', note: 'trusted publishing via OIDC' },
+      { label: 'aura-llm.dev launched', note: 'landing, docs, roadmap, playground subdomains' },
+      { label: 'Chat playground deployed' },
+      { label: '9-feature landing page with full capability map' },
+    ],
+  },
+  {
+    version: 'v0.5.x',
     phase: 'active',
     title: 'Observability & SDK Parity',
     subtitle: 'TypeScript SDK, distributed tracing, provider completions',
     items: [
-      { label: 'TypeScript SDK' },
-      { label: 'Distributed tracing', note: 'OpenTelemetry' },
+      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
+      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
       { label: 'HF Classic Inference API', note: '#74' },
       { label: 'Bedrock Llama / Mistral / Titan families', note: '#73' },
       { label: 'Mistral FIM completions', note: '#75' },
+      { label: 'Hosted demo gateway at api.aura-llm.dev' },
     ],
     issueRefs: ['#73', '#74', '#75'],
   },
@@ -277,7 +292,7 @@ export function RoadmapPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/80 text-xs text-gray-400 mb-5 border border-gray-700/50">
             <span className="h-1.5 w-1.5 rounded-full bg-green-400 inline-block" />
             Current release
-            <span className="font-mono text-green-400 font-semibold">v0.3.2</span>
+            <span className="font-mono text-green-400 font-semibold">v0.4.1</span>
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
             <span className="gradient-text">Building in public.</span>
@@ -285,8 +300,9 @@ export function RoadmapPage() {
             <span className="text-gray-200">Here's where we are.</span>
           </h1>
           <p className="text-lg text-gray-400 max-w-xl leading-relaxed">
-            Three major versions shipped in four months. Seven LLM providers unified
-            behind a single API. This is what we've done — and what comes next.
+            Four major versions shipped. Seven LLM providers unified behind a
+            single API. Open-sourced, on PyPI, on GHCR, ready to deploy. This is
+            what we've done — and what comes next.
           </p>
 
           <div className="flex items-center gap-6 mt-8">
@@ -301,7 +317,7 @@ export function RoadmapPage() {
             </div>
             <div className="h-8 w-px bg-gray-800" />
             <div className="text-center">
-              <div className="text-2xl font-bold gradient-text">v0.4</div>
+              <div className="text-2xl font-bold gradient-text">v0.5</div>
               <div className="text-xs text-gray-500 mt-0.5">in progress</div>
             </div>
           </div>
