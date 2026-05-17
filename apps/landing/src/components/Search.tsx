@@ -54,6 +54,10 @@ const searchIndex: SearchItem[] = [
   { title: 'OpenAI', path: '/docs/providers/openai', section: 'Providers', description: 'GPT-4o, o1, o3 models' },
   { title: 'Anthropic', path: '/docs/providers/anthropic', section: 'Providers', description: 'Claude Opus, Sonnet, Haiku models' },
   { title: 'Google', path: '/docs/providers/google', section: 'Providers', description: 'Gemini 2.5, 2.0, 1.5 models' },
+  { title: 'Mistral', path: '/docs/providers/mistral', section: 'Providers', description: 'Mistral Large, Codestral, Ministral edge models' },
+  { title: 'Ollama', path: '/docs/providers/ollama', section: 'Providers', description: 'Local LLM inference, $0 cost' },
+  { title: 'HuggingFace', path: '/docs/providers/huggingface', section: 'Providers', description: 'TGI Inference Endpoints for any HF model' },
+  { title: 'AWS Bedrock', path: '/docs/providers/bedrock', section: 'Providers', description: 'Claude on Bedrock with IAM auth' },
 
   // Concepts
   { title: 'Open Responses API', path: '/docs/concepts/open-responses', section: 'Concepts', description: 'API specification for agentic workflows' },

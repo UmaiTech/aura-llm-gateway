@@ -152,6 +152,10 @@ const docSections = [
       { title: 'OpenAI', path: '/docs/providers/openai', icon: Server },
       { title: 'Anthropic', path: '/docs/providers/anthropic', icon: Server },
       { title: 'Google', path: '/docs/providers/google', icon: Server },
+      { title: 'Mistral', path: '/docs/providers/mistral', icon: Server },
+      { title: 'Ollama', path: '/docs/providers/ollama', icon: Server },
+      { title: 'HuggingFace', path: '/docs/providers/huggingface', icon: Server },
+      { title: 'AWS Bedrock', path: '/docs/providers/bedrock', icon: Server },
     ],
   },
   {
