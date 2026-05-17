@@ -1,0 +1,44 @@
+# Self-hosted gateways for the benchmark.
+# Run from scripts/bench/ : docker compose -f docker-compose.bench.yml up -d
+#
+# Hosted gateways (OpenRouter, Portkey, Aura hosted) hit over the public
+# internet — they don't show up here.
+
+services:
+  # Aura (self-hosted) — the gateway under test
+  aura:
+    image: ghcr.io/umaitech/aura-llm-gateway:latest
+    container_name: bench-aura
+    ports:
+      - "8080:8080"
+    environment:
+      - AURA_HOST=0.0.0.0
+      - AURA_PORT=8080
+      - AURA_MASTER_KEY=${AURA_MASTER_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - RUST_LOG=warn
+
+  # Bifrost — Go-based OpenAI-compatible gateway
+  bifrost:
+    image: maximhq/bifrost:latest
+    container_name: bench-bifrost
+    ports:
+      - "8081:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+  # LiteLLM proxy
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: bench-litellm
+    ports:
+      - "4000:4000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_KEY}
+    command: ["--config", "/app/litellm-config.yaml"]
+    volumes:
+      - ./litellm-config.yaml:/app/litellm-config.yaml:ro
+
+  # Helicone (optional) — usually used as cloud proxy.
+  # If you want a local Helicone proxy, configure here.
