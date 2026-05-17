@@ -1,12 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd apps/landing && npm install && npm run build",
+  "buildCommand": "cd apps/landing && npm install && npm run build && cd ../chat && npm install && npm run build && cd ../.. && mkdir -p apps/landing/dist/playground && cp -R apps/chat/dist/. apps/landing/dist/playground/",
   "outputDirectory": "apps/landing/dist",
   "installCommand": "echo 'install handled in buildCommand'",
   "framework": null,
   "headers": [
     {
       "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/playground/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -47,7 +56,16 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/|.*\\..*).*)",
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "playground.aura-llm.dev" }],
+      "destination": "/playground/:path*"
+    },
+    {
+      "source": "/playground/((?!assets/|.*\\..*).*)",
+      "destination": "/playground/index.html"
+    },
+    {
+      "source": "/((?!playground/|assets/|.*\\..*).*)",
       "destination": "/index.html"
     }
   ]
