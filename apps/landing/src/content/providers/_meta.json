@@ -1,5 +1,9 @@
 {
   "openai": "OpenAI",
   "anthropic": "Anthropic",
-  "google": "Google"
+  "google": "Google",
+  "mistral": "Mistral",
+  "ollama": "Ollama",
+  "huggingface": "HuggingFace",
+  "bedrock": "AWS Bedrock"
 }
