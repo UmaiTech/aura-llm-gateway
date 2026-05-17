@@ -8,7 +8,7 @@ const features = [
   {
     icon: Globe,
     title: 'Multi-Provider Support',
-    description: 'Unified API for OpenAI, Anthropic, and Google models. Switch providers without changing your code.',
+    description: 'Unified API for OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, and AWS Bedrock. Switch providers without changing your code.',
   },
   {
     icon: BarChart3,
@@ -112,7 +112,8 @@ export default function App() {
           </h1>
 
           <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            Route requests to OpenAI, Anthropic, and Google with a single API.
+            Route requests across seven providers — OpenAI, Anthropic, Google, Mistral,
+            Ollama, HuggingFace, and AWS Bedrock — with a single API.
             Built-in cost tracking, observability, and agentic workflow support.
           </p>
 
