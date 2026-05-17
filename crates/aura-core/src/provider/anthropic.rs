@@ -582,13 +582,12 @@ impl AnthropicStreamTransformer {
             } => {
                 self.current_content_index = index;
                 match content_block {
-                    AnthropicContentBlock::Text { .. } => {
-                        if !self.output_item_added {
-                            self.output_item_added = true;
-                            let item = Item::Message(MessageItem::assistant("msg_0", ""));
-                            return Some(Ok(StreamEvent::output_item_added(0, item)));
-                        }
+                    AnthropicContentBlock::Text { .. } if !self.output_item_added => {
+                        self.output_item_added = true;
+                        let item = Item::Message(MessageItem::assistant("msg_0", ""));
+                        return Some(Ok(StreamEvent::output_item_added(0, item)));
                     }
+                    AnthropicContentBlock::Text { .. } => {}
                     AnthropicContentBlock::ToolUse { id, name, .. } => {
                         let entry = self.accumulated_tool_calls.entry(index).or_default();
                         entry.id = id;

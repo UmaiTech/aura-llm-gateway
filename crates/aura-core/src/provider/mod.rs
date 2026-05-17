@@ -4,13 +4,21 @@
 //! LLM providers (OpenAI, Anthropic, Google, etc.).
 
 mod anthropic;
+mod bedrock;
 mod error;
 mod gemini;
+mod huggingface;
+mod mistral;
+mod ollama;
 mod openai;
 
 pub use anthropic::AnthropicProvider;
+pub use bedrock::BedrockProvider;
 pub use error::ProviderError;
 pub use gemini::GeminiProvider;
+pub use huggingface::HuggingFaceProvider;
+pub use mistral::MistralProvider;
+pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
 
 use async_trait::async_trait;

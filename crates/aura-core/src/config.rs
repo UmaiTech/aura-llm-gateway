@@ -133,6 +133,26 @@ pub struct ProviderConfig {
 
     /// Google API key (optional)
     pub google_api_key: Option<String>,
+
+    /// Mistral AI API key (optional)
+    pub mistral_api_key: Option<String>,
+
+    /// HuggingFace user access token (`hf_...`) for TGI endpoints (optional)
+    pub huggingface_api_key: Option<String>,
+
+    /// HuggingFace TGI endpoint base URL, e.g.
+    /// `https://abc123.us-east-1.aws.endpoints.huggingface.cloud`
+    pub huggingface_endpoint_url: Option<String>,
+
+    /// HuggingFace model name served at the TGI endpoint (informational)
+    pub huggingface_model: Option<String>,
+
+    /// Ollama server base URL (defaults to `http://localhost:11434` if absent)
+    pub ollama_base_url: Option<String>,
+
+    /// AWS region for Bedrock (defaults to `us-east-1` if absent).
+    /// Credentials are sourced from the AWS default credential chain.
+    pub aws_region: Option<String>,
 }
 
 /// Logging configuration
@@ -349,6 +369,36 @@ impl Config {
                 self.providers.google_api_key = Some(key);
             }
         }
+        if let Ok(key) = env::var("MISTRAL_API_KEY") {
+            if !key.is_empty() {
+                self.providers.mistral_api_key = Some(key);
+            }
+        }
+        if let Ok(key) = env::var("HUGGINGFACE_API_KEY") {
+            if !key.is_empty() {
+                self.providers.huggingface_api_key = Some(key);
+            }
+        }
+        if let Ok(url) = env::var("HUGGINGFACE_ENDPOINT_URL") {
+            if !url.is_empty() {
+                self.providers.huggingface_endpoint_url = Some(url);
+            }
+        }
+        if let Ok(model) = env::var("HUGGINGFACE_MODEL") {
+            if !model.is_empty() {
+                self.providers.huggingface_model = Some(model);
+            }
+        }
+        if let Ok(url) = env::var("OLLAMA_BASE_URL") {
+            if !url.is_empty() {
+                self.providers.ollama_base_url = Some(url);
+            }
+        }
+        if let Ok(region) = env::var("AWS_REGION") {
+            if !region.is_empty() {
+                self.providers.aws_region = Some(region);
+            }
+        }
 
         // Database
         if let Ok(url) = env::var("DATABASE_URL") {
@@ -414,6 +464,10 @@ impl Config {
         if self.providers.openai_api_key.is_none()
             && self.providers.anthropic_api_key.is_none()
             && self.providers.google_api_key.is_none()
+            && self.providers.mistral_api_key.is_none()
+            && self.providers.huggingface_api_key.is_none()
+            && self.providers.ollama_base_url.is_none()
+            && self.providers.aws_region.is_none()
         {
             return Err(ConfigError::NoProviderKeys);
         }
@@ -435,9 +489,38 @@ impl Config {
         self.providers.google_api_key.is_some()
     }
 
+    /// Returns true if Mistral is configured
+    pub fn has_mistral(&self) -> bool {
+        self.providers.mistral_api_key.is_some()
+    }
+
+    /// Returns true if HuggingFace TGI is configured (both key and endpoint required)
+    pub fn has_huggingface(&self) -> bool {
+        self.providers.huggingface_api_key.is_some()
+            && self.providers.huggingface_endpoint_url.is_some()
+    }
+
+    /// Returns true if Ollama is enabled (always true when ollama_base_url is set or default)
+    pub fn has_ollama(&self) -> bool {
+        // Ollama requires no API key; presence of the config key (or just the default URL) enables it.
+        // We use a sentinel: if `ollama_base_url` is Some, Ollama is explicitly enabled.
+        self.providers.ollama_base_url.is_some()
+    }
+
+    /// Returns true if AWS Bedrock is configured
+    pub fn has_bedrock(&self) -> bool {
+        self.providers.aws_region.is_some()
+    }
+
     /// Returns true if any provider is configured
     pub fn has_any_provider(&self) -> bool {
-        self.has_openai() || self.has_anthropic() || self.has_google()
+        self.has_openai()
+            || self.has_anthropic()
+            || self.has_google()
+            || self.has_mistral()
+            || self.has_huggingface()
+            || self.has_ollama()
+            || self.has_bedrock()
     }
 
     /// Returns the server address as a string (host:port)
@@ -477,6 +560,31 @@ impl Config {
         self.providers.google_api_key.as_deref()
     }
 
+    /// Returns the Mistral API key if configured
+    pub fn mistral_api_key(&self) -> Option<&str> {
+        self.providers.mistral_api_key.as_deref()
+    }
+
+    /// Returns the HuggingFace API key if configured
+    pub fn huggingface_api_key(&self) -> Option<&str> {
+        self.providers.huggingface_api_key.as_deref()
+    }
+
+    /// Returns the HuggingFace TGI endpoint URL if configured
+    pub fn huggingface_endpoint_url(&self) -> Option<&str> {
+        self.providers.huggingface_endpoint_url.as_deref()
+    }
+
+    /// Returns the Ollama base URL (custom or default)
+    pub fn ollama_base_url(&self) -> Option<&str> {
+        self.providers.ollama_base_url.as_deref()
+    }
+
+    /// Returns the AWS region for Bedrock if configured
+    pub fn aws_region(&self) -> Option<&str> {
+        self.providers.aws_region.as_deref()
+    }
+
     /// Returns the database URL if configured
     pub fn database_url(&self) -> Option<&str> {
         self.database.url.as_deref()
@@ -506,6 +614,10 @@ impl Config {
             openai = %self.has_openai(),
             anthropic = %self.has_anthropic(),
             google = %self.has_google(),
+            mistral = %self.has_mistral(),
+            huggingface = %self.has_huggingface(),
+            ollama = %self.has_ollama(),
+            bedrock = %self.has_bedrock(),
             database = %self.database.url.is_some(),
             redis = %self.redis.url.is_some(),
             routing_strategy = %self.routing.strategy,
@@ -534,6 +646,12 @@ impl Config {
         }
         if masked.providers.google_api_key.is_some() {
             masked.providers.google_api_key = Some("***".to_string());
+        }
+        if masked.providers.mistral_api_key.is_some() {
+            masked.providers.mistral_api_key = Some("***".to_string());
+        }
+        if masked.providers.huggingface_api_key.is_some() {
+            masked.providers.huggingface_api_key = Some("***".to_string());
         }
         if masked.admin.key.is_some() {
             masked.admin.key = Some("***".to_string());

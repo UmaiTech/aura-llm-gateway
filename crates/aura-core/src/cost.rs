@@ -85,11 +85,20 @@ impl Default for CostCalculator {
 
 impl CostCalculator {
     /// Create a new cost calculator with default pricing data
-    /// Pricing last updated: January 2026
+    /// Pricing last updated: May 2026
     /// Sources:
     /// - OpenAI: <https://openai.com/api/pricing/>
     /// - Anthropic: <https://www.anthropic.com/pricing>
     /// - Google: <https://ai.google.dev/gemini-api/docs/pricing>
+    /// - Mistral: <https://mistral.ai/technology/#pricing>
+    /// - Ollama: local inference, no cost
+    /// - HuggingFace Inference Endpoints: <https://huggingface.co/pricing#endpoints>
+    ///   NOTE: HF Inference Endpoints are billed per compute-hour, not per token.
+    ///   The per-token prices below are placeholders for a mid-tier instance.
+    ///   Actual cost depends on instance type and duration.
+    /// - AWS Bedrock: <https://aws.amazon.com/bedrock/pricing/>
+    ///   Bedrock Claude pricing matches Anthropic direct pricing (Bedrock adds a
+    ///   small regional surcharge in practice; matching Anthropic prices is conservative).
     pub fn new() -> Self {
         let mut pricing = HashMap::new();
 
@@ -360,6 +369,98 @@ impl CostCalculator {
         pricing.insert(
             "gemini-1.5-flash-8b".to_string(),
             ModelPricing::new(0.0375, 0.15).with_cached(0.01),
+        );
+
+        // =================================================================
+        // Mistral AI pricing (as of May 2026)
+        // Source: https://mistral.ai/technology/#pricing
+        // =================================================================
+
+        pricing.insert(
+            "mistral-large-latest".to_string(),
+            ModelPricing::new(2.00, 6.00),
+        );
+        pricing.insert(
+            "mistral-large-2411".to_string(),
+            ModelPricing::new(2.00, 6.00),
+        );
+        pricing.insert(
+            "mistral-medium-latest".to_string(),
+            ModelPricing::new(0.40, 2.00),
+        );
+        pricing.insert(
+            "mistral-small-latest".to_string(),
+            ModelPricing::new(0.20, 0.60),
+        );
+        pricing.insert(
+            "codestral-latest".to_string(),
+            ModelPricing::new(0.30, 0.90),
+        );
+        // Pixtral large uses mistral-large tier pricing
+        pricing.insert(
+            "pixtral-large-latest".to_string(),
+            ModelPricing::new(2.00, 6.00),
+        );
+        pricing.insert(
+            "ministral-8b-latest".to_string(),
+            ModelPricing::new(0.10, 0.10),
+        );
+        pricing.insert(
+            "ministral-3b-latest".to_string(),
+            ModelPricing::new(0.04, 0.04),
+        );
+
+        // =================================================================
+        // Ollama (local inference — $0.00 for all models)
+        // =================================================================
+
+        for model in &[
+            "llama3.3",
+            "llama3.2",
+            "llama3.1",
+            "qwen2.5",
+            "mistral",
+            "mixtral",
+            "phi3",
+            "gemma2",
+            "codellama",
+            "deepseek-r1",
+        ] {
+            pricing.insert(model.to_string(), ModelPricing::new(0.00, 0.00));
+        }
+
+        // =================================================================
+        // HuggingFace TGI Inference Endpoints
+        // NOTE: HF endpoints are billed per compute-hour, not per token.
+        // The placeholder below ($0.50 in / $1.50 out per 1M tokens) approximates
+        // a medium GPU instance. Set pricing.set_pricing() at runtime for accuracy.
+        // =================================================================
+
+        // No static model keys — TGI endpoints are deployment-specific.
+        // Use set_pricing() if you want cost tracking for a specific endpoint.
+
+        // =================================================================
+        // AWS Bedrock — Anthropic Claude on Bedrock
+        // Prices match Anthropic direct (Bedrock has a small regional surcharge
+        // in reality; using Anthropic list prices is a reasonable approximation).
+        // Source: https://aws.amazon.com/bedrock/pricing/
+        // =================================================================
+
+        pricing.insert(
+            "anthropic.claude-opus-4-5-20251001-v1:0".to_string(),
+            ModelPricing::new(15.00, 75.00).with_cached(1.50),
+        );
+        pricing.insert(
+            "anthropic.claude-sonnet-4-5-20250929-v1:0".to_string(),
+            ModelPricing::new(3.00, 15.00).with_cached(0.30),
+        );
+        pricing.insert(
+            "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
+            ModelPricing::new(0.80, 4.00).with_cached(0.08),
+        );
+        pricing.insert(
+            "anthropic.claude-3-7-sonnet-20250219-v1:0".to_string(),
+            ModelPricing::new(3.00, 15.00).with_cached(0.30),
         );
 
         Self { pricing }

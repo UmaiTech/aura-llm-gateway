@@ -7,8 +7,9 @@ mod routes;
 
 use anyhow::Context;
 use aura_core::{
-    AnthropicProvider, CostCalculator, GeminiProvider, OpenAIProvider, Provider, RateLimiter,
-    RedisPool, ResponseCache,
+    AnthropicProvider, BedrockProvider, CostCalculator, GeminiProvider, HuggingFaceProvider,
+    MistralProvider, OllamaProvider, OpenAIProvider, Provider, RateLimiter, RedisPool,
+    ResponseCache,
 };
 use aura_db::{ApiKeyUsageRepo, DbPool, NewApiKeyUsage, NewRequestLog, PoolConfig, RequestLogRepo};
 use axum::{middleware, Router};
@@ -94,6 +95,74 @@ impl AppState {
             providers.insert("google".to_string(), gemini);
         } else {
             warn!("Google API key not configured - Gemini provider disabled");
+        }
+
+        // Register Mistral provider if API key is configured
+        if let Some(api_key) = &config.providers.mistral_api_key {
+            info!("Registering Mistral provider");
+            let mistral = Arc::new(MistralProvider::new(api_key)) as Arc<dyn Provider>;
+
+            for model in mistral.models() {
+                model_map.insert(model.to_string(), "mistral".to_string());
+            }
+
+            providers.insert("mistral".to_string(), mistral);
+        } else {
+            warn!("Mistral API key not configured - Mistral provider disabled");
+        }
+
+        // Register Ollama provider if base URL is configured
+        // (Ollama requires no API key; the URL presence enables it)
+        if let Some(base_url) = &config.providers.ollama_base_url {
+            info!("Registering Ollama provider");
+            let ollama = Arc::new(OllamaProvider::new(Some(base_url.clone()))) as Arc<dyn Provider>;
+
+            // Only register the hardcoded common models in the static map.
+            // Runtime resolution via supports_model() handles any other local model.
+            for model in ollama.models() {
+                model_map.insert(model.to_string(), "ollama".to_string());
+            }
+
+            providers.insert("ollama".to_string(), ollama);
+        } else {
+            warn!("OLLAMA_BASE_URL not configured - Ollama provider disabled");
+        }
+
+        // Register HuggingFace TGI provider if both key and endpoint are configured
+        if let (Some(api_key), Some(endpoint_url)) = (
+            &config.providers.huggingface_api_key,
+            &config.providers.huggingface_endpoint_url,
+        ) {
+            info!("Registering HuggingFace TGI provider");
+            let hf = Arc::new(HuggingFaceProvider::new(api_key, endpoint_url)) as Arc<dyn Provider>;
+
+            // HuggingFace has no static model list; models() returns [].
+            // Model resolution happens via supports_model() fallback.
+            // Register the configured model name if provided.
+            if let Some(model_name) = &config.providers.huggingface_model {
+                model_map.insert(model_name.clone(), "huggingface".to_string());
+            }
+
+            providers.insert("huggingface".to_string(), hf);
+        } else {
+            warn!("HuggingFace API key or endpoint URL not configured - HuggingFace provider disabled");
+        }
+
+        // Register AWS Bedrock provider if region is configured
+        // (Credentials come from the AWS default chain at startup)
+        if let Some(region) = &config.providers.aws_region {
+            info!("Registering AWS Bedrock provider (region: {})", region);
+            let bedrock = Arc::new(
+                tokio::runtime::Handle::current().block_on(BedrockProvider::new(region.clone())),
+            ) as Arc<dyn Provider>;
+
+            for model in bedrock.models() {
+                model_map.insert(model.to_string(), "bedrock".to_string());
+            }
+
+            providers.insert("bedrock".to_string(), bedrock);
+        } else {
+            warn!("AWS_REGION not configured - Bedrock provider disabled");
         }
 
         if db_pool.is_some() {
@@ -226,6 +295,14 @@ impl AppState {
                     "anthropic"
                 } else if response.model.starts_with("gemini-") {
                     "google"
+                } else if response.model.starts_with("mistral")
+                    || response.model.starts_with("codestral")
+                    || response.model.starts_with("ministral")
+                    || response.model.starts_with("pixtral")
+                {
+                    "mistral"
+                } else if response.model.starts_with("anthropic.") {
+                    "bedrock"
                 } else {
                     "unknown"
                 }
