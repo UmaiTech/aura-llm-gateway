@@ -77,6 +77,10 @@ perf.data.old
 *.profraw
 *.profdata
 
+# Helm chart dependencies (fetched at build time via `helm dep update`)
+deploy/charts/*/charts/
+deploy/charts/*/*.tgz
+
 # Node modules (for dashboard when added)
 node_modules/
 dist/

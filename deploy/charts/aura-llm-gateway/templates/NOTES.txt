@@ -1,0 +1,39 @@
+Aura LLM Gateway has been installed.
+
+1. Check the deployment status:
+
+   kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "aura-llm-gateway.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+2. Forward a port to test locally:
+
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "aura-llm-gateway.fullname" . }} 8080:{{ .Values.service.port }}
+
+3. Hit the health endpoint:
+
+   curl http://localhost:8080/health
+
+{{- if .Values.ingress.enabled }}
+
+4. Ingress is enabled. Once DNS resolves, the gateway is reachable at:
+   {{- range .Values.ingress.hosts }}
+   {{- if $.Values.ingress.tls }}
+     https://{{ .host }}
+   {{- else }}
+     http://{{ .host }}
+   {{- end }}
+   {{- end }}
+{{- end }}
+
+{{- if not (or .Values.secrets.existingSecret .Values.secrets.inline.auraMasterKey) }}
+
+WARNING: AURA_MASTER_KEY is not configured. The gateway requires a 32-byte
+hex master key to encrypt provider credentials. Generate one with:
+
+    openssl rand -hex 32
+
+Then either:
+  - Set secrets.inline.auraMasterKey in your values.yaml (NOT recommended for prod)
+  - Create a Secret manually and set secrets.existingSecret = <secret-name>
+{{- end }}
+
+For full documentation, visit https://docs.aura-llm.dev

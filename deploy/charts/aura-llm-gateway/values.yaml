@@ -1,0 +1,177 @@
+# Default values for aura-llm-gateway.
+# See https://github.com/UmaiTech/aura-llm-gateway for full documentation.
+
+# -- Number of gateway replicas. Set to 2+ for HA. Override with HPA if autoscaling.
+replicaCount: 1
+
+image:
+  # -- Container image repository. Pulled from GHCR by default.
+  repository: ghcr.io/umaitech/aura-llm-gateway
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Defaults to .Chart.AppVersion if unset.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: aura.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: ""
+
+# -- Liveness probe configuration. Hits GET /health on the service port.
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ----------------------------------------------------------------------------
+# Gateway configuration
+# ----------------------------------------------------------------------------
+# These map to the AURA_* and provider env vars consumed by aura-proxy.
+# Anything sensitive goes in the secret block (existingSecret recommended).
+# ----------------------------------------------------------------------------
+
+config:
+  # -- Bind address for the gateway. Leave as 0.0.0.0 in-cluster.
+  host: "0.0.0.0"
+  # -- Bind port. Must match service.port.
+  port: 8080
+  # -- Rust log level. e.g. "info", "debug", "info,aura_proxy=debug".
+  logLevel: "info"
+  # -- Optional YAML config mounted at /app/config.yaml. Leave empty to use env-only config.
+  yaml: ""
+
+# ----------------------------------------------------------------------------
+# Secrets
+# ----------------------------------------------------------------------------
+# Two ways to provide secrets:
+#   1) Set existingSecret to the name of a pre-created Secret in the same
+#      namespace. Recommended for production (use sealed-secrets, ESO, etc).
+#   2) Set the inline values below — the chart will create a Secret for you.
+#      DO NOT commit real values into values.yaml in git.
+# ----------------------------------------------------------------------------
+
+secrets:
+  # -- Name of an existing Secret. If set, inline values below are ignored.
+  existingSecret: ""
+
+  # Inline secret values (only used when existingSecret is empty).
+  # The Secret keys are: AURA_MASTER_KEY, AURA_ADMIN_KEY, DATABASE_URL,
+  # REDIS_URL, OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY,
+  # MISTRAL_API_KEY, HUGGINGFACE_API_KEY, AWS_ACCESS_KEY_ID,
+  # AWS_SECRET_ACCESS_KEY.
+  inline:
+    # -- 32-byte hex master key for credential encryption. Generate: openssl rand -hex 32
+    auraMasterKey: ""
+    # -- Admin API key for management endpoints.
+    auraAdminKey: ""
+
+    # Database & cache (only required if features depend on them).
+    databaseUrl: ""
+    redisUrl: ""
+
+    # Provider keys. Set whichever you need; unset providers are disabled at boot.
+    openaiApiKey: ""
+    anthropicApiKey: ""
+    googleApiKey: ""
+    mistralApiKey: ""
+    huggingfaceApiKey: ""
+    huggingfaceEndpointUrl: ""
+    huggingfaceModel: ""
+    ollamaBaseUrl: ""
+    awsRegion: ""
+    awsAccessKeyId: ""
+    awsSecretAccessKey: ""
+
+# ----------------------------------------------------------------------------
+# Optional subcharts (Bitnami)
+# ----------------------------------------------------------------------------
+# Both default to OFF. Most operators have managed PG/Redis already.
+# Enable for local dev / kind clusters or quick demo deployments.
+# ----------------------------------------------------------------------------
+
+postgresql:
+  enabled: false
+  auth:
+    username: aura
+    password: aura
+    database: aura
+  primary:
+    persistence:
+      size: 10Gi
+
+redis:
+  enabled: false
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 2Gi
+  replica:
+    replicaCount: 0

@@ -173,6 +173,20 @@ providers: {}
 
 See [`config.example.yaml`](config.example.yaml) for a full example with all options documented.
 
+#### Helm Chart (Kubernetes)
+
+Deploy to any Kubernetes cluster with the official Helm chart:
+
+```bash
+helm install aura oci://ghcr.io/umaitech/charts/aura-llm-gateway \
+  --version 0.1.0 \
+  --namespace aura --create-namespace \
+  --set secrets.inline.auraMasterKey="$(openssl rand -hex 32)" \
+  --set secrets.inline.openaiApiKey="sk-..."
+```
+
+Full chart documentation: [`deploy/charts/aura-llm-gateway/README.md`](deploy/charts/aura-llm-gateway/README.md).
+
 ## Development
 
 ### Using the Makefile

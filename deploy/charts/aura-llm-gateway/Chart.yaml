@@ -1,0 +1,35 @@
+apiVersion: v2
+name: aura-llm-gateway
+description: |
+  Aura LLM Gateway — high-performance Rust proxy implementing the Open
+  Responses API for agentic workflows. Routes across seven LLM providers
+  (OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, AWS Bedrock)
+  with cost tracking, prompt compression, smart routing, and AES-256-GCM
+  credential encryption.
+type: application
+version: 0.1.0
+appVersion: "0.4.1"
+home: https://aura-llm.dev
+sources:
+  - https://github.com/UmaiTech/aura-llm-gateway
+icon: https://aura-llm.dev/icon-square.svg
+keywords:
+  - llm
+  - ai
+  - gateway
+  - openai
+  - anthropic
+  - rust
+  - open-responses
+maintainers:
+  - name: UmaiTech
+    url: https://github.com/UmaiTech
+dependencies:
+  - name: postgresql
+    version: "~16.2.0"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: postgresql.enabled
+  - name: redis
+    version: "~20.6.0"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: redis.enabled
