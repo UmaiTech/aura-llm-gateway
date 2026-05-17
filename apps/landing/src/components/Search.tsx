@@ -20,7 +20,7 @@ const searchIndex: SearchItem[] = [
   { title: 'Quickstart', path: '/docs/quickstart', section: 'Getting Started', description: 'Get up and running in 5 minutes' },
   { title: 'Configuration', path: '/docs/configuration', section: 'Getting Started', description: 'Environment variables and settings' },
   { title: 'Deployment', path: '/docs/deployment', section: 'Getting Started', description: 'Docker, Kubernetes, and production setup' },
-  { title: 'Roadmap', path: '/docs/roadmap', section: 'Getting Started', description: 'Upcoming features and releases' },
+  { title: 'Roadmap', path: '/roadmap', section: 'Project', description: 'Version history, in-progress work, and future plans' },
 
   // API Reference
   { title: 'API Overview', path: '/docs/api', section: 'API Reference', description: 'API endpoints and authentication' },
