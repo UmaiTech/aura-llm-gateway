@@ -76,9 +76,12 @@ export function SettingsPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Default Model</label>
                       <select className="w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring">
-                        <option value="gpt-4o">gpt-4o</option>
-                        <option value="claude-3-opus">claude-3-opus</option>
-                        <option value="gemini-pro">gemini-pro</option>
+                        <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                        <option value="gpt-5.5">gpt-5.5</option>
+                        <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+                        <option value="claude-opus-4-7">claude-opus-4-7</option>
+                        <option value="gemini-3-pro">gemini-3-pro</option>
+                        <option value="gpt-4o">gpt-4o (legacy)</option>
                       </select>
                     </div>
                     <div className="space-y-2">

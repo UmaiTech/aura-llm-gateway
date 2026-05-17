@@ -14,16 +14,26 @@ interface Model {
 }
 
 const models: Model[] = [
-  // OpenAI
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', inputPrice: 2.50, outputPrice: 10.00, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', inputPrice: 0.15, outputPrice: 0.60, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
-  { id: 'o1', name: 'o1', provider: 'openai', inputPrice: 15.00, outputPrice: 60.00, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
-  { id: 'o3-mini', name: 'o3-mini', provider: 'openai', inputPrice: 1.10, outputPrice: 4.40, contextWindow: 200000, streaming: true, functionCalling: true, vision: false },
-  // Anthropic
+  // OpenAI — 2026 lineup
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', inputPrice: 30.00, outputPrice: 180.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', inputPrice: 5.00, outputPrice: 30.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', inputPrice: 2.50, outputPrice: 15.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', inputPrice: 0.75, outputPrice: 4.50, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', provider: 'openai', inputPrice: 0.20, outputPrice: 1.25, contextWindow: 1000000, streaming: true, functionCalling: true, vision: false },
+  { id: 'o1', name: 'o1 (reasoning)', provider: 'openai', inputPrice: 15.00, outputPrice: 60.00, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
+  { id: 'o3-mini', name: 'o3-mini (reasoning)', provider: 'openai', inputPrice: 1.10, outputPrice: 4.40, contextWindow: 200000, streaming: true, functionCalling: true, vision: false },
+  { id: 'gpt-4o', name: 'GPT-4o (legacy)', provider: 'openai', inputPrice: 2.50, outputPrice: 10.00, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini (legacy)', provider: 'openai', inputPrice: 0.15, outputPrice: 0.60, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
+  // Anthropic — 2026 lineup
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', inputPrice: 5.00, outputPrice: 25.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic', inputPrice: 5.00, outputPrice: 25.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', inputPrice: 3.00, outputPrice: 15.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-sonnet-4-5-20250514', name: 'Claude Sonnet 4.5', provider: 'anthropic', inputPrice: 3.00, outputPrice: 15.00, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-4-5-20250514', name: 'Claude Opus 4.5', provider: 'anthropic', inputPrice: 15.00, outputPrice: 75.00, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-haiku-4-5-20250514', name: 'Claude Haiku 4.5', provider: 'anthropic', inputPrice: 0.80, outputPrice: 4.00, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
   // Google
+  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'google', inputPrice: 1.50, outputPrice: 6.00, contextWindow: 2000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', provider: 'google', inputPrice: 0.15, outputPrice: 0.60, contextWindow: 2000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google', inputPrice: 1.25, outputPrice: 10.00, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'google', inputPrice: 0.10, outputPrice: 0.40, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
 ]

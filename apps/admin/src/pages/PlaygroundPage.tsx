@@ -33,11 +33,23 @@ interface Conversation {
 }
 
 const MODELS = [
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI' },
-  { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic' },
-  { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', provider: 'Anthropic' },
-  { id: 'gemini-pro', name: 'Gemini Pro', provider: 'Google' },
+  // OpenAI — 2026
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'OpenAI' },
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'OpenAI' },
+  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'OpenAI' },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'OpenAI' },
+  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', provider: 'OpenAI' },
+  { id: 'gpt-4o', name: 'GPT-4o (legacy)', provider: 'OpenAI' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini (legacy)', provider: 'OpenAI' },
+  // Anthropic — 2026
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'Anthropic' },
+  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'Anthropic' },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+  { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'Anthropic' },
+  { id: 'claude-3-opus', name: 'Claude 3 Opus (legacy)', provider: 'Anthropic' },
+  // Google
+  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'Google' },
+  { id: 'gemini-pro', name: 'Gemini Pro (legacy)', provider: 'Google' },
 ]
 
 export function PlaygroundPage() {
@@ -46,7 +58,7 @@ export function PlaygroundPage() {
       id: '1',
       title: 'New conversation',
       messages: [],
-      model: 'gpt-4o',
+      model: 'gpt-5.4-mini',
       systemPrompt: 'You are a helpful assistant.',
       createdAt: new Date(),
     },
@@ -116,7 +128,7 @@ export function PlaygroundPage() {
       id: String(Date.now()),
       title: 'New conversation',
       messages: [],
-      model: 'gpt-4o',
+      model: 'gpt-5.4-mini',
       systemPrompt: 'You are a helpful assistant.',
       createdAt: new Date(),
     }

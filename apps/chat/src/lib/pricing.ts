@@ -8,7 +8,12 @@ export interface ModelPricing {
 
 // Pricing data per model
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // OpenAI
+  // OpenAI — 2026 lineup
+  'gpt-5.5-pro': { inputPerMillion: 30.00, outputPerMillion: 180.00 },
+  'gpt-5.5': { inputPerMillion: 5.00, outputPerMillion: 30.00 },
+  'gpt-5.4': { inputPerMillion: 2.50, outputPerMillion: 15.00 },
+  'gpt-5.4-mini': { inputPerMillion: 0.75, outputPerMillion: 4.50 },
+  'gpt-5.4-nano': { inputPerMillion: 0.20, outputPerMillion: 1.25 },
   'gpt-5.2': { inputPerMillion: 6.00, outputPerMillion: 24.00 },
   'gpt-5': { inputPerMillion: 5.00, outputPerMillion: 20.00 },
   'gpt-5-mini': { inputPerMillion: 0.30, outputPerMillion: 1.20 },
@@ -17,10 +22,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-4-turbo': { inputPerMillion: 10.00, outputPerMillion: 30.00 },
   'gpt-3.5-turbo': { inputPerMillion: 0.50, outputPerMillion: 1.50 },
 
-  // Anthropic
+  // Anthropic — 2026 lineup
+  'claude-opus-4-7': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
+  'claude-opus-4-6': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
+  'claude-sonnet-4-6': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
   'claude-opus-4-5-20251101': { inputPerMillion: 15.00, outputPerMillion: 75.00 },
   'claude-sonnet-4-20250514': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
-  'claude-3-5-sonnet-20241022': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
   'claude-3-5-haiku-20241022': { inputPerMillion: 0.80, outputPerMillion: 4.00 },
 
   // Google

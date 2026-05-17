@@ -251,6 +251,11 @@ export const AVAILABLE_MODELS: Array<{
   provider: 'openai' | 'anthropic' | 'google'
 }> = [
   // OpenAI - Latest models first
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai' },
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai' },
+  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai' },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai' },
+  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', provider: 'openai' },
   { id: 'gpt-5.2', name: 'GPT-5.2', provider: 'openai' },
   { id: 'gpt-5', name: 'GPT-5', provider: 'openai' },
   { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'openai' },
@@ -260,9 +265,11 @@ export const AVAILABLE_MODELS: Array<{
   { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai' },
 
   // Anthropic - Latest models first
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic' },
+  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic' },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic' },
   { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', provider: 'anthropic' },
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'anthropic' },
   { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'anthropic' },
 
   // Google - Latest models first

@@ -70,7 +70,7 @@ export const useChatStore = create<ChatState>()(
       // Initial state
       conversations: [],
       currentConversationId: null,
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       systemPrompt: '',
       agentMode: false,
       enabledTools: [],
