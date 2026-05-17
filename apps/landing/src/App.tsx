@@ -1,39 +1,55 @@
 import {
-  Sparkles, ArrowRight, Zap, Shield, BarChart3,
-  Code2, Server, Globe, MessageSquare, BookOpen,
-  Github, ExternalLink
+  Sparkles, ArrowRight, Zap, BarChart3,
+  Code2, Globe, MessageSquare, BookOpen,
+  Github, ExternalLink, Lock, Network, FileSearch,
+  Layers, Minimize2
 } from 'lucide-react'
 
 const features = [
   {
     icon: Globe,
-    title: 'Multi-Provider Support',
-    description: 'Unified API for OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, and AWS Bedrock. Switch providers without changing your code.',
+    title: '7 Providers',
+    description: 'OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, AWS Bedrock — all behind one Open Responses API.',
+  },
+  {
+    icon: Minimize2,
+    title: 'Prompt Compression',
+    description: 'TOON, AISP, YAML, and JSON compression strategies cut token usage 40–60% on uniform arrays and nested objects.',
+  },
+  {
+    icon: Network,
+    title: 'Smart Routing',
+    description: 'Eight strategies — round-robin, weighted, region-aware, cost-optimized. Circuit breaker fails over to a healthy provider on the same call.',
   },
   {
     icon: BarChart3,
     title: 'Cost Tracking',
-    description: 'Real-time cost calculation per request. Track spending across all providers with detailed usage metrics.',
+    description: 'Per-request USD on every response. Track input, output, cached, and reasoning tokens across all seven providers.',
+  },
+  {
+    icon: FileSearch,
+    title: 'Response Validation',
+    description: 'Logprobs, self-consistency, best-of-N sampling, and confidence thresholds — measurably reduce hallucinations.',
+  },
+  {
+    icon: Lock,
+    title: 'Encrypted Credentials',
+    description: 'AES-256-GCM envelope encryption for provider API keys. Master key from KMS or Vault — never written to disk in plaintext.',
+  },
+  {
+    icon: Layers,
+    title: 'Multi-Tenancy',
+    description: 'Hierarchical org → team → project → end-user model with scoped API keys and per-user cost allocation.',
   },
   {
     icon: Zap,
-    title: 'Open Responses API',
-    description: 'Built on the Open Responses specification for agentic workflows with streaming, tool use, and conversation threading.',
-  },
-  {
-    icon: Shield,
-    title: 'Enterprise Ready',
-    description: 'Load balancing, rate limiting, caching, and observability built-in. Deploy with confidence.',
-  },
-  {
-    icon: Server,
-    title: 'Self-Hosted',
-    description: 'Run on your own infrastructure. Full control over your data and API keys.',
+    title: 'Production Ready',
+    description: 'Redis-backed rate limiting and response caching, Prometheus metrics, structured logging, and SSE streaming throughout.',
   },
   {
     icon: Code2,
-    title: 'Developer First',
-    description: 'Clean Rust codebase, comprehensive API docs, and a built-in chat playground for testing.',
+    title: 'Self-Hosted in Rust',
+    description: 'Single static binary, no runtime deps. Axum + Tokio + reqwest. Built to keep gateway overhead under 10ms.',
   },
 ]
 
