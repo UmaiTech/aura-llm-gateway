@@ -335,7 +335,9 @@ export default function App() {
             Test the gateway with our built-in chat interface. Supports agent mode with tool execution.
           </p>
           <a
-            href="http://localhost:3000"
+            href="https://playground.aura-llm.dev"
+            target="_blank"
+            rel="noopener noreferrer"
             className="btn-primary gap-2"
           >
             Open Playground

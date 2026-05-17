@@ -553,7 +553,9 @@ export function DocsPage() {
             <div className="flex items-center gap-4">
               <SearchButton onClick={() => setSearchOpen(true)} />
               <a
-                href="http://localhost:3000"
+                href="https://playground.aura-llm.dev"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1"
               >
                 Playground
