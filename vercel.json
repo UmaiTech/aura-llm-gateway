@@ -4,7 +4,6 @@
   "outputDirectory": "apps/landing/dist",
   "installCommand": "echo 'install handled in buildCommand'",
   "framework": null,
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- apps/landing/ vercel.json",
   "headers": [
     {
       "source": "/assets/(.*)",
