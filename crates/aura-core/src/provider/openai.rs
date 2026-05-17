@@ -19,16 +19,26 @@ use super::{EventStream, Provider, ProviderError};
 /// OpenAI API base URL
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
-/// Supported OpenAI models
+/// Supported OpenAI models (most recent first)
 const SUPPORTED_MODELS: &[&str] = &[
+    // GPT-5.5 family (2026)
+    "gpt-5.5-pro",
+    "gpt-5.5",
+    // GPT-5.4 family (2026)
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    // GPT-5 family (older 2026 line)
     "gpt-5.2",
     "gpt-5",
     "gpt-5-mini",
+    // Legacy 4.x / 4o (kept for backward compat)
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4-turbo",
     "gpt-4",
     "gpt-3.5-turbo",
+    // o-series reasoning models
     "o1",
     "o1-mini",
     "o1-preview",

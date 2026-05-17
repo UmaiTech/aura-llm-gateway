@@ -21,8 +21,14 @@ const ANTHROPIC_API_BASE: &str = "https://api.anthropic.com/v1";
 /// Current Anthropic API version
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-/// Supported Claude models
+/// Supported Claude models (most recent first)
 const SUPPORTED_MODELS: &[&str] = &[
+    // Claude 4.7 (2026 — Opus only in this line)
+    "claude-opus-4-7-20260416",
+    "claude-opus-4-7",
+    // Claude 4.6 (2026)
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
     // Claude 4.5 (dated versions)
     "claude-opus-4-5-20250514",
     "claude-sonnet-4-5-20250514",

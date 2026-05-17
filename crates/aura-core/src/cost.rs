@@ -103,8 +103,29 @@ impl CostCalculator {
         let mut pricing = HashMap::new();
 
         // =================================================================
-        // OpenAI pricing (as of January 2026)
+        // OpenAI pricing (as of May 2026)
         // =================================================================
+
+        // GPT-5.5 family (2026)
+        pricing.insert("gpt-5.5-pro".to_string(), ModelPricing::new(30.00, 180.00));
+        pricing.insert(
+            "gpt-5.5".to_string(),
+            ModelPricing::new(5.00, 30.00).with_cached(0.50),
+        );
+
+        // GPT-5.4 family (2026)
+        pricing.insert(
+            "gpt-5.4".to_string(),
+            ModelPricing::new(2.50, 15.00).with_cached(0.25),
+        );
+        pricing.insert(
+            "gpt-5.4-mini".to_string(),
+            ModelPricing::new(0.75, 4.50).with_cached(0.075),
+        );
+        pricing.insert(
+            "gpt-5.4-nano".to_string(),
+            ModelPricing::new(0.20, 1.25).with_cached(0.02),
+        );
 
         // GPT-4o family
         pricing.insert(
@@ -228,8 +249,28 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Anthropic pricing (as of January 2026)
+        // Anthropic pricing (as of May 2026)
         // =================================================================
+
+        // Claude 4.7 family (2026 — Opus only in this line, no Sonnet 4.7 shipped)
+        pricing.insert(
+            "claude-opus-4-7-20260416".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "claude-opus-4-7".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+
+        // Claude 4.6 family (2026)
+        pricing.insert(
+            "claude-opus-4-6".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "claude-sonnet-4-6".to_string(),
+            ModelPricing::new(3.00, 15.00).with_cached(0.30),
+        );
 
         // Claude 4.5 family (2025-2026)
         pricing.insert(
