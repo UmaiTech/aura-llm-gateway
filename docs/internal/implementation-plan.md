@@ -262,7 +262,7 @@ Define the core Open Responses API types in `aura-types`.
 - Added `CreateResponseRequest` with builder methods for common options
 - Added `Tool` and `FunctionDefinition` types for function calling
 - Added `SseMessage` for parsing/formatting Server-Sent Events
-- Created `docs/PROVIDER_MAPPING.md` documenting type mappings for each provider
+- Created `docs/architecture/provider-mapping.md` documenting type mappings for each provider
 
 ---
 
@@ -338,7 +338,7 @@ Define the core Open Responses API types in `aura-types`.
 ### PR #6: OpenAI Adapter (First Working Proxy!)
 **Rust Concepts:** Traits, async traits, JSON transformation
 
-**Reference:** See `docs/PROVIDER_MAPPING.md` for detailed type mappings between Open Responses API and OpenAI.
+**Reference:** See `docs/architecture/provider-mapping.md` for detailed type mappings between Open Responses API and OpenAI.
 
 **Status:** ✅ **COMPLETED**
 
@@ -454,7 +454,7 @@ pub trait Provider: Send + Sync {
 ### PR #9: Claude Adapter
 **Rust Concepts:** Applying trait patterns, different API shapes
 
-**Reference:** See `docs/PROVIDER_MAPPING.md` for detailed Anthropic/Claude type mappings.
+**Reference:** See `docs/architecture/provider-mapping.md` for detailed Anthropic/Claude type mappings.
 
 **Status:** ✅ **COMPLETED** (January 26, 2026)
 
@@ -488,7 +488,7 @@ pub trait Provider: Send + Sync {
 ### PR #10: Gemini Adapter
 **Rust Concepts:** Reinforcing patterns, handling edge cases
 
-**Reference:** See `docs/PROVIDER_MAPPING.md` for detailed Google/Gemini type mappings.
+**Reference:** See `docs/architecture/provider-mapping.md` for detailed Google/Gemini type mappings.
 
 **Status:** ✅ **COMPLETED** (January 25, 2026)
 
@@ -1076,8 +1076,8 @@ pub struct ProviderRegistry {
 - `docs/api/streaming.md` ✅ - SSE streaming documentation
 - `docs/api/cost-tracking.md` ✅ - Cost tracking and agentic metadata
 - `docs/api/architecture.md` ✅ - Architecture overview (public docs)
-- `docs/architecture.md` ✅ - Detailed architecture with Mermaid diagrams
-- `docs/design/pricing-scraper.md` ✅ - Pricing scraper design document
+- `docs/architecture/overview.md` ✅ - Detailed architecture with Mermaid diagrams
+- `docs/internal/pricing-scraper.md` ✅ - Pricing scraper design document
 - `apps/landing/` ✅ - Landing page with docs viewer
 
 **Architecture Diagrams (Mermaid):**
@@ -1889,7 +1889,7 @@ Interactive, beautiful API documentation.
 ## Milestone 13: Additional Providers
 
 ### PR #58: AWS Bedrock Adapter
-**Reference:** See `docs/PROVIDER_MAPPING.md` for detailed AWS Bedrock type mappings.
+**Reference:** See `docs/architecture/provider-mapping.md` for detailed AWS Bedrock type mappings.
 
 **Tasks:**
 - [ ] Implement `BedrockProvider` struct
@@ -1915,7 +1915,7 @@ Interactive, beautiful API documentation.
 ---
 
 ### PR #59: Mistral Adapter
-**Reference:** See `docs/PROVIDER_MAPPING.md` for detailed Mistral type mappings.
+**Reference:** See `docs/architecture/provider-mapping.md` for detailed Mistral type mappings.
 
 **Tasks:**
 - [ ] Implement `MistralProvider` struct
@@ -1938,7 +1938,7 @@ Interactive, beautiful API documentation.
 ---
 
 ### PR #60: Ollama Adapter (Local Models)
-**Reference:** See `docs/PROVIDER_MAPPING.md` for detailed Ollama type mappings.
+**Reference:** See `docs/architecture/provider-mapping.md` for detailed Ollama type mappings.
 
 **Tasks:**
 - [ ] Implement `OllamaProvider` struct

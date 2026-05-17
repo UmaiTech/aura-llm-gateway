@@ -190,7 +190,7 @@ npm run preview
 
 ## Integration with Admin Dashboard
 
-This chat app will be integrated into the Aura Admin Dashboard as the "Playground" feature. See [docs/ADMIN_APP_PLAN.md](../../docs/ADMIN_APP_PLAN.md) for details.
+This chat app will be integrated into the Aura Admin Dashboard as the "Playground" feature. See [docs/internal/admin-app-plan.md](../../docs/internal/admin-app-plan.md) for details.
 
 ## License
 

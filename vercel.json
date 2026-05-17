@@ -56,9 +56,9 @@
   ],
   "rewrites": [
     {
-      "source": "/:path*",
+      "source": "/((?!playground/).*)",
       "has": [{ "type": "host", "value": "playground.aura-llm.dev" }],
-      "destination": "/playground/:path*"
+      "destination": "/playground/$1"
     },
     {
       "source": "/playground/((?!assets/|.*\\..*).*)",

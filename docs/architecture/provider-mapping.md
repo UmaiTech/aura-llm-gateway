@@ -688,4 +688,4 @@ To add support for a new provider:
 5. Update feature support matrix in this document
 6. Add provider to registry
 
-See `docs/IMPLEMENTATION_PLAN.md` for the full PR workflow.
+See `docs/internal/implementation-plan.md` for the full PR workflow.

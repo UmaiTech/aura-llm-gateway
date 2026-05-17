@@ -74,7 +74,7 @@ tab.
 
 Operators running Aura LLM Gateway in production should review:
 
-- [docs/architecture.md](docs/architecture.md) for the threat model
+- [docs/architecture/overview.md](docs/architecture/overview.md) for the threat model
 - [docs/api/authentication.md](docs/api/authentication.md) for API key handling
 - The "Production" section of `README.md` for CORS and TLS guidance
 - Provider credential storage — Aura uses AES-256-GCM envelope encryption,
