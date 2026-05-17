@@ -27,11 +27,11 @@ A high-performance, production-ready LLM proxy gateway built in Rust that implem
 
 ## Overview
 
-Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI, Anthropic, Google) with built-in load balancing, cost tracking, caching, and observability. It's designed for production deployments requiring high throughput, low latency, and enterprise-grade reliability.
+Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace TGI, AWS Bedrock) with built-in load balancing, cost tracking, caching, and observability. It's designed for production deployments requiring high throughput, low latency, and enterprise-grade reliability.
 
 ### Key Features
 
-- **Multi-Provider Support**: OpenAI, Anthropic (Claude), Google (Gemini)
+- **Multi-Provider Support**: OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Ollama, HuggingFace TGI, AWS Bedrock
 - **Open Responses API**: Semantic streaming events for agentic workflows
 - **API Key Authentication**: Secure API key management with scopes and rate limits
 - **Hierarchical Organizations**: Organization → Teams → Projects with scoped API keys
@@ -323,11 +323,15 @@ The `docker-compose.yml` includes:
 - 🔄 **PR #37-38: TypeScript SDK** - Coming soon
 - 🔄 **Admin Dashboard** - React admin UI for key and org management
 
-### Planned Providers
-- 📋 **AWS Bedrock** - Claude, Llama, Titan models via Bedrock
-- 📋 **Mistral** - Mistral Large, Medium, Codestral
-- 📋 **Ollama** - Local models (Llama, Mistral, etc.)
-- 📋 **HuggingFace** - Inference API and Endpoints
+### Completed Providers
+- [x] **Mistral** - mistral-large-latest, mistral-small-latest, codestral-latest, pixtral-large, ministral-8b/3b
+- [x] **Ollama** - Local inference; any model pulled locally; default endpoint `http://localhost:11434`
+- [x] **HuggingFace TGI** - Per-deployment Inference Endpoints; OpenAI-compatible; bring-your-own endpoint
+- [x] **AWS Bedrock** - Claude on Bedrock (claude-3-5-sonnet, claude-3-haiku, claude-3-7-sonnet); Llama/Titan deferred
+
+### Planned Provider Extensions
+- 📋 **AWS Bedrock: Llama / Mistral / Titan** - Additional Bedrock model families
+- 📋 **HuggingFace Classic Inference API** - `api-inference.huggingface.co` endpoint
 
 ### Bonus (Implemented Early)
 - [x] **Chat UI** - React chat app with tool execution cards

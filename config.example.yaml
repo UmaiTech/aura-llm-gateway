@@ -19,6 +19,8 @@ server:
 # Provider API keys
 # NOTE: For production, prefer environment variables for sensitive values:
 #   OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
+#   MISTRAL_API_KEY, HUGGINGFACE_API_KEY, HUGGINGFACE_ENDPOINT_URL,
+#   HUGGINGFACE_MODEL, OLLAMA_BASE_URL, AWS_REGION
 providers:
   # OpenAI API key (optional)
   # openai_api_key: "sk-..."
@@ -26,8 +28,30 @@ providers:
   # Anthropic API key (optional)
   # anthropic_api_key: "sk-ant-..."
 
-  # Google API key (optional)
+  # Google Gemini API key (optional)
   # google_api_key: "..."
+
+  # Mistral AI API key (optional)
+  # Enables: mistral-large-latest, mistral-small-latest, codestral-latest, etc.
+  # mistral_api_key: "..."
+
+  # HuggingFace TGI — Inference Endpoints (optional)
+  # Both api_key and endpoint_url are required to activate this provider.
+  # Each deployment has its own endpoint URL; the model name is optional but
+  # helps with routing when multiple HF endpoints are registered.
+  # huggingface_api_key: "hf_..."
+  # huggingface_endpoint_url: "https://your-endpoint.endpoints.huggingface.cloud"
+  # huggingface_model: "meta-llama/Llama-3.1-8B-Instruct"
+
+  # Ollama — local inference server (optional, no API key required)
+  # Supports any model pulled locally; set OLLAMA_BASE_URL or leave unset to
+  # use the default http://localhost:11434.
+  # ollama_base_url: "http://localhost:11434"
+
+  # AWS Bedrock (optional)
+  # Set the region to enable. Credentials are resolved via the standard AWS
+  # credential chain (env vars → ~/.aws/credentials → EC2/ECS IAM role).
+  # aws_region: "us-east-1"
 
 logging:
   # Log level: trace, debug, info, warn, error
