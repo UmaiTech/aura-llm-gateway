@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, Suspense, ComponentType } from 'react'
-import { useLocation, Link, useNavigate } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
