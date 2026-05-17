@@ -31,19 +31,19 @@ Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI,
 
 ### Key Features
 
-- **Multi-Provider Support**: OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Ollama, HuggingFace TGI, AWS Bedrock
-- **Open Responses API**: Semantic streaming events for agentic workflows
-- **API Key Authentication**: Secure API key management with scopes and rate limits
-- **Hierarchical Organizations**: Organization → Teams → Projects with scoped API keys
-- **End-User Cost Tracking**: Track costs per end-user for billing and allocation
-- **Credential Encryption**: AES-256-GCM envelope encryption for provider credentials
-- **Cost Tracking**: Real-time usage and cost monitoring per request
-- **Agentic Metadata**: Tool call tracking, requires_action flags, reasoning status
-- **Load Balancing**: Distribute requests across providers and API keys
-- **Response Caching**: Redis-based caching with configurable TTL
-- **Rate Limiting**: Per-key and per-user rate limits with burst support
-- **Observability**: Prometheus metrics, structured logging, request tracing
-- **High Performance**: Built in Rust with async I/O (Tokio + Axum)
+- **7 LLM providers** behind one Open Responses API — OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Ollama, HuggingFace TGI, AWS Bedrock
+- **Prompt compression** — TOON, AISP, YAML, JSON strategies, 40–60% token savings on uniform arrays and nested objects
+- **Smart routing & failover** — 8 strategies (round-robin, weighted, region-aware, cost-optimized) + circuit breaker
+- **Cost tracking** — per-request USD on every response, with input/output/cached/reasoning token breakdown
+- **Response validation** — logprobs, self-consistency, best-of-N, confidence thresholds to reduce hallucinations
+- **Encrypted credentials** — AES-256-GCM envelope encryption for provider API keys
+- **Multi-tenancy** — Organization → Team → Project → End-User hierarchy with scoped API keys
+- **API key authentication** — bearer tokens, scopes, per-key rate limits
+- **Response caching** — Redis-backed, SHA-256 keys, TTL configurable
+- **Rate limiting** — per-key token bucket, monthly token budgets, retry-aware headers
+- **Observability** — Prometheus `/metrics`, structured tracing, OpenAPI/Swagger
+- **Streaming** — SSE with semantic Open Responses events end-to-end
+- **High performance** — Rust + Axum + Tokio, single static binary, sub-10ms gateway overhead
 
 ## Architecture
 
@@ -52,19 +52,21 @@ aura-llm-gateway/
 ├── crates/
 │   ├── aura-types/      # Shared type definitions (Open Responses API types)
 │   ├── aura-db/         # Database models and queries (SQLx)
-│   ├── aura-core/       # Core business logic (providers, routing, caching)
+│   ├── aura-core/       # Core business logic (providers, routing, caching, compression)
 │   └── aura-proxy/      # Main server binary (Axum routes, middleware)
 ├── sdks/
-│   └── python/          # Python SDK (aura-llm package)
+│   └── python/          # Python SDK (aura-llm on PyPI)
 ├── apps/
-│   ├── chat/            # React chat UI for testing the gateway
-│   └── landing/         # Landing page and documentation site
+│   ├── admin/           # Admin dashboard (React)
+│   ├── chat/            # Chat playground (React, deployed at /playground)
+│   └── landing/         # Marketing landing + docs site (aura-llm.dev)
+├── deploy/
+│   └── charts/          # Helm chart for Kubernetes deployment
 ├── migrations/          # SQLx database migrations
-├── dashboard/           # React admin dashboard (coming soon)
-└── docs/               # Documentation (with Mermaid diagrams)
+└── docs/                # Contributor/operator docs (user docs live at docs.aura-llm.dev)
 ```
 
-See [docs/architecture.md](docs/architecture.md) for detailed architecture diagrams.
+See [docs/architecture/overview.md](docs/architecture/overview.md) for detailed architecture diagrams.
 
 ## Quick Start
 
@@ -305,56 +307,17 @@ The `docker-compose.yml` includes:
 - **postgres**: PostgreSQL 16 database for persistence
 - **redis**: Redis 7 for caching and rate limiting
 
-## Project Status
+## Project status
 
-**Current Phase**: Developer Experience & Advanced Features (Milestone 8 & 6) 🔄
+Aura is pre-1.0 but actively used. Current line:
 
-### Completed
-- [x] **PR #1: Project Scaffolding** - Cargo workspace with 4 crates
-- [x] **PR #2: Configuration System** - Environment + YAML config with validation
-- [x] **PR #3: Open Responses API Types** - Full type system with 60+ tests
-- [x] **PR #4: Basic Axum Server** - Health endpoint, tracing middleware
-- [x] **PR #5: HTTP Client Foundation** - Reqwest with retries and timeouts
-- [x] **PR #6: OpenAI Adapter** - Provider trait + OpenAI implementation
-- [x] **PR #7: Streaming Support** - SSE streaming with semantic events
-- [x] **PR #9: Claude Adapter** - Full Anthropic provider with streaming and tool support
-- [x] **PR #10: Gemini Adapter** - Full Google Gemini provider with streaming and function calling
-- [x] **PR #13: API Key Authentication** - Bearer token auth with scopes and rate limits
-- [x] **PR #14: PostgreSQL Setup** - Database schema, models, AppState integration
-- [x] **PR #15: Request Logging** - Async logging to database
-- [x] **PR #16: Cost Tracking** - Per-request cost calculation with agentic metadata
-- [x] **PR #21: Conversation Threading** - Stateful conversations with previous_response_id
-- [x] **PR #28: Documentation** - API docs, architecture diagrams (Mermaid)
-- [x] **PR #35-36: Python SDK** - Full-featured client with sync/async, streaming, typed events
-- [x] **PR #54: Organization Model** - Hierarchical org → teams → projects structure
-- [x] **Credential Encryption** - AES-256-GCM envelope encryption for provider API keys
-- [x] **End-User Tracking** - Per-user cost allocation with upsert on API requests
-- [x] **PR #17: Prometheus Metrics** - `/metrics` endpoint with request/token/cost metrics
-- [x] **PR #19: Rate Limiting** - Redis-backed token bucket with per-key limits
-- [x] **PR #20: Response Caching** - TTL-based caching with SHA256 cache keys
+- **Shipping** — 7 providers, smart routing, prompt compression, multi-tenancy, cost tracking, encrypted credentials, response caching, rate limiting, Prometheus metrics, Python SDK on PyPI, Helm chart for k8s deploys
+- **In progress** — TypeScript SDK, OpenTelemetry tracing, HF classic Inference API, additional Bedrock model families (Llama/Mistral/Titan), Mistral FIM completions
+- **Considering** — webhook callbacks, semantic caching, A/B traffic splitting between models, hard budget caps
 
-### In Progress
-- 🔄 **PR #37-38: TypeScript SDK** - Coming soon
-- 🔄 **Admin Dashboard** - React admin UI for key and org management
+For the live roadmap with version-anchored detail, see **[roadmap.aura-llm.dev](https://roadmap.aura-llm.dev)**.
 
-### Completed Providers
-- [x] **Mistral** - mistral-large-latest, mistral-small-latest, codestral-latest, pixtral-large, ministral-8b/3b
-- [x] **Ollama** - Local inference; any model pulled locally; default endpoint `http://localhost:11434`
-- [x] **HuggingFace TGI** - Per-deployment Inference Endpoints; OpenAI-compatible; bring-your-own endpoint
-- [x] **AWS Bedrock** - Claude on Bedrock (claude-3-5-sonnet, claude-3-haiku, claude-3-7-sonnet); Llama/Titan deferred
-
-### Planned Provider Extensions
-- 📋 **AWS Bedrock: Llama / Mistral / Titan** - Additional Bedrock model families
-- 📋 **HuggingFace Classic Inference API** - `api-inference.huggingface.co` endpoint
-
-### Bonus (Implemented Early)
-- [x] **Chat UI** - React chat app with tool execution cards
-- [x] **Landing Page** - Marketing site with integrated docs viewer
-- [x] **Agent Mode** - Built-in tools with Tavily web search integration
-- [x] **Agentic Metadata** - Tool call tracking, requires_action, reasoning status
-- [x] **2026 Model Pricing** - GPT-5, Claude 4.5, Gemini 3 supported
-
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the complete roadmap.
+Historical PR-by-PR detail lives in [`docs/internal/implementation-plan.md`](docs/internal/implementation-plan.md).
 
 ## Chat UI
 
@@ -469,10 +432,22 @@ same terms.
 
 ## Links
 
+### Live sites
+- [aura-llm.dev](https://aura-llm.dev) — marketing landing
+- [docs.aura-llm.dev](https://docs.aura-llm.dev) — full user documentation
+- [roadmap.aura-llm.dev](https://roadmap.aura-llm.dev) — current and planned work
+- [playground.aura-llm.dev](https://playground.aura-llm.dev) — interactive chat playground
+
+### Reference
 - [Open Responses API Specification](https://www.openresponses.org/specification)
-- [Python SDK Documentation](sdks/python/README.md)
-- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
-- [Admin App Plan](docs/ADMIN_APP_PLAN.md)
-- [Chat UI Documentation](apps/chat/README.md)
-- [Provider Mapping Guide](docs/PROVIDER_MAPPING.md)
-- [Documentation](docs/)
+- [Python SDK on PyPI](https://pypi.org/project/aura-llm/)
+- [Helm chart](deploy/charts/aura-llm-gateway/README.md)
+- [Docker image (GHCR)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/aura-llm-gateway)
+
+### Repository docs
+- [Contributor docs index](docs/README.md)
+- [Architecture](docs/architecture/overview.md)
+- [Provider mapping](docs/architecture/provider-mapping.md)
+- [Deployment with Helm](docs/deployment/helm.md)
+- [Deployment with Docker](docs/deployment/docker.md)
+- [Implementation plan (historical)](docs/internal/implementation-plan.md)

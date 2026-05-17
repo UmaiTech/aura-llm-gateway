@@ -31,18 +31,19 @@ jobs:
         with:
           version: v3.16.2
 
-      - name: Lint chart
-        run: helm lint deploy/charts/aura-llm-gateway
-
       - name: Update dependencies
         run: helm dependency update deploy/charts/aura-llm-gateway
 
+      - name: Lint chart
+        run: helm lint deploy/charts/aura-llm-gateway
+
       - name: Template render (default values)
-        run: helm template aura deploy/charts/aura-llm-gateway
+        run: helm template aura deploy/charts/aura-llm-gateway --dependency-update
 
       - name: Template render (with subcharts and ingress)
         run: |
           helm template aura deploy/charts/aura-llm-gateway \
+            --dependency-update \
             --set postgresql.enabled=true \
             --set redis.enabled=true \
             --set ingress.enabled=true \
