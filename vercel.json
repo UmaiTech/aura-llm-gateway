@@ -47,11 +47,6 @@
   ],
   "rewrites": [
     {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "docs.aura-llm.dev" }],
-      "destination": "/docs/:path*"
-    },
-    {
       "source": "/((?!assets/|.*\\..*).*)",
       "destination": "/index.html"
     }
