@@ -73,7 +73,10 @@ jobs:
           helm dependency update deploy/charts/aura-llm-gateway
           # helm 3.16 helm package requires subcharts as extracted directories,
           # but helm dependency update leaves them as .tgz files. Unpack them.
+          # shopt -s nullglob makes the glob expand to nothing (not literal)
+          # if no .tgz files matched — keeps the loop safe to re-run.
           cd deploy/charts/aura-llm-gateway/charts && \
+            shopt -s nullglob && \
             for f in *.tgz; do tar -xzf "$f" && rm "$f"; done
 
       - name: Package chart
