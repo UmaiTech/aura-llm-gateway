@@ -35,5 +35,10 @@ chrono.workspace = true
 humantime.workspace = true
 regex.workspace = true
 
+# AWS Bedrock
+aws-config = { workspace = true }
+aws-sdk-bedrockruntime = { workspace = true }
+aws-credential-types = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
