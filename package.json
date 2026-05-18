@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "description": "Root package.json — exists solely to declare deps used by the Vercel serverless functions in /api/. The actual apps live in apps/landing/, apps/chat/, apps/admin/ with their own package.json files.",
+  "engines": {
+    "node": "22.x"
+  },
   "dependencies": {
     "better-auth": "^1.3.0",
     "pg": "^8.13.0"
