@@ -62,12 +62,22 @@ jobs:
 
       - name: Post version preview comment
         uses: actions/github-script@v7
+        env:
+          # Pass step outputs through env vars instead of inlining them into the
+          # JS script body. Inlining via ${{ ... }} string-substitutes BEFORE the
+          # JS parser runs, so any unescaped JS-special characters in the values
+          # (backticks, $, quotes, even bare identifiers from commit messages)
+          # break the script with "SyntaxError: Unexpected identifier".
+          CURRENT_VERSION: ${{ steps.version.outputs.current }}
+          NEXT_VERSION: ${{ steps.version.outputs.next }}
+          BUMP: ${{ steps.version.outputs.bump }}
+          CHANGELOG: ${{ steps.changelog.outputs.content }}
         with:
           script: |
-            const current = '${{ steps.version.outputs.current }}';
-            const next = '${{ steps.version.outputs.next }}';
-            const bump = '${{ steps.version.outputs.bump }}';
-            const changelog = `${{ steps.changelog.outputs.content }}`;
+            const current = process.env.CURRENT_VERSION;
+            const next = process.env.NEXT_VERSION;
+            const bump = process.env.BUMP;
+            const changelog = process.env.CHANGELOG || '';
 
             const bumpEmoji = { 'major': '🚨', 'minor': '✨', 'patch': '🔧', 'none': '➖' }[bump] || '❓';
             const bumpLabel = { 'major': 'MAJOR', 'minor': 'MINOR', 'patch': 'PATCH', 'none': 'No bump' }[bump] || 'Unknown';
