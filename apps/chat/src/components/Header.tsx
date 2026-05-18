@@ -1,5 +1,6 @@
-import { Menu, Wrench } from 'lucide-react'
+import { LogOut, Menu, Wrench } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { useSession, signOut } from '../lib/auth-client'
 import { ThemeToggle } from './ThemeToggle'
 
 interface HeaderProps {
@@ -58,7 +59,48 @@ export function Header({
             {agentMode ? "Agent" : "Chat"}
           </span>
         </button>
+
+        <UserMenu />
       </div>
     </header>
+  )
+}
+
+/**
+ * Compact user identity + sign-out control. Renders only when there's an
+ * active session (which is always when AuthGate has admitted us into the
+ * chat, but we guard anyway for the brief window during sign-out).
+ */
+function UserMenu() {
+  const { data: session } = useSession()
+  if (!session?.user) return null
+
+  const handleSignOut = async () => {
+    await signOut()
+    // Reload so AuthGate re-renders the sign-in screen cleanly.
+    window.location.href = '/'
+  }
+
+  const initial = (session.user.name || session.user.email || '?').charAt(0).toUpperCase()
+
+  return (
+    <button
+      onClick={handleSignOut}
+      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-secondary transition-colors"
+      title={`Signed in as ${session.user.email}. Click to sign out.`}
+    >
+      {session.user.image ? (
+        <img
+          src={session.user.image}
+          alt={session.user.name || 'User avatar'}
+          className="h-6 w-6 rounded-full"
+        />
+      ) : (
+        <div className="h-6 w-6 rounded-full bg-aura-500/30 text-aura-300 flex items-center justify-center text-xs font-semibold">
+          {initial}
+        </div>
+      )}
+      <LogOut className="h-4 w-4 text-muted-foreground hidden sm:inline" />
+    </button>
   )
 }
