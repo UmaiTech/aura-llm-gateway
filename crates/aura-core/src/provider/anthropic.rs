@@ -32,9 +32,11 @@ const SUPPORTED_MODELS: &[&str] = &[
     // Claude 4.5 (dated versions)
     "claude-opus-4-5-20250514",
     "claude-sonnet-4-5-20250514",
+    "claude-haiku-4-5-20251001",
     // Claude 4.5 (aliases)
     "claude-opus-4-5",
     "claude-sonnet-4-5",
+    "claude-haiku-4-5",
     // Claude 3.7
     "claude-3-7-sonnet-20250219",
     // Claude 3.5 (dated versions)

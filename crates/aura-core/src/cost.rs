@@ -290,6 +290,10 @@ impl CostCalculator {
             ModelPricing::new(3.00, 15.00).with_cached(0.30),
         );
         pricing.insert(
+            "claude-haiku-4-5-20251001".to_string(),
+            ModelPricing::new(1.00, 5.00).with_cached(0.10),
+        );
+        pricing.insert(
             "claude-haiku-4-5-20251201".to_string(),
             ModelPricing::new(1.00, 5.00).with_cached(0.10),
         );
