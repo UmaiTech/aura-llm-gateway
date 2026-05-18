@@ -131,8 +131,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   'upgrade',
 ])
 
-export const config = {
-  runtime: 'nodejs',
-  // Required for SSE streaming — Edge has a 25s response time cap that
-  // doesn't work for long LLM streams.
-}
+// Runs on Vercel's default Node.js runtime. Edge is not viable here:
+// it has a 25s response cap that doesn't work for long LLM streams.
+// The explicit `config.runtime` export was removed because Vercel
+// deprecated that key — Node is the default for @vercel/node@5.

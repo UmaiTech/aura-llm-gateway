@@ -40,8 +40,7 @@ export default async function handler(req: Request): Promise<Response> {
   return response
 }
 
-// Tell Vercel to use the Node.js runtime — better-auth needs `pg` which
-// doesn't work in the Edge runtime.
-export const config = {
-  runtime: 'nodejs',
-}
+// Runs on Vercel's default Node.js runtime (@vercel/node). The explicit
+// `config.runtime` export was removed because Vercel deprecated that key
+// — Node is the default for /api/*.ts handlers under @vercel/node@5.
+// better-auth depends on `pg`, which only works on Node, not Edge.
