@@ -58,8 +58,21 @@ const baseURL =
 // of 4 leaves headroom without blowing past Fly Postgres's connection
 // budget (default 100 across all clients). Each Vercel serverless
 // invocation is short-lived, so idle connections drop off quickly.
+//
+// `ssl` must be set explicitly here. Fly Postgres requires TLS, but the
+// `node-postgres` driver does NOT honor `sslmode=require` in the
+// connection string the way libpq does — it only reads its own `ssl`
+// option. Without this, the driver opens a plain-TCP connection, Fly
+// rejects it mid-handshake, and the function hangs until
+// `connectionTimeoutMillis` fires (every request, no logs). Setting
+// `rejectUnauthorized: false` because Fly Postgres uses a self-signed
+// cert by default — the connection is still TLS-encrypted, we just
+// don't validate the cert chain. Acceptable here because the gateway
+// runs in the same Fly org and we're only protecting bearer tokens
+// in transit, not against MITM from inside Fly's network.
 const pool = new Pool({
   connectionString: databaseUrl,
+  ssl: { rejectUnauthorized: false },
   max: 4,
   idleTimeoutMillis: 5000,
   connectionTimeoutMillis: 5000,
