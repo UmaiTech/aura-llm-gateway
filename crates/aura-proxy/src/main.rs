@@ -1060,39 +1060,194 @@ async fn run_migrate() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Build the CORS layer.
-///
-/// Reads `AURA_CORS_ALLOWED_ORIGINS` (comma-separated origins). If unset or
-/// empty, falls back to permissive CORS (`Any`) — fine for local development
-/// but never for production. Set the env var in production to restrict
-/// origins to your actual frontend domains.
-fn build_cors_layer() -> CorsLayer {
-    let allowed = std::env::var("AURA_CORS_ALLOWED_ORIGINS").unwrap_or_default();
-    if allowed.trim().is_empty() {
-        warn!(
-            "AURA_CORS_ALLOWED_ORIGINS unset — using permissive CORS (Any). \
-             Set this in production to restrict to your frontend domains."
-        );
-        return CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods(Any)
-            .allow_headers(Any);
+/// Result of parsing the AURA_CORS_ALLOWED_ORIGINS env var.
+#[derive(Debug)]
+enum CorsConfig {
+    /// Env var unset or all-whitespace — fall back to permissive CORS.
+    Unset,
+    /// Env var set but every entry was unparseable — fall back to permissive
+    /// CORS rather than silently blocking all cross-origin requests.
+    AllInvalid { raw: String },
+    /// Env var has at least one valid origin. `invalid` lists any entries
+    /// that failed to parse and were dropped (for operator-visible logging).
+    Strict {
+        origins: Vec<HeaderValue>,
+        invalid: Vec<String>,
+    },
+}
+
+/// Parse the comma-separated AURA_CORS_ALLOWED_ORIGINS into a CorsConfig.
+fn parse_cors_origins(raw: &str) -> CorsConfig {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return CorsConfig::Unset;
     }
 
-    let origins: Vec<HeaderValue> = allowed
+    let entries: Vec<&str> = trimmed
         .split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .filter_map(|s| s.parse::<HeaderValue>().ok())
         .collect();
 
-    info!(origins = ?origins, "Configuring CORS with explicit allowed origins");
+    // All entries were empty after splitting (e.g. ",,,") — treat as unset
+    // rather than reporting AllInvalid, since the operator clearly meant nothing.
+    if entries.is_empty() {
+        return CorsConfig::Unset;
+    }
 
+    let mut origins: Vec<HeaderValue> = Vec::with_capacity(entries.len());
+    let mut invalid: Vec<String> = Vec::new();
+    for entry in &entries {
+        match entry.parse::<HeaderValue>() {
+            Ok(v) => origins.push(v),
+            Err(_) => invalid.push((*entry).to_string()),
+        }
+    }
+
+    if origins.is_empty() {
+        CorsConfig::AllInvalid {
+            raw: trimmed.to_string(),
+        }
+    } else {
+        CorsConfig::Strict { origins, invalid }
+    }
+}
+
+/// Build the permissive CORS layer used as the fallback / dev default.
+fn permissive_cors_layer() -> CorsLayer {
     CorsLayer::new()
-        .allow_origin(origins)
+        .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any)
-        .allow_credentials(false)
+}
+
+/// Build the CORS layer based on `AURA_CORS_ALLOWED_ORIGINS`.
+///
+/// 1. **Unset or empty** → permissive CORS (`Any`) with a `warn!` log.
+///    Fine for local development; never for production.
+///
+/// 2. **Set with valid origins** → strict CORS allowing exactly those origins.
+///    Invalid entries are logged and dropped.
+///
+/// 3. **Set but every entry fails to parse** → falls back to permissive CORS
+///    with a loud `error!` log, so a typo in the env var doesn't silently
+///    break every cross-origin request in production.
+fn build_cors_layer() -> CorsLayer {
+    let raw = std::env::var("AURA_CORS_ALLOWED_ORIGINS").unwrap_or_default();
+    match parse_cors_origins(&raw) {
+        CorsConfig::Unset => {
+            warn!(
+                "AURA_CORS_ALLOWED_ORIGINS unset — using permissive CORS (Any). \
+                 Set this in production to restrict to your frontend domains."
+            );
+            permissive_cors_layer()
+        }
+        CorsConfig::AllInvalid { raw } => {
+            error!(
+                raw = %raw,
+                "AURA_CORS_ALLOWED_ORIGINS is set but every entry is invalid — \
+                 falling back to permissive CORS to avoid silently blocking all \
+                 cross-origin requests. Fix the env var to restore strict mode."
+            );
+            permissive_cors_layer()
+        }
+        CorsConfig::Strict { origins, invalid } => {
+            if !invalid.is_empty() {
+                error!(
+                    invalid_origins = ?invalid,
+                    "AURA_CORS_ALLOWED_ORIGINS contains entries that are not valid \
+                     HTTP header values — these will be ignored. Check for typos / \
+                     stray whitespace / non-ASCII characters."
+                );
+            }
+            info!(origins = ?origins, "Configuring CORS with explicit allowed origins");
+            CorsLayer::new()
+                .allow_origin(origins)
+                .allow_methods(Any)
+                .allow_headers(Any)
+                .allow_credentials(false)
+        }
+    }
+}
+
+#[cfg(test)]
+mod cors_tests {
+    use super::*;
+
+    #[test]
+    fn empty_string_returns_unset() {
+        assert!(matches!(parse_cors_origins(""), CorsConfig::Unset));
+        assert!(matches!(parse_cors_origins("   "), CorsConfig::Unset));
+        assert!(matches!(parse_cors_origins(",,, , ,"), CorsConfig::Unset));
+    }
+
+    #[test]
+    fn single_valid_origin() {
+        let cfg = parse_cors_origins("https://playground.aura-llm.dev");
+        match cfg {
+            CorsConfig::Strict { origins, invalid } => {
+                assert_eq!(origins.len(), 1);
+                assert_eq!(origins[0], "https://playground.aura-llm.dev");
+                assert!(invalid.is_empty());
+            }
+            _ => panic!("expected Strict variant, got {cfg:?}"),
+        }
+    }
+
+    #[test]
+    fn multiple_valid_origins_trimmed() {
+        let cfg = parse_cors_origins(
+            "https://aura-llm.dev,  https://playground.aura-llm.dev , https://docs.aura-llm.dev",
+        );
+        match cfg {
+            CorsConfig::Strict { origins, invalid } => {
+                assert_eq!(origins.len(), 3);
+                assert!(invalid.is_empty());
+            }
+            _ => panic!("expected Strict variant, got {cfg:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_entries_partial_kept() {
+        // Header values cannot contain whitespace mid-string or non-ASCII.
+        let cfg =
+            parse_cors_origins("https://valid.example,not\nallowed,https://also-valid.example");
+        match cfg {
+            CorsConfig::Strict { origins, invalid } => {
+                assert_eq!(origins.len(), 2);
+                assert_eq!(invalid.len(), 1);
+                assert_eq!(invalid[0], "not\nallowed");
+            }
+            _ => panic!("expected Strict variant with partial validity, got {cfg:?}"),
+        }
+    }
+
+    #[test]
+    fn all_invalid_falls_back() {
+        let cfg = parse_cors_origins("not\nallowed,also\rbad");
+        match cfg {
+            CorsConfig::AllInvalid { raw } => {
+                assert!(raw.contains("not\nallowed"));
+            }
+            _ => panic!("expected AllInvalid variant, got {cfg:?}"),
+        }
+    }
+
+    #[test]
+    fn build_cors_layer_never_panics() {
+        // Smoke test — just ensure the public entry point survives each case.
+        std::env::remove_var("AURA_CORS_ALLOWED_ORIGINS");
+        let _ = build_cors_layer();
+
+        std::env::set_var("AURA_CORS_ALLOWED_ORIGINS", "https://example.com");
+        let _ = build_cors_layer();
+
+        std::env::set_var("AURA_CORS_ALLOWED_ORIGINS", "not\nallowed");
+        let _ = build_cors_layer();
+
+        std::env::remove_var("AURA_CORS_ALLOWED_ORIGINS");
+    }
 }
 
 /// Initialize tracing/logging
