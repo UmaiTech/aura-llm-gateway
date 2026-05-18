@@ -85,4 +85,6 @@ jobs:
       - name: Push chart to GHCR
         run: |
           CHART_TGZ=$(ls ./packaged/aura-llm-gateway-*.tgz | head -n1)
-          helm push "$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/charts
+          # OCI registries require lowercase repository references
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          helm push "$CHART_TGZ" "oci://ghcr.io/${OWNER}/charts"

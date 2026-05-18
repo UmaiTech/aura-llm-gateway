@@ -2,14 +2,15 @@
 
 [![CI](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
 [![Python SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml)
+[![Helm Chart](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/helm-chart.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/helm-chart.yml)
 [![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway?include_prereleases&label=release)](https://github.com/UmaiTech/aura-llm-gateway/releases)
-[![Version](https://img.shields.io/badge/version-0.3.1-blue)](https://github.com/UmaiTech/aura-llm-gateway)
+[![PyPI](https://img.shields.io/pypi/v/aura-llm?label=pypi%3A%20aura-llm)](https://pypi.org/project/aura-llm/)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fumaitech%2Faura--llm--gateway-2496ED?logo=docker&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/aura-llm-gateway)
+[![Helm](https://img.shields.io/badge/helm-ghcr.io%2Fumaitech%2Fcharts%2Faura--llm--gateway-0F1689?logo=helm&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/charts%2Faura-llm-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
-[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](Dockerfile)
 [![GitHub last commit](https://img.shields.io/github/last-commit/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/commits/main)
-[![GitHub issues](https://img.shields.io/github/issues/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/issues)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/UmaiTech/aura-llm-gateway/pulls)
 
 <p align="center">

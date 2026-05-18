@@ -2,6 +2,9 @@
 
 [![PyPI](https://img.shields.io/pypi/v/aura-llm)](https://pypi.org/project/aura-llm/)
 [![Python](https://img.shields.io/pypi/pyversions/aura-llm)](https://pypi.org/project/aura-llm/)
+[![Downloads](https://img.shields.io/pypi/dm/aura-llm)](https://pypi.org/project/aura-llm/)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fumaitech%2Faura--llm--gateway-2496ED?logo=docker&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/aura-llm-gateway)
+[![Helm](https://img.shields.io/badge/helm-ghcr.io%2Fumaitech%2Fcharts%2Faura--llm--gateway-0F1689?logo=helm&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/charts%2Faura-llm-gateway)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Python SDK for the [Aura LLM Gateway](https://github.com/UmaiTech/aura-llm-gateway), implementing the [Open Responses API](https://www.openresponses.org/specification).
