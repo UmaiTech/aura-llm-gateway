@@ -52,11 +52,15 @@ const baseURL =
   process.env.BETTER_AUTH_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
+// Pool size sits above 1 because better-auth's adapter and our mint-key
+// transaction can hold a connection simultaneously inside the same
+// invocation — with max: 1 they deadlock waiting for each other. A pool
+// of 4 leaves headroom without blowing past Fly Postgres's connection
+// budget (default 100 across all clients). Each Vercel serverless
+// invocation is short-lived, so idle connections drop off quickly.
 const pool = new Pool({
   connectionString: databaseUrl,
-  // Vercel serverless functions are short-lived; keep the pool small to
-  // avoid exhausting Postgres connections under burst traffic.
-  max: 1,
+  max: 4,
   idleTimeoutMillis: 5000,
   connectionTimeoutMillis: 5000,
 })
@@ -97,11 +101,24 @@ export const auth = betterAuth({
   // Disable email + password auth entirely. GitHub-only for now.
   emailAndPassword: { enabled: false },
 
-  trustedOrigins: [
-    'https://playground.aura-llm.dev',
-    'https://aura-llm.dev',
-    'http://localhost:3000', // local dev
-  ],
+  // Trusted origins: prod domains + local dev + Vercel preview deploys.
+  // Vercel sets VERCEL_URL to the per-deploy hostname (e.g.
+  // aura-llm-gateway-git-fix-foo-marcus-elwin-s-projects.vercel.app), but
+  // since these URLs are dynamic we accept any *.vercel.app origin in
+  // non-production environments. better-auth supports passing a function
+  // that's invoked per-request for dynamic checks.
+  trustedOrigins: (request: Request) => {
+    const staticOrigins = [
+      'https://playground.aura-llm.dev',
+      'https://aura-llm.dev',
+      'http://localhost:3000',
+    ]
+    const origin = request.headers.get('origin')
+    if (origin && /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
+      return [...staticOrigins, origin]
+    }
+    return staticOrigins
+  },
 })
 
 // Re-export the pool so other server-side modules (the proxy, the per-user

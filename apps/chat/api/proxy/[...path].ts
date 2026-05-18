@@ -29,15 +29,27 @@ export default async function handler(req: Request): Promise<Response> {
 
   // 2. Per-user gateway key lookup (mints on first call if it's missing —
   // covers the edge case where the OAuth callback's fire-and-forget mint
-  // failed)
+  // failed).
+  //
+  // Concurrency note: two near-simultaneous proxy calls from the same user
+  // can BOTH see a missing key and BOTH try to mint. The first one wins
+  // (the INSERT succeeds); the second one's INSERT fails with a unique
+  // constraint violation on (user_id). The losing call must re-fetch
+  // because the winning call has now populated the row — it's NOT actually
+  // a 500-worthy failure, just a benign race.
+  //
+  // Always re-fetch after a mint attempt (success OR failure) before
+  // deciding whether to 500.
   let apiKey = await getUserApiKey(session.user.id)
   if (!apiKey) {
     try {
       await mintPlaygroundApiKey(req)
-      apiKey = await getUserApiKey(session.user.id)
     } catch (err) {
-      console.error('[proxy] Late mint failed:', err)
+      // Concurrent mint won the race, or some other DB error — either way,
+      // fall through to the re-fetch and let the re-fetch decide.
+      console.warn('[proxy] Mint attempt failed (may be benign race):', err)
     }
+    apiKey = await getUserApiKey(session.user.id)
     if (!apiKey) {
       return jsonError(
         500,

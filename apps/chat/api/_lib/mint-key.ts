@@ -88,11 +88,26 @@ export async function mintPlaygroundApiKey(req: Request): Promise<void> {
       ],
     )
 
-    await client.query(
+    // ON CONFLICT DO NOTHING gracefully handles the case where a concurrent
+    // invocation (e.g. another /api/proxy call from the same user) already
+    // minted the row between our pre-check above and this INSERT. The
+    // proxy's re-fetch will then return the winning row.
+    const insertResult = await client.query(
       `INSERT INTO playground_auth.user_api_key (user_id, api_key_id, api_key_secret, tier)
-       VALUES ($1, $2, $3, 'free')`,
+       VALUES ($1, $2, $3, 'free')
+       ON CONFLICT (user_id) DO NOTHING`,
       [userId, keyId, key],
     )
+
+    if (insertResult.rowCount === 0) {
+      // Concurrent mint won — roll back the api_keys insert we just did
+      // (otherwise we'd leak an orphaned key in public.api_keys).
+      await client.query('ROLLBACK')
+      console.warn(
+        `[mint-key] Lost race for user ${userId}; another mint already inserted the user_api_key row.`,
+      )
+      return
+    }
 
     await client.query('COMMIT')
     console.log(`[mint-key] Minted key ${keyId} for user ${userId}`)
