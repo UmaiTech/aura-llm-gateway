@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+# Thin release image — assembles a multi-arch container from pre-built
+# binaries produced by the `build-release` job in build-release.yml.
+#
+# The full-build `Dockerfile` (cargo-chef + rustc) is fine for dev and
+# CI builds on a single architecture, but cross-compiling Rust for arm64
+# under QEMU emulation in CI took ~1h44m. This file skips the compile
+# entirely: the workflow already builds native amd64 and arm64 binaries
+# in parallel matrix jobs, then this image just copies the right one in.
+#
+# Build arg `TARGETARCH` is set automatically by `docker buildx build
+# --platform linux/amd64,linux/arm64` — it resolves to `amd64` or
+# `arm64` per arch leg. The workflow stages both binaries under
+# `release-bins/` so this COPY can pick the right one.
+
+FROM debian:bookworm-slim AS runtime
+
+ARG TARGETARCH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -s /bin/false aura
+
+WORKDIR /app
+
+# Binaries are staged by the workflow as:
+#   release-bins/amd64/aura-proxy
+#   release-bins/arm64/aura-proxy
+COPY release-bins/${TARGETARCH}/aura-proxy /app/aura-proxy
+COPY --chown=aura:aura config.example.yaml /app/config.example.yaml
+
+RUN chmod +x /app/aura-proxy && chown -R aura:aura /app
+
+USER aura
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+ENV AURA_HOST=0.0.0.0 \
+    AURA_PORT=8080 \
+    RUST_LOG=info
+
+ENTRYPOINT ["/app/aura-proxy"]

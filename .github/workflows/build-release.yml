@@ -127,6 +127,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Pull the binaries built natively by the `build-release` matrix
+      # (linux-x86_64, linux-aarch64) instead of cross-compiling under
+      # QEMU. The previous flow took ~1h44m because rustc-under-QEMU is
+      # ~10x slower than native — now this job is ~2min.
+      - name: Download Linux x86_64 binary
+        uses: actions/download-artifact@v7
+        with:
+          name: aura-proxy-linux-x86_64
+          path: artifacts/amd64
+
+      - name: Download Linux aarch64 binary
+        uses: actions/download-artifact@v7
+        with:
+          name: aura-proxy-linux-aarch64
+          path: artifacts/arm64
+
+      - name: Stage binaries for Docker COPY
+        run: |
+          set -euo pipefail
+          mkdir -p release-bins/amd64 release-bins/arm64
+          tar -xzf artifacts/amd64/aura-proxy-linux-x86_64.tar.gz -C release-bins/amd64
+          tar -xzf artifacts/arm64/aura-proxy-linux-aarch64.tar.gz -C release-bins/arm64
+          # Sanity check: both binaries exist and are executable
+          file release-bins/amd64/aura-proxy release-bins/arm64/aura-proxy
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -152,9 +180,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: Dockerfile.release
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
