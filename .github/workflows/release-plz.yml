@@ -47,6 +47,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run release-plz
+        id: release-plz
         uses: release-plz/action@v0.5
         with:
           command: release-pr
@@ -55,6 +56,45 @@ jobs:
           # Falls back to GITHUB_TOKEN but PRs won't trigger CI workflows
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # release-plz manages the Rust workspace version but doesn't know about
+      # sdks/python/pyproject.toml. Sync it to match the new workspace version
+      # so PyPI publishes the right version on the next release tag.
+      - name: Sync Python SDK version with workspace
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Find the open release-plz PR (created by the step above)
+          PR_NUMBER=$(gh pr list --state open --label release --json number --jq '.[0].number' || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open release PR found — nothing to sync"
+            exit 0
+          fi
+          PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+          echo "Found release PR #${PR_NUMBER} on branch ${PR_BRANCH}"
+
+          git fetch origin "$PR_BRANCH"
+          git checkout "$PR_BRANCH"
+
+          # Read the new workspace version from Cargo.toml
+          NEW_VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
+          CURRENT_PY=$(grep -m1 '^version' sdks/python/pyproject.toml | sed -E 's/version = "([^"]+)"/\1/')
+          echo "Workspace: ${NEW_VERSION}, Python SDK currently: ${CURRENT_PY}"
+
+          if [ "$NEW_VERSION" = "$CURRENT_PY" ]; then
+            echo "Python SDK version already in sync — no commit needed"
+            exit 0
+          fi
+
+          # Update pyproject.toml in-place
+          sed -i -E "s/^version = \"${CURRENT_PY}\"/version = \"${NEW_VERSION}\"/" sdks/python/pyproject.toml
+
+          git config user.name "release-plz[bot]"
+          git config user.email "release-plz@users.noreply.github.com"
+          git add sdks/python/pyproject.toml
+          git commit -m "chore: sync Python SDK version to ${NEW_VERSION}"
+          git push origin "$PR_BRANCH"
 
   # Release unpublished packages (creates GitHub releases, publishes to crates.io).
   # IMPORTANT: Must use PAT so that tags created here trigger build-release workflow.
