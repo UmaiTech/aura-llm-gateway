@@ -2,75 +2,481 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [unreleased]
 
-## [Unreleased]
+### Bug Fixes
 
-### Added
-- **Hierarchical Organization Model** - Multi-tenant support with organizations, teams, and projects (2026-01-27)
-  - Organizations as top-level billing entities
-  - Teams for department/product grouping with token limits
-  - Projects under teams for initiative-level scoping
-  - API keys scoped to organization, team, project, or user level
-- **End-User Cost Tracking** - Per-customer billing and cost allocation (2026-01-27)
-  - `user` field in API requests for end-user identification
-  - Automatic upsert of end-user records on API requests
-  - Per-user token usage and cost tracking
-  - Support for blocking abusive users
-- **Credential Encryption** - Secure storage for provider API keys (2026-01-27)
-  - AES-256-GCM envelope encryption
-  - Random DEK (Data Encryption Key) per credential
-  - Master key wrapping via AURA_MASTER_KEY environment variable
-  - Organizations can store their own provider credentials
-- **Claude/Anthropic Adapter** - Full Anthropic provider support (2026-01-26)
-  - Claude 3.5 Sonnet and Haiku model support
-  - Streaming with semantic events
-  - Tool/function calling support
-  - Proper message format transformation
-- **API Key Authentication** - Secure bearer token auth (2026-01-26)
-  - API key format: `aura_live_<random>` / `aura_test_<random>`
-  - SHA-256 hashed storage (keys never stored in plaintext)
-  - Scope-based permissions (responses:create, usage:read, etc.)
-  - Rate limiting per key (requests per minute, monthly token limits)
-- **Conversation Persistence** - Full stateful conversation support (2026-01-23)
-  - New `responses` table storing complete Open Responses API objects with JSONB
-  - Automatic conversation creation with auto-generated titles from first message
-  - Conversation threading via `previous_response_id` mechanism
-  - REST API endpoints for conversation management (`GET /v1/conversations`, `GET /v1/conversations/{id}`, `DELETE /v1/conversations/{id}`)
-  - Request logging for both streaming and non-streaming responses
-  - Usage tracking (input/output tokens) and cost calculation persistence
-  - Message extraction to simplified `messages` table
-  - Enhanced debug logging for usage data and cost calculations
-- Initial project scaffolding with Cargo workspace
-- Four crates: aura-types, aura-db, aura-core, aura-proxy
-- Comprehensive CI/CD workflows (CI, Security Audit, Build Release)
-- Automated release workflow with release-plz
-- Makefile with 50+ development commands
-- GitHub issue and PR templates
-- CODEOWNERS file
-- VS Code configuration and recommended extensions
-- Status badges in README (CI, Security, Release, Coverage, License, Rust version)
-- cargo-deny configuration for dependency management
-- Dependabot configuration
-- Enhanced .gitignore for Rust projects
-- Git hooks with cargo-husky (pre-commit: fmt + clippy, pre-push: tests)
-- Contributing guidelines with conventional commits
+- Move api/ to repo root so Vercel actually deploys functions
+- Pin Node 22.x for Vercel build
+- Drop deprecated config.runtime export
 
-### Fixed
-- **Database:** Fixed PostgreSQL type mismatch - converted `DECIMAL(10,6)` to `DOUBLE PRECISION` for cost columns (2026-01-23)
-- **Persistence:** Fixed response cloning order to preserve enriched usage/cost data (2026-01-23)
-- **Routing:** Updated Axum route parameters from `:id` to `{id}` syntax for v0.8 compatibility (2026-01-23)
-- **UI:** Fixed code block formatting in chat app - removed alternating line backgrounds (2026-01-23)
-- **Security:** Removed RSA timing attack vulnerability (RUSTSEC-2023-0071) by disabling unused MySQL support in sqlx
-- **CI:** Fixed cargo-deny configuration to use v2 format
+### Features
 
-### Changed
-- **Persistence:** All database operations now run in non-blocking background tasks (2026-01-23)
-- **Logging:** Enhanced observability with detailed usage/cost tracking logs (2026-01-23)
-- Updated sqlx to use `default-features = false` to only include PostgreSQL support
-- **Performance:** Pre-commit hook now only checks library code (3-5x faster)
-- **Performance:** CI now uses Swatinem/rust-cache for better caching (2-5x faster on cache hits)
-- **Performance:** Tool installation uses pre-built binaries (10x faster)
+- Add Vercel Analytics to landing, chat, and admin
+
+## [0.7.1] - 2026-05-18
+
+### Bug Fixes
+
+- PR-review fixes for trustedOrigins, race, and pool size
+- TrustedOrigins callback signature matches better-auth
+
+### Features
+
+- Playground_auth schema for better-auth + user→key link
+- Wire better-auth with GitHub OAuth
+- Gate chat UI behind GitHub sign-in + add UserMenu
+- Vercel serverless functions for auth + gateway proxy
+- Route chat through /api/proxy + friendly 429 UI
+
+### Miscellaneous Tasks
+
+- Release v0.7.1
+
+## [0.7.0] - 2026-05-18
+
+### Bug Fixes
+
+- Skip version preview comment step on fork PRs
+- Scope api key routes to auth user
+
+### Miscellaneous Tasks
+
+- Release v0.6.1
+- Sync Python SDK version to 0.6.1
+- Release v0.7.0
+
+## [0.6.0] - 2026-05-18
+
+### Bug Fixes
+
+- Make harness runnable + switch to Claude Haiku 4.5
+- Fail open + log loudly when AURA_CORS_ALLOWED_ORIGINS is misconfigured
+- Move cors_tests module to end of main.rs
+- Make `migrate` subcommand robust to duplicate argv from Fly
+- Pass changelog through env vars in version-preview workflow
+
+### Features
+
+- Register claude-haiku-4-5-20251001
+- Fly.io config + CORS env var + migrate subcommand
+
+### Miscellaneous Tasks
+
+- Release v0.6.0
+
+## [0.5.4] - 2026-05-18
+
+### Bug Fixes
+
+- Bump Rust to 1.91 for AWS SDK MSRV
+
+### Miscellaneous Tasks
+
+- Release v0.5.4
+
+## [0.5.3] - 2026-05-18
+
+### Bug Fixes
+
+- Sync Python SDK version with workspace on every release
+- Attribute Python SDK sync commit to maintainer
+
+### Miscellaneous Tasks
+
+- Release v0.5.3
+
+## [0.5.2] - 2026-05-18
+
+### Bug Fixes
+
+- Lowercase GHCR repo owner + refresh README badges
+
+### Miscellaneous Tasks
+
+- Release v0.5.2
+
+## [0.5.1] - 2026-05-17
+
+### Bug Fixes
+
+- Grant contents:read to PyPI publish job for private repo checkout
+- Extract helm subchart .tgz files before packaging
+- Use shopt -s nullglob for safe re-runs of helm extract step
+
+### Features
+
+- Redirect playground.aura-llm.dev/ to /chat for clean URL
+
+### Miscellaneous Tasks
+
+- Release v0.5.1
+
+## [0.5.0] - 2026-05-17
+
+### Bug Fixes
+
+- Redirect docs subdomain root to docs homepage
+- Render roadmap directly at root on roadmap subdomain
+- Correct playground asset routing + reorg docs + freshen README
+- Two more localhost:3000 playground links missed earlier
+
+### Documentation
+
+- Bring content up to v0.4.1 reality
+- Replace 'Helm Chart (Coming Soon)' with real chart instructions
+- Update example snippets to current-generation models
+
+### Features
+
+- Wire playground and roadmap subdomains
+- Bundle chat app at /playground in the landing build
+- Add PyPI publish workflow via trusted publishing (OIDC)
+- Add Helm chart + GHCR OCI publish workflow
+- Flip feature cards on click to reveal code examples
+- Register GPT-5.4/5.5 + Claude 4.6/4.7 models with pricing
+- Default chat + admin apps to gpt-5.4-mini, update model pickers
+
+### Miscellaneous Tasks
+
+- Release v0.4.2
+
+## [0.4.1] - 2026-05-17
+
+### Bug Fixes
+
+- Remove vercel ignoreCommand that skipped infra builds
+- Remove unused useNavigate import blocking tsc
+- Register new providers in sidebar nav and search index
+
+### Documentation
+
+- Add provider reference pages for Mistral, Ollama, HF, Bedrock
+
+### Features
+
+- Update hero copy to reflect 7-provider lineup
+- Redesign roadmap page with accurate v0.3.2 state
+- Link roadmap from landing nav and docs sidebar
+- Expand feature grid from 6 to 9 with differentiated capabilities
+
+### Miscellaneous Tasks
+
+- Remove stale roadmap.md references
+- Add per-app vercel.json + docs.aura-llm.dev rewrite
+- Release v0.4.1
+
+## [0.4.0] - 2026-05-17
+
+### Documentation
+
+- Update env example, config example, and README for new providers
+
+### Features
+
+- Add Mistral AI provider with full parity
+- Add Ollama local inference provider
+- Add HuggingFace TGI provider for Inference Endpoints
+- Add AWS Bedrock provider with Claude on Bedrock
+- Wire new providers into routing, config, and cost tracking
+
+### Miscellaneous Tasks
+
+- Add vercel.json for landing page deployment
+- Add provider benchmark harness
+- Release v0.4.0
+
+## [0.3.2] - 2026-05-06
+
+### Documentation
+
+- Add LICENSE, CODE_OF_CONDUCT, and SECURITY policy for OSS release
+- Round out OSS prep (SUPPORT, FUNDING, SDK LICENSE, pre-1.0 notice, CI hardening)
+
+### Miscellaneous Tasks
+
+- Release v0.3.2
+
+## [0.3.1] - 2026-02-06
+
+### Bug Fixes
+
+- Wf again v2
+
+### Features
+
+- Implement admin dashboard foundation with Stripe/Vercel-inspired UI (#61)
+
+### Miscellaneous Tasks
+
+- Release v0.3.1 (#65)
+
+## [0.3.0] - 2026-02-03
+
+### Bug Fixes
+
+- Wf
+- Wf again
+
+### Features
+
+- Implement smart routing with load balancing and failover (#60)
+
+### Miscellaneous Tasks
+
+- Release v0.3.0 (#63)
+
+## [0.2.8] - 2026-01-29
+
+### Features
+
+- Implement Milestone 5 production readiness features (#58)
+
+### Miscellaneous Tasks
+
+- Release v0.2.8 (#59)
+
+## [0.2.7] - 2026-01-29
+
+### Bug Fixes
+
+- Upgrade Rust to 1.88 in Dockerfile for home crate compatibility (#55)
+
+### Features
+
+- Add MDX support and interactive documentation components (#56)
+
+### Miscellaneous Tasks
+
+- Release v0.2.7 (#57)
+
+## [0.2.6] - 2026-01-25
+
+### Bug Fixes
+
+- Bump rush version in docker step (#53)
+
+### Miscellaneous Tasks
+
+- Release v0.2.6 (#54)
+
+## [0.2.5] - 2026-01-25
+
+### Miscellaneous Tasks
+
+- Release v0.2.5 (#52)
+
+## [0.2.4] - 2026-01-25
+
+### Bug Fixes
+
+- Use GitHub Container Registry instead of Docker Hub
+- Only run release-plz release when release PR is merged
+- Make orgs work
+- Chat build
+- Chat build again
+- Latency display
+
+### Miscellaneous Tasks
+
+- Release v0.2.2
+- Release v0.2.3
+- Release v0.2.4 (#51)
+
+## [0.2.1] - 2026-01-25
+
+### Bug Fixes
+
+- Ensure git HEAD points to branch for release-plz
+- Improve release-plz PR creation with robust API sync
+- Pass --git-token argument to release-plz release-pr command
+- Db operations for proxy
+- Db operations for proxy
+- Some fixes
+- Some fixes
+- Release fixes
+- Split release-plz into separate jobs per official docs
+- Fix lint, type check, and formatting issues in Python SDK
+- Drop Python 3.9 support, require 3.10+
+- Use modern Python 3.10+ union syntax for type aliases
+- Fix CI build step and update to PEP 735 dependency groups
+- Use uv tool run for twine in CI
+- Add allow(dead_code) for auth code prepared for future use
+- Add persist-credentials: false to release-plz workflow
+- Fix release-plz permission and gitignore conflicts
+- Allow release-plz to push version bump commits
+- Use PAT token for release-plz PR creation
+- Use PAT for release job so tags trigger build-release
+- Add provider and model count to startup log
+- Enable release tracking for all workspace packages
+
+### Documentation
+
+- Add Python SDK documentation and CI workflow
+- Add SDK documentation to API reference
+- Update plan and README with Python SDK completion
+- Add comprehensive documentation for org model, auth, and encryption
+- Add organizations and end-user tracking documentation
+- Add MDX migration and missing docs to implementation plan
+- Add conversations, credentials, deployment, and error docs
+- Update roadmap with Gemini completion and new providers
+- Update API docs and roadmap with all live providers
+
+### Features
+
+- Fix release-plz timing issue with explicit commit fetch
+- Add Python SDK for Aura LLM Gateway
+- Add Claude adapter, API key auth, and credential encryption
+- Add hierarchical org model with teams, projects, and end-user tracking
+- Wire up authentication and usage tracking
+- Add Google Gemini provider implementation
+
+### Miscellaneous Tasks
+
+- Make 2 steps of release
+- Fix release again
+- Release v0.2.0
+- Release v0.2.1
+
+## [0.2.0] - 2026-01-23
+
+### Bug Fixes
+
+- Local database
+- Handle both Date objects and strings in formatDate
+- Chat, docs and route
+- Migrations
+- Migrations
+- Redesigns
+- Enable git tag creation in release-plz config
+- Workflow
+- Revert to release mode to bypass PR branch creation issue
+
+### Documentation
+
+- Update implementation plan and README with completed work
+- Update implementation plan with recent progress
+- Add pricing scraper design document
+- Add architecture and sequence diagrams
+- Convert architecture diagrams to Mermaid format
+- Update implementation plan and README with recent progress
+- Expand admin app plan with dev logs, insights, and agentic harness
+
+### Features
+
+- Implement OpenAI adapter, chat UI, and database models
+- Add admin app plan, chat persistence, and agent tools
+- Add Tavily web search integration and documentation
+- Add agent mode with tool execution and cost tracking
+- Enrich responses with cost and Aura metadata
+- Add landing page, enhanced tool cards, and API documentation
+- Add aura_request_id and automatic MD docs loading
+- Add model name and agentic metadata to Aura responses
+- Add Makefile commands for frontend apps
+- Add database integration and 2026 model pricing
+- Revert to Vite with MDX support
+- Add workflow_dispatch trigger to build-release workflow
+
+### Miscellaneous Tasks
+
+- Bump version to 0.2.0 for new features
+
+## [0.1.7] - 2026-01-22
+
+### Bug Fixes
+
+- Split release workflow into two phases for reliable tag creation
+- Add workflow-level permissions for release-plz
+- Configure git credentials for release-plz to push commits
+- Switch release-plz to automatic release mode
+- Add pull-requests read permission for release-plz
+
+### Documentation
+
+- Update plan
+
+### Features
+
+- Add basic server
+
+### Miscellaneous Tasks
+
+- Release
+- Fix wfs
+- Release v0.1.6
+- Release v0.1.7
+
+## [0.1.5] - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Release v0.1.5
+
+## [0.1.4] - 2026-01-21
+
+### Bug Fixes
+
+- Use array instead of vec in test to satisfy clippy
+
+### Features
+
+- Implement Open Responses API types (PR #3)
+
+### Miscellaneous Tasks
+
+- Release v0.1.4
+
+## [0.1.3] - 2026-01-21
+
+### Miscellaneous Tasks
+
+- Add manual workflow dispatch trigger to release workflow
+- Update dependabot team to ai-core
+- Configure unified workspace releases for all packages
+- Release v0.1.3
+
+## [0.1.2] - 2026-01-21
+
+### Bug Fixes
+
+- Some security fixes
+- Update cargo-deny config and add cargo-audit ignore
+- Move audit.toml to .cargo directory
+- Update cargo-deny config to new format
+- Disable licenses section in cargo-deny config
+- Remove deprecated version field from cargo-deny config
+- Enable licenses section in cargo-deny config with allow list
+- Disable licenses section in cargo-deny config
+- Update cargo-deny licenses configuration to use accepted field
+- Change 'accepted' to 'allow' in deny.toml for cargo-deny v0.19.0
+- Update CI workflows to use modern non-deprecated actions
+- Add missing licenses to cargo-deny allow list
+- Fix release-plz workflow and add Docker support
+
+### Documentation
+
+- Initial plan
+- Update implementation plan and README for PR #2 completion
+
+### Features
+
+- Project setups for mono
+- Add configuration system with environment loading
+- Add YAML configuration file support
+
+### Miscellaneous Tasks
+
+- Build performance
+- Release v0.1.1
+- Fix release
+- Fix release
+- Fix release
+- Logos
+- Logos
+- Release v0.1.2
+
+### Refactor
+
+- Simplify to single docker-compose file
 
 <!-- generated by git-cliff -->
