@@ -12,6 +12,7 @@ use aura_core::{
     ResponseCache,
 };
 use aura_db::{ApiKeyUsageRepo, DbPool, NewApiKeyUsage, NewRequestLog, PoolConfig, RequestLogRepo};
+use axum::http::HeaderValue;
 use axum::{middleware, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -907,6 +908,26 @@ async fn main() -> anyhow::Result<()> {
     // Initialize tracing
     init_tracing();
 
+    // Subcommand dispatch. Supported:
+    //   <bin>                — start the gateway (default)
+    //   <bin> migrate        — run database migrations and exit
+    //   <bin> --version      — print version and exit
+    let args: Vec<String> = std::env::args().collect();
+    match args.get(1).map(String::as_str) {
+        Some("migrate") => return run_migrate().await,
+        Some("--version") | Some("-V") => {
+            println!("aura-proxy {}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
+        Some(other) if other.starts_with("--") => {
+            // Unknown flag — fall through to start mode
+        }
+        Some(other) => {
+            anyhow::bail!("Unknown subcommand: {other}. Valid: migrate, --version");
+        }
+        None => {}
+    }
+
     info!("Starting Aura LLM Gateway v{}", env!("CARGO_PKG_VERSION"));
 
     // Initialize Prometheus metrics exporter
@@ -994,12 +1015,7 @@ async fn main() -> anyhow::Result<()> {
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
-        )
+        .layer(build_cors_layer())
         .with_state(state);
 
     // Create TCP listener
@@ -1019,6 +1035,64 @@ async fn main() -> anyhow::Result<()> {
     info!("Server shutdown complete");
 
     Ok(())
+}
+
+/// Run sqlx migrations against DATABASE_URL and exit.
+///
+/// Used as Fly.io's release_command so each deploy applies pending
+/// migrations before the new pod starts serving traffic. Idempotent —
+/// sqlx tracks applied migrations in the `_sqlx_migrations` table.
+async fn run_migrate() -> anyhow::Result<()> {
+    let database_url =
+        std::env::var("DATABASE_URL").context("DATABASE_URL must be set to run migrations")?;
+
+    info!("Running database migrations");
+    let pool_config = PoolConfig::new(&database_url);
+    let pool = aura_db::create_pool(pool_config)
+        .await
+        .context("Failed to connect to database for migrations")?;
+
+    aura_db::run_migrations(&pool)
+        .await
+        .context("Migration run failed")?;
+
+    info!("Migrations complete");
+    Ok(())
+}
+
+/// Build the CORS layer.
+///
+/// Reads `AURA_CORS_ALLOWED_ORIGINS` (comma-separated origins). If unset or
+/// empty, falls back to permissive CORS (`Any`) — fine for local development
+/// but never for production. Set the env var in production to restrict
+/// origins to your actual frontend domains.
+fn build_cors_layer() -> CorsLayer {
+    let allowed = std::env::var("AURA_CORS_ALLOWED_ORIGINS").unwrap_or_default();
+    if allowed.trim().is_empty() {
+        warn!(
+            "AURA_CORS_ALLOWED_ORIGINS unset — using permissive CORS (Any). \
+             Set this in production to restrict to your frontend domains."
+        );
+        return CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any);
+    }
+
+    let origins: Vec<HeaderValue> = allowed
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse::<HeaderValue>().ok())
+        .collect();
+
+    info!(origins = ?origins, "Configuring CORS with explicit allowed origins");
+
+    CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_credentials(false)
 }
 
 /// Initialize tracing/logging

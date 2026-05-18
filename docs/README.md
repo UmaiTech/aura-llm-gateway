@@ -21,6 +21,7 @@ docs/
 
 ### For operators
 
+- [Deploying with Fly.io](./deployment/fly.md) — cheapest path for a hosted demo (~$10/mo)
 - [Deploying with Helm](./deployment/helm.md) — install on any Kubernetes cluster
 - [Deploying with Docker](./deployment/docker.md) — single-container deploy
 - [Configuration reference](../config.example.yaml) — every supported config key

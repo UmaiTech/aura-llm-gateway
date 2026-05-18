@@ -10,7 +10,7 @@ pub mod repo;
 
 pub use error::DbError;
 pub use models::*;
-pub use pool::{create_pool, DbPool, PoolConfig};
+pub use pool::{create_pool, run_migrations, DbPool, PoolConfig};
 pub use repo::*;
 
 /// Returns the crate version
