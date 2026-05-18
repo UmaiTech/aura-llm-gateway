@@ -912,8 +912,23 @@ async fn main() -> anyhow::Result<()> {
     //   <bin>                — start the gateway (default)
     //   <bin> migrate        — run database migrations and exit
     //   <bin> --version      — print version and exit
+    //
+    // We scan all args (not just args[1]) and ignore anything that looks like
+    // a self-path. Some runtimes (notably Fly.io's release_command) end up
+    // calling the binary with its own path duplicated in argv, e.g.:
+    //   argv = ["/app/aura-proxy", "/app/aura-proxy", "migrate"]
+    // which would defeat a naive `args[1]` check.
     let args: Vec<String> = std::env::args().collect();
-    match args.get(1).map(String::as_str) {
+    let self_path = args.first().cloned().unwrap_or_default();
+    let known_subcommands = ["migrate"];
+    let interesting: Vec<&str> = args
+        .iter()
+        .skip(1)
+        .map(String::as_str)
+        .filter(|a| *a != self_path && *a != "aura-proxy")
+        .collect();
+
+    match interesting.first().copied() {
         Some("migrate") => return run_migrate().await,
         Some("--version") | Some("-V") => {
             println!("aura-proxy {}", env!("CARGO_PKG_VERSION"));
@@ -923,7 +938,10 @@ async fn main() -> anyhow::Result<()> {
             // Unknown flag — fall through to start mode
         }
         Some(other) => {
-            anyhow::bail!("Unknown subcommand: {other}. Valid: migrate, --version");
+            anyhow::bail!(
+                "Unknown subcommand: {other}. Valid: {}",
+                known_subcommands.join(", ")
+            );
         }
         None => {}
     }

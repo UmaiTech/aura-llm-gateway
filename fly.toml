@@ -1,44 +1,40 @@
-# Fly.io deployment configuration for Aura LLM Gateway.
-# See docs/deployment/fly.md for the full setup walkthrough.
+# fly.toml app configuration file generated for aura-gateway on 2026-05-18T09:56:26+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "aura-gateway"
-primary_region = "arn"  # Stockholm — change to your region
+app = 'aura-gateway'
+primary_region = 'arn'
 
-# Build the Docker image from the existing root Dockerfile.
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
-# Run database migrations before swapping to the new image version.
-# Requires sqlx-cli to be available; we ship it baked into the image (or
-# alternatively, invoke the gateway with a `migrate` subcommand once added).
 [deploy]
-  release_command = "/app/aura-proxy migrate"
-  strategy = "rolling"
+  strategy = 'rolling'
+  # Fly prepends the Dockerfile ENTRYPOINT, so we just pass the subcommand args.
+  release_command = 'migrate'
 
-# Gateway HTTP service.
+[env]
+  AURA_CORS_ALLOWED_ORIGINS = 'https://playground.aura-llm.dev,https://aura-llm.dev'
+  AURA_HOST = '0.0.0.0'
+  AURA_PORT = '8080'
+  RUST_LOG = 'info,aura_proxy=info,aura_core=info'
+
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = false  # cold starts kill LLM gateway latency demos
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    timeout = "5s"
-    path = "/health"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
-
-# Default env vars (non-secret). Secrets are set via `fly secrets set ...`.
-[env]
-  AURA_HOST = "0.0.0.0"
-  AURA_PORT = "8080"
-  RUST_LOG = "info,aura_proxy=info,aura_core=info"
-  # Tightened CORS — only the playground + landing can call this gateway.
-  AURA_CORS_ALLOWED_ORIGINS = "https://playground.aura-llm.dev,https://aura-llm.dev"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
