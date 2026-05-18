@@ -7,8 +7,11 @@ the JSON that drives the `LoadTestChart` component on
 ## What this measures
 
 **The variable is the gateway, not the LLM.** Six gateways, one provider
-(Anthropic Claude Sonnet 4.5), one prompt, one model, run from the same VM,
-in the same region, within the same one-hour window.
+(Anthropic Claude Haiku 4.5 — `claude-haiku-4-5-20251001`), one prompt, one
+model, run from the same VM, in the same region, within the same one-hour
+window. Haiku 4.5 is picked over Sonnet/Opus to keep the ~105k-request full
+run cheap; the *gateway overhead* we're measuring doesn't depend on model
+tier anyway.
 
 Per scenario (1, 2, 3, 4, 5 tool calls per request × 1,000 requests):
 
@@ -100,6 +103,10 @@ uv run python harness.py --full --runs 3
 
 # Faster smoke benchmark: 200 requests × 5 scenarios × 7 gateways × 1 run
 uv run python harness.py --full --requests 200 --runs 1
+
+# Subset: only run a few gateways (case-insensitive, comma-separated)
+uv run python harness.py --smoke --gateways aura,litellm,bifrost
+uv run python harness.py --full --gateways aura,"aura (hosted)" --runs 1
 ```
 
 Output lands at `results/<gateway>__tc<N>__run<R>.jsonl` (one line per
@@ -134,6 +141,10 @@ warm-up (`--warmup 200`) or lower concurrency (`--concurrency 25`).
 5. **Don't trust the first 100 requests.** JIT, connection-pool warm-up,
    DNS resolution — all of it skews p50 downward. The harness discards
    warm-ups by default.
+6. **Missing gateway API keys are silently skipped, not failed.** If
+   `OPENROUTER_KEY` is empty in `.env`, OpenRouter just doesn't appear in
+   the output — no error. Use `--gateways aura,litellm,bifrost` to be
+   explicit about which gateways you intend to compare on partial runs.
 
 ## Publishing the numbers
 

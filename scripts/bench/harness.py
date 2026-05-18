@@ -1,7 +1,7 @@
 """LLM gateway benchmark harness.
 
 Runs 1k requests × 5 scenarios × N gateways × R runs against the same provider
-(Anthropic Sonnet 4.5) and writes results.json in the shape consumed by
+(Anthropic Claude Haiku 4.5) and writes results.json in the shape consumed by
 LoadTestChart.astro.
 
 See README.md for the full setup.
@@ -25,6 +25,7 @@ from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.table import Table
 
 from gateway_adapters import (
+    MODEL,
     GatewayAdapter,
     GatewayResponse,
     build_adapters,
@@ -197,8 +198,8 @@ def summarize(per_run: dict, adapters: list[GatewayAdapter]) -> dict:
         "scenarios": scenarios,
         "metadata": {
             "ran_at": datetime.now(timezone.utc).isoformat(),
-            "provider": "anthropic-claude-sonnet-4-5",
-            "harness_version": "0.1.0",
+            "provider": f"anthropic-{MODEL}",
+            "harness_version": "0.2.0",
             "runs": len(runs),
         },
     }
@@ -256,14 +257,31 @@ async def smoke_test(adapters: list[GatewayAdapter]) -> None:
 @click.option("--concurrency", default=DEFAULT_CONCURRENCY, help="In-flight requests.")
 @click.option("--runs", default=DEFAULT_RUNS, help="How many full passes (median is taken).")
 @click.option("--out", default=str(RESULTS_DIR), help="Output dir.")
-def main(smoke, full, requests, warmup, concurrency, runs, out):
+@click.option(
+    "--gateways",
+    default="",
+    help="Comma-separated subset of gateway names to run (case-insensitive). Empty = all.",
+)
+def main(smoke, full, requests, warmup, concurrency, runs, out, gateways):
     load_dotenv()
     adapters = build_adapters()
     if not adapters:
         console.print("[red]No gateways configured — fill in .env and try again.[/]")
         raise SystemExit(1)
 
-    console.print(f"[bold]Configured gateways:[/] {', '.join(a.name for a in adapters)}\n")
+    if gateways:
+        wanted = {g.strip().lower() for g in gateways.split(",") if g.strip()}
+        adapters = [a for a in adapters if a.name.lower() in wanted]
+        if not adapters:
+            available = ", ".join(a.name for a in build_adapters())
+            console.print(
+                f"[red]--gateways filter matched nothing.[/]\n"
+                f"Available: {available}"
+            )
+            raise SystemExit(1)
+
+    console.print(f"[bold]Configured gateways:[/] {', '.join(a.name for a in adapters)}")
+    console.print(f"[bold]Model:[/] {MODEL}\n")
 
     if smoke:
         asyncio.run(smoke_test(adapters))

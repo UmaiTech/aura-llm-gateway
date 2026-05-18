@@ -20,7 +20,9 @@ import httpx
 # Normalized request and result
 # ---------------------------------------------------------------------------
 
-MODEL = "claude-sonnet-4-5"
+MODEL = "claude-haiku-4-5-20251001"
+# Some gateways require provider-prefixed model strings (e.g. "anthropic/...").
+MODEL_PREFIXED = f"anthropic/{MODEL}"
 PROMPT_TEMPLATE = (
     "Call the echo tool {n} times in a row, each with a different value. "
     "Then say 'done'. Request id: {rid}"
@@ -136,7 +138,7 @@ class BifrostAdapter:
     async def call(self, client: httpx.AsyncClient, tool_calls: int) -> GatewayResponse:
         # Bifrost OAI-shape — model name in OpenAI form, Anthropic underneath
         payload = {
-            "model": "anthropic/claude-sonnet-4-5",
+            "model": MODEL_PREFIXED,
             "messages": [{"role": "user", "content": _prompt(tool_calls)}],
             "tools": [ECHO_TOOL],
             "max_tokens": 256,
@@ -187,7 +189,7 @@ class LiteLLMAdapter:
 
     async def call(self, client: httpx.AsyncClient, tool_calls: int) -> GatewayResponse:
         payload = {
-            "model": "claude-sonnet-4-5",
+            "model": MODEL,
             "messages": [{"role": "user", "content": _prompt(tool_calls)}],
             "tools": [ECHO_TOOL],
             "max_tokens": 256,
@@ -305,7 +307,7 @@ class OpenRouterAdapter:
 
     async def call(self, client: httpx.AsyncClient, tool_calls: int) -> GatewayResponse:
         payload = {
-            "model": "anthropic/claude-sonnet-4-5",
+            "model": MODEL_PREFIXED,
             "messages": [{"role": "user", "content": _prompt(tool_calls)}],
             "tools": [ECHO_TOOL],
             "max_tokens": 256,
