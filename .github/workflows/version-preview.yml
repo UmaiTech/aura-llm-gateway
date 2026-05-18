@@ -61,6 +61,10 @@ jobs:
           echo "$EOF" >> $GITHUB_OUTPUT
 
       - name: Post version preview comment
+        # GITHUB_TOKEN on fork PRs is read-only by GitHub Actions security
+        # policy — it can't post comments. Skip on external PRs; the version
+        # preview still appears in the workflow logs for maintainer review.
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         env:
           # Pass step outputs through env vars instead of inlining them into the
