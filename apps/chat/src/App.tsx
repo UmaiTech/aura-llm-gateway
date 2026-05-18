@@ -9,13 +9,11 @@ import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } f
 import { calculateCost } from './lib/pricing'
 import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
-const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
-
-// Debug: Log API key status on load (only in development)
-if (import.meta.env.DEV) {
-  console.log('[Auth] API Key loaded:', API_KEY ? `${API_KEY.slice(0, 20)}...` : 'MISSING')
-}
+// In production the chat hits same-origin /api/proxy (a serverless function
+// that holds the per-user gateway API key). VITE_API_BASE_URL is only used
+// for local-dev to talk directly to a running gateway.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/proxy'
+const API_KEY = '' // Frontend never holds the API key; session cookie is the credential
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -53,9 +51,13 @@ export default function App() {
   const consistencyConfig = useChatStore.getState().getConsistencyConfig()
   const compressionConfig = useChatStore.getState().getCompressionConfig()
 
-  // Create API instance with all strategy configs
+  // Create API instance with all strategy configs.
+  // Defaults to the same-origin proxy at /api/proxy/v1 in prod; can be
+  // overridden via VITE_API_BASE_URL for local-dev against a direct gateway.
   const api = new AuraAPI({
-    baseUrl: import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1` : '/v1',
+    baseUrl: import.meta.env.VITE_API_BASE_URL
+      ? `${import.meta.env.VITE_API_BASE_URL}/v1`
+      : '/api/proxy/v1',
     apiKey: API_KEY,
     routingStrategy,
     validationConfig,
@@ -295,10 +297,10 @@ export default function App() {
 
         const response = await fetch(`${API_BASE}/v1/responses`, {
           method: 'POST',
+          credentials: 'include', // Session cookie auth via /api/proxy
           headers: {
             'Content-Type': 'application/json',
             'X-Routing-Strategy': routingStrategy,
-            ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
           },
           body: JSON.stringify(request),
           signal,

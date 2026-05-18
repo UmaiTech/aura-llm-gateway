@@ -470,9 +470,11 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
     setFeedback('submitting')
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+      // Same-origin proxy in prod; VITE_API_BASE_URL is the local-dev escape hatch.
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/proxy'
       const response = await fetch(`${apiBaseUrl}/v1/feedback`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },

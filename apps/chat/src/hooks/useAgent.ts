@@ -5,10 +5,31 @@ import { useState, useCallback, useRef } from 'react'
 import { generateId } from '../lib/utils'
 import { BUILT_IN_TOOLS, executeTool } from '../lib/agent'
 import { calculateCost } from '../lib/pricing'
+import { AuraApiError } from '../lib/api'
 import type { Message, Tool, ToolInvocation, MessageUsage } from '../lib/types'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
-const API_KEY = import.meta.env.VITE_AURA_API_KEY || ''
+// In prod, requests flow through /api/proxy (the serverless function holds
+// the per-user gateway API key). In local dev with `vercel dev`, same path.
+// To bypass the proxy and hit a local gateway directly, set VITE_API_BASE_URL.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/proxy'
+
+/**
+ * Turn a raw error into a UI-friendly message. Surfaces special copy for
+ * rate-limit (429) and auth (401) errors so the user knows what to do.
+ */
+function friendlyErrorMessage(err: unknown): string {
+  if (err instanceof AuraApiError) {
+    if (err.isRateLimit()) {
+      const retryHint = err.retryAfter ? ` Try again in ${err.retryAfter}s.` : ''
+      return `You've hit the free-tier limit (5 requests/min, 50K tokens/month).${retryHint} Star the repo on GitHub and let us know if you want a higher tier.`
+    }
+    if (err.isUnauthenticated()) {
+      return 'Your session expired. Refresh the page to sign in again.'
+    }
+    return err.message
+  }
+  return err instanceof Error ? err.message : 'An unexpected error occurred'
+}
 
 interface UseAgentOptions {
   model: string
@@ -109,8 +130,7 @@ export function useAgent({
         if (err instanceof Error && err.name === 'AbortError') {
           // User cancelled - don't show error
         } else {
-          const errorMessage = err instanceof Error ? err.message : 'An error occurred'
-          setError(errorMessage)
+          setError(friendlyErrorMessage(err))
         }
       } finally {
         setIsLoading(false)
@@ -197,9 +217,9 @@ async function runAgentLoop(
     // Make streaming request
     const response = await fetch(`${API_BASE}/v1/responses`, {
       method: 'POST',
+      credentials: 'include', // Session cookie auth via /api/proxy
       headers: {
         'Content-Type': 'application/json',
-        ...(API_KEY && { 'Authorization': `Bearer ${API_KEY}` }),
       },
       body: JSON.stringify(request),
       signal,
