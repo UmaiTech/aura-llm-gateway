@@ -1170,6 +1170,73 @@ fn build_cors_layer() -> CorsLayer {
     }
 }
 
+/// Initialize tracing/logging
+fn init_tracing() {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                // Default log level
+                "aura_proxy=debug,aura_core=debug,tower_http=debug,axum::rejection=trace".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+}
+
+/// Initialize Prometheus metrics exporter
+fn init_metrics() {
+    use metrics_exporter_prometheus::PrometheusBuilder;
+
+    // Build and install the Prometheus recorder
+    let builder = PrometheusBuilder::new();
+
+    // Install the recorder globally
+    match builder.install_recorder() {
+        Ok(handle) => {
+            // Store the handle for later use by the /metrics endpoint
+            routes::metrics::set_prometheus_handle(handle);
+            info!("Prometheus metrics exporter initialized");
+
+            // Describe all metrics for better Prometheus documentation
+            aura_core::metrics::describe_metrics();
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to initialize Prometheus metrics exporter");
+        }
+    }
+}
+
+/// Graceful shutdown signal handler
+///
+/// Listens for SIGTERM (Ctrl+C) and SIGINT signals to gracefully shutdown the server.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C signal, shutting down gracefully");
+        },
+        _ = terminate => {
+            info!("Received SIGTERM signal, shutting down gracefully");
+        },
+    }
+}
+
 #[cfg(test)]
 mod cors_tests {
     use super::*;
@@ -1247,72 +1314,5 @@ mod cors_tests {
         let _ = build_cors_layer();
 
         std::env::remove_var("AURA_CORS_ALLOWED_ORIGINS");
-    }
-}
-
-/// Initialize tracing/logging
-fn init_tracing() {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                // Default log level
-                "aura_proxy=debug,aura_core=debug,tower_http=debug,axum::rejection=trace".into()
-            }),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-}
-
-/// Initialize Prometheus metrics exporter
-fn init_metrics() {
-    use metrics_exporter_prometheus::PrometheusBuilder;
-
-    // Build and install the Prometheus recorder
-    let builder = PrometheusBuilder::new();
-
-    // Install the recorder globally
-    match builder.install_recorder() {
-        Ok(handle) => {
-            // Store the handle for later use by the /metrics endpoint
-            routes::metrics::set_prometheus_handle(handle);
-            info!("Prometheus metrics exporter initialized");
-
-            // Describe all metrics for better Prometheus documentation
-            aura_core::metrics::describe_metrics();
-        }
-        Err(e) => {
-            warn!(error = %e, "Failed to initialize Prometheus metrics exporter");
-        }
-    }
-}
-
-/// Graceful shutdown signal handler
-///
-/// Listens for SIGTERM (Ctrl+C) and SIGINT signals to gracefully shutdown the server.
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {
-            info!("Received Ctrl+C signal, shutting down gracefully");
-        },
-        _ = terminate => {
-            info!("Received SIGTERM signal, shutting down gracefully");
-        },
     }
 }
