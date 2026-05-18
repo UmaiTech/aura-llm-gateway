@@ -107,13 +107,13 @@ export const auth = betterAuth({
   // since these URLs are dynamic we accept any *.vercel.app origin in
   // non-production environments. better-auth supports passing a function
   // that's invoked per-request for dynamic checks.
-  trustedOrigins: (request: Request) => {
+  trustedOrigins: (request?: Request) => {
     const staticOrigins = [
       'https://playground.aura-llm.dev',
       'https://aura-llm.dev',
       'http://localhost:3000',
     ]
-    const origin = request.headers.get('origin')
+    const origin = request?.headers.get('origin')
     if (origin && /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
       return [...staticOrigins, origin]
     }
