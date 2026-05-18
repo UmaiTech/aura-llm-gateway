@@ -12,9 +12,9 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 use utoipa::ToSchema;
@@ -22,7 +22,8 @@ use uuid::Uuid;
 
 use crate::AppState;
 use aura_core::crypto::{
-    extract_key_id, generate_api_key, verify_api_key, API_KEY_PREFIX_LIVE, API_KEY_PREFIX_TEST,
+    extract_key_id, generate_api_key, verify_api_key, GeneratedApiKey, API_KEY_PREFIX_LIVE,
+    API_KEY_PREFIX_TEST,
 };
 use aura_db::{ApiKey, ApiKeyRepo, NewApiKey};
 
@@ -142,6 +143,81 @@ impl IntoResponse for AuthError {
 
         (status, Json(self)).into_response()
     }
+}
+
+fn auth_error_response(
+    status: StatusCode,
+    code: impl Into<String>,
+    message: impl Into<String>,
+) -> (StatusCode, Json<AuthError>) {
+    (
+        status,
+        Json(AuthError {
+            error: AuthErrorInner {
+                code: code.into(),
+                message: message.into(),
+            },
+        }),
+    )
+}
+
+fn authenticated_user_id(
+    auth: Option<&AuthContext>,
+) -> Result<String, (StatusCode, Json<AuthError>)> {
+    auth.and_then(|auth| auth.api_key.user_id.clone())
+        .ok_or_else(|| {
+            auth_error_response(
+                StatusCode::UNAUTHORIZED,
+                "missing_user_context",
+                "Authenticated API key is not associated with a user.",
+            )
+        })
+}
+
+fn ensure_api_key_owner(
+    api_key: &ApiKey,
+    user_id: &str,
+) -> Result<(), (StatusCode, Json<AuthError>)> {
+    if api_key.user_id.as_deref() == Some(user_id) {
+        return Ok(());
+    }
+
+    Err(auth_error_response(
+        StatusCode::FORBIDDEN,
+        "forbidden",
+        "API key does not belong to the authenticated user.",
+    ))
+}
+
+fn build_new_api_key(
+    req: &CreateApiKeyRequest,
+    generated: &GeneratedApiKey,
+    user_id: String,
+    expires_at: Option<DateTime<Utc>>,
+) -> NewApiKey {
+    NewApiKey {
+        key_id: generated.key_id.clone(),
+        key_hash: generated.key_hash.clone(),
+        name: req.name.clone(),
+        description: req.description.clone(),
+        user_id: Some(user_id),
+        organization_id: req.organization_id,
+        scopes: serde_json::json!(req.scopes),
+        rate_limit_rpm: req.rate_limit_rpm,
+        monthly_token_limit: req.monthly_token_limit,
+        expires_at,
+        allowed_ips: None,
+        metadata: None,
+        scope_type: req.scope_type.clone(),
+        scope_id: req.scope_id,
+    }
+}
+
+fn api_key_infos_owned_by_user(keys: Vec<ApiKey>, user_id: &str) -> Vec<ApiKeyInfo> {
+    keys.into_iter()
+        .filter(|key| key.user_id.as_deref() == Some(user_id))
+        .map(ApiKeyInfo::from)
+        .collect()
 }
 
 /// Load full tenant hierarchy context for the API key
@@ -447,6 +523,7 @@ pub struct CreateApiKeyResponse {
 )]
 pub async fn create_api_key(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthContext>>,
     Json(req): Json<CreateApiKeyRequest>,
 ) -> Result<Json<CreateApiKeyResponse>, (StatusCode, Json<AuthError>)> {
     let pool = state.db_pool().ok_or_else(|| {
@@ -460,6 +537,8 @@ pub async fn create_api_key(
             }),
         )
     })?;
+
+    let user_id = authenticated_user_id(auth.as_ref().map(|auth| &auth.0))?;
 
     // Determine prefix based on environment
     let prefix = if req.environment == "test" {
@@ -477,22 +556,7 @@ pub async fn create_api_key(
         .map(|days| Utc::now() + Duration::days(days));
 
     // Create the database record
-    let new_key = NewApiKey {
-        key_id: generated.key_id.clone(),
-        key_hash: generated.key_hash,
-        name: req.name.clone(),
-        description: req.description.clone(),
-        user_id: None, // TODO: Get from auth context
-        organization_id: req.organization_id,
-        scopes: serde_json::json!(req.scopes),
-        rate_limit_rpm: req.rate_limit_rpm,
-        monthly_token_limit: req.monthly_token_limit,
-        expires_at,
-        allowed_ips: None,
-        metadata: None,
-        scope_type: req.scope_type,
-        scope_id: req.scope_id,
-    };
+    let new_key = build_new_api_key(&req, &generated, user_id, expires_at);
 
     let api_key = ApiKeyRepo::create(pool, new_key).await.map_err(|e| {
         (
@@ -570,9 +634,9 @@ pub struct ListApiKeysResponse {
 )]
 pub async fn list_api_keys(
     State(state): State<AppState>,
-    // TODO: Extract user from auth context
+    auth: Option<Extension<AuthContext>>,
 ) -> Result<Json<ListApiKeysResponse>, (StatusCode, Json<AuthError>)> {
-    let _pool = state.db_pool().ok_or_else(|| {
+    let pool = state.db_pool().ok_or_else(|| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(AuthError {
@@ -584,9 +648,19 @@ pub async fn list_api_keys(
         )
     })?;
 
-    // TODO: Filter by user_id from auth context
-    // For now, return empty list if no user context
-    let keys: Vec<ApiKeyInfo> = vec![];
+    let user_id = authenticated_user_id(auth.as_ref().map(|auth| &auth.0))?;
+    let keys = ApiKeyRepo::get_by_user(pool, &user_id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthError {
+                error: AuthErrorInner {
+                    code: "lookup_failed".to_string(),
+                    message: format!("Failed to list API keys: {}", e),
+                },
+            }),
+        )
+    })?;
+    let keys = api_key_infos_owned_by_user(keys, &user_id);
 
     Ok(Json(ListApiKeysResponse { keys }))
 }
@@ -602,6 +676,7 @@ pub async fn list_api_keys(
     responses(
         (status = 200, description = "API key info", body = ApiKeyInfo),
         (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
         (status = 404, description = "API key not found"),
         (status = 503, description = "Database unavailable")
     ),
@@ -611,6 +686,7 @@ pub async fn list_api_keys(
 )]
 pub async fn get_api_key(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthContext>>,
     axum::extract::Path(key_id): axum::extract::Path<String>,
 ) -> Result<Json<ApiKeyInfo>, (StatusCode, Json<AuthError>)> {
     let pool = state.db_pool().ok_or_else(|| {
@@ -624,6 +700,8 @@ pub async fn get_api_key(
             }),
         )
     })?;
+
+    let user_id = authenticated_user_id(auth.as_ref().map(|auth| &auth.0))?;
 
     let api_key = ApiKeyRepo::find_by_key_id(pool, &key_id)
         .await
@@ -650,6 +728,8 @@ pub async fn get_api_key(
             )
         })?;
 
+    ensure_api_key_owner(&api_key, &user_id)?;
+
     Ok(Json(ApiKeyInfo::from(api_key)))
 }
 
@@ -664,6 +744,7 @@ pub async fn get_api_key(
     responses(
         (status = 204, description = "API key revoked successfully"),
         (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
         (status = 404, description = "API key not found"),
         (status = 503, description = "Database unavailable")
     ),
@@ -673,6 +754,7 @@ pub async fn get_api_key(
 )]
 pub async fn revoke_api_key(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthContext>>,
     axum::extract::Path(key_id): axum::extract::Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<AuthError>)> {
     let pool = state.db_pool().ok_or_else(|| {
@@ -686,6 +768,8 @@ pub async fn revoke_api_key(
             }),
         )
     })?;
+
+    let user_id = authenticated_user_id(auth.as_ref().map(|auth| &auth.0))?;
 
     // Find the key first
     let api_key = ApiKeyRepo::find_by_key_id(pool, &key_id)
@@ -713,6 +797,8 @@ pub async fn revoke_api_key(
             )
         })?;
 
+    ensure_api_key_owner(&api_key, &user_id)?;
+
     // Revoke the key
     ApiKeyRepo::revoke(pool, api_key.id).await.map_err(|e| {
         (
@@ -727,4 +813,163 @@ pub async fn revoke_api_key(
     })?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_api_key(user_id: Option<&str>) -> ApiKey {
+        test_api_key_with_id(user_id, "ak_test_123")
+    }
+
+    fn test_api_key_with_id(user_id: Option<&str>, key_id: &str) -> ApiKey {
+        let now = Utc::now();
+
+        ApiKey {
+            id: Uuid::new_v4(),
+            key_id: key_id.to_string(),
+            key_hash: "hash".to_string(),
+            name: "test key".to_string(),
+            description: None,
+            user_id: user_id.map(str::to_string),
+            organization_id: None,
+            scopes: serde_json::json!(["*"]),
+            rate_limit_rpm: None,
+            monthly_token_limit: None,
+            current_month_tokens: 0,
+            usage_reset_month: None,
+            status: "active".to_string(),
+            expires_at: None,
+            last_used_at: None,
+            allowed_ips: None,
+            metadata: None,
+            scope_type: None,
+            scope_id: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn test_auth_context(user_id: Option<&str>) -> AuthContext {
+        let api_key = test_api_key(user_id);
+
+        AuthContext {
+            user_id: user_id.map(str::to_string),
+            tenant: TenantContext {
+                api_key_id: api_key.key_id.clone(),
+                ..Default::default()
+            },
+            api_key,
+        }
+    }
+
+    #[test]
+    fn authenticated_user_id_reads_api_key_user_id_from_auth_context() {
+        let auth = test_auth_context(Some("user-123"));
+
+        assert_eq!(
+            authenticated_user_id(Some(&auth)).expect("user id should be present"),
+            "user-123"
+        );
+    }
+
+    #[test]
+    fn authenticated_user_id_uses_api_key_user_id_when_context_differs() {
+        let mut auth = test_auth_context(Some("api-key-user"));
+        auth.user_id = Some("stale-context-user".to_string());
+
+        assert_eq!(
+            authenticated_user_id(Some(&auth)).expect("user id should be present"),
+            "api-key-user"
+        );
+    }
+
+    #[test]
+    fn authenticated_user_id_rejects_missing_context() {
+        let error = authenticated_user_id(None).expect_err("missing context should fail");
+
+        assert_eq!(error.0, StatusCode::UNAUTHORIZED);
+        assert_eq!(error.1.error.code, "missing_user_context");
+    }
+
+    #[test]
+    fn ensure_api_key_owner_allows_matching_user() {
+        let api_key = test_api_key(Some("user-123"));
+
+        assert!(ensure_api_key_owner(&api_key, "user-123").is_ok());
+    }
+
+    #[test]
+    fn ensure_api_key_owner_rejects_other_user() {
+        let api_key = test_api_key(Some("other-user"));
+        let error = ensure_api_key_owner(&api_key, "user-123").expect_err("other user should fail");
+
+        assert_eq!(error.0, StatusCode::FORBIDDEN);
+        assert_eq!(error.1.error.code, "forbidden");
+    }
+
+    #[test]
+    fn ensure_api_key_owner_rejects_unowned_key() {
+        let api_key = test_api_key(None);
+        let error =
+            ensure_api_key_owner(&api_key, "user-123").expect_err("unowned key should fail");
+
+        assert_eq!(error.0, StatusCode::FORBIDDEN);
+        assert_eq!(error.1.error.code, "forbidden");
+    }
+
+    #[test]
+    fn build_new_api_key_sets_authenticated_user_id() {
+        let scope_id = Uuid::new_v4();
+        let organization_id = Uuid::new_v4();
+        let req = CreateApiKeyRequest {
+            name: "deploy key".to_string(),
+            description: Some("created from test".to_string()),
+            environment: "test".to_string(),
+            scopes: vec!["responses:create".to_string(), "responses:read".to_string()],
+            rate_limit_rpm: Some(60),
+            monthly_token_limit: Some(10_000),
+            expires_in_days: Some(30),
+            organization_id: Some(organization_id),
+            scope_type: Some("project".to_string()),
+            scope_id: Some(scope_id),
+        };
+        let generated = GeneratedApiKey {
+            key: "aura_test_full_secret".to_string(),
+            key_id: "aura_test_public_id".to_string(),
+            key_hash: "hashed-secret".to_string(),
+        };
+        let expires_at = Some(Utc::now() + Duration::days(30));
+
+        let new_key = build_new_api_key(&req, &generated, "user-123".to_string(), expires_at);
+
+        assert_eq!(new_key.user_id.as_deref(), Some("user-123"));
+        assert_eq!(new_key.key_id, generated.key_id);
+        assert_eq!(new_key.key_hash, generated.key_hash);
+        assert_eq!(new_key.name, req.name);
+        assert_eq!(new_key.description, req.description);
+        assert_eq!(new_key.organization_id, Some(organization_id));
+        assert_eq!(new_key.rate_limit_rpm, Some(60));
+        assert_eq!(new_key.monthly_token_limit, Some(10_000));
+        assert_eq!(new_key.expires_at, expires_at);
+        assert_eq!(new_key.scope_type.as_deref(), Some("project"));
+        assert_eq!(new_key.scope_id, Some(scope_id));
+        assert_eq!(
+            new_key.scopes,
+            serde_json::json!(["responses:create", "responses:read"])
+        );
+    }
+
+    #[test]
+    fn api_key_infos_owned_by_user_filters_other_users() {
+        let owned = test_api_key_with_id(Some("user-123"), "owned-key");
+        let other = test_api_key_with_id(Some("other-user"), "other-key");
+        let unowned = test_api_key_with_id(None, "unowned-key");
+
+        let keys = api_key_infos_owned_by_user(vec![other, owned, unowned], "user-123");
+
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].key_id, "owned-key");
+    }
 }
