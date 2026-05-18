@@ -9,7 +9,7 @@
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fumaitech%2Faura--llm--gateway-2496ED?logo=docker&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/aura-llm-gateway)
 [![Helm](https://img.shields.io/badge/helm-ghcr.io%2Fumaitech%2Fcharts%2Faura--llm--gateway-0F1689?logo=helm&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/charts%2Faura-llm-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg?logo=rust)](https://www.rust-lang.org)
 [![GitHub last commit](https://img.shields.io/github/last-commit/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/commits/main)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/UmaiTech/aura-llm-gateway/pulls)
 
@@ -73,7 +73,7 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for detailed 
 
 ### Prerequisites
 
-- Rust 1.75+ (2021 edition)
+- Rust 1.91+ (2021 edition) — required by transitive AWS SDK dependencies
 - PostgreSQL 14+ (optional, for persistence)
 - Redis 7+ (optional, for caching/rate limiting)
 - Docker & Docker Compose (optional, for containerized deployment)

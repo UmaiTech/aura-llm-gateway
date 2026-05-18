@@ -5,7 +5,7 @@
 # ============================================================================
 # Stage 1: Chef - Prepare the recipe (dependency manifest)
 # ============================================================================
-FROM rust:1.88-slim-bookworm AS chef
+FROM rust:1.91-slim-bookworm AS chef
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
