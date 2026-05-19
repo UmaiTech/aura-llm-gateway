@@ -30,7 +30,11 @@ import { normalizeRequest } from '../_lib/normalize-request'
 // We also strip the spurious `?path=...` query param that Vercel's
 // `:path*` rewrite (vercel.json) tacks onto every request. Leaving
 // it confuses better-auth's route matcher.
-export default async function handler(req: Request): Promise<Response> {
+// `req` is loosely typed because @vercel/node@5 hands us either a
+// Web `Request` or a Node-style `IncomingMessage`-like object
+// depending on the deploy. `normalizeRequest` accepts both and
+// returns a real `Request` for better-auth to consume.
+export default async function handler(req: unknown): Promise<Response> {
   try {
     const absoluteReq = normalizeRequest(req)
     const response = await auth.handler(absoluteReq)
