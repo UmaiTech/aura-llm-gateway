@@ -1,0 +1,74 @@
+name: Fly Deploy & Migrate
+
+# Drives gateway deploys to Fly.io. Triggers on pushes to main that
+# touch gateway-relevant files. Every deploy runs the same flow because
+# `release_command = 'migrate'` in fly.toml fires the sqlx migration
+# runner as part of the deploy lifecycle — so:
+#
+#   - Rust/Dockerfile changed  → image rebuild + migrate (release_command)
+#   - migrations/** only       → image rebuild + migrate (release_command)
+#
+# The rebuild is unavoidable for migrations-only PRs because the .sql
+# files are baked into the image at build time (via sqlx::migrate!).
+# That's the trade-off for shipping migrations as compile-time embedded
+# bytes — they ride along with the binary rather than being copied to
+# the container at runtime. ~2-3 min for the rebuild.
+#
+# Requires the `FLY_API_TOKEN` repo secret. Generate with:
+#   flyctl auth token
+# Then add at: https://github.com/UmaiTech/aura-llm-gateway/settings/secrets/actions
+#
+# See https://fly.io/docs/flyctl/integrating/#github-actions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'migrations/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Dockerfile'
+      - 'fly.toml'
+      - '.github/workflows/fly-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Serialize deploys to Fly — two parallel deploys race on the
+  # release_command and one will error out with "previous release still
+  # running". The default queue lets a deploy finish before the next
+  # one starts, which is what we want for migrations especially.
+  group: fly-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fly
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.5
+
+      - name: Deploy
+        # `flyctl deploy --remote-only` builds the image on Fly's
+        # remote builder (no Docker needed in the runner), ships it,
+        # then runs `release_command = 'migrate'` from fly.toml before
+        # routing traffic to the new release.
+        #
+        # The migrate command (crates/aura-proxy/src/main.rs::run_migrate)
+        # calls `sqlx::migrate!("../../migrations").run(pool)`, which
+        # tracks applied versions in `_sqlx_migrations` and is
+        # idempotent — re-running it on a fresh release is a no-op
+        # for already-applied migrations.
+        #
+        # --wait-timeout caps the deploy at 5 min. release_command
+        # failures (e.g. a broken migration) abort the deploy and
+        # leave the previous release serving traffic — we don't end
+        # up with a half-migrated DB and a new binary that expects
+        # the new schema.
+        run: flyctl deploy --remote-only --wait-timeout 300
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
