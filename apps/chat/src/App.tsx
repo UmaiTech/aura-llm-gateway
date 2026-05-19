@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { BetaBanner } from './components/BetaBanner'
 import { ChatContainer } from './components/ChatContainer'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -579,6 +580,9 @@ export default function App() {
           agentMode={agentMode}
           onAgentModeChange={setAgentMode}
         />
+
+        {/* Beta-signup banner — hidden once the user joins */}
+        <BetaBanner />
 
         {/* Chat area */}
         <ChatContainer

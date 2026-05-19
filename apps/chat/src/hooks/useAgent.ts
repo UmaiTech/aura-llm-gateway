@@ -5,7 +5,12 @@ import { useState, useCallback, useRef } from 'react'
 import { generateId } from '../lib/utils'
 import { BUILT_IN_TOOLS, executeTool } from '../lib/agent'
 import { calculateCost } from '../lib/pricing'
-import { AuraApiError } from '../lib/api'
+import { AuraApiError, buildApiError } from '../lib/api'
+
+// Sentinel embedded in the rate-limit error message so the UI can
+// detect it and render the "Join the beta" CTA without us having to
+// change every error-handling signature in the chat.
+export const RATE_LIMIT_SENTINEL = '__rate_limit_429__'
 import type { Message, Tool, ToolInvocation, MessageUsage } from '../lib/types'
 
 // In prod, requests flow through /api/proxy (the serverless function holds
@@ -21,7 +26,10 @@ function friendlyErrorMessage(err: unknown): string {
   if (err instanceof AuraApiError) {
     if (err.isRateLimit()) {
       const retryHint = err.retryAfter ? ` Try again in ${err.retryAfter}s.` : ''
-      return `You've hit the free-tier limit (5 requests/min, 50K tokens/month).${retryHint} Star the repo on GitHub and let us know if you want a higher tier.`
+      // Prefix the message with the sentinel so the UI can detect a
+      // rate-limit error and render the beta-signup CTA. The sentinel
+      // is stripped before display in ChatContainer.
+      return `${RATE_LIMIT_SENTINEL}You've hit the free-tier limit (5 requests/min, 50K tokens/month).${retryHint}`
     }
     if (err.isUnauthenticated()) {
       return 'Your session expired. Refresh the page to sign in again.'
@@ -226,8 +234,11 @@ async function runAgentLoop(
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error?.message || `Request failed: ${response.status}`)
+      // Throw AuraApiError so friendlyErrorMessage / the rate-limit
+      // CTA path can detect 429s and special-case them. Previously we
+      // threw a plain Error here, which made the isRateLimit() branch
+      // in friendlyErrorMessage dead code.
+      throw await buildApiError(response)
     }
 
     // Process stream

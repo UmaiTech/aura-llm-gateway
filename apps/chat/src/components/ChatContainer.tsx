@@ -2,6 +2,8 @@ import { useRef, useEffect } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { WelcomeScreen } from './WelcomeScreen'
+import { RateLimitNotice } from './RateLimitNotice'
+import { RATE_LIMIT_SENTINEL } from '../hooks/useAgent'
 import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
 
 interface ChatContainerProps {
@@ -69,14 +71,18 @@ export function ChatContainer({
                 isStreaming={message.isStreaming}
               />
             ))}
-            {error && (
+            {error && error.startsWith(RATE_LIMIT_SENTINEL) ? (
+              <RateLimitNotice
+                message={error.slice(RATE_LIMIT_SENTINEL.length)}
+              />
+            ) : error ? (
               <div className="flex items-center gap-2 p-4 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
                 <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-sm">{error}</p>
               </div>
-            )}
+            ) : null}
             <div ref={messagesEndRef} />
           </div>
         )}
