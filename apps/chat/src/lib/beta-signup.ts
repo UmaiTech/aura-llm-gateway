@@ -27,7 +27,23 @@ export interface BetaSignupState {
 
 export async function getBetaSignupState(): Promise<BetaSignupState> {
   const res = await fetch('/api/beta-signup', { credentials: 'include' })
-  if (!res.ok) throw new Error(`beta-signup GET failed: ${res.status}`)
+  if (!res.ok) {
+    // Pull whatever the server said in the body so the caller's
+    // console.error / toast can show something useful (e.g. "401
+    // unauthorized — session expired"). Fall through to a status-only
+    // message if the body isn't JSON.
+    const detail = await res
+      .json()
+      .then((b: { error?: string; message?: string }) =>
+        b.message ?? b.error ?? '',
+      )
+      .catch(() => '')
+    throw new Error(
+      detail
+        ? `beta-signup GET ${res.status}: ${detail}`
+        : `beta-signup GET failed: ${res.status}`,
+    )
+  }
   return res.json()
 }
 

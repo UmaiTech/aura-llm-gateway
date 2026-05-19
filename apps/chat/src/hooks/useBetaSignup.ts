@@ -42,8 +42,20 @@ export function useBetaSignup(): UseBetaSignup {
       .then((s) => {
         if (!cancelled) setState(s)
       })
-      .catch(() => {
-        // Non-fatal — leave default `signedUp: false`.
+      .catch((err) => {
+        // Non-fatal for the chat: the beta CTA is optional UI, we
+        // don't want a broken /api/beta-signup to block sign-in or
+        // chatting. But silently swallowing the error makes auth /
+        // backend failures invisible. Log it so they show up in the
+        // browser console + Vercel error tracking.
+        console.error('[beta-signup] state fetch failed:', err)
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Could not check beta signup state.',
+          )
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

@@ -49,10 +49,21 @@ export default async function handler(
       // Fire-and-forget. If the mint fails, the first /api/proxy call
       // retries.
       if (res.statusCode >= 200 && res.statusCode < 400) {
-        // Pass the raw headers along so mint-key can read the session
-        // cookie better-auth just set.
-        void mintPlaygroundApiKey({ headers: req.headers }).catch((err) => {
-          console.error('[auth] mintPlaygroundApiKey failed (non-fatal):', err)
+        // CRITICAL: req.headers has the OAuth state cookie (from the
+        // pre-callback redirect), but NOT the session cookie — the
+        // session cookie is what better-auth just set on the
+        // response via `Set-Cookie`. Reading `req.headers` would make
+        // getSession() return null and skip the mint silently.
+        //
+        // Build a synthetic header map that points at the session
+        // cookie better-auth wrote on `res`. mint-key then resolves a
+        // real session and proceeds to insert the user_api_key row.
+        const headers = sessionHeadersFromResponse(req, res)
+        void mintPlaygroundApiKey({ headers }).catch((err) => {
+          console.error(
+            '[auth] mintPlaygroundApiKey failed (non-fatal):',
+            err,
+          )
         })
       }
       return result
@@ -79,6 +90,43 @@ export default async function handler(
         }),
       )
     }
+  }
+}
+
+/**
+ * Build a fake request-headers object whose `cookie` includes the
+ * session cookie better-auth just wrote on the response. Used by the
+ * post-callback mint hook because the inbound req.headers only have
+ * the pre-callback OAuth state cookie, not the session cookie that
+ * `auth.api.getSession` needs.
+ */
+function sessionHeadersFromResponse(
+  req: IncomingMessage,
+  res: ServerResponse,
+): IncomingMessage['headers'] {
+  // Pull every `Set-Cookie` value off the response. Node's getHeader
+  // returns string | string[] | number — for set-cookie it's an array
+  // when better-auth has set multiple, single string otherwise.
+  const setCookie = res.getHeader('set-cookie')
+  const setCookies = Array.isArray(setCookie)
+    ? setCookie
+    : setCookie != null
+      ? [String(setCookie)]
+      : []
+
+  // Strip attributes (`; HttpOnly; Path=/...`) — only the `name=value`
+  // pair belongs in a Cookie request header.
+  const cookieParts = setCookies.map((line) => line.split(';')[0].trim())
+
+  // Merge with whatever the client already sent on the request. The
+  // original `cookie` header might carry unrelated cookies we want to
+  // keep around (CSRF tokens, etc.).
+  const existing = req.headers.cookie
+  if (existing) cookieParts.unshift(existing)
+
+  return {
+    ...req.headers,
+    cookie: cookieParts.filter(Boolean).join('; '),
   }
 }
 
