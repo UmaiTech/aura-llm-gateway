@@ -13,6 +13,7 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
+import { fromNodeHeaders } from 'better-auth/node'
 import { auth, pool } from './auth'
 
 /**
@@ -37,9 +38,17 @@ function generateApiKey(): { key: string; keyId: string; keyHash: string } {
 const FREE_TIER_RATE_LIMIT_RPM = 5
 const FREE_TIER_MONTHLY_TOKEN_LIMIT = 50_000
 
-export async function mintPlaygroundApiKey(req: Request): Promise<void> {
-  // Pull the active session from the request that just authenticated.
-  const session = await auth.api.getSession({ headers: req.headers })
+// Accept either a Web Request (Headers instance) or a Node-style
+// header map. better-auth ships `fromNodeHeaders` to convert the
+// latter into a Headers instance; pass-through for the former.
+export async function mintPlaygroundApiKey(req: {
+  headers: Headers | Record<string, string | string[] | undefined>
+}): Promise<void> {
+  const headers =
+    req.headers instanceof Headers
+      ? req.headers
+      : fromNodeHeaders(req.headers)
+  const session = await auth.api.getSession({ headers })
   if (!session?.user?.id) {
     console.warn('[mint-key] No session on request; skipping mint')
     return
