@@ -50,25 +50,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: superfly/flyctl-actions/setup-flyctl@v1.5
-
+      # The one-shot superfly/flyctl-actions@v1.5 wraps a single
+      # flyctl invocation. This is the versioned action — the
+      # setup-flyctl/ subpath doesn't publish version tags, only
+      # @master. v1.5 is the latest tag as of 2026-05-19.
+      # https://github.com/superfly/flyctl-actions
+      #
+      # `flyctl deploy --remote-only` builds the image on Fly's
+      # remote builder (no Docker needed in the runner), ships it,
+      # then runs `release_command = 'migrate'` from fly.toml before
+      # routing traffic to the new release.
+      #
+      # The migrate command (crates/aura-proxy/src/main.rs::run_migrate)
+      # calls `sqlx::migrate!("../../migrations").run(pool)`, which
+      # tracks applied versions in `_sqlx_migrations` and is
+      # idempotent — re-running it on a fresh release is a no-op for
+      # already-applied migrations.
+      #
+      # --wait-timeout caps the deploy at 5 min. release_command
+      # failures (e.g. a broken migration) abort the deploy and leave
+      # the previous release serving traffic — we don't end up with a
+      # half-migrated DB and a new binary that expects the new schema.
       - name: Deploy
-        # `flyctl deploy --remote-only` builds the image on Fly's
-        # remote builder (no Docker needed in the runner), ships it,
-        # then runs `release_command = 'migrate'` from fly.toml before
-        # routing traffic to the new release.
-        #
-        # The migrate command (crates/aura-proxy/src/main.rs::run_migrate)
-        # calls `sqlx::migrate!("../../migrations").run(pool)`, which
-        # tracks applied versions in `_sqlx_migrations` and is
-        # idempotent — re-running it on a fresh release is a no-op
-        # for already-applied migrations.
-        #
-        # --wait-timeout caps the deploy at 5 min. release_command
-        # failures (e.g. a broken migration) abort the deploy and
-        # leave the previous release serving traffic — we don't end
-        # up with a half-migrated DB and a new binary that expects
-        # the new schema.
-        run: flyctl deploy --remote-only --wait-timeout 300
+        uses: superfly/flyctl-actions@v1.5
+        with:
+          args: 'deploy --remote-only --wait-timeout 300'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
