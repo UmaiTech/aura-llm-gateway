@@ -50,10 +50,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The one-shot superfly/flyctl-actions@v1.5 wraps a single
-      # flyctl invocation. This is the versioned action — the
-      # setup-flyctl/ subpath doesn't publish version tags, only
-      # @master. v1.5 is the latest tag as of 2026-05-19.
+      # The one-shot superfly/flyctl-actions@1.5 wraps a single
+      # flyctl invocation. Their tag scheme is unversioned-style:
+      # `1.5`, `1.6` (no `v` prefix). `v1.4` exists for legacy but
+      # newer releases drop the `v`. Latest is `1.6` as of 2026-05-19.
       # https://github.com/superfly/flyctl-actions
       #
       # `flyctl deploy --remote-only` builds the image on Fly's
@@ -72,7 +72,7 @@ jobs:
       # the previous release serving traffic — we don't end up with a
       # half-migrated DB and a new binary that expects the new schema.
       - name: Deploy
-        uses: superfly/flyctl-actions@v1.5
+        uses: superfly/flyctl-actions@1.5
         with:
           args: 'deploy --remote-only --wait-timeout 300'
         env:
