@@ -25,11 +25,21 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/proxy'
 function friendlyErrorMessage(err: unknown): string {
   if (err instanceof AuraApiError) {
     if (err.isRateLimit()) {
+      // Three distinct shapes of 429:
+      //   - daily_message_limit_exceeded: "you've used your 20 free
+      //     messages for today" — show the gateway's exact message,
+      //     it already has the per-key count and reset time
+      //   - rate_limit_exceeded: per-minute burst — short retry hint
+      //   - anything else with 429: pass through whatever the server
+      //     said
+      // All three get the sentinel prefix so the UI swaps to
+      // RateLimitNotice with the beta CTA, which is the same upsell
+      // regardless of which limit hit.
+      if (err.code === 'daily_message_limit_exceeded') {
+        return `${RATE_LIMIT_SENTINEL}${err.message}`
+      }
       const retryHint = err.retryAfter ? ` Try again in ${err.retryAfter}s.` : ''
-      // Prefix the message with the sentinel so the UI can detect a
-      // rate-limit error and render the beta-signup CTA. The sentinel
-      // is stripped before display in ChatContainer.
-      return `${RATE_LIMIT_SENTINEL}You've hit the free-tier limit (5 requests/min, 50K tokens/month).${retryHint}`
+      return `${RATE_LIMIT_SENTINEL}You're sending requests too fast.${retryHint}`
     }
     if (err.isUnauthenticated()) {
       return 'Your session expired. Refresh the page to sign in again.'

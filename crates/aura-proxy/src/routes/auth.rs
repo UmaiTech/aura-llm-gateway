@@ -205,6 +205,10 @@ fn build_new_api_key(
         scopes: serde_json::json!(req.scopes),
         rate_limit_rpm: req.rate_limit_rpm,
         monthly_token_limit: req.monthly_token_limit,
+        // Daily message cap is only set by playground-mint flow (free
+        // tier). Admin-issued keys via this endpoint inherit None,
+        // matching prior behavior.
+        daily_message_limit: None,
         expires_at,
         allowed_ips: None,
         metadata: None,
@@ -837,6 +841,7 @@ mod tests {
             scopes: serde_json::json!(["*"]),
             rate_limit_rpm: None,
             monthly_token_limit: None,
+            daily_message_limit: None,
             current_month_tokens: 0,
             usage_reset_month: None,
             status: "active".to_string(),

@@ -257,6 +257,12 @@ pub struct ApiKey {
     pub scopes: serde_json::Value,
     pub rate_limit_rpm: Option<i32>,
     pub monthly_token_limit: Option<i64>,
+    /// Max requests per UTC day. NULL = no cap. Counter is Redis-backed
+    /// and rolls over at 00:00 UTC. Different from rate_limit_rpm
+    /// (per-minute burst) — daily_message_limit is the constraint that
+    /// actually shapes chat usage since per-minute caps are rarely
+    /// reached organically.
+    pub daily_message_limit: Option<i32>,
     pub current_month_tokens: i64,
     pub usage_reset_month: Option<String>,
     pub status: String,
@@ -314,6 +320,7 @@ pub struct NewApiKey {
     pub scopes: serde_json::Value,
     pub rate_limit_rpm: Option<i32>,
     pub monthly_token_limit: Option<i64>,
+    pub daily_message_limit: Option<i32>,
     pub expires_at: Option<DateTime<Utc>>,
     pub allowed_ips: Option<serde_json::Value>,
     pub metadata: Option<serde_json::Value>,

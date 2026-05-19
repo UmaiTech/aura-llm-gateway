@@ -33,9 +33,22 @@ function generateApiKey(): { key: string; keyId: string; keyHash: string } {
 }
 
 /**
- * Free-tier defaults. Matches the plan agreed in the Half B design discussion.
+ * Free-tier defaults for the hosted playground.
+ *
+ * Three caps applied per minted key:
+ *   - RATE_LIMIT_RPM: anti-burst, prevents 20+ requests/min from a
+ *     loop. Rarely hit in normal chat.
+ *   - DAILY_MESSAGE_LIMIT: the constraint that actually shapes
+ *     organic usage. ~20 chat turns per UTC day; counter resets at
+ *     00:00 UTC. This is the cap users hit and that drives them to
+ *     the beta CTA.
+ *   - MONTHLY_TOKEN_LIMIT: hard ceiling for power users with long
+ *     conversations. Combined with the daily message cap it acts as
+ *     a second tripwire — short messages are gated by daily count,
+ *     long ones by token usage.
  */
 const FREE_TIER_RATE_LIMIT_RPM = 5
+const FREE_TIER_DAILY_MESSAGE_LIMIT = 20
 const FREE_TIER_MONTHLY_TOKEN_LIMIT = 50_000
 
 // Accept either a Web Request (Headers instance) or a Node-style
@@ -83,8 +96,8 @@ export async function mintPlaygroundApiKey(req: {
     await client.query(
       `INSERT INTO api_keys (
         key_id, key_hash, name, description, user_id, scopes,
-        rate_limit_rpm, monthly_token_limit, status
-      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, 'active')`,
+        rate_limit_rpm, monthly_token_limit, daily_message_limit, status
+      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, 'active')`,
       [
         keyId,
         keyHash,
@@ -94,6 +107,7 @@ export async function mintPlaygroundApiKey(req: {
         JSON.stringify(['responses:create', 'conversations:read', 'usage:read']),
         FREE_TIER_RATE_LIMIT_RPM,
         FREE_TIER_MONTHLY_TOKEN_LIMIT,
+        FREE_TIER_DAILY_MESSAGE_LIMIT,
       ],
     )
 

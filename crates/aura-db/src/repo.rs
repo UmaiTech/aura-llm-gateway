@@ -525,10 +525,10 @@ impl ApiKeyRepo {
             r#"
             INSERT INTO api_keys (
                 key_id, key_hash, name, description, user_id, organization_id,
-                scopes, rate_limit_rpm, monthly_token_limit, expires_at,
-                allowed_ips, metadata
+                scopes, rate_limit_rpm, monthly_token_limit, daily_message_limit,
+                expires_at, allowed_ips, metadata
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
             "#,
         )
@@ -541,6 +541,7 @@ impl ApiKeyRepo {
         .bind(&new.scopes)
         .bind(new.rate_limit_rpm)
         .bind(new.monthly_token_limit)
+        .bind(new.daily_message_limit)
         .bind(new.expires_at)
         .bind(&new.allowed_ips)
         .bind(&new.metadata)
@@ -687,6 +688,9 @@ impl ApiKeyRepo {
             scopes: row.get("scopes"),
             rate_limit_rpm: row.get("rate_limit_rpm"),
             monthly_token_limit: row.get("monthly_token_limit"),
+            // try_get + .ok().flatten() so reads from pre-migration-020
+            // rows (no column at all) don't blow up — they yield None.
+            daily_message_limit: row.try_get("daily_message_limit").ok().flatten(),
             current_month_tokens: row.get("current_month_tokens"),
             usage_reset_month: row.get("usage_reset_month"),
             status: row.get("status"),

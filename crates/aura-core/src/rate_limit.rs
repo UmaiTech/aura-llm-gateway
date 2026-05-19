@@ -313,6 +313,121 @@ impl RateLimiter {
 
         Ok(true)
     }
+
+    /// Check + atomically increment the per-UTC-day message counter for
+    /// the given key. Returns Ok((allowed, used, seconds_until_reset)):
+    ///
+    ///   - `allowed = true` and counter incremented → request OK
+    ///   - `allowed = false` → daily cap reached, counter NOT incremented
+    ///   - Redis errors propagate as RateLimitError; the caller should
+    ///     fail-open to avoid taking the gateway down with the limiter.
+    ///
+    /// Counter key: `<prefix>:daily_msgs:<api_key_id>:YYYY-MM-DD`. TTL is
+    /// set once on the first increment to expire ~25h later (a bit past
+    /// midnight UTC), so the next day's key starts fresh.
+    ///
+    /// We use a Lua script to make the GET / INCR / EXPIRE sequence
+    /// atomic — otherwise two concurrent calls at the exact boundary
+    /// could both see "current = limit - 1" and both increment, allowing
+    /// limit+1 messages through. With ~5-req/min anti-burst already
+    /// gating the request, this race is theoretical but cheap to close.
+    pub async fn check_daily_messages(
+        &self,
+        key: &str,
+        limit: u32,
+    ) -> Result<DailyMessageResult, RateLimitError> {
+        let now = chrono::Utc::now();
+        let day = now.format("%Y-%m-%d").to_string();
+        let redis_key = format!("{}:daily_msgs:{}:{}", self.key_prefix, key, day);
+
+        // Seconds until 00:00 UTC the next day. We set this as the TTL
+        // on a fresh counter so it rolls over exactly at midnight.
+        let tomorrow = (now + chrono::Duration::days(1))
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .map(|naive| naive.and_utc())
+            .unwrap_or(now + chrono::Duration::hours(24));
+        let ttl_seconds = (tomorrow - now).num_seconds().max(60);
+
+        // KEYS[1] = redis_key, ARGV[1] = limit, ARGV[2] = ttl
+        // Returns: { allowed (1|0), used_after_call, reset_in_seconds }
+        let script = redis::Script::new(
+            r#"
+            local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+            local limit = tonumber(ARGV[1])
+            if current >= limit then
+                local ttl = redis.call('TTL', KEYS[1])
+                if ttl < 0 then ttl = tonumber(ARGV[2]) end
+                return { 0, current, ttl }
+            end
+            local new_val = redis.call('INCR', KEYS[1])
+            if new_val == 1 then
+                redis.call('EXPIRE', KEYS[1], ARGV[2])
+            end
+            local ttl = redis.call('TTL', KEYS[1])
+            if ttl < 0 then ttl = tonumber(ARGV[2]) end
+            return { 1, new_val, ttl }
+            "#,
+        );
+
+        let mut conn = self.redis.connection();
+        let result: Vec<i64> = script
+            .key(&redis_key)
+            .arg(limit as i64)
+            .arg(ttl_seconds)
+            .invoke_async(&mut conn)
+            .await?;
+
+        let allowed = result.first().copied().unwrap_or(0) == 1;
+        let used = result.get(1).copied().unwrap_or(0) as u32;
+        let reset_after_secs = result.get(2).copied().unwrap_or(ttl_seconds) as u64;
+
+        if !allowed {
+            warn!(
+                key = %key,
+                used = %used,
+                limit = %limit,
+                "Daily message limit reached"
+            );
+        } else {
+            debug!(
+                key = %key,
+                used = %used,
+                limit = %limit,
+                "Daily message check passed"
+            );
+        }
+
+        Ok(DailyMessageResult {
+            allowed,
+            limit,
+            used,
+            reset_after_secs,
+        })
+    }
+}
+
+/// Outcome of a daily-message limit check, mirroring `RateLimitResult`
+/// in shape so headers + error responses are easy to assemble.
+#[derive(Debug, Clone)]
+pub struct DailyMessageResult {
+    pub allowed: bool,
+    pub limit: u32,
+    pub used: u32,
+    pub reset_after_secs: u64,
+}
+
+impl DailyMessageResult {
+    /// Headers to attach so the chat client can show a "X messages
+    /// remaining today" indicator if it wants to.
+    pub fn headers(&self) -> Vec<(&'static str, String)> {
+        let remaining = self.limit.saturating_sub(self.used);
+        vec![
+            ("X-Daily-Limit", self.limit.to_string()),
+            ("X-Daily-Remaining", remaining.to_string()),
+            ("X-Daily-Reset", self.reset_after_secs.to_string()),
+        ]
+    }
 }
 
 #[cfg(test)]

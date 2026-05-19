@@ -138,6 +138,73 @@ pub async fn rate_limit_middleware(
         return (StatusCode::TOO_MANY_REQUESTS, headers, Json(error_response)).into_response();
     }
 
+    // Daily message limit check. Independent of the per-minute counter
+    // above — the RPM cap is anti-burst, this one shapes organic chat
+    // usage (each /v1/responses call counts as one message). Skipped
+    // if the key has no daily cap set (NULL column = pro / internal).
+    //
+    // Fail-open on Redis errors so we don't black out the gateway if
+    // the limiter has a hiccup.
+    let daily_result = if let Some(daily_limit) = auth.api_key.daily_message_limit {
+        match rate_limiter
+            .check_daily_messages(&key, daily_limit as u32)
+            .await
+        {
+            Ok(r) => Some(r),
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    api_key_id = %key,
+                    "Daily message check failed"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if let Some(ref d) = daily_result {
+        if !d.allowed {
+            debug!(
+                api_key_id = %key,
+                limit = %d.limit,
+                used = %d.used,
+                reset_after = %d.reset_after_secs,
+                "Daily message limit reached"
+            );
+
+            aura_core::metrics::record_rate_limit_exceeded(&key);
+
+            let mut headers = HeaderMap::new();
+            for (name, value) in d.headers() {
+                if let Ok(v) = HeaderValue::from_str(&value) {
+                    headers.insert(name, v);
+                }
+            }
+            if let Ok(v) = HeaderValue::from_str(&d.reset_after_secs.to_string()) {
+                headers.insert("Retry-After", v);
+            }
+
+            // Distinct code so the chat can render a "daily limit"
+            // message ("come back tomorrow") instead of the per-minute
+            // "try again in 47s" copy.
+            let error = serde_json::json!({
+                "error": {
+                    "code": "daily_message_limit_exceeded",
+                    "message": format!(
+                        "You've used your {} free messages for today. The limit resets in about {}h.",
+                        d.limit,
+                        d.reset_after_secs.div_ceil(3600).max(1)
+                    ),
+                    "retry_after_seconds": d.reset_after_secs,
+                }
+            });
+
+            return (StatusCode::TOO_MANY_REQUESTS, headers, Json(error)).into_response();
+        }
+    }
+
     // Run the actual handler
     let mut response = next.run(request).await;
 
@@ -146,6 +213,15 @@ pub async fn rate_limit_middleware(
     for (name, value) in result.headers() {
         if let Ok(v) = HeaderValue::from_str(&value) {
             headers.insert(name, v);
+        }
+    }
+    // Surface the daily counter too so the chat can show
+    // "X messages left today" if it wants.
+    if let Some(d) = daily_result {
+        for (name, value) in d.headers() {
+            if let Ok(v) = HeaderValue::from_str(&value) {
+                headers.insert(name, v);
+            }
         }
     }
 
