@@ -18,22 +18,32 @@
 
 import { auth } from '../_lib/auth'
 import { mintPlaygroundApiKey } from '../_lib/mint-key'
+import { normalizeRequest } from '../_lib/normalize-request'
 
-// Vercel's Node.js runtime gives us a Web-API-style Request/Response.
-// better-auth's handler is built for the same shape — direct passthrough.
+// Vercel's Node.js runtime hands us a Web-API-style Request, but
+// `req.url` is the relative path (`/api/auth/get-session?path=...`)
+// rather than an absolute URL. better-auth/better-call calls
+// `new URL(req.url)` internally, which throws `Invalid URL` on a
+// relative path. We rebuild a proper absolute Request before
+// forwarding.
+//
+// We also strip the spurious `?path=...` query param that Vercel's
+// `:path*` rewrite (vercel.json) tacks onto every request. Leaving
+// it confuses better-auth's route matcher.
 export default async function handler(req: Request): Promise<Response> {
   try {
-    const response = await auth.handler(req)
+    const absoluteReq = normalizeRequest(req)
+    const response = await auth.handler(absoluteReq)
 
     // On a successful sign-in callback, ensure the user has a gateway API key.
     // We hook here (after the callback has run) rather than as a better-auth
     // lifecycle event because the lifecycle hooks ship per-request in
     // serverless environments and we want this to be idempotent + safe to retry.
-    const url = new URL(req.url)
+    const url = new URL(absoluteReq.url)
     if (url.pathname === '/api/auth/callback/github' && response.status < 400) {
       // Don't block the response on the mint — fire-and-forget. If it fails,
       // the first /api/proxy call will retry.
-      void mintPlaygroundApiKey(req).catch((err) => {
+      void mintPlaygroundApiKey(absoluteReq).catch((err) => {
         console.error('[auth] mintPlaygroundApiKey failed (non-fatal):', err)
       })
     }
