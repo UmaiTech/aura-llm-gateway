@@ -17,9 +17,11 @@ http://localhost:8080
 
 Explore the API interactively with our Swagger UI:
 
-**[Open Swagger UI](http://localhost:8080/swagger-ui)** - Try out endpoints directly in your browser
+**[Open Swagger UI](https://api.aura-llm.dev/swagger-ui/)** - Try out endpoints directly in your browser against the live gateway.
 
-You can also access the raw OpenAPI 3.1 specification at [`/openapi.json`](http://localhost:8080/openapi.json).
+You can also fetch the raw OpenAPI 3.1 specification at [`https://api.aura-llm.dev/openapi.json`](https://api.aura-llm.dev/openapi.json).
+
+> Running self-hosted? Swap `api.aura-llm.dev` for your own host (e.g. `http://localhost:8080`).
 
 ## Authentication
 

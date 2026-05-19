@@ -100,7 +100,7 @@ const docSections = [
     title: 'API Reference',
     items: [
       { title: 'Overview', path: '/docs/api', icon: Code2 },
-      { title: 'Swagger UI', path: 'http://localhost:8080/swagger-ui', icon: ExternalLink, external: true },
+      { title: 'Swagger UI', path: 'https://api.aura-llm.dev/swagger-ui/', icon: ExternalLink, external: true },
       { title: 'Authentication', path: '/docs/api/authentication', icon: Server },
       { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
       { title: 'Conversations', path: '/docs/api/conversations', icon: BookOpen },
