@@ -6,13 +6,73 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Point Swagger UI + OpenAPI links at the live gateway
+- Rewrite /api/proxy to Node-style req/res with pipeline()
+- PR-review feedback on beta-signup PR
+- Single source of truth at root, drop per-crate clones
+- Skip QEMU Rust compile in Docker publish, copy pre-built binaries
+
+### Features
+
+- Managed-service beta signup CTA + 429 rate-limit fix
+
+### Miscellaneous Tasks
+
+- Auto-deploy on main + apply migrations via release_command
+
+## [0.8.2] - 2026-05-19
+
+### Bug Fixes
+
+- Pass pg.Pool directly to better-auth 1.6, set search_path
+- Move auth.ts out of apps/chat to escape ESM/CJS clash
+- Defensively read origin from trustedOrigins callback arg
+- Normalize Request URL for better-auth and proxy
+- Accept Node-style request shape in normalizeRequest
+- Use better-auth's toNodeHandler for /api/auth/*
+- Set search_path via connection options, not pool listener
+- Rename playground_auth columns to camelCase
+
+### Documentation
+
+- For design audit
+
+### Features
+
+- Graceful auth-down screen after 10s instead of infinite spinner
+
+### Miscellaneous Tasks
+
+- Release v0.8.2
+
+## [0.8.1] - 2026-05-19
+
+### Bug Fixes
+
+- Route multi-segment /api/auth + surface real auth errors
+
+### Miscellaneous Tasks
+
+- Release v0.8.1
+
+## [0.8.0] - 2026-05-18
+
+### Bug Fixes
+
 - Move api/ to repo root so Vercel actually deploys functions
 - Pin Node 22.x for Vercel build
 - Drop deprecated config.runtime export
+- Enable TLS on the pg Pool so Fly Postgres connects
 
 ### Features
 
 - Add Vercel Analytics to landing, chat, and admin
+
+### Miscellaneous Tasks
+
+- Release v0.7.2
+- Sync Python SDK version to 0.7.2
+- Release v0.8.0
 
 ## [0.7.1] - 2026-05-18
 
