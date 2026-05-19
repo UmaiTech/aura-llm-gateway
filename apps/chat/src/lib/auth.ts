@@ -78,17 +78,33 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 })
 
+// Force every new pg connection to use the `playground_auth` schema as
+// the default search_path. better-auth's Kysely query builder issues
+// unqualified table names like `SELECT * FROM "user"` — without this,
+// those resolve to `public.user` (which doesn't exist) and fail.
+//
+// Doing this here, on connect, is cheaper than wrapping every model
+// name with a schema prefix via better-auth's per-model config (which
+// also broke between 1.3 and 1.6).
+pool.on('connect', (client) => {
+  // search_path must include `public` as a fallback for built-in types
+  // and any cross-schema references better-auth might make.
+  void client.query('SET search_path TO playground_auth, public')
+})
+
 export const auth = betterAuth({
   baseURL,
   secret: betterAuthSecret,
 
-  // Map better-auth's default table names to our `playground_auth` schema.
-  // The Postgres adapter accepts a `schema` option on each model.
-  database: {
-    type: 'postgres',
-    pool,
-    schema: 'playground_auth',
-  },
+  // better-auth 1.6 accepts a raw `pg.Pool` here and auto-wraps it in
+  // a Kysely Postgres dialect internally. The old 1.3-era shape we had
+  // — `{ type: 'postgres', pool, schema: 'playground_auth' }` —
+  // silently rejected during adapter init in 1.6 and surfaced as
+  // "Failed to initialize database adapter" 504s.
+  //
+  // Note: 1.6 has no per-config schema option. We pin the schema by
+  // setting `search_path` on every pool connection (above).
+  database: pool,
 
   socialProviders: {
     github: {
