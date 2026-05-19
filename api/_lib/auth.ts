@@ -139,14 +139,12 @@ export const auth = betterAuth({
   baseURL,
   secret: betterAuthSecret,
 
-  // better-auth 1.6 accepts a raw `pg.Pool` here and auto-wraps it in
-  // a Kysely Postgres dialect internally. The old 1.3-era shape we had
-  // — `{ type: 'postgres', pool, schema: 'playground_auth' }` —
-  // silently rejected during adapter init in 1.6 and surfaced as
-  // "Failed to initialize database adapter" 504s.
-  //
-  // Note: 1.6 has no per-config schema option. We pin the schema by
-  // setting `search_path` on every pool connection (above).
+  // Pass the pg.Pool directly — better-auth 1.6 auto-wraps it in a
+  // Kysely Postgres dialect with default camelCase column conventions
+  // (`emailVerified`, `createdAt`, etc.). Our migration 017 renames
+  // every playground_auth column to camelCase to match. Schema scoping
+  // (playground_auth) is pinned via the `options=-c search_path=...`
+  // URL param on the pool's connection string (above).
   database: pool,
 
   socialProviders: {
