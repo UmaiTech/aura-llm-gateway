@@ -13,7 +13,7 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { auth, pool } from '../../apps/chat/src/lib/auth'
+import { auth, pool } from './auth'
 
 /**
  * Generate a key in the gateway's format:

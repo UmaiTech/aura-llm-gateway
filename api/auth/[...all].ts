@@ -16,7 +16,7 @@
  * every URL under /api/auth/ maps to this single file.
  */
 
-import { auth } from '../../apps/chat/src/lib/auth'
+import { auth } from '../_lib/auth'
 import { mintPlaygroundApiKey } from '../_lib/mint-key'
 
 // Vercel's Node.js runtime gives us a Web-API-style Request/Response.

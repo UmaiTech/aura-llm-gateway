@@ -15,7 +15,7 @@
  * rate-limited quota, but never gets the underlying gateway key.
  */
 
-import { auth } from '../../apps/chat/src/lib/auth'
+import { auth } from '../_lib/auth'
 import { getUserApiKey, mintPlaygroundApiKey } from '../_lib/mint-key'
 
 const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || 'https://api.aura-llm.dev'

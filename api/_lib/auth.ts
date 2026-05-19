@@ -1,15 +1,22 @@
 /**
- * better-auth configuration for the playground.
+ * better-auth configuration for the playground (server-only).
+ *
+ * Lives under /api/_lib/ — outside apps/chat/ — because apps/chat's
+ * package.json declares `"type": "module"`. Vercel's @vercel/node
+ * compiles .ts to CJS (`exports.foo = ...`), which Node refuses to
+ * load from an ESM-typed package. Putting this file under the repo-root
+ * /api/ tree keeps it in the implicit CJS scope of the root
+ * package.json (no `type: module` there).
  *
  * Imported by:
- *   - apps/chat/api/auth/[...all].ts  — the Vercel serverless function that
+ *   - api/auth/[...all].ts  — the Vercel serverless function that
  *     handles every /api/auth/* request (sign-in, callback, sign-out, etc.)
- *   - apps/chat/api/proxy/[...path].ts — the serverless proxy validates the
+ *   - api/proxy/[...path].ts — the serverless proxy validates the
  *     session before forwarding LLM calls to api.aura-llm.dev
+ *   - api/_lib/mint-key.ts — writes the per-user gateway API key
  *
- * NOT imported by the React client. The client uses better-auth/react via
- * a separate module (`./auth-client.ts`) so we never bundle the database
- * driver or the GitHub OAuth secret into the browser.
+ * NOT imported by the React client. The client uses better-auth/react
+ * via apps/chat/src/lib/auth-client.ts, which stays in the React app.
  */
 
 import { betterAuth } from 'better-auth'
