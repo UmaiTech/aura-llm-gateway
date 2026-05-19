@@ -81,6 +81,18 @@ pub async fn rate_limit_middleware(
     let auth = match auth_context {
         Some(ctx) => ctx,
         None => {
+            // Diagnostic log: we expected the auth middleware to have
+            // inserted an AuthContext here. If we see this for paths
+            // OTHER than /health, /metrics, /openapi, /swagger, /admin,
+            // there's a layer-ordering bug — rate limiting is silently
+            // bypassed for authenticated requests, which is why
+            // hammering the playground doesn't trip 429.
+            let path = request.uri().path();
+            warn!(
+                path = %path,
+                method = %request.method(),
+                "Rate limit middleware: no AuthContext on request — limit skipped"
+            );
             return next.run(request).await;
         }
     };
