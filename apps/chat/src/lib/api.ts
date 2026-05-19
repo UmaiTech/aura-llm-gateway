@@ -28,7 +28,7 @@ export class AuraApiError extends Error {
   }
 }
 
-async function buildApiError(response: globalThis.Response): Promise<AuraApiError> {
+export async function buildApiError(response: globalThis.Response): Promise<AuraApiError> {
   let body: { error?: { code?: string; message?: string } } = {}
   try {
     body = await response.json()
