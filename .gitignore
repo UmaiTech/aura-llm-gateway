@@ -117,3 +117,5 @@ wheels/
 .venv/
 venv/
 ENV/
+.vercel
+.env*.local
