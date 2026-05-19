@@ -21,12 +21,11 @@ import { normalizeRequest } from '../_lib/normalize-request'
 
 const GATEWAY_BASE_URL = process.env.GATEWAY_BASE_URL || 'https://api.aura-llm.dev'
 
-export default async function handler(req: Request): Promise<Response> {
-  // Vercel's @vercel/node@5 hands us a Request whose `url` is a path,
-  // not an absolute URL — and the vercel.json `:path*` rewrite tacks
-  // on a spurious `?path=...` query param. Rebuild a proper Request
-  // before doing anything with it.
-  req = normalizeRequest(req)
+// `rawReq` is loosely typed because @vercel/node@5 hands us either a
+// Web `Request` or a Node-style `IncomingMessage`-like object.
+// `normalizeRequest` accepts both and returns a real `Request`.
+export default async function handler(rawReq: unknown): Promise<Response> {
+  const req = normalizeRequest(rawReq)
 
   // 1. Session check
   const session = await auth.api.getSession({ headers: req.headers })
