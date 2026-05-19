@@ -72,8 +72,17 @@ export default function App() {
   const currentConversation = getCurrentConversation()
   const messages = currentConversation?.messages || []
 
-  // Find selected model object
-  const selectedModel = AVAILABLE_MODELS.find((m) => m.id === model) || AVAILABLE_MODELS[0]
+  // Find the selected model. If the stored id no longer exists (model
+  // retired, persisted state from before the tier split, etc.), fall
+  // back to the first FREE-tier model — not just AVAILABLE_MODELS[0],
+  // which is a beta-locked frontier model and would silently leave
+  // the user picking a model they can't actually use. Last-resort
+  // AVAILABLE_MODELS[0] handles the (impossible-but-typecheckable)
+  // case of zero free models in the list.
+  const selectedModel =
+    AVAILABLE_MODELS.find((m) => m.id === model) ??
+    AVAILABLE_MODELS.find((m) => m.tier !== 'beta') ??
+    AVAILABLE_MODELS[0]
 
   const handleModelChange = useCallback(
     (newModel: Model) => {
