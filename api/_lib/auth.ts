@@ -99,6 +99,28 @@ pool.on('connect', (client) => {
   void client.query('SET search_path TO playground_auth, public')
 })
 
+// Pull an Origin header value out of whatever better-auth happens to
+// hand the `trustedOrigins` callback. In 1.6 we've observed three
+// shapes: a real `Request`, a plain object with a `headers` map, and
+// `undefined`. Calling `.headers.get('origin')` on the second one
+// throws `headers.get is not a function`.
+function extractOrigin(req: unknown): string | undefined {
+  if (!req || typeof req !== 'object') return undefined
+  const headers = (req as { headers?: unknown }).headers
+  if (!headers) return undefined
+  // Real Headers / fetch Request
+  if (typeof (headers as Headers).get === 'function') {
+    return (headers as Headers).get('origin') ?? undefined
+  }
+  // Plain object (Node-style) — keys are usually lowercase already
+  if (typeof headers === 'object') {
+    const h = headers as Record<string, string | string[] | undefined>
+    const raw = h.origin ?? h.Origin
+    return Array.isArray(raw) ? raw[0] : raw
+  }
+  return undefined
+}
+
 export const auth = betterAuth({
   baseURL,
   secret: betterAuthSecret,
@@ -143,13 +165,18 @@ export const auth = betterAuth({
   // since these URLs are dynamic we accept any *.vercel.app origin in
   // non-production environments. better-auth supports passing a function
   // that's invoked per-request for dynamic checks.
-  trustedOrigins: (request?: Request) => {
+  //
+  // The argument shape from better-auth 1.6 isn't always a full Request:
+  // sometimes it's a Request-like with `headers` as a Headers instance,
+  // sometimes as a plain `Record<string, string>`, sometimes undefined.
+  // Read the origin defensively to avoid `headers.get is not a function`.
+  trustedOrigins: (request?: unknown) => {
     const staticOrigins = [
       'https://playground.aura-llm.dev',
       'https://aura-llm.dev',
       'http://localhost:3000',
     ]
-    const origin = request?.headers.get('origin')
+    const origin = extractOrigin(request)
     if (origin && /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
       return [...staticOrigins, origin]
     }
