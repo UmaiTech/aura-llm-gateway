@@ -32,8 +32,17 @@ import { fromNodeHeaders } from 'better-auth/node'
 import { auth } from '../_lib/auth'
 import { getUserApiKey, mintPlaygroundApiKey } from '../_lib/mint-key'
 
-const GATEWAY_BASE_URL =
+// Trim + strip trailing slash so accidental whitespace or a trailing
+// `/` in the Vercel env var doesn't produce malformed URLs like
+// ' https://api.aura-llm.dev  /v1/responses' which `fetch` rejects
+// with `ERR_INVALID_URL`. The env var has been set by hand at least
+// once with leading/trailing spaces — defensively cleaning the value
+// here is cheaper than catching it at a future deploy.
+const GATEWAY_BASE_URL = (
   process.env.GATEWAY_BASE_URL || 'https://api.aura-llm.dev'
+)
+  .trim()
+  .replace(/\/+$/, '')
 
 // Headers we MUST NOT forward back to the client per RFC 7230. Browsers
 // also reject `transfer-encoding` on fetch responses.

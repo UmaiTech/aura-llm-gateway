@@ -330,31 +330,45 @@ export function ChatInput({
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-secondary transition-colors whitespace-nowrap"
-              title={`Current model: ${model.name}`}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium text-foreground hover:bg-secondary transition-colors whitespace-nowrap",
+                modelDropdownOpen && "bg-secondary",
+              )}
+              aria-label={`Model: ${model.name}`}
             >
               <span className="hidden sm:inline">{model.name}</span>
               <span className="sm:hidden">{model.id.split('-')[0]}</span>
+              {model.tier === 'beta' && (
+                // Mirror the row badge so the user can SEE that the
+                // currently-selected model is locked. Otherwise their
+                // sends would silently fail and they'd have no idea why.
+                <Lock className="h-3 w-3 text-aura-400" aria-label="Beta-locked" />
+              )}
               <ChevronDown className={cn(
                 "h-3.5 w-3.5 transition-transform",
                 modelDropdownOpen && "rotate-180"
               )} />
             </button>
 
-            {/* Dropdown menu (overlays upward) */}
+            {/* Dropdown menu — opens upward, solid background so the
+                chat behind it doesn't show through. `bg-popover` falls
+                back to a near-opaque dark in dark mode + near-opaque
+                white in light mode; w-72 gives badges room without
+                wrapping. */}
             {modelDropdownOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-64 max-h-96 overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="absolute bottom-full left-0 mb-2 w-72 max-h-96 overflow-y-auto rounded-xl border border-border bg-popover shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 {providerOrder.map((provider) => {
                   const providerModels = groupedModels[provider]
                   if (!providerModels || providerModels.length === 0) return null
 
                   return (
-                    <div key={provider} className="py-2">
-                      <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div key={provider} className="py-1.5">
+                      <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                         {providerLabels[provider]}
                       </div>
                       {providerModels.map((m) => {
                         const locked = m.tier === 'beta'
+                        const selected = m.id === model.id
                         return (
                           <button
                             key={m.id}
@@ -367,33 +381,25 @@ export function ChatInput({
                               setModelDropdownOpen(false)
                             }}
                             className={cn(
-                              "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm transition-colors",
-                              locked
-                                ? "text-muted-foreground hover:bg-aura-500/5"
-                                : "hover:bg-secondary",
-                              m.id === model.id && !locked && "bg-primary-500/10 text-primary-400"
+                              "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm transition-colors text-left",
+                              "hover:bg-secondary",
+                              selected && !locked && "bg-primary-500/10 text-primary-400",
+                              selected && locked && "bg-aura-500/10",
+                              locked && !selected && "text-muted-foreground",
                             )}
-                            // Tooltip on the row gives the WHY without an
-                            // extra hover popover. Browser-native is
-                            // fine — keeps the dropdown JS small.
-                            title={
-                              locked
-                                ? 'Frontier model — join the managed-service beta to unlock.'
-                                : `Use ${m.name}`
-                            }
                           >
-                            <span className="truncate flex items-center gap-2">
-                              {m.name}
+                            <span className="truncate min-w-0 flex-1">{m.name}</span>
+                            <span className="flex items-center gap-1.5 flex-shrink-0">
                               {locked && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-aura-500/15 text-aura-300 border border-aura-500/30">
                                   <Lock className="h-2.5 w-2.5" />
                                   Beta
                                 </span>
                               )}
+                              {selected && !locked && (
+                                <Check className="h-4 w-4" />
+                              )}
                             </span>
-                            {m.id === model.id && !locked && (
-                              <Check className="h-4 w-4 flex-shrink-0" />
-                            )}
                           </button>
                         )
                       })}

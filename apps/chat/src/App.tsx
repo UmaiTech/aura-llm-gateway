@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { BetaUpsellModal } from './components/BetaUpsellModal'
 import { ChatContainer } from './components/ChatContainer'
 import { Sidebar } from './components/Sidebar'
@@ -72,17 +72,28 @@ export default function App() {
   const currentConversation = getCurrentConversation()
   const messages = currentConversation?.messages || []
 
-  // Find the selected model. If the stored id no longer exists (model
-  // retired, persisted state from before the tier split, etc.), fall
-  // back to the first FREE-tier model — not just AVAILABLE_MODELS[0],
-  // which is a beta-locked frontier model and would silently leave
-  // the user picking a model they can't actually use. Last-resort
-  // AVAILABLE_MODELS[0] handles the (impossible-but-typecheckable)
-  // case of zero free models in the list.
+  // Find the selected model. If the stored id no longer exists, or it
+  // points at a beta-locked model (e.g. localStorage from before the
+  // tier split, like a user who picked Sonnet 4.6 yesterday), fall
+  // back to the first FREE-tier model. Last-resort AVAILABLE_MODELS[0]
+  // handles the (impossible-but-typecheckable) case of zero free
+  // models in the list.
   const selectedModel =
-    AVAILABLE_MODELS.find((m) => m.id === model) ??
+    AVAILABLE_MODELS.find((m) => m.id === model && m.tier !== 'beta') ??
     AVAILABLE_MODELS.find((m) => m.tier !== 'beta') ??
     AVAILABLE_MODELS[0]
+
+  // If the stored model id was beta-locked, write the freed-up
+  // selection back to the store so the picker label, the API client
+  // base URL, and any downstream consumers all reflect the safe
+  // fallback. Without this, the store keeps a dangling beta id and
+  // the visual mismatch (Header shows the right model, picker
+  // tooltip still says the locked one) confuses users.
+  useEffect(() => {
+    if (model !== selectedModel.id) {
+      setModel(selectedModel.id)
+    }
+  }, [model, selectedModel.id, setModel])
 
   const handleModelChange = useCallback(
     (newModel: Model) => {
