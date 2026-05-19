@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { BetaBanner } from './components/BetaBanner'
+import { BetaUpsellModal } from './components/BetaUpsellModal'
 import { ChatContainer } from './components/ChatContainer'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -20,6 +20,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // When the user taps a beta-locked model in the picker, store it so
+  // BetaUpsellModal can show the model name. Null = modal closed.
+  const [lockedModelPrompt, setLockedModelPrompt] = useState<Model | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const {
@@ -581,8 +584,10 @@ export default function App() {
           onAgentModeChange={setAgentMode}
         />
 
-        {/* Beta-signup banner — hidden once the user joins */}
-        <BetaBanner />
+        {/* The always-on BetaBanner was removed — beta CTAs now appear
+            only in context: as the RateLimitNotice when the user hits
+            429, and as BetaUpsellModal when they tap a beta-locked
+            model in the picker. */}
 
         {/* Chat area */}
         <ChatContainer
@@ -594,6 +599,7 @@ export default function App() {
           model={selectedModel}
           models={AVAILABLE_MODELS}
           onModelChange={handleModelChange}
+          onLockedModelClick={(m) => setLockedModelPrompt(m)}
           routingStrategy={routingStrategy}
           onRoutingStrategyChange={setRoutingStrategy}
           validationStrategy={validationStrategy}
@@ -604,6 +610,12 @@ export default function App() {
           onCompressionStrategyChange={setCompressionStrategy}
         />
       </div>
+
+      <BetaUpsellModal
+        open={lockedModelPrompt !== null}
+        model={lockedModelPrompt}
+        onClose={() => setLockedModelPrompt(null)}
+      />
     </div>
   )
 }

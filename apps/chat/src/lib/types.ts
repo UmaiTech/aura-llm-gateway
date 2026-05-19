@@ -118,6 +118,15 @@ export interface Model {
   name: string
   provider: 'openai' | 'anthropic' | 'google'
   description?: string
+  /**
+   * Access tier for this model on the hosted playground.
+   *  - 'free': included in the playground's free quota (5 rpm, 50K tokens/mo)
+   *  - 'beta': locked behind the managed-service beta. The picker shows a
+   *    badge and tapping it opens the Join-beta CTA instead of selecting.
+   *
+   * Optional — undefined defaults to 'free'.
+   */
+  tier?: 'free' | 'beta'
 }
 
 export interface Conversation {

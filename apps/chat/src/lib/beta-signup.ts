@@ -10,6 +10,7 @@ export type BetaSignupSource =
   | 'rate_limit_429'
   | 'header_banner'
   | 'sign_in_screen'
+  | 'locked_model'
 
 export interface BetaSignup {
   email: string

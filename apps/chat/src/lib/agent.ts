@@ -244,36 +244,48 @@ export const AGENT_SYSTEM_PROMPTS = {
   assistant: `You are a general-purpose assistant with access to various tools including time, weather, search, and calculations. Use these tools proactively when they would help answer the user's questions. Be concise but thorough.`,
 }
 
-// Available models
-export const AVAILABLE_MODELS: Array<{
-  id: string
-  name: string
-  provider: 'openai' | 'anthropic' | 'google'
-}> = [
-  // OpenAI - Latest models first
-  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai' },
-  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai' },
-  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai' },
-  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai' },
-  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', provider: 'openai' },
-  { id: 'gpt-5.2', name: 'GPT-5.2', provider: 'openai' },
-  { id: 'gpt-5', name: 'GPT-5', provider: 'openai' },
-  { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'openai' },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai' },
-  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'openai' },
-  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai' },
+// Available models for the playground UI.
+//
+// `tier` controls who can pick the model:
+//   - 'free' (default): anyone signed in can use it within the free quota
+//     (5 rpm, 50K tokens/month).
+//   - 'beta': locked behind the managed-service beta. The picker badges
+//     the row and clicking it routes to the join-the-beta CTA instead
+//     of selecting it.
+//
+// Rule of thumb for free-tier: small/fast/cheap models from each provider
+// so the playground is a useful demo without burning the free quota in
+// two requests. Frontier models (Opus/Sonnet 4.6+, GPT-5/5.4+, Gemini 3
+// Pro, Mistral Large) are beta-gated.
+import type { Model } from './types'
 
-  // Anthropic - Latest models first
-  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic' },
-  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic' },
-  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic' },
-  { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', provider: 'anthropic' },
-  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'anthropic' },
+export const AVAILABLE_MODELS: Model[] = [
+  // OpenAI — frontier locked, mini/nano free
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', tier: 'free' },
+  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', provider: 'openai', tier: 'free' },
+  { id: 'gpt-5.2', name: 'GPT-5.2', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'openai', tier: 'free' },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', tier: 'free' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', tier: 'free' },
+  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai', tier: 'free' },
 
-  // Google - Latest models first
-  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'google' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'google' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'google' },
+  // Anthropic — Opus/Sonnet locked, Haiku free
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'anthropic', tier: 'free' },
+
+  // Google — Pro locked, Flash family free
+  // See https://deepmind.google/models/model-cards/gemini-3-5-flash/ for the 3.5 Flash spec.
+  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'google', tier: 'beta' },
+  { id: 'gemini-3-5-flash', name: 'Gemini 3.5 Flash', provider: 'google', tier: 'free' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'google', tier: 'free' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'google', tier: 'free' },
 ]

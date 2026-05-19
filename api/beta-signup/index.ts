@@ -24,6 +24,7 @@ const ALLOWED_SOURCES = new Set([
   'rate_limit_429',
   'header_banner',
   'sign_in_screen',
+  'locked_model',
 ])
 
 const MAX_USE_CASE_LEN = 500

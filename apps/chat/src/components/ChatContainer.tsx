@@ -15,6 +15,7 @@ interface ChatContainerProps {
   model: Model
   models: Model[]
   onModelChange: (model: Model) => void
+  onLockedModelClick?: (model: Model) => void
   routingStrategy: RoutingStrategy
   onRoutingStrategyChange: (strategy: RoutingStrategy) => void
   validationStrategy: ValidationStrategy
@@ -34,6 +35,7 @@ export function ChatContainer({
   model,
   models,
   onModelChange,
+  onLockedModelClick,
   routingStrategy,
   onRoutingStrategyChange,
   validationStrategy,
@@ -97,6 +99,7 @@ export function ChatContainer({
         model={model}
         models={models}
         onModelChange={onModelChange}
+        onLockedModelClick={onLockedModelClick}
         routingStrategy={routingStrategy}
         onRoutingStrategyChange={onRoutingStrategyChange}
         validationStrategy={validationStrategy}

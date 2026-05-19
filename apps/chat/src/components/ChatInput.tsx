@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive } from 'lucide-react'
+import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive, Lock } from 'lucide-react'
 import { cn } from '../lib/utils'
 import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
 import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES } from '../lib/types'
@@ -13,6 +13,13 @@ interface ChatInputProps {
   model: Model
   models: Model[]
   onModelChange: (model: Model) => void
+  /**
+   * Fires when the user taps a model marked `tier: 'beta'`. The parent
+   * is expected to surface the join-the-beta CTA (modal / inline panel /
+   * navigation) rather than swap the model. Optional: if absent, locked
+   * models are simply non-clickable.
+   */
+  onLockedModelClick?: (model: Model) => void
   routingStrategy: RoutingStrategy
   onRoutingStrategyChange: (strategy: RoutingStrategy) => void
   validationStrategy: ValidationStrategy
@@ -32,6 +39,7 @@ export function ChatInput({
   model,
   models,
   onModelChange,
+  onLockedModelClick,
   routingStrategy,
   onRoutingStrategyChange,
   validationStrategy,
@@ -345,24 +353,50 @@ export function ChatInput({
                       <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         {providerLabels[provider]}
                       </div>
-                      {providerModels.map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            onModelChange(m)
-                            setModelDropdownOpen(false)
-                          }}
-                          className={cn(
-                            "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors",
-                            m.id === model.id && "bg-primary-500/10 text-primary-400"
-                          )}
-                        >
-                          <span className="truncate">{m.name}</span>
-                          {m.id === model.id && (
-                            <Check className="h-4 w-4 flex-shrink-0" />
-                          )}
-                        </button>
-                      ))}
+                      {providerModels.map((m) => {
+                        const locked = m.tier === 'beta'
+                        return (
+                          <button
+                            key={m.id}
+                            onClick={() => {
+                              if (locked) {
+                                onLockedModelClick?.(m)
+                              } else {
+                                onModelChange(m)
+                              }
+                              setModelDropdownOpen(false)
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm transition-colors",
+                              locked
+                                ? "text-muted-foreground hover:bg-aura-500/5"
+                                : "hover:bg-secondary",
+                              m.id === model.id && !locked && "bg-primary-500/10 text-primary-400"
+                            )}
+                            // Tooltip on the row gives the WHY without an
+                            // extra hover popover. Browser-native is
+                            // fine — keeps the dropdown JS small.
+                            title={
+                              locked
+                                ? 'Frontier model — join the managed-service beta to unlock.'
+                                : `Use ${m.name}`
+                            }
+                          >
+                            <span className="truncate flex items-center gap-2">
+                              {m.name}
+                              {locked && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-aura-500/15 text-aura-300 border border-aura-500/30">
+                                  <Lock className="h-2.5 w-2.5" />
+                                  Beta
+                                </span>
+                              )}
+                            </span>
+                            {m.id === model.id && !locked && (
+                              <Check className="h-4 w-4 flex-shrink-0" />
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
                   )
                 })}
