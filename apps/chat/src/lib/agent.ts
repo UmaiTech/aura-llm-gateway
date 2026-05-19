@@ -274,18 +274,26 @@ export const AVAILABLE_MODELS: Model[] = [
   { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'openai', tier: 'beta' },
   { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai', tier: 'free' },
 
-  // Anthropic — Opus/Sonnet locked, Haiku free
+  // Anthropic — Opus/Sonnet locked, Haiku 4.5 free.
+  // Note: dropped `claude-3-5-haiku-20241022` — Anthropic returns
+  // "model not found" for that id now (deprecated upstream). The
+  // gateway still lists it in SUPPORTED_MODELS for backwards-compat
+  // but the upstream call fails. Haiku 4.5 is the current cheap
+  // Anthropic model.
   { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', tier: 'beta' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'anthropic', tier: 'free' },
+  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', tier: 'free' },
 
-  // Google — Pro locked, Flash family free
-  // See https://deepmind.google/models/model-cards/gemini-3-5-flash/ for the 3.5 Flash spec.
+  // Google — Pro locked, Flash family free.
+  // gemini-3-5-flash was announced in a Deepmind blog but isn't in
+  // the gateway's SUPPORTED_MODELS yet (it routes to Vertex/AI Studio
+  // and our gemini.rs doesn't list it). Using gemini-3-flash as the
+  // free-tier default until we wire 3-5 into the provider.
   { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'google', tier: 'beta' },
-  { id: 'gemini-3-5-flash', name: 'Gemini 3.5 Flash', provider: 'google', tier: 'free' },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', provider: 'google', tier: 'free' },
   { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'google', tier: 'free' },
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'google', tier: 'free' },
 ]

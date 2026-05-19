@@ -28,10 +28,15 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-sonnet-4-6': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
   'claude-opus-4-5-20251101': { inputPerMillion: 15.00, outputPerMillion: 75.00 },
   'claude-sonnet-4-20250514': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
+  'claude-haiku-4-5-20251001': { inputPerMillion: 0.80, outputPerMillion: 4.00 },
+  // Legacy id, kept so older conversations don't show $NaN. Anthropic
+  // no longer serves this model; the playground default switched to
+  // claude-haiku-4-5-20251001.
   'claude-3-5-haiku-20241022': { inputPerMillion: 0.80, outputPerMillion: 4.00 },
 
   // Google
   'gemini-3-pro': { inputPerMillion: 1.50, outputPerMillion: 6.00 },
+  'gemini-3-flash': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
   'gemini-2.0-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
   'gemini-1.5-pro': { inputPerMillion: 1.25, outputPerMillion: 5.00 },
 }
