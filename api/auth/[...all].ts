@@ -22,22 +22,42 @@ import { mintPlaygroundApiKey } from '../_lib/mint-key'
 // Vercel's Node.js runtime gives us a Web-API-style Request/Response.
 // better-auth's handler is built for the same shape — direct passthrough.
 export default async function handler(req: Request): Promise<Response> {
-  const response = await auth.handler(req)
+  try {
+    const response = await auth.handler(req)
 
-  // On a successful sign-in callback, ensure the user has a gateway API key.
-  // We hook here (after the callback has run) rather than as a better-auth
-  // lifecycle event because the lifecycle hooks ship per-request in
-  // serverless environments and we want this to be idempotent + safe to retry.
-  const url = new URL(req.url)
-  if (url.pathname === '/api/auth/callback/github' && response.status < 400) {
-    // Don't block the response on the mint — fire-and-forget. If it fails,
-    // the first /api/proxy call will retry.
-    void mintPlaygroundApiKey(req).catch((err) => {
-      console.error('[auth] mintPlaygroundApiKey failed (non-fatal):', err)
-    })
+    // On a successful sign-in callback, ensure the user has a gateway API key.
+    // We hook here (after the callback has run) rather than as a better-auth
+    // lifecycle event because the lifecycle hooks ship per-request in
+    // serverless environments and we want this to be idempotent + safe to retry.
+    const url = new URL(req.url)
+    if (url.pathname === '/api/auth/callback/github' && response.status < 400) {
+      // Don't block the response on the mint — fire-and-forget. If it fails,
+      // the first /api/proxy call will retry.
+      void mintPlaygroundApiKey(req).catch((err) => {
+        console.error('[auth] mintPlaygroundApiKey failed (non-fatal):', err)
+      })
+    }
+
+    return response
+  } catch (err) {
+    // Without this, any throw inside auth.handler surfaces to Vercel as
+    // an opaque FUNCTION_INVOCATION_FAILED 500 with no body — making
+    // debugging effectively blind. Log the full error to Vercel
+    // function logs (visible in the dashboard) and return a non-leaky
+    // 500. Stack details stay server-side.
+    console.error('[auth] handler crashed:', err)
+    const message = err instanceof Error ? err.message : String(err)
+    return new Response(
+      JSON.stringify({
+        error: 'auth_handler_error',
+        message: message.slice(0, 200),
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      },
+    )
   }
-
-  return response
 }
 
 // Runs on Vercel's default Node.js runtime (@vercel/node). The explicit

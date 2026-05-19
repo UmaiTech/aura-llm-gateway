@@ -69,6 +69,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth/[...all]"
+    },
+    {
+      "source": "/api/proxy/:path*",
+      "destination": "/api/proxy/[...path]"
+    },
+    {
       "source": "/((?!playground/|api/).*)",
       "has": [{ "type": "host", "value": "playground.aura-llm.dev" }],
       "destination": "/playground/$1"
