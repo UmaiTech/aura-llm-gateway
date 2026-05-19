@@ -77,26 +77,40 @@ const baseURL =
 // don't validate the cert chain. Acceptable here because the gateway
 // runs in the same Fly org and we're only protecting bearer tokens
 // in transit, not against MITM from inside Fly's network.
+// Force every pg connection to use the `playground_auth` schema as
+// the default search_path. better-auth's Kysely query builder issues
+// unqualified table names like `INSERT INTO "user"` — without this,
+// those resolve to `public.user` (which doesn't exist) and fail.
+//
+// We use Postgres's `options` startup parameter (delivered via the
+// connection-string query `?options=-c+search_path=...`). Postgres
+// evaluates this at the connection handshake, BEFORE the client can
+// run any queries — so better-auth's first SELECT/INSERT lands in
+// the right schema reliably.
+//
+// We tried `pool.on('connect')` + `SET search_path` first, but the
+// listener is synchronous in node-postgres: the connection is handed
+// back to the consumer before our SET resolves. better-auth then
+// fires an INSERT against `public.user` (which doesn't exist),
+// causing `Connection terminated unexpectedly`.
+//
+// `-c search_path=...` is the libpq option-flag equivalent of
+// `SET search_path = ...`.
+function withSearchPath(url: string): string {
+  const parsed = new URL(url)
+  const existing = parsed.searchParams.get('options') ?? ''
+  const optionString =
+    `${existing} -c search_path=playground_auth,public`.trim()
+  parsed.searchParams.set('options', optionString)
+  return parsed.toString()
+}
+
 const pool = new Pool({
-  connectionString: databaseUrl,
+  connectionString: withSearchPath(databaseUrl),
   ssl: { rejectUnauthorized: false },
   max: 4,
   idleTimeoutMillis: 5000,
   connectionTimeoutMillis: 5000,
-})
-
-// Force every new pg connection to use the `playground_auth` schema as
-// the default search_path. better-auth's Kysely query builder issues
-// unqualified table names like `SELECT * FROM "user"` — without this,
-// those resolve to `public.user` (which doesn't exist) and fail.
-//
-// Doing this here, on connect, is cheaper than wrapping every model
-// name with a schema prefix via better-auth's per-model config (which
-// also broke between 1.3 and 1.6).
-pool.on('connect', (client) => {
-  // search_path must include `public` as a fallback for built-in types
-  // and any cross-schema references better-auth might make.
-  void client.query('SET search_path TO playground_auth, public')
 })
 
 // Pull an Origin header value out of whatever better-auth happens to
