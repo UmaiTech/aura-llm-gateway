@@ -99,7 +99,25 @@ export const useQuotaStore = create<DailyQuotaState>()(
       isFresh: () => {
         const t = get().lastUpdatedAt
         if (t === null) return false
-        return Date.now() - t < STALE_AFTER_MS
+        
+        // Check elapsed time
+        if (Date.now() - t >= STALE_AFTER_MS) return false
+        
+        // Check if the UTC day has changed since last update.
+        // The quota resets at 00:00 UTC each day, so a value from
+        // yesterday is stale even if it's less than 1 hour old.
+        const lastUpdateDate = new Date(t)
+        const nowDate = new Date(Date.now())
+        
+        if (
+          lastUpdateDate.getUTCFullYear() !== nowDate.getUTCFullYear() ||
+          lastUpdateDate.getUTCMonth() !== nowDate.getUTCMonth() ||
+          lastUpdateDate.getUTCDate() !== nowDate.getUTCDate()
+        ) {
+          return false
+        }
+        
+        return true
       },
 
       isExhausted: () => {
