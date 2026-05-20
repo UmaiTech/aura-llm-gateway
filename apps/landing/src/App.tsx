@@ -268,7 +268,7 @@ function Hero() {
     >
       <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', display: 'block', marginBottom: 'var(--space-4)' }}>
-          v0.5.x — Open Responses API
+          Open Responses API — compatible
         </span>
         <h1
           style={{
