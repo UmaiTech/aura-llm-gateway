@@ -2,35 +2,56 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx,md,mdx}",
   ],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        aura: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-        },
-        primary: {
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-        },
+        canvas: 'var(--canvas)',
+        'canvas-elevated': 'var(--canvas-elevated)',
+        'canvas-overlay': 'var(--canvas-overlay)',
+        ink: 'var(--ink)',
+        'ink-muted': 'var(--ink-muted)',
+        'ink-dim': 'var(--ink-dim)',
+        rule: 'var(--rule)',
+        'rule-strong': 'var(--rule-strong)',
+        accent: 'var(--accent)',
+        'accent-ink': 'var(--accent-ink)',
+        'code-bg': 'var(--code-bg)',
+        'code-highlight': 'var(--code-highlight)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        display: 'var(--font-display)',
+        sans: 'var(--font-body)',
+        mono: 'var(--font-mono)',
+      },
+      spacing: {
+        1: 'var(--space-1)',
+        2: 'var(--space-2)',
+        3: 'var(--space-3)',
+        4: 'var(--space-4)',
+        5: 'var(--space-5)',
+        6: 'var(--space-6)',
+        7: 'var(--space-7)',
+        8: 'var(--space-8)',
+      },
+      zIndex: {
+        nav: 'var(--z-nav)',
+        sticky: 'var(--z-sticky)',
+        overlay: 'var(--z-overlay)',
+        modal: 'var(--z-modal)',
+        toast: 'var(--z-toast)',
+      },
+      borderRadius: {
+        none: '0',
+        sm: '2px',
+        md: '6px',
+        full: '9999px',
       },
     },
   },
   plugins: [],
 }
+
+/* Hallmark · genre: editorial-minimal · design-system: design.md · designed-as-app */
