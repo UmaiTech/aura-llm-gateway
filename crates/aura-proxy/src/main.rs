@@ -1087,7 +1087,17 @@ async fn run_migrate() -> anyhow::Result<()> {
         std::env::var("DATABASE_URL").context("DATABASE_URL must be set to run migrations")?;
 
     info!("Running database migrations");
-    let pool_config = PoolConfig::new(&database_url);
+    // The release_command on Fly fires before traffic shifts to the new
+    // release. Fly Postgres can be in the middle of a connection cycle
+    // at that moment (especially right after another deploy), so the
+    // default 10s pool acquire timeout has bitten us twice now with
+    // `pool timed out while waiting for an open connection`. Bump to
+    // 60s here only — long-running serving uses the default. We also
+    // pin max_connections=2 to be polite: this is a one-shot CLI that
+    // doesn't need 10 connections.
+    let pool_config = PoolConfig::new(&database_url)
+        .max_connections(2)
+        .connect_timeout(60);
     let pool = aura_db::create_pool(pool_config)
         .await
         .context("Failed to connect to database for migrations")?;

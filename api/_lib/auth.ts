@@ -110,7 +110,15 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
   max: 4,
   idleTimeoutMillis: 5000,
-  connectionTimeoutMillis: 5000,
+  // Bumped from 5s → 15s after intermittent `Connection terminated
+  // due to connection timeout` errors on cold Vercel function starts.
+  // Fly Postgres handshake (public endpoint + TLS + auth) can take
+  // 3-8s the first time a new function instance hits it. 5s left no
+  // headroom for a momentary Fly machine cycle — which happens on
+  // every gateway redeploy via release_command. 15s absorbs the
+  // cycle without making real failures (unreachable Fly PG) much
+  // slower; those fail on TCP connect long before this fires.
+  connectionTimeoutMillis: 15000,
 })
 
 // Pull an Origin header value out of whatever better-auth happens to

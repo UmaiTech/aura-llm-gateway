@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { LogOut, Menu, Wrench } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSession, signOut } from '../lib/auth-client'
+import { useChatStore } from '../stores/chatStore'
+import { AgentToolsDialog } from './AgentToolsDialog'
 import { DailyQuotaChip } from './DailyQuotaChip'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -17,6 +20,13 @@ export function Header({
   agentMode,
   onAgentModeChange,
 }: HeaderProps) {
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false)
+  // Tool selection state lives in chatStore (persisted). Header reads
+  // and writes it here so the dialog can stay a thin presentational
+  // component that doesn't need to know about Zustand.
+  const enabledTools = useChatStore((s) => s.enabledTools)
+  const toggleTool = useChatStore((s) => s.toggleTool)
+
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/50 glass px-4 shadow-premium">
       <div className="flex items-center gap-3">
@@ -47,16 +57,19 @@ export function Header({
         {/* Theme toggle */}
         <ThemeToggle />
 
-        {/* Agent mode toggle */}
+        {/* Agent tools — opens a dialog with the master switch and a
+            per-tool checklist. Used to be a single boolean toggle,
+            but users couldn't tell which tools were active or what
+            they did. */}
         <button
-          onClick={() => onAgentModeChange(!agentMode)}
+          onClick={() => setAgentDialogOpen(true)}
           className={cn(
             "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
             agentMode
               ? "border-primary-500 bg-primary-500/10 text-primary-400"
               : "border-border hover:bg-secondary text-muted-foreground"
           )}
-          title={agentMode ? "Agent mode enabled (with tools)" : "Click to enable agent mode with tools"}
+          title={agentMode ? "Agent mode on. Click to configure tools." : "Click to enable agent mode and pick tools."}
         >
           <Wrench className="h-4 w-4" />
           <span className="text-sm font-medium hidden sm:inline">
@@ -66,6 +79,15 @@ export function Header({
 
         <UserMenu />
       </div>
+
+      <AgentToolsDialog
+        open={agentDialogOpen}
+        onClose={() => setAgentDialogOpen(false)}
+        agentMode={agentMode}
+        onAgentModeChange={onAgentModeChange}
+        enabledTools={enabledTools}
+        onToggleTool={toggleTool}
+      />
     </header>
   )
 }
