@@ -5,7 +5,7 @@ import { useState, useCallback, useRef } from 'react'
 import { generateId } from '../lib/utils'
 import { BUILT_IN_TOOLS, executeTool } from '../lib/agent'
 import { calculateCost } from '../lib/pricing'
-import { AuraApiError, buildApiError } from '../lib/api'
+import { AuraApiError, buildApiError, parseIntHeader } from '../lib/api'
 import { useQuotaStore } from '../stores/quotaStore'
 
 // Sentinel embedded in the rate-limit error message so the UI can
@@ -255,10 +255,12 @@ async function runAgentLoop(
       if (response.status === 429) {
         const err = await buildApiError(response.clone())
         if (err.code === 'daily_message_limit_exceeded') {
-          const limit = parseInt(response.headers.get('X-Daily-Limit') ?? '0', 10)
-          const reset = parseInt(response.headers.get('X-Daily-Reset') ?? '0', 10)
-          if (limit > 0) {
-            useQuotaStore.getState().markExhausted(limit, reset || undefined)
+          // parseIntHeader preserves 0 as a valid "resets now" value;
+          // returns undefined only for missing / malformed headers.
+          const limit = parseIntHeader(response.headers.get('X-Daily-Limit'))
+          const reset = parseIntHeader(response.headers.get('X-Daily-Reset'))
+          if (limit !== undefined && limit > 0) {
+            useQuotaStore.getState().markExhausted(limit, reset)
           }
         }
         throw err

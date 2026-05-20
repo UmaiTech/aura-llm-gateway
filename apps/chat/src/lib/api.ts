@@ -38,9 +38,28 @@ export async function buildApiError(response: globalThis.Response): Promise<Aura
   }
   const message = body.error?.message ?? `Request failed: ${response.status}`
   const code = body.error?.code ?? `http_${response.status}`
-  const retryAfterRaw = response.headers.get('Retry-After')
-  const retryAfter = retryAfterRaw ? parseInt(retryAfterRaw, 10) : undefined
+  // parseIntHeader preserves 0 (a valid "retry immediately" hint) and
+  // only returns undefined for missing / malformed headers. The older
+  // `raw ? parseInt(...) : undefined` form happened to be correct here
+  // because `'0'` is truthy as a string — but losing that subtle
+  // distinction across reviewers isn't worth the line saved.
+  const retryAfter = parseIntHeader(response.headers.get('Retry-After'))
   return new AuraApiError(message, code, response.status, retryAfter)
+}
+
+/**
+ * Parse a numeric HTTP header, returning `undefined` for missing or
+ * malformed values but preserving `0` as a valid value.
+ *
+ * Important: `0` is meaningful on headers like `X-Daily-Reset` ("limit
+ * resets now") and `Retry-After` ("retry immediately"). The naive
+ * idiom `parseInt(h ?? '0', 10) || undefined` collapses both "missing"
+ * and "zero" into `undefined`, which silently drops information.
+ */
+export function parseIntHeader(value: string | null | undefined): number | undefined {
+  if (value === null || value === undefined) return undefined
+  const n = parseInt(value, 10)
+  return Number.isFinite(n) ? n : undefined
 }
 
 // In prod (Vercel), we hit the same-origin /api/proxy/v1 — a serverless
@@ -142,10 +161,14 @@ export class AuraAPI {
       if (response.status === 429) {
         const err = await buildApiError(response.clone())
         if (err.code === 'daily_message_limit_exceeded') {
-          const limit = parseInt(response.headers.get('X-Daily-Limit') ?? '0', 10)
-          const reset = parseInt(response.headers.get('X-Daily-Reset') ?? '0', 10)
-          if (limit > 0) {
-            useQuotaStore.getState().markExhausted(limit, reset || undefined)
+          const limit = parseIntHeader(response.headers.get('X-Daily-Limit'))
+          // parseIntHeader returns undefined for missing / malformed
+          // headers but preserves 0 — which is a meaningful value here
+          // ("limit resets any second now"). The old `reset || undefined`
+          // collapsed 0 into "unknown reset time".
+          const reset = parseIntHeader(response.headers.get('X-Daily-Reset'))
+          if (limit !== undefined && limit > 0) {
+            useQuotaStore.getState().markExhausted(limit, reset)
           }
         }
         throw err
