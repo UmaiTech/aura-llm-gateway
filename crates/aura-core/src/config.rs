@@ -137,6 +137,9 @@ pub struct ProviderConfig {
     /// Mistral AI API key (optional)
     pub mistral_api_key: Option<String>,
 
+    /// Together AI API key (optional)
+    pub together_api_key: Option<String>,
+
     /// HuggingFace user access token (`hf_...`) for TGI endpoints (optional)
     pub huggingface_api_key: Option<String>,
 
@@ -374,6 +377,11 @@ impl Config {
                 self.providers.mistral_api_key = Some(key);
             }
         }
+        if let Ok(key) = env::var("TOGETHER_API_KEY") {
+            if !key.is_empty() {
+                self.providers.together_api_key = Some(key);
+            }
+        }
         if let Ok(key) = env::var("HUGGINGFACE_API_KEY") {
             if !key.is_empty() {
                 self.providers.huggingface_api_key = Some(key);
@@ -465,6 +473,7 @@ impl Config {
             && self.providers.anthropic_api_key.is_none()
             && self.providers.google_api_key.is_none()
             && self.providers.mistral_api_key.is_none()
+            && self.providers.together_api_key.is_none()
             && self.providers.huggingface_api_key.is_none()
             && self.providers.ollama_base_url.is_none()
             && self.providers.aws_region.is_none()
@@ -494,6 +503,11 @@ impl Config {
         self.providers.mistral_api_key.is_some()
     }
 
+    /// Returns true if Together is configured
+    pub fn has_together(&self) -> bool {
+        self.providers.together_api_key.is_some()
+    }
+
     /// Returns true if HuggingFace TGI is configured (both key and endpoint required)
     pub fn has_huggingface(&self) -> bool {
         self.providers.huggingface_api_key.is_some()
@@ -518,6 +532,7 @@ impl Config {
             || self.has_anthropic()
             || self.has_google()
             || self.has_mistral()
+            || self.has_together()
             || self.has_huggingface()
             || self.has_ollama()
             || self.has_bedrock()
@@ -563,6 +578,11 @@ impl Config {
     /// Returns the Mistral API key if configured
     pub fn mistral_api_key(&self) -> Option<&str> {
         self.providers.mistral_api_key.as_deref()
+    }
+
+    /// Returns the Together API key if configured
+    pub fn together_api_key(&self) -> Option<&str> {
+        self.providers.together_api_key.as_deref()
     }
 
     /// Returns the HuggingFace API key if configured
@@ -615,6 +635,7 @@ impl Config {
             anthropic = %self.has_anthropic(),
             google = %self.has_google(),
             mistral = %self.has_mistral(),
+            together = %self.has_together(),
             huggingface = %self.has_huggingface(),
             ollama = %self.has_ollama(),
             bedrock = %self.has_bedrock(),
@@ -649,6 +670,9 @@ impl Config {
         }
         if masked.providers.mistral_api_key.is_some() {
             masked.providers.mistral_api_key = Some("***".to_string());
+        }
+        if masked.providers.together_api_key.is_some() {
+            masked.providers.together_api_key = Some("***".to_string());
         }
         if masked.providers.huggingface_api_key.is_some() {
             masked.providers.huggingface_api_key = Some("***".to_string());
@@ -717,6 +741,12 @@ impl ConfigBuilder {
     /// Sets the Google API key
     pub fn google_api_key(mut self, key: impl Into<String>) -> Self {
         self.config.providers.google_api_key = Some(key.into());
+        self
+    }
+
+    /// Sets the Together API key
+    pub fn together_api_key(mut self, key: impl Into<String>) -> Self {
+        self.config.providers.together_api_key = Some(key.into());
         self
     }
 
@@ -806,6 +836,14 @@ mod tests {
     fn test_config_validation_with_provider() {
         let config = ConfigBuilder::new().openai_api_key("sk-test").build();
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_config_validation_with_together_provider() {
+        let config = ConfigBuilder::new().together_api_key("tog-test").build();
+        assert!(config.validate().is_ok());
+        assert!(config.has_together());
+        assert!(config.has_any_provider());
     }
 
     #[test]
