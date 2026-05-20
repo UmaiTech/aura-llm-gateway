@@ -174,25 +174,40 @@ const phaseLabel = (phase: Phase): string => {
 }
 
 /**
- * Map a release entry's version string to a changelog URL.
+ * Map a release entry's version string to a stable changelog URL.
  *
- * For specific shipped versions ("v0.4.x") we anchor into the
- * version's CHANGELOG.md section. For multi-version entries
- * ("v0.6–v0.7") there's no single anchor — link to the file root.
+ * Strategy: link to the most-recent tagged GitHub Release in each
+ * minor, which lands on the Release notes page for that tag. The
+ * `?q=` filter on the Releases index doesn't work the way I
+ * assumed — it does substring search on release *names*, not
+ * `tag_name`, and returns a noisy filtered list. Direct tag URLs
+ * are stable and shareable.
  *
- * GitHub auto-generates fragment anchors from headings as
- * `#nnn---yyyy-mm-dd` for our git-cliff format. The release tag
- * (`vX.Y.Z`) is more stable, so we use that instead — clicking
- * lands on the Release notes for that tag.
+ * For multi-minor ranges (e.g. "v0.6–v0.7") and "Future", link to
+ * the full CHANGELOG.md.
  */
+const LATEST_TAG_PER_MINOR: Record<string, string> = {
+  // Update when a new patch ships. Cheap to maintain manually since
+  // releases land via release-plz.
+  'v0.1.x': 'v0.1.7',
+  'v0.2.x': 'v0.2.8',
+  'v0.3.x': 'v0.3.2',
+  'v0.4.x': 'v0.4.2',
+  'v0.5.x': 'v0.5.4',
+  'v0.8.x': 'v0.8.4',
+  'v0.9.x': 'v0.9.1',
+}
+
 function changelogHref(version: string): string {
-  // Multi-version range — link to the file root
   if (version.includes('–') || version === 'Future') {
     return 'https://github.com/UmaiTech/aura-llm-gateway/blob/main/CHANGELOG.md'
   }
-  // vX.Y.x — pick a representative recent tag in that minor
-  const minor = version.replace('v', '').replace('.x', '')
-  return `https://github.com/UmaiTech/aura-llm-gateway/releases?q=v${minor}`
+  const tag = LATEST_TAG_PER_MINOR[version]
+  if (tag) {
+    return `https://github.com/UmaiTech/aura-llm-gateway/releases/tag/${tag}`
+  }
+  // Fallback for any unmapped minor — go to the releases index.
+  return 'https://github.com/UmaiTech/aura-llm-gateway/releases'
 }
 
 export function RoadmapPage() {
@@ -200,8 +215,28 @@ export function RoadmapPage() {
     <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
       <nav style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--rule)' }}>
         <div style={{ maxWidth: '52rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <Link to="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
+          <Link
+            to="/"
+            aria-label="Aura LLM Gateway — home"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', textDecoration: 'none' }}
+          >
+            <img
+              src="/icon-square.svg"
+              alt=""
+              aria-hidden
+              style={{ display: 'block', height: 36, width: 36 }}
+            />
+            <span
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.25rem',
+                letterSpacing: '-0.01em',
+                color: 'var(--ink)',
+                lineHeight: 1,
+              }}
+            >
+              Aura
+            </span>
           </Link>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>
             Roadmap · v0.9.x

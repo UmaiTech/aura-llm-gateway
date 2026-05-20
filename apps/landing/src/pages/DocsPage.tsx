@@ -548,8 +548,28 @@ export function DocsPage() {
             >
               {sidebarOpen ? '× Close' : '☰ Menu'}
             </button>
-            <Link to="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
-              <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
+            <Link
+              to="/"
+              aria-label="Aura LLM Gateway — home"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', textDecoration: 'none' }}
+            >
+              <img
+                src="/icon-square.svg"
+                alt=""
+                aria-hidden
+                style={{ display: 'block', height: 36, width: 36 }}
+              />
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.25rem',
+                  letterSpacing: '-0.01em',
+                  color: 'var(--ink)',
+                  lineHeight: 1,
+                }}
+              >
+                Aura
+              </span>
             </Link>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>
               Docs

@@ -211,8 +211,39 @@ function Nav() {
       }}
     >
       <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-        <a href="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center' }}>
-          <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
+        <a
+          href="/"
+          aria-label="Aura LLM Gateway — home"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            textDecoration: 'none',
+          }}
+        >
+          {/* Icon-only mark from /icon-square.svg, rendered large
+              enough to actually read. Pairing with a typographic
+              wordmark gives us full control over each piece's size —
+              the horizontal-logo.svg has lots of internal padding
+              that left the icon feeling timid at any reasonable
+              CSS height. */}
+          <img
+            src="/icon-square.svg"
+            alt=""
+            aria-hidden
+            style={{ display: 'block', height: 48, width: 48 }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.5rem',
+              letterSpacing: '-0.01em',
+              color: 'var(--ink)',
+              lineHeight: 1,
+            }}
+          >
+            Aura
+          </span>
         </a>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', color: 'var(--ink-muted)', letterSpacing: '0.04em' }}>
           <a href="https://docs.aura-llm.dev" className="link">Docs</a>
