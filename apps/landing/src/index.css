@@ -27,6 +27,9 @@
   --accent: oklch(0.74 0.16 230);
   --accent-ink: oklch(0.18 0 0);
 
+  /* Warm brand accent — restricted to the landing hero CTA */
+  --accent-warm: oklch(0.74 0.18 280);
+
   /* Fonts */
   --font-display: 'Fraunces Variable', 'Fraunces', 'Tiempos Headline', 'GT Sectra', Georgia, serif;
   --font-body: 'Inter Variable', 'Inter', 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
@@ -142,6 +145,22 @@
   .btn-outline:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+
+  /* Warm variant — landing hero CTA only */
+  .btn-outline--warm:hover {
+    color: var(--accent-warm);
+    border-color: var(--accent-warm);
+  }
+  .btn-outline--warm:focus-visible {
+    outline-color: var(--accent-warm);
+  }
+
+  /* Brand wordmark image used in nav (logo-horizontal.svg) */
+  .brand-wordmark {
+    display: block;
+    height: 28px;
+    width: auto;
   }
 
   /* Typographic link */

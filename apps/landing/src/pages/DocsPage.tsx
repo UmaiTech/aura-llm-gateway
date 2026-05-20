@@ -528,8 +528,8 @@ export function DocsPage() {
     <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
       {/* Top bar */}
       <nav style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--rule)', background: 'var(--canvas)' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="docs-mobile-toggle"
@@ -548,8 +548,8 @@ export function DocsPage() {
             >
               {sidebarOpen ? '× Close' : '☰ Menu'}
             </button>
-            <Link to="/" className="link" style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: '1.0625rem', letterSpacing: '-0.01em', textDecoration: 'none' }}>
-              Aura · LLM Gateway
+            <Link to="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
+              <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
             </Link>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
               Docs

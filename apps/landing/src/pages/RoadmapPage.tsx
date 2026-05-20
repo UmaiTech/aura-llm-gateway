@@ -138,9 +138,9 @@ export function RoadmapPage() {
   return (
     <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
       <nav style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--rule)' }}>
-        <div style={{ maxWidth: '52rem', margin: '0 auto', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <Link to="/" className="link" style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: '1.0625rem', letterSpacing: '-0.01em', textDecoration: 'none' }}>
-            Aura · LLM Gateway
+        <div style={{ maxWidth: '52rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+          <Link to="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
           </Link>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
             Roadmap · v0.5.x
@@ -150,6 +150,7 @@ export function RoadmapPage() {
 
       <main style={{ maxWidth: '52rem', margin: '0 auto', padding: 'var(--space-7) var(--space-5) var(--space-7) var(--space-5)' }}>
         <header style={{ marginBottom: 'var(--space-7)' }}>
+          <img src="/icon-square.svg" alt="" aria-hidden style={{ display: 'block', height: 48, width: 48, marginBottom: 'var(--space-5)' }} />
           <h1
             style={{
               fontFamily: 'var(--font-display)',

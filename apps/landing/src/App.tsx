@@ -144,10 +144,10 @@ function Nav() {
         padding: 'var(--space-4) var(--space-6) var(--space-4) var(--space-6)',
       }}
     >
-      <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: '1.125rem', letterSpacing: '-0.01em' }}>
-          Aura · LLM Gateway
-        </span>
+      <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <a href="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
+        </a>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', color: 'var(--ink-muted)', letterSpacing: '0.04em' }}>
           <a href="https://docs.aura-llm.dev" className="link">Docs</a>
           <span aria-hidden>·</span>
@@ -215,7 +215,7 @@ function Hero() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
-          <a href="/docs/quickstart" className="btn-outline">
+          <a href="/docs/quickstart" className="btn-outline btn-outline--warm">
             Get started <span aria-hidden>→</span>
           </a>
           <a href="/docs/api" className="link" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
