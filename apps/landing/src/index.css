@@ -157,18 +157,18 @@
   }
 
   /* Brand wordmark image used in nav (logo-horizontal.svg).
-     Bumped from 28px → 36px after launch feedback that the brand
-     mark felt too timid relative to the editorial typography.
-     Still well below the 84px hero scale, still subordinate to
-     the "v0.5.x — Open Responses API" eyebrow. */
+     Iterated: 28 → 36 → 44px. The redesign's editorial typography
+     dwarfs anything smaller; at 44px the mark holds its own next
+     to the Fraunces hero without becoming a banner. Mobile keeps
+     a smaller variant so it doesn't crowd the nav links. */
   .brand-wordmark {
     display: block;
-    height: 36px;
+    height: 44px;
     width: auto;
   }
   @media (max-width: 640px) {
     .brand-wordmark {
-      height: 30px;
+      height: 34px;
     }
   }
 
@@ -221,32 +221,53 @@
   color: var(--accent);
 }
 
-/* Code block */
+/* Code block — "terminal" treatment.
+   Left accent rule + slightly elevated background distinguishes
+   prose from code without going full "macOS window chrome" (which
+   would clash with the editorial-minimal voice). The accent rule
+   is the same cyan used elsewhere; restraints land on color, not
+   shape. */
 .code-block {
   margin: var(--space-5) 0;
 }
 .code-block-label {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--ink-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
   margin-bottom: var(--space-2);
   display: block;
 }
-.code-block pre {
+.code-block pre,
+.editorial-pre {
   background: var(--code-bg);
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) + var(--space-2));
+  border-left: 2px solid var(--accent);
   border-radius: 0;
   overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--ink);
   margin: 0;
+  /* Tabular figures so column-aligned token counts in examples
+     line up cleanly across rows. */
+  font-variant-numeric: tabular-nums;
 }
 .code-block code {
   font-family: var(--font-mono);
   font-size: 0.875rem;
 }
+
+/* Lightweight token coloring for the editorial pres on App.tsx
+   (which don't go through Prism). Comments dim, strings warm,
+   numbers cool. Applied via <span class="t-*"> tags. */
+.t-comment { color: var(--ink-dim); font-style: italic; }
+.t-string  { color: oklch(0.78 0.10 60); }
+.t-number  { color: oklch(0.78 0.10 230); }
+.t-keyword { color: var(--accent-warm); }
+.t-key     { color: var(--ink-muted); }
 
 /* Inline code (when used as a markdown component) */
 code {

@@ -118,8 +118,11 @@ const sections: Section[] = [
   },
 ]
 
+// Editorial pres pick up the .editorial-pre treatment (cyan
+// left rule, tabular numerics, generous line-height) from
+// index.css. Inline styles only override what's distinct here.
 const response = (
-  <pre style={{ background: 'var(--code-bg)', color: 'var(--ink)', padding: 'var(--space-4)', overflowX: 'auto', margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', lineHeight: 1.6 }}>
+  <pre className="editorial-pre" style={{ fontSize: '0.8125rem' }}>
     {responseCode}
   </pre>
 )
@@ -263,7 +266,7 @@ function SectionRow({ section, padTop, padBottom, showResponseExtras }: { sectio
           </div>
           <div>
             <span className="code-block-label">{section.codeLabel}</span>
-            <pre style={{ background: 'var(--code-bg)', color: 'var(--ink)', padding: 'var(--space-4)', overflowX: 'auto', margin: 0, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', lineHeight: 1.6 }}>
+            <pre className="editorial-pre" style={{ fontSize: '0.8125rem' }}>
               {section.code}
             </pre>
             {showResponseExtras && (
@@ -297,12 +300,42 @@ function ClosingNote() {
 function Footer() {
   return (
     <footer style={{ padding: 'var(--space-6)', borderTop: '1px solid var(--rule)' }}>
-      <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
+      <div
+        style={{
+          maxWidth: '72rem',
+          margin: '0 auto',
+          display: 'flex',
+          gap: 'var(--space-4)',
+          flexWrap: 'wrap',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+        }}
+      >
         <p style={{ fontSize: '0.875rem', color: 'var(--ink-muted)', margin: 0 }}>
           Aura LLM Gateway · open source · MIT ·{' '}
           <a href="https://github.com/UmaiTech/aura-llm-gateway" className="link">
             github.com/UmaiTech/aura-llm-gateway <span aria-hidden>→</span>
           </a>
+        </p>
+        {/* Hand-cut signature line. Centered-bottom on mobile, right-
+            aligned on wider screens via the flex layout above. The
+            heart uses --accent-warm (the same purple used on the hero
+            keyword) so the brand color closes the page where it
+            opened it. */}
+        <p
+          style={{
+            color: 'var(--ink-muted)',
+            margin: 0,
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.75rem',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Made in Stockholm with{' '}
+          <span aria-label="love" style={{ color: 'var(--accent-warm)' }}>
+            ❤
+          </span>
         </p>
       </div>
     </footer>

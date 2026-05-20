@@ -303,27 +303,41 @@ function SignInScreen() {
       <footer
         style={{
           padding: '24px 32px',
-          textAlign: 'center',
           fontFamily: 'var(--auth-font-mono)',
           fontSize: '0.75rem',
           color: 'var(--auth-ink-dim)',
           borderTop: '1px solid var(--auth-rule)',
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
         }}
       >
-        Want to self-host? See the{' '}
-        <a
-          href="https://github.com/UmaiTech/aura-llm-gateway"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: 'var(--auth-ink-muted)',
-            textDecoration: 'underline',
-            textUnderlineOffset: '0.2em',
-          }}
-        >
-          source on GitHub
-        </a>
-        .
+        <span>
+          Want to self-host? See the{' '}
+          <a
+            href="https://github.com/UmaiTech/aura-llm-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: 'var(--auth-ink-muted)',
+              textDecoration: 'underline',
+              textUnderlineOffset: '0.2em',
+            }}
+          >
+            source on GitHub
+          </a>
+          .
+        </span>
+        {/* Matches the landing's sign-off so the playground feels like
+            the same publication. Accent-warm heart for brand continuity. */}
+        <span style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Made in Stockholm with{' '}
+          <span aria-label="love" style={{ color: 'var(--auth-accent-warm)' }}>
+            ❤
+          </span>
+        </span>
       </footer>
     </div>
   )
