@@ -143,22 +143,33 @@ pub async fn rate_limit_middleware(
     // usage (each /v1/responses call counts as one message). Skipped
     // if the key has no daily cap set (NULL column = pro / internal).
     //
+    // Only applies to POST /v1/responses requests — read-only requests
+    // like GET /v1/conversations should not consume the daily message
+    // quota.
+    //
     // Fail-open on Redis errors so we don't black out the gateway if
     // the limiter has a hiccup.
-    let daily_result = if let Some(daily_limit) = auth.api_key.daily_message_limit {
-        match rate_limiter
-            .check_daily_messages(&key, daily_limit as u32)
-            .await
-        {
-            Ok(r) => Some(r),
-            Err(e) => {
-                warn!(
-                    error = %e,
-                    api_key_id = %key,
-                    "Daily message check failed"
-                );
-                None
+    let is_response_creation = request.method() == axum::http::Method::POST
+        && request.uri().path() == "/v1/responses";
+
+    let daily_result = if is_response_creation {
+        if let Some(daily_limit) = auth.api_key.daily_message_limit {
+            match rate_limiter
+                .check_daily_messages(&key, daily_limit as u32)
+                .await
+            {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        api_key_id = %key,
+                        "Daily message check failed"
+                    );
+                    None
+                }
             }
+        } else {
+            None
         }
     } else {
         None
