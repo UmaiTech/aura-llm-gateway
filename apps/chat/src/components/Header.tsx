@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogOut, Menu, Wrench } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Wrench } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSession, signOut } from '../lib/auth-client'
 import { useChatStore } from '../stores/chatStore'
@@ -57,25 +57,50 @@ export function Header({
         {/* Theme toggle */}
         <ThemeToggle />
 
-        {/* Agent tools — opens a dialog with the master switch and a
-            per-tool checklist. Used to be a single boolean toggle,
-            but users couldn't tell which tools were active or what
-            they did. */}
-        <button
-          onClick={() => setAgentDialogOpen(true)}
+        {/* Agent tools — split control. The label/wrench toggles agent
+            mode in one click (which is what the label "Agent"/"Chat"
+            implies). The chevron opens the dialog for picking which
+            tools are active. Earlier iteration used one button that
+            opened the dialog instead of toggling, which broke the
+            mental model — the label still suggested a toggle. */}
+        <div
           className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
+            "inline-flex items-stretch rounded-lg border overflow-hidden",
             agentMode
-              ? "border-primary-500 bg-primary-500/10 text-primary-400"
-              : "border-border hover:bg-secondary text-muted-foreground"
+              ? "border-primary-500"
+              : "border-border"
           )}
-          title={agentMode ? "Agent mode on. Click to configure tools." : "Click to enable agent mode and pick tools."}
         >
-          <Wrench className="h-4 w-4" />
-          <span className="text-sm font-medium hidden sm:inline">
-            {agentMode ? "Agent" : "Chat"}
-          </span>
-        </button>
+          <button
+            onClick={() => onAgentModeChange(!agentMode)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 transition-colors",
+              agentMode
+                ? "bg-primary-500/10 text-primary-400"
+                : "hover:bg-secondary text-muted-foreground"
+            )}
+            title={agentMode ? "Agent mode on. Click to switch to chat." : "Click to enable agent mode."}
+            aria-pressed={agentMode}
+          >
+            <Wrench className="h-4 w-4" />
+            <span className="text-sm font-medium hidden sm:inline">
+              {agentMode ? "Agent" : "Chat"}
+            </span>
+          </button>
+          <button
+            onClick={() => setAgentDialogOpen(true)}
+            className={cn(
+              "flex items-center px-1.5 border-l transition-colors",
+              agentMode
+                ? "border-primary-500/50 bg-primary-500/10 text-primary-400 hover:bg-primary-500/20"
+                : "border-border hover:bg-secondary text-muted-foreground"
+            )}
+            title="Configure agent tools"
+            aria-label="Configure agent tools"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
         <UserMenu />
       </div>
