@@ -64,9 +64,8 @@ export function CardGrid({ children, columns, cols }: CardGridProps) {
         margin: 'var(--space-5) 0',
         display: 'grid',
         gap: 'var(--space-5)',
-        gridTemplateColumns: 'minmax(0, 1fr)',
+        gridTemplateColumns: layout === 'asymmetric' ? 'minmax(0, 3fr) minmax(0, 2fr)' : 'minmax(0, 1fr)',
       }}
-      className={layout === 'asymmetric' ? 'card-grid-asymmetric' : 'card-grid-stack'}
     >
       {items.map((child, idx) => (
         <div
