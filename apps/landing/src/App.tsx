@@ -430,7 +430,16 @@ function Footer() {
           Made in Stockholm with{' '}
           <span aria-label="love" style={{ color: 'var(--accent-warm)' }}>
             ❤
-          </span>
+          </span>{' '}
+          by{' '}
+          <a
+            href="https://www.umai-tech.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link"
+          >
+            UmaiTech
+          </a>
         </p>
       </div>
     </footer>
