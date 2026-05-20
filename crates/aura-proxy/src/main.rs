@@ -1086,28 +1086,79 @@ async fn run_migrate() -> anyhow::Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").context("DATABASE_URL must be set to run migrations")?;
 
-    info!("Running database migrations");
-    // The release_command on Fly fires before traffic shifts to the new
-    // release. Fly Postgres can be in the middle of a connection cycle
-    // at that moment (especially right after another deploy), so the
-    // default 10s pool acquire timeout has bitten us twice now with
-    // `pool timed out while waiting for an open connection`. Bump to
-    // 60s here only — long-running serving uses the default. We also
-    // pin max_connections=2 to be polite: this is a one-shot CLI that
-    // doesn't need 10 connections.
-    let pool_config = PoolConfig::new(&database_url)
-        .max_connections(2)
-        .connect_timeout(60);
-    let pool = aura_db::create_pool(pool_config)
-        .await
-        .context("Failed to connect to database for migrations")?;
+    // Retry loop for the Fly release_command:
+    //
+    // The release_command fires before traffic shifts to the new
+    // release. At that exact moment Fly Postgres is sometimes
+    // mid-cycle (we've seen both `pool timed out while waiting for an
+    // open connection` and `expected to read 5 bytes, got 0 bytes at
+    // EOF` — the latter is PG accepting the TCP socket but dropping
+    // it before sending the startup packet, i.e. postgres process
+    // not yet ready). Both are transient — a single retry 5s later
+    // typically succeeds.
+    //
+    // sqlx's run_migrations is idempotent (tracked in
+    // _sqlx_migrations), so a partial success on attempt N and a
+    // full success on attempt N+1 is safe.
+    //
+    // Total grace: ATTEMPTS * BACKOFF_SECS = 6 * 5 = 30s before
+    // failing the deploy. Long enough to cover a Fly PG cycle, short
+    // enough that a truly broken DB still surfaces fast.
+    const ATTEMPTS: u32 = 6;
+    const BACKOFF_SECS: u64 = 5;
 
-    aura_db::run_migrations(&pool)
-        .await
-        .context("Migration run failed")?;
+    info!(attempts = ATTEMPTS, "Running database migrations");
 
-    info!("Migrations complete");
-    Ok(())
+    let mut last_err: Option<anyhow::Error> = None;
+    for attempt in 1..=ATTEMPTS {
+        // max_connections=2 because this is a one-shot CLI, not a
+        // server. connect_timeout=60 absorbs a typical Fly PG cycle
+        // within a single attempt.
+        let pool_config = PoolConfig::new(&database_url)
+            .max_connections(2)
+            .connect_timeout(60);
+
+        let outcome: anyhow::Result<()> = async {
+            let pool = aura_db::create_pool(pool_config)
+                .await
+                .context("Failed to connect to database for migrations")?;
+            aura_db::run_migrations(&pool)
+                .await
+                .context("Migration run failed")?;
+            Ok(())
+        }
+        .await;
+
+        match outcome {
+            Ok(()) => {
+                info!(attempt, "Migrations complete");
+                return Ok(());
+            }
+            Err(e) if attempt < ATTEMPTS => {
+                warn!(
+                    attempt,
+                    next_in_secs = BACKOFF_SECS,
+                    error = %e,
+                    "Migration attempt failed, retrying"
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(BACKOFF_SECS)).await;
+                last_err = Some(e);
+            }
+            Err(e) => {
+                // Final attempt — bubble up so the release_command
+                // fails the deploy and we don't shift traffic to a
+                // gateway that can't talk to its DB.
+                last_err = Some(e);
+                break;
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("Migrations failed for unknown reason")))
+        .context(format!(
+            "Migrations failed after {} attempts with {}s backoff",
+            ATTEMPTS, BACKOFF_SECS
+        ))
 }
 
 /// Result of parsing the AURA_CORS_ALLOWED_ORIGINS env var.
