@@ -16,6 +16,7 @@
  */
 
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Calculator, Check, Clock, CloudSun, Search, Wrench, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { BUILT_IN_TOOLS } from '../lib/agent'
@@ -92,13 +93,18 @@ export function AgentToolsDialog({
     enabledTools.length === 0 ||
     enabledTools.length === BUILT_IN_TOOLS.length
 
-  return (
+  // Portal to <body> so the dialog escapes the <Header> stacking
+  // context (which uses `glass` / backdrop-filter and traps z-index).
+  // Without this, even z-[100] on the dialog can't reliably paint
+  // above sibling chrome — backdrop-filter creates a new stacking
+  // context, and the dialog rendered inside <Header> is bound to it.
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm px-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl bg-gray-950 border border-gray-800 shadow-2xl p-6 space-y-5"
+        className="w-full max-w-md rounded-xl bg-card border border-border shadow-2xl p-6 space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -108,17 +114,17 @@ export function AgentToolsDialog({
               <Wrench className="h-4 w-4 text-aura-400" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-100">
+              <h2 className="text-base font-semibold text-foreground">
                 Agent tools
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Let the model call functions during its response.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -131,12 +137,12 @@ export function AgentToolsDialog({
             'flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors cursor-pointer',
             agentMode
               ? 'border-aura-500/30 bg-aura-500/5'
-              : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900/60',
+              : 'border-border bg-secondary/40 hover:bg-secondary/60',
           )}
         >
           <div>
-            <div className="text-sm font-medium text-gray-100">Agent mode</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-sm font-medium text-foreground">Agent mode</div>
+            <div className="text-xs text-muted-foreground">
               {agentMode
                 ? 'Tools below are available to the model.'
                 : 'Standard chat — tools off.'}
@@ -159,12 +165,12 @@ export function AgentToolsDialog({
             !agentMode && 'opacity-50',
           )}
         >
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
             Built-in tools
           </div>
           {BUILT_IN_TOOLS.map((t) => {
             const meta = TOOL_PRESENTATION[t.name] ?? {
-              icon: <Wrench className="h-4 w-4 text-gray-500" />,
+              icon: <Wrench className="h-4 w-4 text-muted-foreground" />,
               label: t.name,
               blurb: t.description,
             }
@@ -180,15 +186,15 @@ export function AgentToolsDialog({
                   'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-colors',
                   enabled
                     ? 'border-aura-500/30 bg-aura-500/5'
-                    : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900/60',
+                    : 'border-border bg-secondary/40 hover:bg-secondary/60',
                 )}
               >
                 <div className="mt-0.5">{meta.icon}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-100">
+                  <div className="text-sm font-medium text-foreground">
                     {meta.label}
                   </div>
-                  <div className="text-xs text-gray-500 leading-relaxed mt-0.5">
+                  <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">
                     {meta.blurb}
                   </div>
                 </div>
@@ -197,7 +203,7 @@ export function AgentToolsDialog({
                     'h-5 w-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5',
                     enabled
                       ? 'border-aura-500 bg-aura-500'
-                      : 'border-gray-700 bg-gray-900',
+                      : 'border-border bg-background',
                   )}
                 >
                   {enabled && <Check className="h-3 w-3 text-white" />}
@@ -207,11 +213,12 @@ export function AgentToolsDialog({
           })}
         </div>
 
-        <p className="text-xs text-gray-500 text-center pt-1">
+        <p className="text-xs text-muted-foreground text-center pt-1">
           Tools run client-side after the model picks them. Results stream back
           into the same conversation.
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

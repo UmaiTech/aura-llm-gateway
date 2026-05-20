@@ -520,6 +520,17 @@ export default function App() {
             responseId,
           },
         ]
+
+        // Carry the response that contained the tool_use blocks forward
+        // into the next roundtrip's previous_response_id. Without this the
+        // Anthropic adapter sees a `tool_result` block with no prior
+        // `tool_use` (because intra-turn roundtrips weren't being chained)
+        // and returns: "unexpected tool_use_id found in tool_result
+        // blocks ... Each tool_result block must have a corresponding
+        // tool_use block in the previous message."
+        if (responseId) {
+          lastResponseId = responseId
+        }
       }
 
       setError(`Agent stopped after ${maxRoundtrips} tool roundtrips`)

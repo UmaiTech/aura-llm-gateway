@@ -9,6 +9,7 @@
  */
 
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Lock, Sparkles, X, Check } from 'lucide-react'
 import { useBetaSignup } from '../hooks/useBetaSignup'
 import type { Model } from '../lib/types'
@@ -41,13 +42,16 @@ export function BetaUpsellModal({ open, model, onClose }: BetaUpsellModalProps) 
 
   const modelName = model?.name ?? 'Frontier models'
 
-  return (
+  // Portal to <body> so the modal escapes the parent stacking context
+  // (header / sidebar use backdrop-filter via the `glass` class, which
+  // creates a new stacking context and traps z-index).
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm px-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl bg-gray-950 border border-gray-800 shadow-2xl p-6 space-y-4"
+        className="w-full max-w-md rounded-xl bg-card border border-border shadow-2xl p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -56,7 +60,7 @@ export function BetaUpsellModal({ open, model, onClose }: BetaUpsellModalProps) 
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -64,10 +68,10 @@ export function BetaUpsellModal({ open, model, onClose }: BetaUpsellModalProps) 
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-gray-100">
+          <h2 className="text-lg font-semibold text-foreground">
             {modelName} is in the managed beta
           </h2>
-          <p className="text-sm text-gray-400 leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             The free playground tier covers small &amp; fast models from
             every provider. Frontier models (Opus, Sonnet, GPT-5, Gemini 3
             Pro) unlock with the managed beta — higher limits, prod-ready
@@ -91,10 +95,11 @@ export function BetaUpsellModal({ open, model, onClose }: BetaUpsellModalProps) 
           </button>
         )}
 
-        <p className="text-xs text-gray-500 text-center pt-1">
+        <p className="text-xs text-muted-foreground text-center pt-1">
           One click. We already have your email from sign-in.
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
