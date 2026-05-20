@@ -31,8 +31,17 @@ export function DailyQuotaChip() {
 
   const tone = useMemo(() => {
     if (limit === null || remaining === null) return 'hidden'
-    if (remaining === 0) return 'exhausted'
-    const ratio = remaining / limit
+    // limit <= 0 means "no daily cap on this key" (e.g. admin / pro
+    // keys with NULL → 0 fallthrough from a future change). Show
+    // nothing — the chip is a free-tier nudge, irrelevant here.
+    // Without this guard, `remaining / 0` would produce NaN/Infinity
+    // and tone comparisons would silently misclassify.
+    if (limit <= 0) return 'hidden'
+    if (remaining <= 0) return 'exhausted'
+    // Clamp ratio to [0, 1] — defensively, in case the server ever
+    // sends remaining > limit (shouldn't happen, but a stale Redis
+    // counter or a backfill bump-up could).
+    const ratio = Math.min(remaining / limit, 1)
     if (ratio > 0.5) return 'muted'
     if (ratio > 0.15) return 'amber'
     return 'red'
