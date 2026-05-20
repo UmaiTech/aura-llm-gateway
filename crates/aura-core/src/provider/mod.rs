@@ -11,6 +11,7 @@ mod huggingface;
 mod mistral;
 mod ollama;
 mod openai;
+mod together;
 
 pub use anthropic::AnthropicProvider;
 pub use bedrock::BedrockProvider;
@@ -20,6 +21,7 @@ pub use huggingface::HuggingFaceProvider;
 pub use mistral::MistralProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
+pub use together::TogetherProvider;
 
 use async_trait::async_trait;
 use aura_types::{CreateResponseRequest, Response, StreamEvent};

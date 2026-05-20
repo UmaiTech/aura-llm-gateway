@@ -19,7 +19,7 @@ server:
 # Provider API keys
 # NOTE: For production, prefer environment variables for sensitive values:
 #   OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
-#   MISTRAL_API_KEY, HUGGINGFACE_API_KEY, HUGGINGFACE_ENDPOINT_URL,
+#   MISTRAL_API_KEY, TOGETHER_API_KEY, HUGGINGFACE_API_KEY, HUGGINGFACE_ENDPOINT_URL,
 #   HUGGINGFACE_MODEL, OLLAMA_BASE_URL, AWS_REGION
 providers:
   # OpenAI API key (optional)
@@ -34,6 +34,10 @@ providers:
   # Mistral AI API key (optional)
   # Enables: mistral-large-latest, mistral-small-latest, codestral-latest, etc.
   # mistral_api_key: "..."
+
+  # Together AI API key (optional)
+  # Enables hosted open models like Llama, DeepSeek, Qwen, Mixtral, and DBRX.
+  # together_api_key: "..."
 
   # HuggingFace TGI — Inference Endpoints (optional)
   # Both api_key and endpoint_url are required to activate this provider.

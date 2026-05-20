@@ -9,7 +9,7 @@ use anyhow::Context;
 use aura_core::{
     AnthropicProvider, BedrockProvider, CostCalculator, GeminiProvider, HuggingFaceProvider,
     MistralProvider, OllamaProvider, OpenAIProvider, Provider, RateLimiter, RedisPool,
-    ResponseCache,
+    ResponseCache, TogetherProvider,
 };
 use aura_db::{ApiKeyUsageRepo, DbPool, NewApiKeyUsage, NewRequestLog, PoolConfig, RequestLogRepo};
 use axum::http::HeaderValue;
@@ -110,6 +110,20 @@ impl AppState {
             providers.insert("mistral".to_string(), mistral);
         } else {
             warn!("Mistral API key not configured - Mistral provider disabled");
+        }
+
+        // Register Together provider if API key is configured
+        if let Some(api_key) = &config.providers.together_api_key {
+            info!("Registering Together provider");
+            let together = Arc::new(TogetherProvider::new(api_key)) as Arc<dyn Provider>;
+
+            for model in together.models() {
+                model_map.insert(model.to_string(), "together".to_string());
+            }
+
+            providers.insert("together".to_string(), together);
+        } else {
+            warn!("TOGETHER_API_KEY not configured - Together provider disabled");
         }
 
         // Register Ollama provider if base URL is configured
