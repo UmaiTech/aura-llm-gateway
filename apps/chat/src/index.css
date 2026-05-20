@@ -1,6 +1,28 @@
+@import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/inter';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Editorial design tokens — used by the AuthGate sign-in screen to
+   match the redesigned landing page (Fraunces display, monochrome
+   surfaces, restrained cyan + warm purple accents). Kept separate
+   from the chat's own design system below; rest of the chat keeps
+   its existing Vercel/ChatGPT-style theme. */
+:root {
+  --auth-canvas: oklch(0.18 0 0);
+  --auth-canvas-elevated: oklch(0.22 0 0);
+  --auth-ink: oklch(0.95 0 0);
+  --auth-ink-muted: oklch(0.68 0 0);
+  --auth-ink-dim: oklch(0.50 0 0);
+  --auth-rule: oklch(0.30 0 0);
+  --auth-accent: oklch(0.74 0.16 230);
+  --auth-accent-warm: oklch(0.74 0.18 280);
+  --auth-font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --auth-font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --auth-font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+}
 
 @layer base {
   * {

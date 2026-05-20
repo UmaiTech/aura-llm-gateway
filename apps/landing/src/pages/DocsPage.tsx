@@ -551,7 +551,7 @@ export function DocsPage() {
             <Link to="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
               <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
             </Link>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>
               Docs
             </span>
           </div>
@@ -624,7 +624,11 @@ export function DocsPage() {
                             display: 'block',
                             padding: '4px 0',
                             fontSize: '0.875rem',
-                            color: isActive ? 'var(--ink)' : itemHasContent ? 'var(--ink-muted)' : 'var(--ink-dim)',
+                            // Active items pick up the cyan accent on the
+                            // border AND the text so they're unambiguously
+                            // selected — single hairline alone got lost in
+                            // dense sidebars during user testing.
+                            color: isActive ? 'var(--accent)' : itemHasContent ? 'var(--ink-muted)' : 'var(--ink-dim)',
                             textDecoration: 'none',
                             fontWeight: isActive ? 500 : 400,
                             borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',

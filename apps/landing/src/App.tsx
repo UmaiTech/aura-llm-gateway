@@ -170,7 +170,7 @@ function Hero() {
       }}
     >
       <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', display: 'block', marginBottom: 'var(--space-4)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', display: 'block', marginBottom: 'var(--space-4)' }}>
           v0.5.x — Open Responses API
         </span>
         <h1
@@ -184,7 +184,7 @@ function Hero() {
             maxWidth: '20ch',
           }}
         >
-          A unified LLM gateway, written like a foundry publishes a type specimen.
+          A <span style={{ color: 'var(--accent-warm)' }}>unified</span> LLM gateway, written like a foundry publishes a type specimen.
         </h1>
         <p style={{ fontSize: '1.0625rem', lineHeight: 1.6, color: 'var(--ink-muted)', maxWidth: '52ch', marginBottom: 'var(--space-6)' }}>
           Route requests across seven providers behind one API. Built in Rust, open-sourced under MIT,
@@ -249,7 +249,7 @@ function SectionRow({ section, padTop, padBottom, showResponseExtras }: { sectio
       <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 'var(--space-5)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 'var(--space-6)' }} className="section-row-grid">
           <div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)', display: 'block', marginBottom: 'var(--space-3)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', display: 'block', marginBottom: 'var(--space-3)' }}>
               {section.marker}
             </span>
             <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 'clamp(1.75rem, 3vw, 2.25rem)', lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 'var(--space-4)', maxWidth: '22ch' }}>

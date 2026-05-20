@@ -156,11 +156,31 @@
     outline-color: var(--accent-warm);
   }
 
-  /* Brand wordmark image used in nav (logo-horizontal.svg) */
+  /* Brand wordmark image used in nav (logo-horizontal.svg).
+     Bumped from 28px → 36px after launch feedback that the brand
+     mark felt too timid relative to the editorial typography.
+     Still well below the 84px hero scale, still subordinate to
+     the "v0.5.x — Open Responses API" eyebrow. */
   .brand-wordmark {
     display: block;
-    height: 28px;
+    height: 36px;
     width: auto;
+  }
+  @media (max-width: 640px) {
+    .brand-wordmark {
+      height: 30px;
+    }
+  }
+
+  /* Hero accent — used on a single keyword in the display headline
+     and on each "§ NN" section marker. Restrained to ~3-5% of total
+     pigment per the editorial-minimal slop test. Cyan/blue lifts the
+     Fraunces specimen without becoming a gradient. */
+  .accent {
+    color: var(--accent);
+  }
+  .accent-warm {
+    color: var(--accent-warm);
   }
 
   /* Typographic link */
