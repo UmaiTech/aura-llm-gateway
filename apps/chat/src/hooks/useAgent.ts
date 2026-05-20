@@ -6,6 +6,7 @@ import { generateId } from '../lib/utils'
 import { BUILT_IN_TOOLS, executeTool } from '../lib/agent'
 import { calculateCost } from '../lib/pricing'
 import { AuraApiError, buildApiError } from '../lib/api'
+import { useQuotaStore } from '../stores/quotaStore'
 
 // Sentinel embedded in the rate-limit error message so the UI can
 // detect it and render the "Join the beta" CTA without us having to
@@ -248,8 +249,25 @@ async function runAgentLoop(
       // CTA path can detect 429s and special-case them. Previously we
       // threw a plain Error here, which made the isRateLimit() branch
       // in friendlyErrorMessage dead code.
+      //
+      // On a daily-limit 429, also snap the quota chip to 0 so the
+      // user sees the wall immediately.
+      if (response.status === 429) {
+        const err = await buildApiError(response.clone())
+        if (err.code === 'daily_message_limit_exceeded') {
+          const limit = parseInt(response.headers.get('X-Daily-Limit') ?? '0', 10)
+          const reset = parseInt(response.headers.get('X-Daily-Reset') ?? '0', 10)
+          if (limit > 0) {
+            useQuotaStore.getState().markExhausted(limit, reset || undefined)
+          }
+        }
+        throw err
+      }
       throw await buildApiError(response)
     }
+
+    // Capture daily-quota headers off the successful response.
+    useQuotaStore.getState().updateFromHeaders(response.headers)
 
     // Process stream
     const reader = response.body?.getReader()

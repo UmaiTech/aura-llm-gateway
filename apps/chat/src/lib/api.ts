@@ -1,4 +1,5 @@
 import type { CreateResponseRequest, Response, StreamEvent, Message, RoutingStrategy, ValidationConfig, ConsistencyConfig, CompressionConfig } from './types'
+import { useQuotaStore } from '../stores/quotaStore'
 
 /**
  * Error thrown for any non-2xx HTTP response from the gateway/proxy.
@@ -135,8 +136,26 @@ export class AuraAPI {
     })
 
     if (!response.ok) {
+      // On 429 with the daily-message code, mark the quota exhausted
+      // so the UI counter snaps to "0 / 20" without waiting for the
+      // next successful call (there won't be one until reset).
+      if (response.status === 429) {
+        const err = await buildApiError(response.clone())
+        if (err.code === 'daily_message_limit_exceeded') {
+          const limit = parseInt(response.headers.get('X-Daily-Limit') ?? '0', 10)
+          const reset = parseInt(response.headers.get('X-Daily-Reset') ?? '0', 10)
+          if (limit > 0) {
+            useQuotaStore.getState().markExhausted(limit, reset || undefined)
+          }
+        }
+        throw err
+      }
       throw await buildApiError(response)
     }
+
+    // Pluck the daily-quota headers off the successful response so the
+    // header chip can show "X / 20 today" without an extra fetch.
+    useQuotaStore.getState().updateFromHeaders(response.headers)
 
     const reader = response.body?.getReader()
     if (!reader) {

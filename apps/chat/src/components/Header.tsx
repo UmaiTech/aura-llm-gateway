@@ -1,6 +1,7 @@
 import { LogOut, Menu, Wrench } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSession, signOut } from '../lib/auth-client'
+import { DailyQuotaChip } from './DailyQuotaChip'
 import { ThemeToggle } from './ThemeToggle'
 
 interface HeaderProps {
@@ -40,6 +41,9 @@ export function Header({
 
       {/* Right side controls */}
       <div className="flex items-center gap-3">
+        {/* Daily quota chip — hidden until first API call lands header data */}
+        <DailyQuotaChip />
+
         {/* Theme toggle */}
         <ThemeToggle />
 
