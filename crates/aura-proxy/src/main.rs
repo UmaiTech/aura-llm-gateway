@@ -773,14 +773,33 @@ impl AppState {
         response: &aura_types::Response,
         request: &aura_types::CreateResponseRequest,
     ) {
+        // Each early-return below now logs at INFO so we can grep
+        // `flyctl logs` for which branch is short-circuiting. After we
+        // identify the culprit we can demote these back to debug.
+        info!(
+            api_key_id = %auth.api_key.id,
+            response_id = %response.id,
+            usage_present = response.usage.is_some(),
+            db_pool_present = self.db_pool.is_some(),
+            "record_api_key_usage: entered"
+        );
+
         let Some(pool) = &self.db_pool else {
+            info!(
+                api_key_id = %auth.api_key.id,
+                "record_api_key_usage: no db_pool — skipping"
+            );
             return;
         };
 
         let usage = match &response.usage {
             Some(u) => u,
             None => {
-                debug!("No usage data in response, skipping usage recording");
+                info!(
+                    api_key_id = %auth.api_key.id,
+                    response_id = %response.id,
+                    "record_api_key_usage: response.usage is None — skipping"
+                );
                 return;
             }
         };
@@ -851,7 +870,10 @@ impl AppState {
 
         match ApiKeyUsageRepo::create(pool, new_usage).await {
             Ok(_) => {
-                debug!(
+                // Bumped to info! while debugging why api_key_usage was
+                // empty in production. Demote back to debug! once
+                // diagnostics show rows being written reliably.
+                info!(
                     api_key_id = %auth.api_key.id,
                     request_id = %response.id,
                     input_tokens = %usage.input_tokens,
