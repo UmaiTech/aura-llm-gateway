@@ -393,4 +393,14 @@ code {
   margin-bottom: var(--space-3);
 }
 
+/* Landing section row — 3fr/2fr on wide, single column under 800px */
+.section-row-grid {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+@media (max-width: 800px) {
+  .section-row-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
 /* Hallmark · genre: editorial-minimal · design-system: design.md · designed-as-app */
