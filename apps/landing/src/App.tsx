@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import { GatewayDiagram } from './components/GatewayDiagram'
+import { StockholmFooter } from './components/StockholmFooter'
 
 const heroCode = `curl -X POST http://localhost:8080/v1/responses \\
   -H 'Content-Type: application/json' \\
@@ -414,35 +415,7 @@ function Footer() {
             github.com/UmaiTech/aura-llm-gateway <span aria-hidden>→</span>
           </a>
         </p>
-        {/* Hand-cut signature line. Centered-bottom on mobile, right-
-            aligned on wider screens via the flex layout above. The
-            heart uses --accent-warm (the same purple used on the hero
-            keyword) so the brand color closes the page where it
-            opened it. */}
-        <p
-          style={{
-            color: 'var(--ink-muted)',
-            margin: 0,
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.75rem',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Made in Stockholm with{' '}
-          <span aria-label="love" style={{ color: 'var(--accent-warm)' }}>
-            ❤
-          </span>{' '}
-          by{' '}
-          <a
-            href="https://www.umai-tech.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="link"
-          >
-            UmaiTech
-          </a>
-        </p>
+        <StockholmFooter />
       </div>
     </footer>
   )

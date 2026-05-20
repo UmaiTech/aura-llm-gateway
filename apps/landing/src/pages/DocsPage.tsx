@@ -6,6 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import mermaid from 'mermaid'
 import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
+import { StockholmFooter } from '../components/StockholmFooter'
 
 import {
   Callout,
@@ -701,6 +702,9 @@ export function DocsPage() {
                 {currentContent || ''}
               </ReactMarkdown>
             )}
+
+            <hr style={{ margin: 'var(--space-7) 0 var(--space-4) 0', border: 0, borderTop: '1px solid var(--rule)' }} />
+            <StockholmFooter />
           </div>
         </main>
       </div>

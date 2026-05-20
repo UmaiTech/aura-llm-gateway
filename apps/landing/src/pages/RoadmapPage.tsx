@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { StockholmFooter } from '../components/StockholmFooter'
 
 type Phase = 'shipped' | 'active' | 'planned' | 'considering'
 
@@ -390,6 +391,9 @@ export function RoadmapPage() {
         <p style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: '1.25rem', lineHeight: 1.4, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
           Help shape the roadmap. <a href="https://github.com/UmaiTech/aura-llm-gateway/issues" className="link">Open an issue</a> · <a href="https://github.com/UmaiTech/aura-llm-gateway/discussions" className="link">join discussions</a>.
         </p>
+
+        <hr style={{ margin: 'var(--space-7) 0 var(--space-4) 0' }} />
+        <StockholmFooter />
       </main>
     </div>
   )

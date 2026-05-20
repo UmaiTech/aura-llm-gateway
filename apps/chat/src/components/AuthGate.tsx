@@ -48,9 +48,39 @@ export function AuthGate({ children }: AuthGateProps) {
   }
 
   if (isPending) {
+    // Mirror the SignInScreen canvas + tokens so there's no visible
+    // jump from a black Tailwind loading screen into the editorial
+    // sign-in. Same background, same brand mark, mono "signing in…"
+    // label — what changes is just adding the rest of the page.
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <Loader2 className="h-6 w-6 animate-spin text-aura-400" />
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          background: 'var(--auth-canvas)',
+          color: 'var(--auth-ink)',
+          fontFamily: 'var(--auth-font-mono)',
+        }}
+      >
+        <img src="/playground/logo.svg" alt="" style={{ height: 40, width: 40 }} />
+        <Loader2
+          className="h-5 w-5 animate-spin"
+          style={{ color: 'var(--auth-accent-warm)' }}
+        />
+        <span
+          style={{
+            fontSize: '0.75rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--auth-ink-muted)',
+          }}
+        >
+          Signing in…
+        </span>
       </div>
     )
   }
@@ -336,7 +366,20 @@ function SignInScreen() {
           Made in Stockholm with{' '}
           <span aria-label="love" style={{ color: 'var(--auth-accent-warm)' }}>
             ❤
-          </span>
+          </span>{' '}
+          by{' '}
+          <a
+            href="https://www.umai-tech.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: 'var(--auth-ink)',
+              textDecoration: 'underline',
+              textUnderlineOffset: '0.2em',
+            }}
+          >
+            UmaiTech
+          </a>
         </span>
       </footer>
     </div>
