@@ -124,8 +124,10 @@ impl TogetherProvider {
                         role: match role {
                             Role::User => "user".to_string(),
                             Role::Assistant => "assistant".to_string(),
-                            Role::System => "system".to_string(),
                             Role::Tool => "tool".to_string(),
+                            Role::System => {
+                                unreachable!("System messages are filtered out earlier")
+                            }
                         },
                         content: Some(together_content),
                         tool_call_id: None,
