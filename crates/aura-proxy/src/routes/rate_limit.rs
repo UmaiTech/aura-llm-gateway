@@ -149,8 +149,8 @@ pub async fn rate_limit_middleware(
     //
     // Fail-open on Redis errors so we don't black out the gateway if
     // the limiter has a hiccup.
-    let is_response_creation = request.method() == axum::http::Method::POST
-        && request.uri().path() == "/v1/responses";
+    let is_response_creation =
+        request.method() == axum::http::Method::POST && request.uri().path() == "/v1/responses";
 
     let daily_result = if is_response_creation {
         if let Some(daily_limit) = auth.api_key.daily_message_limit {
