@@ -181,7 +181,7 @@ function HowItWorks() {
             maxWidth: '24ch',
           }}
         >
-          One API, three layers, seven providers.
+          One API, two layers, seven providers.
         </h2>
         <p
           style={{
@@ -192,9 +192,11 @@ function HowItWorks() {
             marginBottom: 'var(--space-5)',
           }}
         >
-          Every request flows through the same three layers — auth and cost
-          tracking, smart routing with failover, prompt compression — before
-          it hits the upstream provider. Hover any block to see what it does.
+          Every request flows through a middleware row — auth, rate
+          limits, response cache, compression, structured logging — and
+          a core that resolves the model, calculates the real cost, and
+          enriches the response before it leaves the gateway. Hover or
+          click any block to see what it does.
         </p>
         <GatewayDiagram />
       </div>
