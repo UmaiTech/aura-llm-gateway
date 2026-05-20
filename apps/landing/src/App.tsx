@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react'
+import { GatewayDiagram } from './components/GatewayDiagram'
 
 const heroCode = `curl -X POST http://localhost:8080/v1/responses \\
   -H 'Content-Type: application/json' \\
@@ -132,10 +133,72 @@ export default function App() {
     <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
       <Nav />
       <Hero />
+      <HowItWorks />
       <Sections />
       <ClosingNote />
       <Footer />
     </div>
+  )
+}
+
+/**
+ * Visual architecture section that sits between the hero and the
+ * numbered Sections. Replaces the static "9 feature cards" pattern
+ * the old landing used — same information density but readable in a
+ * glance, and the hover state lets visitors poke around rather than
+ * scroll past a wall of cards.
+ */
+function HowItWorks() {
+  return (
+    <section
+      style={{
+        padding: 'var(--space-7) var(--space-6) var(--space-6) var(--space-6)',
+        borderTop: '1px solid var(--rule)',
+      }}
+    >
+      <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.75rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--accent)',
+            display: 'block',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          § 00 — How it works
+        </span>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            marginBottom: 'var(--space-4)',
+            maxWidth: '24ch',
+          }}
+        >
+          One API, three layers, seven providers.
+        </h2>
+        <p
+          style={{
+            fontSize: '1rem',
+            lineHeight: 1.6,
+            color: 'var(--ink-muted)',
+            maxWidth: '52ch',
+            marginBottom: 'var(--space-5)',
+          }}
+        >
+          Every request flows through the same three layers — auth and cost
+          tracking, smart routing with failover, prompt compression — before
+          it hits the upstream provider. Hover any block to see what it does.
+        </p>
+        <GatewayDiagram />
+      </div>
+    </section>
   )
 }
 
@@ -187,11 +250,12 @@ function Hero() {
             maxWidth: '20ch',
           }}
         >
-          A <span style={{ color: 'var(--accent-warm)' }}>unified</span> LLM gateway, written like a foundry publishes a type specimen.
+          A <span style={{ color: 'var(--accent-warm)' }}>unified</span> LLM gateway. Written in Rust, made for production.
         </h1>
         <p style={{ fontSize: '1.0625rem', lineHeight: 1.6, color: 'var(--ink-muted)', maxWidth: '52ch', marginBottom: 'var(--space-6)' }}>
-          Route requests across seven providers behind one API. Built in Rust, open-sourced under MIT,
-          deployed with a single Helm command.
+          Route requests across seven providers behind one Open Responses API.
+          Built-in cost tracking, observability, and agentic workflow support —
+          deploy with a single Helm command.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-5)', borderTop: '1px solid var(--rule)', borderBottom: '1px solid var(--rule)', padding: 'var(--space-5) 0', marginBottom: 'var(--space-6)' }}>

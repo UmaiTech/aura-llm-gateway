@@ -77,25 +77,64 @@ const releases: Release[] = [
   },
   {
     version: 'v0.5.x',
-    phase: 'active',
-    title: 'Observability & SDK Parity',
-    subtitle: 'TypeScript SDK, distributed tracing, provider completions',
+    phase: 'shipped',
+    title: 'Hosted Demo & Provider Reach',
+    subtitle: 'api.aura-llm.dev live, new provider families',
     items: [
-      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
-      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
+      { label: 'Hosted demo gateway', note: 'api.aura-llm.dev on Fly.io' },
       { label: 'HF Classic Inference API', note: '#74' },
       { label: 'Bedrock Llama / Mistral / Titan families', note: '#73' },
       { label: 'Mistral FIM completions', note: '#75' },
-      { label: 'Hosted demo gateway at api.aura-llm.dev' },
     ],
     issueRefs: ['#73', '#74', '#75'],
+  },
+  {
+    version: 'v0.6–v0.7',
+    phase: 'shipped',
+    title: 'Playground Auth',
+    subtitle: 'GitHub OAuth, per-user gateway keys, server-side proxy',
+    items: [
+      { label: 'better-auth + GitHub OAuth on playground' },
+      { label: 'Auto-mint per-user gateway API key on first sign-in' },
+      { label: 'Server-side proxy', note: 'no API key ever in the browser' },
+      { label: 'playground_auth schema isolation' },
+      { label: 'Helm chart on ghcr.io', note: 'one-command k8s install' },
+    ],
+  },
+  {
+    version: 'v0.8.x',
+    phase: 'shipped',
+    title: 'Free Tier & Beta Funnel',
+    subtitle: 'Daily cap, model gating, managed-beta CTAs',
+    items: [
+      { label: 'Daily message cap', note: '20/day, atomic Redis counter' },
+      { label: 'Frontier models gated behind managed beta' },
+      { label: 'Beta-signup CTAs', note: '3 surfaces, source-attributed' },
+      { label: 'Rate-limit notice with one-click join' },
+      { label: 'Vercel Analytics on all apps' },
+    ],
+  },
+  {
+    version: 'v0.9.x',
+    phase: 'active',
+    title: 'Resilience & UX Polish',
+    subtitle: 'HA Postgres, quota chip, editorial redesign',
+    items: [
+      { label: 'Fly Postgres replica + repmgr failover' },
+      { label: 'Migrate retry-with-backoff', note: 'absorbs PG flap windows' },
+      { label: 'Daily-quota chip', note: 'persistent, with stale check' },
+      { label: 'Hard chat cutoff at 20', note: 'input disabled at the wall' },
+      { label: 'Editorial-minimal redesign', note: 'landing + docs + roadmap' },
+      { label: 'TypeScript SDK', note: 'matching Python feature set — in progress' },
+    ],
   },
   {
     version: 'v1.0',
     phase: 'planned',
     title: 'Stabilization',
-    subtitle: 'Enterprise security, HA deployment, 99.9% uptime',
+    subtitle: 'Enterprise security, observability, 99.9% uptime',
     items: [
+      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
       { label: 'Webhook callbacks for async response completion' },
       { label: 'Auto-updating pricing scraper' },
       { label: 'API key rotation' },
@@ -134,6 +173,28 @@ const phaseLabel = (phase: Phase): string => {
   }
 }
 
+/**
+ * Map a release entry's version string to a changelog URL.
+ *
+ * For specific shipped versions ("v0.4.x") we anchor into the
+ * version's CHANGELOG.md section. For multi-version entries
+ * ("v0.6–v0.7") there's no single anchor — link to the file root.
+ *
+ * GitHub auto-generates fragment anchors from headings as
+ * `#nnn---yyyy-mm-dd` for our git-cliff format. The release tag
+ * (`vX.Y.Z`) is more stable, so we use that instead — clicking
+ * lands on the Release notes for that tag.
+ */
+function changelogHref(version: string): string {
+  // Multi-version range — link to the file root
+  if (version.includes('–') || version === 'Future') {
+    return 'https://github.com/UmaiTech/aura-llm-gateway/blob/main/CHANGELOG.md'
+  }
+  // vX.Y.x — pick a representative recent tag in that minor
+  const minor = version.replace('v', '').replace('.x', '')
+  return `https://github.com/UmaiTech/aura-llm-gateway/releases?q=v${minor}`
+}
+
 export function RoadmapPage() {
   return (
     <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
@@ -142,8 +203,8 @@ export function RoadmapPage() {
           <Link to="/" aria-label="Aura LLM Gateway — home" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
             <img src="/logo-horizontal.svg" alt="Aura LLM Gateway" className="brand-wordmark" />
           </Link>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-            Roadmap · v0.5.x
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>
+            Roadmap · v0.9.x
           </span>
         </div>
       </nav>
@@ -165,9 +226,10 @@ export function RoadmapPage() {
             Building in public. Here's where we are.
           </h1>
           <p style={{ fontSize: '1.0625rem', lineHeight: 1.6, color: 'var(--ink-muted)', maxWidth: '56ch' }}>
-            Four versions shipped. Seven providers unified behind a single API.
-            Open-sourced, on PyPI, on GHCR, ready to deploy. This is what we've done —
-            and what comes next.
+            Nine versions shipped. Seven providers unified behind a single API.
+            Open-sourced, on PyPI, on GHCR, with a live hosted playground at{' '}
+            <a href="https://playground.aura-llm.dev" className="link">playground.aura-llm.dev</a>.
+            This is what we've built — and what comes next.
           </p>
         </header>
 
@@ -253,6 +315,32 @@ export function RoadmapPage() {
                 </li>
               ))}
             </ul>
+
+            {/* Per-release changelog link for shipped versions.
+                For multi-version entries (v0.6–v0.7) we link to the
+                CHANGELOG.md file itself; for single versions we
+                anchor into that section. "active" / "planned" /
+                "considering" don't get a link since there's nothing
+                shipped yet. */}
+            {release.phase === 'shipped' && (
+              <div
+                style={{
+                  marginTop: 'var(--space-3)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.8125rem',
+                  color: 'var(--ink-muted)',
+                }}
+              >
+                <a
+                  href={changelogHref(release.version)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link"
+                >
+                  Changelog →
+                </a>
+              </div>
+            )}
 
             {idx < releases.length - 1 && (
               <div style={{ textAlign: 'center', color: 'var(--ink-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', letterSpacing: '0.2em', marginTop: 'var(--space-6)' }}>
