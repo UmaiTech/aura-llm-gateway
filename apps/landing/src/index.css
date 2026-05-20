@@ -403,4 +403,51 @@ code {
   }
 }
 
+/* Docs layout — left rail + content */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-height: calc(100vh - 4rem);
+}
+.docs-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+}
+.docs-main {
+  min-width: 0;
+}
+.docs-mobile-toggle {
+  display: none;
+}
+.docs-mobile-backdrop {
+  display: none;
+}
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .docs-mobile-toggle {
+    display: inline-block;
+  }
+  .docs-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 18rem;
+    height: 100vh;
+    z-index: var(--z-modal);
+    transform: translateX(-100%);
+    transition: transform var(--motion-duration-base) var(--motion-ease);
+  }
+  .docs-sidebar.docs-sidebar-open {
+    transform: translateX(0);
+  }
+  .docs-mobile-backdrop {
+    display: block;
+  }
+}
+
 /* Hallmark · genre: editorial-minimal · design-system: design.md · designed-as-app */
