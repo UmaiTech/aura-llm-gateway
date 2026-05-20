@@ -39,16 +39,19 @@ function generateApiKey(): { key: string; keyId: string; keyHash: string } {
  *   - RATE_LIMIT_RPM: anti-burst, prevents 20+ requests/min from a
  *     loop. Rarely hit in normal chat.
  *   - DAILY_MESSAGE_LIMIT: the constraint that actually shapes
- *     organic usage. ~20 chat turns per UTC day; counter resets at
- *     00:00 UTC. This is the cap users hit and that drives them to
- *     the beta CTA.
+ *     organic usage. ~50 chat turns per UTC day; counter resets at
+ *     00:00 UTC. Started at 20 but bumped to 50 — at 20 a real
+ *     conversation (3-4 turns of back-and-forth, then a follow-up
+ *     thread or two) hit the wall faster than felt right. 50 lets
+ *     someone explore the playground meaningfully across a few
+ *     sessions without blowing past anti-abuse territory.
  *   - MONTHLY_TOKEN_LIMIT: hard ceiling for power users with long
  *     conversations. Combined with the daily message cap it acts as
  *     a second tripwire — short messages are gated by daily count,
  *     long ones by token usage.
  */
 const FREE_TIER_RATE_LIMIT_RPM = 5
-const FREE_TIER_DAILY_MESSAGE_LIMIT = 20
+const FREE_TIER_DAILY_MESSAGE_LIMIT = 50
 const FREE_TIER_MONTHLY_TOKEN_LIMIT = 50_000
 
 // Accept either a Web Request (Headers instance) or a Node-style
