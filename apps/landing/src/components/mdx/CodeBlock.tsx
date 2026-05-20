@@ -1,6 +1,4 @@
 import { useState, ReactNode } from 'react'
-import { clsx } from 'clsx'
-import { Check, Copy } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
@@ -20,7 +18,6 @@ export function CodeBlock({
   highlightLines = [],
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
-
   const code = children.trim()
 
   const handleCopy = async () => {
@@ -29,42 +26,39 @@ export function CodeBlock({
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const label = title || (language && language !== 'text' ? language : '')
+
   return (
-    <div className="my-4 rounded-lg overflow-hidden bg-[#0f172a] border border-gray-800">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900/50 border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          {title && (
-            <span className="text-sm text-gray-400 font-mono">{title}</span>
-          )}
-          {!title && language && (
-            <span className="text-xs text-gray-500 font-mono uppercase">{language}</span>
-          )}
-        </div>
+    <div className="code-block">
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        {label && (
+          <span className="code-block-label" style={{ marginBottom: 'var(--space-2)' }}>
+            {label}
+          </span>
+        )}
         <button
           onClick={handleCopy}
-          className={clsx(
-            'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
-            copied
-              ? 'text-green-400 bg-green-500/10'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'
-          )}
+          style={{
+            background: 'transparent',
+            border: 0,
+            cursor: 'pointer',
+            color: 'var(--ink-muted)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.75rem',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            padding: 0,
+            marginLeft: 'auto',
+            marginBottom: 'var(--space-2)',
+            textDecoration: 'underline',
+            textDecorationColor: 'var(--rule)',
+            textUnderlineOffset: '0.2em',
+          }}
+          aria-label={copied ? 'Copied' : 'Copy code'}
         >
-          {copied ? (
-            <>
-              <Check className="h-3.5 w-3.5" />
-              Copied!
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              Copy
-            </>
-          )}
+          {copied ? 'copied ✓' : 'copy ↗'}
         </button>
       </div>
-
-      {/* Code */}
       <SyntaxHighlighter
         language={language}
         style={vscDarkPlus}
@@ -73,9 +67,7 @@ export function CodeBlock({
         lineProps={(lineNumber) => {
           const style: React.CSSProperties = { display: 'block' }
           if (highlightLines.includes(lineNumber)) {
-            style.backgroundColor = 'rgba(99, 102, 241, 0.1)'
-            style.borderLeft = '2px solid #6366f1'
-            style.marginLeft = '-2px'
+            style.background = 'var(--code-highlight)'
           }
           return { style }
         }}
@@ -83,8 +75,8 @@ export function CodeBlock({
           margin: 0,
           borderRadius: 0,
           fontSize: '0.875rem',
-          background: 'transparent',
-          padding: '1rem',
+          background: 'var(--code-bg)',
+          padding: 'var(--space-4)',
         }}
       >
         {code}
@@ -93,15 +85,25 @@ export function CodeBlock({
   )
 }
 
-// Inline code component
 interface InlineCodeProps {
   children: ReactNode
 }
 
 export function InlineCode({ children }: InlineCodeProps) {
   return (
-    <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+    <code
+      style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: '0.875rem',
+        color: 'var(--ink)',
+        background: 'var(--canvas-elevated)',
+        padding: '1px 6px',
+        borderRadius: '2px',
+      }}
+    >
       {children}
     </code>
   )
 }
+
+/* Hallmark · genre: editorial-minimal · macrostructure: workbench · design-system: design.md · designed-as-app */

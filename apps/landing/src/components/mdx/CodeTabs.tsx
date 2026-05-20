@@ -1,5 +1,4 @@
 import { useState, ReactNode, Children, isValidElement } from 'react'
-import { clsx } from 'clsx'
 
 interface CodeTabProps {
   label: string
@@ -23,42 +22,42 @@ export function CodeTabs({ children, defaultTab = 0 }: CodeTabsProps) {
       isValidElement(child) && child.type === CodeTab
   )
 
-  if (tabs.length === 0) {
-    return null
-  }
+  if (tabs.length === 0) return null
 
   return (
-    <div className="my-6 rounded-lg overflow-hidden border border-gray-800 bg-[#0f172a]">
-      {/* Tab headers */}
-      <div className="flex border-b border-gray-800 bg-gray-900/50">
-        {tabs.map((tab, index) => (
-          <button
-            key={index}
-            onClick={() => setActiveTab(index)}
-            className={clsx(
-              'px-4 py-2 text-sm font-medium transition-colors relative',
-              activeTab === index
-                ? 'text-aura-400'
-                : 'text-gray-400 hover:text-white'
-            )}
-          >
-            {tab.props.label}
-            {activeTab === index && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-aura-500" />
-            )}
-          </button>
-        ))}
+    <div style={{ margin: 'var(--space-5) 0' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-4)', borderBottom: '1px solid var(--rule)', marginBottom: 'var(--space-3)' }}>
+        {tabs.map((tab, index) => {
+          const isActive = activeTab === index
+          return (
+            <button
+              key={index}
+              onClick={() => setActiveTab(index)}
+              style={{
+                background: 'transparent',
+                border: 0,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.75rem',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: isActive ? 'var(--ink)' : 'var(--ink-muted)',
+                padding: 'var(--space-2) 0',
+                marginBottom: '-1px',
+                borderBottom: isActive ? '1px solid var(--ink)' : '1px solid transparent',
+                transition: 'color var(--motion-duration-base) var(--motion-ease)',
+              }}
+            >
+              {tab.props.label}
+            </button>
+          )
+        })}
       </div>
-
-      {/* Tab content */}
-      <div className="[&>*]:my-0 [&>div>pre]:rounded-none [&>div>pre]:border-0">
-        {tabs[activeTab]}
-      </div>
+      <div>{tabs[activeTab]}</div>
     </div>
   )
 }
 
-// Language icons for visual appeal
 const languageLabels: Record<string, string> = {
   python: 'Python',
   typescript: 'TypeScript',
@@ -74,3 +73,5 @@ const languageLabels: Record<string, string> = {
 export function getLanguageLabel(lang: string): string {
   return languageLabels[lang.toLowerCase()] || lang
 }
+
+/* Hallmark · genre: editorial-minimal · macrostructure: workbench · design-system: design.md · designed-as-app */
