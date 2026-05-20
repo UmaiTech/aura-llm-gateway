@@ -226,9 +226,11 @@ async function runAgentLoop(
       instructions: systemPrompt,
       tools: tools.map((t) => ({
         type: 'function' as const,
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters,
+        function: {
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        },
       })),
       stream: true,
     }

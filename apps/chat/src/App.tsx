@@ -322,9 +322,11 @@ export default function App() {
           instructions: effectiveSystemPrompt,
           tools: activeTools.map((t) => ({
             type: 'function' as const,
-            name: t.name,
-            description: t.description,
-            parameters: t.parameters,
+            function: {
+              name: t.name,
+              description: t.description,
+              parameters: t.parameters,
+            },
           })),
           stream: true,
           ...(lastResponseId && { previous_response_id: lastResponseId }),
