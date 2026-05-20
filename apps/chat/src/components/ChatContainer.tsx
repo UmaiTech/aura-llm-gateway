@@ -4,6 +4,7 @@ import { ChatInput } from './ChatInput'
 import { WelcomeScreen } from './WelcomeScreen'
 import { RateLimitNotice } from './RateLimitNotice'
 import { RATE_LIMIT_SENTINEL } from '../hooks/useAgent'
+import { useQuotaStore } from '../stores/quotaStore'
 import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
 
 interface ChatContainerProps {
@@ -90,6 +91,14 @@ export function ChatContainer({
         )}
       </div>
 
+      {/* Persistent rate-limit banner when the user is exhausted. The
+          inline notice above only renders on a fresh 429 error; once
+          the user navigates or refreshes that error clears, but the
+          server-side cap is still in effect until midnight UTC. This
+          banner reads from quotaStore (persisted, fresh-checked) so
+          the wall stays visible across reloads. */}
+      <QuotaExhaustedBanner />
+
       {/* Input area */}
       <ChatInput
         onSendMessage={onSendMessage}
@@ -109,6 +118,38 @@ export function ChatContainer({
         compressionStrategy={compressionStrategy}
         onCompressionStrategyChange={onCompressionStrategyChange}
       />
+    </div>
+  )
+}
+
+/**
+ * Persistent rate-limit banner that renders above the chat input
+ * when the user's daily quota is exhausted. Unlike the inline error
+ * notice (which clears with the error state), this one is driven by
+ * the persisted quotaStore — so a refresh, new conversation, or new
+ * tab still shows the wall until the gateway hands fresh quota.
+ *
+ * Uses the existing RateLimitNotice component so the visual + the
+ * Join-the-beta CTA stay consistent across the two entry points.
+ */
+function QuotaExhaustedBanner() {
+  const exhausted = useQuotaStore((s) => s.isExhausted())
+  const resetInSeconds = useQuotaStore((s) => s.resetInSeconds)
+  const limit = useQuotaStore((s) => s.limit)
+
+  if (!exhausted) return null
+
+  const hours =
+    resetInSeconds !== null
+      ? Math.max(1, Math.ceil(resetInSeconds / 3600))
+      : null
+  const limitText = limit ?? 'your daily'
+  const resetText = hours !== null ? ` Resets in about ${hours}h.` : ''
+  const message = `You've used your ${limitText} free messages for today.${resetText}`
+
+  return (
+    <div className="px-4 pt-3">
+      <RateLimitNotice message={message} />
     </div>
   )
 }

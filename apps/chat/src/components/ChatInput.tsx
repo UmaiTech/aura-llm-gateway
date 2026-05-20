@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive, Lock } from 'lucide-react'
 import { cn } from '../lib/utils'
 import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
+import { useQuotaStore } from '../stores/quotaStore'
 import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES } from '../lib/types'
 
 interface ChatInputProps {
@@ -82,8 +83,20 @@ export function ChatInput({
     }
   }, [modelDropdownOpen, activeDropdown])
 
+  // Hard cutoff: when the user's daily quota is exhausted (server
+  // told us so on the last response or 429), block sends client-side
+  // instead of letting the user hit 429 again and again. Reads from
+  // quotaStore which is hydrated from response headers + persisted to
+  // localStorage so a refresh doesn't re-enable the input until the
+  // gateway grants fresh quota.
+  const quotaExhausted = useQuotaStore((s) => s.isExhausted())
+  const effectiveDisabled = disabled || quotaExhausted
+  const effectivePlaceholder = quotaExhausted
+    ? "You've used your daily free messages — join the beta for more."
+    : placeholder
+
   const handleSubmit = useCallback(async () => {
-    if (!input.trim() || isLoading || disabled) return
+    if (!input.trim() || isLoading || effectiveDisabled) return
 
     const message = input.trim()
     setInput('')
@@ -94,7 +107,7 @@ export function ChatInput({
     }
 
     await onSendMessage(message)
-  }, [input, isLoading, disabled, onSendMessage])
+  }, [input, isLoading, effectiveDisabled, onSendMessage])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -425,13 +438,14 @@ export function ChatInput({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={disabled}
+            placeholder={effectivePlaceholder}
+            disabled={effectiveDisabled}
             rows={1}
             className={cn(
               "flex-1 resize-none bg-transparent text-foreground placeholder:text-muted-foreground",
               "focus:outline-none text-sm leading-relaxed py-2",
-              "min-h-[40px] max-h-[200px]"
+              "min-h-[40px] max-h-[200px]",
+              quotaExhausted && "cursor-not-allowed"
             )}
           />
 
@@ -447,14 +461,18 @@ export function ChatInput({
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={!input.trim() || disabled}
+              disabled={!input.trim() || effectiveDisabled}
               className={cn(
                 "p-2.5 rounded-xl transition-colors",
-                input.trim() && !disabled
+                input.trim() && !effectiveDisabled
                   ? "bg-primary-500 text-white hover:bg-primary-600"
                   : "bg-secondary text-muted-foreground cursor-not-allowed"
               )}
-              title="Send message"
+              title={
+                quotaExhausted
+                  ? "Daily free-tier limit reached. Join the beta for more."
+                  : "Send message"
+              }
             >
               <Send className="h-4 w-4" />
             </button>

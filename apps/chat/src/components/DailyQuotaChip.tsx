@@ -28,8 +28,14 @@ import { useBetaSignup } from '../hooks/useBetaSignup'
 export function DailyQuotaChip() {
   const { limit, remaining } = useQuotaStore()
   const { signedUp, joining, join } = useBetaSignup()
+  // Subscribe via a selector so the chip re-renders when
+  // lastUpdatedAt flips fresh→stale (or vice versa). Reading
+  // isFresh() directly off the store would compute once on render
+  // and miss the change.
+  const fresh = useQuotaStore((s) => s.isFresh())
 
   const tone = useMemo(() => {
+    if (!fresh) return 'hidden'
     if (limit === null || remaining === null) return 'hidden'
     // limit <= 0 means "no daily cap on this key" (e.g. admin / pro
     // keys with NULL → 0 fallthrough from a future change). Show
@@ -45,7 +51,7 @@ export function DailyQuotaChip() {
     if (ratio > 0.5) return 'muted'
     if (ratio > 0.15) return 'amber'
     return 'red'
-  }, [limit, remaining])
+  }, [fresh, limit, remaining])
 
   if (tone === 'hidden') return null
   if (limit === null || remaining === null) return null
