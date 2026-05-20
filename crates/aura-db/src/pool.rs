@@ -56,6 +56,15 @@ impl PoolConfig {
         self.min_connections = min;
         self
     }
+
+    /// Set connect timeout in seconds. Useful for the migrate
+    /// subcommand which runs during Fly's release_command — at that
+    /// point the PG primary can be cycling and the default 10s isn't
+    /// always long enough.
+    pub fn connect_timeout(mut self, secs: u64) -> Self {
+        self.connect_timeout = secs;
+        self
+    }
 }
 
 /// Create a database connection pool

@@ -41,6 +41,7 @@ export default function App() {
     setConsistencyStrategy,
     compressionStrategy,
     setCompressionStrategy,
+    enabledTools,
     createConversation,
     selectConversation,
     deleteConversation,
@@ -305,11 +306,21 @@ export default function App() {
                 }]
               })
 
+        // Filter built-in tools by the user's selection in
+        // AgentToolsDialog. Convention: empty enabledTools = "all
+        // enabled by default" (which matches the original behavior
+        // before the dialog landed). Once the user touches any
+        // checkbox the list is authoritative.
+        const activeTools =
+          enabledTools.length === 0
+            ? BUILT_IN_TOOLS
+            : BUILT_IN_TOOLS.filter((t) => enabledTools.includes(t.name))
+
         const request = {
           model,
           input,
           instructions: effectiveSystemPrompt,
-          tools: BUILT_IN_TOOLS.map((t) => ({
+          tools: activeTools.map((t) => ({
             type: 'function' as const,
             name: t.name,
             description: t.description,
