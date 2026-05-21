@@ -38,7 +38,7 @@ export function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <img
-            src="/logo-glow.svg"
+            src={`${import.meta.env.BASE_URL}logo-glow.svg`}
             alt="Aura"
             className="h-24 w-24 mb-4"
           />
