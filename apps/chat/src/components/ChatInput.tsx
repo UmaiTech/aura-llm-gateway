@@ -272,8 +272,15 @@ export function ChatInput({
                       )}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className={cn("font-medium", strategy.id === validationStrategy && "text-green-400")}>
-                          {strategy.name}
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn("font-medium", strategy.id === validationStrategy && "text-green-400")}>
+                            {strategy.name}
+                          </span>
+                          {strategy.preview && (
+                            <span className="text-[10px] font-mono uppercase tracking-wide text-muted-foreground bg-muted px-1 py-0.5 rounded">
+                              preview
+                            </span>
+                          )}
                         </div>
                         <div className="text-muted-foreground truncate">{strategy.description}</div>
                       </div>

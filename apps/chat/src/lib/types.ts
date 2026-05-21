@@ -258,12 +258,43 @@ export interface ValidationMetadata {
   warning?: string
 }
 
-export const VALIDATION_STRATEGIES: { id: ValidationStrategy; name: string; description: string }[] = [
+// Validation strategies — IMPORTANT: only `none` currently runs in
+// the gateway. The other four are wired through the request body and
+// logged on receipt, but no validation logic consumes them yet.
+// Marked `preview: true` so the chat UI can render a `(preview)` chip
+// rather than implying the option is live. Drop the flag once the
+// gateway-side validator lands.
+export const VALIDATION_STRATEGIES: {
+  id: ValidationStrategy
+  name: string
+  description: string
+  preview?: boolean
+}[] = [
   { id: 'none', name: 'None', description: 'No validation (fastest)' },
-  { id: 'logprobs', name: 'Log Probabilities', description: 'Use token logprobs for confidence (OpenAI only)' },
-  { id: 'best_of_n', name: 'Best of N', description: 'Generate N responses, select best' },
-  { id: 'self_consistency', name: 'Self-Consistency', description: 'Generate N responses, pick most consistent' },
-  { id: 'confidence_threshold', name: 'Confidence Threshold', description: 'Reject responses below threshold' },
+  {
+    id: 'logprobs',
+    name: 'Log Probabilities',
+    description: 'Use token logprobs for confidence (OpenAI only)',
+    preview: true,
+  },
+  {
+    id: 'best_of_n',
+    name: 'Best of N',
+    description: 'Generate N responses, select best',
+    preview: true,
+  },
+  {
+    id: 'self_consistency',
+    name: 'Self-Consistency',
+    description: 'Generate N responses, pick most consistent',
+    preview: true,
+  },
+  {
+    id: 'confidence_threshold',
+    name: 'Confidence Threshold',
+    description: 'Reject responses below threshold',
+    preview: true,
+  },
 ]
 
 export const SELECTION_CRITERIA: { id: SelectionCriteria; name: string }[] = [
