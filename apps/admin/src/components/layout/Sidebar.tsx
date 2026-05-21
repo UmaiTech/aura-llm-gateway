@@ -87,7 +87,7 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b px-4">
           <NavLink to="/" className="flex items-center gap-3">
             <img
-              src="/favicon.svg"
+              src={`${import.meta.env.BASE_URL}favicon.svg`}
               alt="Aura"
               className="h-9 w-9 rounded-lg"
             />
