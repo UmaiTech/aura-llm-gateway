@@ -12,9 +12,12 @@ import {
   Refresh1Line,
 } from '@mingcute/react'
 import { getEndUsers } from '@/lib/api'
+import { useOrgFilterStore } from '@/stores/orgFilterStore'
+import { OrgFilter } from '@/components/OrgFilter'
 import type { EndUserSummary } from '@/lib/types'
 
 export function EndUsersPage() {
+  const selectedOrgId = useOrgFilterStore((s) => s.selectedOrgId)
   const [searchQuery, setSearchQuery] = useState('')
   const [orgFilter, setOrgFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all')
@@ -27,7 +30,7 @@ export function EndUsersPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await getEndUsers()
+      const data = await getEndUsers(selectedOrgId)
       setUsers(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch users')
@@ -36,9 +39,14 @@ export function EndUsersPage() {
     }
   }
 
+  // Re-fetch when the header org filter changes. The in-page
+  // `orgFilter` select (by organization_name) is a separate client-
+  // side narrowing — keeping it complementary instead of replacing
+  // it avoids ripping out a feature in the same PR.
   useEffect(() => {
     fetchUsers()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrgId])
 
   const organizations = [...new Set(users.map((u) => u.organization_name))]
 
@@ -115,10 +123,13 @@ export function EndUsersPage() {
         title="End Users"
         description="Track and manage your customers' usage"
         actions={
-          <Button variant="outline" size="sm" onClick={fetchUsers}>
-            <Refresh1Line className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex gap-2 items-center">
+            <OrgFilter />
+            <Button variant="outline" size="sm" onClick={fetchUsers}>
+              <Refresh1Line className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         }
       />
 

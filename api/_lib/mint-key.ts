@@ -1,6 +1,21 @@
 /**
  * Mint a gateway API key for a freshly-authenticated playground user.
  *
+ * SCOPE: This module is playground-only. It runs from the Vercel
+ * /api/auth/* functions after a successful GitHub OAuth callback on
+ * playground.aura-llm.dev, and writes to:
+ *   - public.api_keys                — with organization_id pointing at
+ *                                       the Playground (Demo) org
+ *                                       (see migration 021)
+ *   - playground_auth.user_api_key   — playground-only link table
+ *
+ * It does NOT run for normal org/key provisioning. Customer orgs and
+ * their keys are created via the gateway's regular admin endpoints
+ * (POST /v1/organizations, POST /v1/api-keys) — those flows are
+ * untouched by this code path. The migration's backfill UPDATE is
+ * likewise scoped via a join on playground_auth.user_api_key, so non-
+ * playground keys keep whatever organization_id they already had.
+ *
  * Called from the GitHub OAuth callback handler. Idempotent — if the user
  * already has a key in playground_auth.user_api_key, this is a no-op.
  *
@@ -10,6 +25,15 @@
  * trying to bootstrap. Chicken-and-egg. We instead write directly to
  * public.api_keys + playground_auth.user_api_key in a transaction, using
  * the same hashing convention the gateway uses.
+ *
+ * KNOWN LIMITATION: per-user breakdowns in the admin's End Users view
+ * will be empty for the Playground org until the playground proxy
+ * starts forwarding a `user` field on LLM requests. The gateway only
+ * creates `end_users` rows when a request body carries `user: "..."`
+ * (see crates/aura-proxy/src/main.rs:813), and api/proxy/[...path].ts
+ * doesn't currently inject one. The Organizations page still shows
+ * accurate api_key / token / cost / request totals — those come from
+ * api_keys joins.
  */
 
 import { createHash, randomBytes } from 'node:crypto'
