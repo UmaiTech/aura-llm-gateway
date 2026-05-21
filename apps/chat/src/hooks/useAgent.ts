@@ -183,6 +183,15 @@ async function runAgentLoop(
 ): Promise<void> {
   let currentMessages = [...messages]
   let roundtrip = 0
+  // Chain response ids across tool roundtrips. Without this, the
+  // Anthropic adapter sees a `tool_result` block with no matching
+  // `tool_use` in the previous message and 422s with:
+  //   "unexpected tool_use_id found in tool_result blocks ...
+  //    Each tool_result block must have a corresponding tool_use
+  //    block in the previous message."
+  // Same bug + same fix as App.tsx's main chat loop; useAgent was
+  // missing the threading entirely.
+  let lastResponseId: string | undefined
 
   while (roundtrip < maxRoundtrips) {
     roundtrip++
@@ -235,6 +244,11 @@ async function runAgentLoop(
         },
       })),
       stream: true,
+      // Carry the previous response forward so the gateway can
+      // rebuild the conversation context (including any tool_use
+      // blocks emitted in the prior turn). Required for Anthropic
+      // tool roundtrips.
+      ...(lastResponseId && { previous_response_id: lastResponseId }),
     }
 
     // Make streaming request
@@ -356,6 +370,14 @@ async function runAgentLoop(
 
               // Handle completed response
               if (event.type === 'response.completed' && event.response) {
+                // Capture the response id so the NEXT roundtrip's
+                // request can carry it forward as previous_response_id.
+                // See the lastResponseId declaration above for why
+                // this matters (Anthropic tool_use/tool_result pair).
+                if (event.response.id) {
+                  lastResponseId = event.response.id
+                }
+
                 // Extract any function calls from the completed response
                 if (event.response.output) {
                   for (const item of event.response.output) {
