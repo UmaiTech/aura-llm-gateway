@@ -263,8 +263,7 @@ code {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary via-aura-400 to-aura-500 bg-clip-text text-transparent;
-  }
+  /* `.gradient-text` removed in 2026-05-21 polish pass — see
+     docs/design-audit/AUDIT.md item L1. Use plain text colour +
+     `font-display` Fraunces for accent. */
 }

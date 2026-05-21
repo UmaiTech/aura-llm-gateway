@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -17,8 +17,11 @@ const buttonVariants = cva(
           'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
+        // `gradient` is the legacy variant name; kept for compat but
+        // now ships a solid aura-500 fill (audit L15: one accent only,
+        // no two-stop gradient). New buttons should use `default`.
         gradient:
-          'bg-gradient-to-r from-aura-500 to-indigo-500 text-white shadow-lg hover:shadow-glow active:scale-[0.98]',
+          'bg-aura-500 text-white shadow-sm hover:bg-aura-400 active:scale-[0.98]',
       },
       size: {
         default: 'h-10 px-4 py-2',

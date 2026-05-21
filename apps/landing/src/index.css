@@ -19,9 +19,9 @@
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
-           bg-gradient-to-r from-aura-500 to-primary-500 text-white
-           hover:from-aura-400 hover:to-primary-400
-           transition-all duration-200 shadow-lg shadow-aura-500/25
+           bg-aura-500 text-white
+           hover:bg-aura-400
+           transition-colors duration-200 shadow-lg shadow-aura-500/25
            hover:shadow-xl hover:shadow-aura-500/30;
   }
 
@@ -29,7 +29,7 @@
     @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
            bg-gray-800 text-gray-100 border border-gray-700
            hover:bg-gray-700 hover:border-gray-600
-           transition-all duration-200;
+           transition-colors duration-200;
   }
 
   .card {
@@ -37,9 +37,10 @@
            backdrop-blur-sm hover:border-gray-700 transition-colors;
   }
 
-  .gradient-text {
-    @apply bg-gradient-to-r from-aura-400 to-primary-400 bg-clip-text text-transparent;
-  }
+  /* `.gradient-text` removed in 2026-05-21 polish pass — replaced
+     with mono-tone headlines + the new `font-display` Fraunces serif.
+     See docs/design-audit/AUDIT.md item L1. If you need an accent on
+     a number/wordmark, use `text-aura-400` directly. */
 }
 
 /* Code block styling */

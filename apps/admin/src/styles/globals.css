@@ -130,23 +130,17 @@
     @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
   }
 
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-aura-400 via-indigo-400 to-indigo-500 bg-clip-text text-transparent;
-  }
-
-  /* Gradient background */
-  .gradient-bg {
-    @apply bg-gradient-to-br from-aura-500/10 via-indigo-500/10 to-transparent;
-  }
+  /* `.gradient-text` and `.gradient-bg` removed in 2026-05-21
+     polish pass. Use `font-display` Fraunces + a single accent
+     colour for emphasis. See docs/design-audit/AUDIT.md item L1. */
 
   /* Stats card */
   .stats-card {
-    @apply relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-200 hover:shadow-premium;
+    @apply relative overflow-hidden rounded-xl border bg-card p-6 transition-colors duration-200 hover:shadow-premium;
   }
 
   .stats-card::before {
-    @apply absolute inset-0 bg-gradient-to-br from-aura-500/5 to-transparent opacity-0 transition-opacity duration-200;
+    @apply absolute inset-0 bg-aura-500/[0.03] opacity-0 transition-opacity duration-200;
     content: '';
   }
 
@@ -156,7 +150,7 @@
 
   /* Sidebar styles */
   .sidebar-item {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150;
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150;
     @apply text-muted-foreground hover:text-foreground hover:bg-accent;
   }
 

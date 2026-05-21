@@ -29,6 +29,11 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        // Display serif for top-level headlines only (h1, marketing
+        // hero h2). Pairing Fraunces with Inter follows the
+        // editorial-minimal direction in docs/design-audit/REDESIGN.md.
+        // Apply via `font-display` — don't replace `font-sans` defaults.
+        display: ['Fraunces', 'Georgia', 'serif'],
       },
     },
   },

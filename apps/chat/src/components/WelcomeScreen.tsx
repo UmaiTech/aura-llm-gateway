@@ -35,12 +35,12 @@ export function WelcomeScreen({ model, onSendMessage }: WelcomeScreenProps) {
       {/* Logo and title */}
       <div className="flex flex-col items-center mb-12">
         <img src="/logo.svg" alt="Aura" className="h-20 w-20 logo-pulse mb-6" />
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text mb-2">
+        <h1 className="font-display text-3xl font-semibold tracking-tight mb-2">
           Welcome to Aura
         </h1>
         <p className="text-muted-foreground text-center max-w-md">
-          Your unified gateway to LLM models.   <br /> Currently using{' '}
-          <span className="gradient-text font-semibold">{model.name}</span>.
+          Your unified gateway to LLM models. <br /> Currently using{' '}
+          <span className="font-mono text-foreground">{model.name}</span>.
         </p>
       </div>
 
