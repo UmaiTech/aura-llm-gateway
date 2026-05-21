@@ -13,9 +13,12 @@ import {
   Refresh1Line,
 } from '@mingcute/react'
 import { getApiKeys } from '@/lib/api'
+import { useOrgFilterStore } from '@/stores/orgFilterStore'
+import { OrgFilter } from '@/components/OrgFilter'
 import type { ApiKeySummary } from '@/lib/types'
 
 export function KeysPage() {
+  const selectedOrgId = useOrgFilterStore((s) => s.selectedOrgId)
   const [keys, setKeys] = useState<ApiKeySummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +34,7 @@ export function KeysPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await getApiKeys()
+      const data = await getApiKeys(selectedOrgId)
       setKeys(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch API keys')
@@ -40,9 +43,12 @@ export function KeysPage() {
     }
   }
 
+  // Re-fetch when org filter changes — same loading state, no flicker
+  // beyond what we already show on page load.
   useEffect(() => {
     fetchKeys()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrgId])
 
   useEffect(() => {
     if (tableRef.current && !loading) {
@@ -126,7 +132,8 @@ export function KeysPage() {
         title="API Keys"
         description="Manage your gateway API keys"
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <OrgFilter />
             <Button variant="outline" size="sm" onClick={fetchKeys}>
               <Refresh1Line className="h-4 w-4 mr-2" />
               Refresh

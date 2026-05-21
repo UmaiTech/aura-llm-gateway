@@ -129,14 +129,26 @@ export async function getTeams(): Promise<TeamSummary[]> {
   return fetchApi<TeamSummary[]>('/admin/teams')
 }
 
-// API Keys
-export async function getApiKeys(): Promise<ApiKeySummary[]> {
-  return fetchApi<ApiKeySummary[]>('/admin/api-keys')
+// API Keys. Pass an organizationId to scope the result to one org —
+// useful for monitoring the Playground (Demo) org separately from
+// real customer keys.
+export async function getApiKeys(
+  organizationId?: string | null,
+): Promise<ApiKeySummary[]> {
+  const query = organizationId
+    ? `?organization_id=${encodeURIComponent(organizationId)}`
+    : ''
+  return fetchApi<ApiKeySummary[]>(`/admin/api-keys${query}`)
 }
 
-// End Users
-export async function getEndUsers(): Promise<EndUserSummary[]> {
-  return fetchApi<EndUserSummary[]>('/admin/end-users')
+// End Users. Same org filter shape as getApiKeys.
+export async function getEndUsers(
+  organizationId?: string | null,
+): Promise<EndUserSummary[]> {
+  const query = organizationId
+    ? `?organization_id=${encodeURIComponent(organizationId)}`
+    : ''
+  return fetchApi<EndUserSummary[]>(`/admin/end-users${query}`)
 }
 
 // Providers (detailed view)

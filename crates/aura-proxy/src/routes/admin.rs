@@ -348,6 +348,14 @@ pub struct LogsQuery {
     pub offset: Option<i32>,
 }
 
+/// Optional `?organization_id=<uuid>` filter used by list_api_keys and
+/// list_end_users. Absent param = no filter (show all orgs). Invalid
+/// UUID = serde rejection at deserialize time, surfaces as a 400.
+#[derive(Debug, Deserialize)]
+pub struct OrgFilterQuery {
+    pub organization_id: Option<Uuid>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PeriodQuery {
     pub period: Option<String>, // 24h, 2d, 3d, 4d, 5d, 6d, 7d
@@ -1043,22 +1051,31 @@ async fn list_teams(
 
 async fn list_api_keys(
     State(state): State<AppState>,
+    Query(filter): Query<OrgFilterQuery>,
 ) -> Result<Json<Vec<ApiKeySummary>>, (StatusCode, Json<serde_json::Value>)> {
     let pool = match state.db_pool() {
         Some(p) => p,
         None => return Err(db_unavailable()),
     };
 
-    let rows = sqlx::query(r#"SELECT * FROM v_api_key_stats LIMIT 100"#)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch API keys: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
-            )
-        })?;
+    // The NULL-or-equal pattern lets us run one query regardless of
+    // whether the caller filtered. Avoids two parallel SQL strings and
+    // keeps the LIMIT in one place.
+    let rows = sqlx::query(
+        r#"SELECT * FROM v_api_key_stats
+            WHERE ($1::uuid IS NULL OR organization_id = $1::uuid)
+            LIMIT 100"#,
+    )
+    .bind(filter.organization_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch API keys: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
 
     let keys: Vec<ApiKeySummary> = rows
         .iter()
@@ -1089,22 +1106,28 @@ async fn list_api_keys(
 
 async fn list_end_users(
     State(state): State<AppState>,
+    Query(filter): Query<OrgFilterQuery>,
 ) -> Result<Json<Vec<EndUserSummary>>, (StatusCode, Json<serde_json::Value>)> {
     let pool = match state.db_pool() {
         Some(p) => p,
         None => return Err(db_unavailable()),
     };
 
-    let rows = sqlx::query(r#"SELECT * FROM v_end_users LIMIT 100"#)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to fetch end users: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
-            )
-        })?;
+    let rows = sqlx::query(
+        r#"SELECT * FROM v_end_users
+            WHERE ($1::uuid IS NULL OR organization_id = $1::uuid)
+            LIMIT 100"#,
+    )
+    .bind(filter.organization_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch end users: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
 
     let users: Vec<EndUserSummary> = rows
         .iter()
