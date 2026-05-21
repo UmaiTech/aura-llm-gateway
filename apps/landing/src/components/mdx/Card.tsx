@@ -1,41 +1,35 @@
-import { ReactNode } from 'react'
-import { clsx } from 'clsx'
-import { LucideIcon } from 'lucide-react'
+import { ReactNode, Children, isValidElement } from 'react'
 
 interface CardProps {
   title: string
   children: ReactNode
-  icon?: LucideIcon
   href?: string
 }
 
-export function Card({ title, children, icon: Icon, href }: CardProps) {
+export function Card({ title, children, href }: CardProps) {
   const content = (
-    <div
-      className={clsx(
-        'p-5 rounded-lg border border-gray-800 bg-gray-900/50',
-        href && 'hover:border-aura-500/50 hover:bg-gray-800/50 transition-colors cursor-pointer'
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {Icon && (
-          <div className="p-2 rounded-lg bg-aura-500/10">
-            <Icon className="h-5 w-5 text-aura-400" />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
-          <div className="text-gray-400 text-sm [&>p]:mb-0">
-            {children}
-          </div>
-        </div>
+    <div style={{ display: 'block' }}>
+      <h3
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 500,
+          fontSize: '1.125rem',
+          color: 'var(--ink)',
+          margin: '0 0 var(--space-2) 0',
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {title}
+      </h3>
+      <div style={{ color: 'var(--ink-muted)', fontSize: '0.9375rem', lineHeight: 1.55 }}>
+        {children}
       </div>
     </div>
   )
 
   if (href) {
     return (
-      <a href={href} className="block no-underline">
+      <a href={href} className="link" style={{ textDecoration: 'none' }}>
         {content}
       </a>
     )
@@ -46,20 +40,64 @@ export function Card({ title, children, icon: Icon, href }: CardProps) {
 
 interface CardGridProps {
   children: ReactNode
+  /**
+   * Layout. Default is `stack` (single column). `asymmetric` lays out two
+   * columns at a 60/40 ratio. Equal-column grids (3-up tiles) are not part
+   * of the design system.
+   *
+   * The legacy `cols` prop is accepted for backwards compatibility but is
+   * coerced: `cols={1}` → stack; `cols={2}` or `cols={3}` → asymmetric.
+   */
+  columns?: 'stack' | 'asymmetric'
   cols?: 1 | 2 | 3
 }
 
-export function CardGrid({ children, cols = 2 }: CardGridProps) {
+export function CardGrid({ children, columns, cols }: CardGridProps) {
+  const layout: 'stack' | 'asymmetric' =
+    columns ?? (cols && cols > 1 ? 'asymmetric' : 'stack')
+
+  const items = Children.toArray(children).filter(isValidElement)
+
   return (
     <div
-      className={clsx(
-        'my-6 grid gap-4',
-        cols === 1 && 'grid-cols-1',
-        cols === 2 && 'grid-cols-1 md:grid-cols-2',
-        cols === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-      )}
+      style={{
+        margin: 'var(--space-5) 0',
+        display: 'grid',
+        gap: 'var(--space-5)',
+        gridTemplateColumns: layout === 'asymmetric' ? 'minmax(0, 3fr) minmax(0, 2fr)' : 'minmax(0, 1fr)',
+      }}
     >
-      {children}
+      {items.map((child, idx) => (
+        <div
+          key={idx}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'var(--space-6) 1fr',
+            gap: 'var(--space-3)',
+            paddingTop: 'var(--space-3)',
+            borderTop: idx === 0 ? '1px solid var(--rule)' : 'none',
+            paddingBottom: 'var(--space-3)',
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.8125rem',
+              color: 'var(--ink-muted)',
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {String(idx + 1).padStart(2, '0')}.
+          </span>
+          <div style={{ borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-3)' }}>
+            {child}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
+
+/* Hallmark · genre: editorial-minimal · macrostructure: workbench · design-system: design.md · designed-as-app */

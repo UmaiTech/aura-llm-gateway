@@ -1,5 +1,5 @@
-import { Check, Clock, Rocket, Sparkles, Github, MessageSquare, ArrowLeft, Map } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { StockholmFooter } from '../components/StockholmFooter'
 
 type Phase = 'shipped' | 'active' | 'planned' | 'considering'
 
@@ -73,30 +73,69 @@ const releases: Release[] = [
       { label: 'Python SDK published on PyPI', note: 'trusted publishing via OIDC' },
       { label: 'aura-llm.dev launched', note: 'landing, docs, roadmap, playground subdomains' },
       { label: 'Chat playground deployed' },
-      { label: '9-feature landing page with full capability map' },
+      { label: 'Landing page with full capability map' },
     ],
   },
   {
     version: 'v0.5.x',
-    phase: 'active',
-    title: 'Observability & SDK Parity',
-    subtitle: 'TypeScript SDK, distributed tracing, provider completions',
+    phase: 'shipped',
+    title: 'Hosted Demo & Provider Reach',
+    subtitle: 'api.aura-llm.dev live, new provider families',
     items: [
-      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
-      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
+      { label: 'Hosted demo gateway', note: 'api.aura-llm.dev on Fly.io' },
       { label: 'HF Classic Inference API', note: '#74' },
       { label: 'Bedrock Llama / Mistral / Titan families', note: '#73' },
       { label: 'Mistral FIM completions', note: '#75' },
-      { label: 'Hosted demo gateway at api.aura-llm.dev' },
     ],
     issueRefs: ['#73', '#74', '#75'],
+  },
+  {
+    version: 'v0.6–v0.7',
+    phase: 'shipped',
+    title: 'Playground Auth',
+    subtitle: 'GitHub OAuth, per-user gateway keys, server-side proxy',
+    items: [
+      { label: 'better-auth + GitHub OAuth on playground' },
+      { label: 'Auto-mint per-user gateway API key on first sign-in' },
+      { label: 'Server-side proxy', note: 'no API key ever in the browser' },
+      { label: 'playground_auth schema isolation' },
+      { label: 'Helm chart on ghcr.io', note: 'one-command k8s install' },
+    ],
+  },
+  {
+    version: 'v0.8.x',
+    phase: 'shipped',
+    title: 'Free Tier & Beta Funnel',
+    subtitle: 'Daily cap, model gating, managed-beta CTAs',
+    items: [
+      { label: 'Daily message cap', note: '20/day, atomic Redis counter' },
+      { label: 'Frontier models gated behind managed beta' },
+      { label: 'Beta-signup CTAs', note: '3 surfaces, source-attributed' },
+      { label: 'Rate-limit notice with one-click join' },
+      { label: 'Vercel Analytics on all apps' },
+    ],
+  },
+  {
+    version: 'v0.9.x',
+    phase: 'active',
+    title: 'Resilience & UX Polish',
+    subtitle: 'HA Postgres, quota chip, editorial redesign',
+    items: [
+      { label: 'Fly Postgres replica + repmgr failover' },
+      { label: 'Migrate retry-with-backoff', note: 'absorbs PG flap windows' },
+      { label: 'Daily-quota chip', note: 'persistent, with stale check' },
+      { label: 'Hard chat cutoff at 20', note: 'input disabled at the wall' },
+      { label: 'Editorial-minimal redesign', note: 'landing + docs + roadmap' },
+      { label: 'TypeScript SDK', note: 'matching Python feature set — in progress' },
+    ],
   },
   {
     version: 'v1.0',
     phase: 'planned',
     title: 'Stabilization',
-    subtitle: 'Enterprise security, HA deployment, 99.9% uptime',
+    subtitle: 'Enterprise security, observability, 99.9% uptime',
     items: [
+      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
       { label: 'Webhook callbacks for async response completion' },
       { label: 'Auto-updating pricing scraper' },
       { label: 'API key rotation' },
@@ -122,256 +161,242 @@ const releases: Release[] = [
   },
 ]
 
-const phaseConfig = {
-  shipped: {
-    icon: Check,
-    iconBg: 'bg-green-500/15',
-    iconBorder: 'border-green-500/30',
-    iconColor: 'text-green-400',
-    nodeBg: 'bg-green-500',
-    cardBorder: 'border-gray-800',
-    cardBg: 'bg-gray-900/40',
-    versionColor: 'text-green-400',
-    label: 'Shipped',
-    labelColor: 'text-green-400 bg-green-500/10 border-green-500/20',
-    opacity: 'opacity-100',
-  },
-  active: {
-    icon: Clock,
-    iconBg: 'bg-primary-500/15',
-    iconBorder: 'border-primary-500/30',
-    iconColor: 'text-primary-400',
-    nodeBg: 'bg-primary-500',
-    cardBorder: 'border-primary-500/40',
-    cardBg: 'bg-gray-900/60',
-    versionColor: 'text-primary-400',
-    label: 'In Progress',
-    labelColor: 'text-primary-400 bg-primary-500/10 border-primary-500/20',
-    opacity: 'opacity-100',
-  },
-  planned: {
-    icon: Rocket,
-    iconBg: 'bg-gray-700/40',
-    iconBorder: 'border-gray-600/40',
-    iconColor: 'text-gray-400',
-    nodeBg: 'bg-gray-600',
-    cardBorder: 'border-gray-700/50',
-    cardBg: 'bg-gray-900/20',
-    versionColor: 'text-gray-400',
-    label: 'Planned',
-    labelColor: 'text-gray-400 bg-gray-700/20 border-gray-600/20',
-    opacity: 'opacity-80',
-  },
-  considering: {
-    icon: Sparkles,
-    iconBg: 'bg-gray-800/40',
-    iconBorder: 'border-gray-700/30',
-    iconColor: 'text-gray-600',
-    nodeBg: 'bg-gray-700',
-    cardBorder: 'border-gray-800/40',
-    cardBg: 'bg-gray-900/10',
-    versionColor: 'text-gray-600',
-    label: 'Considering',
-    labelColor: 'text-gray-600 bg-gray-800/30 border-gray-700/20',
-    opacity: 'opacity-60',
-  },
+const phaseLabel = (phase: Phase): string => {
+  switch (phase) {
+    case 'shipped':
+      return 'shipped'
+    case 'active':
+      return 'in progress'
+    case 'planned':
+      return 'planned'
+    case 'considering':
+      return 'considering'
+  }
 }
 
-function TimelineNode({ phase, isLast }: { phase: Phase; isLast: boolean }) {
-  const cfg = phaseConfig[phase]
-  return (
-    <div className="flex flex-col items-center">
-      <div
-        className={`
-          relative h-3 w-3 rounded-full flex-shrink-0
-          ${cfg.nodeBg}
-          ${phase === 'active' ? 'shadow-[0_0_12px_3px_rgba(99,102,241,0.4)]' : ''}
-        `}
-      >
-        {phase === 'active' && (
-          <span className="absolute inset-0 rounded-full animate-ping bg-primary-500 opacity-30" />
-        )}
-      </div>
-      {!isLast && (
-        <div
-          className={`
-            w-px flex-1 min-h-8
-            ${phase === 'shipped' ? 'bg-gradient-to-b from-green-500/40 to-gray-700/40' : 'bg-gray-800'}
-          `}
-        />
-      )}
-    </div>
-  )
+/**
+ * Map a release entry's version string to a stable changelog URL.
+ *
+ * Strategy: link to the most-recent tagged GitHub Release in each
+ * minor, which lands on the Release notes page for that tag. The
+ * `?q=` filter on the Releases index doesn't work the way I
+ * assumed — it does substring search on release *names*, not
+ * `tag_name`, and returns a noisy filtered list. Direct tag URLs
+ * are stable and shareable.
+ *
+ * For multi-minor ranges (e.g. "v0.6–v0.7") and "Future", link to
+ * the full CHANGELOG.md.
+ */
+const LATEST_TAG_PER_MINOR: Record<string, string> = {
+  // Update when a new patch ships. Cheap to maintain manually since
+  // releases land via release-plz.
+  'v0.1.x': 'v0.1.7',
+  'v0.2.x': 'v0.2.8',
+  'v0.3.x': 'v0.3.2',
+  'v0.4.x': 'v0.4.2',
+  'v0.5.x': 'v0.5.4',
+  'v0.8.x': 'v0.8.4',
+  'v0.9.x': 'v0.9.1',
 }
 
-function ReleaseCard({ release }: { release: Release }) {
-  const cfg = phaseConfig[release.phase]
-  const Icon = cfg.icon
-
-  return (
-    <div className={`${cfg.opacity} group`}>
-      <div
-        className={`
-          rounded-xl border p-5 sm:p-6 transition-all duration-200
-          ${cfg.cardBg} ${cfg.cardBorder}
-          ${release.phase === 'active' ? 'shadow-[0_0_30px_-5px_rgba(99,102,241,0.2)]' : ''}
-          hover:border-gray-600/60
-        `}
-      >
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 border ${cfg.iconBg} ${cfg.iconBorder}`}>
-              <Icon className={`h-4.5 w-4.5 ${cfg.iconColor}`} style={{ height: '1.125rem', width: '1.125rem' }} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`font-mono text-sm font-semibold ${cfg.versionColor}`}>
-                  {release.version}
-                </span>
-                {release.phase === 'shipped' && (
-                  <span className="font-mono text-xs text-gray-600">—</span>
-                )}
-                <h2 className="font-semibold text-white text-base">{release.title}</h2>
-              </div>
-              <p className="text-sm text-gray-500 mt-0.5">{release.subtitle}</p>
-            </div>
-          </div>
-          <span className={`hidden sm:inline-flex flex-shrink-0 text-xs font-medium px-2 py-1 rounded-full border ${cfg.labelColor}`}>
-            {cfg.label}
-          </span>
-        </div>
-
-        <ul className="space-y-1.5 ml-12">
-          {release.items.map((item, i) => (
-            <li key={i} className="flex items-baseline gap-2 text-sm">
-              <span
-                className={`
-                  mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0
-                  ${release.phase === 'shipped' ? 'bg-green-500/60' :
-                    release.phase === 'active' ? 'bg-primary-500/60' :
-                    'bg-gray-600'}
-                `}
-              />
-              <span className={release.phase === 'considering' ? 'text-gray-600' : 'text-gray-300'}>
-                {item.label}
-              </span>
-              {item.note && (
-                <span className="text-gray-600 font-mono text-xs">{item.note}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
+function changelogHref(version: string): string {
+  if (version.includes('–') || version === 'Future') {
+    return 'https://github.com/UmaiTech/aura-llm-gateway/blob/main/CHANGELOG.md'
+  }
+  const tag = LATEST_TAG_PER_MINOR[version]
+  if (tag) {
+    return `https://github.com/UmaiTech/aura-llm-gateway/releases/tag/${tag}`
+  }
+  // Fallback for any unmapped minor — go to the releases index.
+  return 'https://github.com/UmaiTech/aura-llm-gateway/releases'
 }
 
 export function RoadmapPage() {
-  const shippedCount = releases.filter(r => r.phase === 'shipped').length
-
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <div className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-lg sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+    <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
+      <nav style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--rule)' }}>
+        <div style={{ maxWidth: '52rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
           <Link
-            to="/docs"
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-white transition-colors"
+            to="/"
+            aria-label="Aura LLM Gateway — home"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', textDecoration: 'none' }}
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Docs
+            <img
+              src="/icon-square.svg"
+              alt=""
+              aria-hidden
+              style={{ display: 'block', height: 36, width: 36 }}
+            />
+            <span
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.25rem',
+                letterSpacing: '-0.01em',
+                color: 'var(--ink)',
+                lineHeight: 1,
+              }}
+            >
+              Aura
+            </span>
           </Link>
-          <div className="flex items-center gap-1.5 text-sm text-gray-500">
-            <Map className="h-3.5 w-3.5" />
-            <span>Roadmap</span>
-          </div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent)' }}>
+            Roadmap · v0.9.x
+          </span>
         </div>
-      </div>
+      </nav>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-8">
-        <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/80 text-xs text-gray-400 mb-5 border border-gray-700/50">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 inline-block" />
-            Current release
-            <span className="font-mono text-green-400 font-semibold">v0.4.1</span>
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
-            <span className="gradient-text">Building in public.</span>
-            <br />
-            <span className="text-gray-200">Here's where we are.</span>
+      <main style={{ maxWidth: '52rem', margin: '0 auto', padding: 'var(--space-7) var(--space-5) var(--space-7) var(--space-5)' }}>
+        <header style={{ marginBottom: 'var(--space-7)' }}>
+          <img src="/icon-square.svg" alt="" aria-hidden style={{ display: 'block', height: 48, width: 48, marginBottom: 'var(--space-5)' }} />
+          <h1
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 400,
+              fontSize: 'clamp(2.5rem, 5vw, 3.5rem)',
+              lineHeight: 1.05,
+              letterSpacing: '-0.02em',
+              marginBottom: 'var(--space-5)',
+              maxWidth: '18ch',
+            }}
+          >
+            Building in public. Here's where we are.
           </h1>
-          <p className="text-lg text-gray-400 max-w-xl leading-relaxed">
-            Four major versions shipped. Seven LLM providers unified behind a
-            single API. Open-sourced, on PyPI, on GHCR, ready to deploy. This is
-            what we've done — and what comes next.
+          <p style={{ fontSize: '1.0625rem', lineHeight: 1.6, color: 'var(--ink-muted)', maxWidth: '56ch' }}>
+            Nine versions shipped. Seven providers unified behind a single API.
+            Open-sourced, on PyPI, on GHCR, with a live hosted playground at{' '}
+            <a href="https://playground.aura-llm.dev" className="link">playground.aura-llm.dev</a>.
+            This is what we've built — and what comes next.
           </p>
+        </header>
 
-          <div className="flex items-center gap-6 mt-8">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{shippedCount}</div>
-              <div className="text-xs text-gray-500 mt-0.5">versions shipped</div>
-            </div>
-            <div className="h-8 w-px bg-gray-800" />
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">7</div>
-              <div className="text-xs text-gray-500 mt-0.5">LLM providers</div>
-            </div>
-            <div className="h-8 w-px bg-gray-800" />
-            <div className="text-center">
-              <div className="text-2xl font-bold gradient-text">v0.5</div>
-              <div className="text-xs text-gray-500 mt-0.5">in progress</div>
-            </div>
-          </div>
-        </div>
+        <hr style={{ margin: 'var(--space-7) 0', border: 0, color: 'var(--ink-muted)', textAlign: 'left' }} />
 
-        <div className="relative">
-          <div
-            className="absolute left-[5px] top-3 bottom-0 w-px bg-gradient-to-b from-green-500/50 via-primary-500/30 to-gray-800/0"
-            aria-hidden="true"
-          />
-
-          <div className="space-y-6">
-            {releases.map((release, i) => (
-              <div key={release.version} className="flex gap-5">
-                <TimelineNode
-                  phase={release.phase}
-                  isLast={i === releases.length - 1}
-                />
-                <div className="flex-1 pb-2 min-w-0">
-                  <ReleaseCard release={release} />
+        {releases.map((release, idx) => (
+          <article key={release.version} style={{ marginBottom: 'var(--space-7)' }}>
+            <header
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) auto',
+                alignItems: 'baseline',
+                gap: 'var(--space-4)',
+                marginBottom: 'var(--space-4)',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.875rem',
+                    letterSpacing: '0.04em',
+                    color: 'var(--ink-muted)',
+                    marginBottom: 'var(--space-2)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {release.version}
                 </div>
+                <h2
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 500,
+                    fontSize: 'clamp(1.5rem, 2.5vw, 1.875rem)',
+                    lineHeight: 1.1,
+                    letterSpacing: '-0.02em',
+                    margin: 0,
+                  }}
+                >
+                  {release.title}
+                </h2>
+                <p style={{ color: 'var(--ink-muted)', fontSize: '0.9375rem', marginTop: 'var(--space-2)', margin: 'var(--space-2) 0 0 0' }}>
+                  {release.subtitle}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: release.phase === 'active' ? 'var(--accent)' : 'var(--ink-muted)',
+                  fontStyle: 'italic',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {phaseLabel(release.phase)}
+              </span>
+            </header>
 
-        <div className="mt-14 rounded-xl border border-gray-800 bg-gray-900/30 p-6 sm:p-8">
-          <h2 className="text-lg font-semibold text-white mb-2">Help shape the roadmap</h2>
-          <p className="text-sm text-gray-400 mb-5 max-w-lg">
-            Open an issue to request a feature, vote on existing proposals, or
-            contribute a PR. We read everything.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="https://github.com/UmaiTech/aura-llm-gateway/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary gap-2 text-sm px-4 py-2"
-            >
-              <Github className="h-4 w-4" />
-              Open an issue
-            </a>
-            <a
-              href="https://github.com/UmaiTech/aura-llm-gateway/discussions"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary gap-2 text-sm px-4 py-2"
-            >
-              <MessageSquare className="h-4 w-4" />
-              Discussions
-            </a>
-          </div>
-        </div>
-      </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, borderTop: '1px solid var(--rule)' }}>
+              {release.items.map((item, i) => (
+                <li
+                  key={i}
+                  style={{
+                    padding: 'var(--space-2) 0',
+                    borderBottom: '1px solid var(--rule)',
+                    color: release.phase === 'considering' ? 'var(--ink-muted)' : 'var(--ink)',
+                    fontSize: '0.9375rem',
+                    lineHeight: 1.55,
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 'var(--space-3)',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>{item.label}</span>
+                  {item.note && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', color: 'var(--ink-muted)' }}>
+                      — {item.note}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {/* Per-release changelog link for shipped versions.
+                For multi-version entries (v0.6–v0.7) we link to the
+                CHANGELOG.md file itself; for single versions we
+                anchor into that section. "active" / "planned" /
+                "considering" don't get a link since there's nothing
+                shipped yet. */}
+            {release.phase === 'shipped' && (
+              <div
+                style={{
+                  marginTop: 'var(--space-3)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.8125rem',
+                  color: 'var(--ink-muted)',
+                }}
+              >
+                <a
+                  href={changelogHref(release.version)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link"
+                >
+                  Changelog →
+                </a>
+              </div>
+            )}
+
+            {idx < releases.length - 1 && (
+              <div style={{ textAlign: 'center', color: 'var(--ink-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', letterSpacing: '0.2em', marginTop: 'var(--space-6)' }}>
+                — — —
+              </div>
+            )}
+          </article>
+        ))}
+
+        <hr style={{ margin: 'var(--space-7) 0 var(--space-5) 0' }} />
+
+        <p style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: '1.25rem', lineHeight: 1.4, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+          Help shape the roadmap. <a href="https://github.com/UmaiTech/aura-llm-gateway/issues" className="link">Open an issue</a> · <a href="https://github.com/UmaiTech/aura-llm-gateway/discussions" className="link">join discussions</a>.
+        </p>
+
+        <hr style={{ margin: 'var(--space-7) 0 var(--space-4) 0' }} />
+        <StockholmFooter />
+      </main>
     </div>
   )
 }
+
+/* Hallmark · genre: editorial-minimal · macrostructure: long-document · design-system: design.md · designed-as-app */

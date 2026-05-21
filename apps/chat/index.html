@@ -9,6 +9,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Pre-React paint: paints the editorial-dark canvas as soon
+         as the HTML is parsed so users never see a flash of white
+         (or of the old gray-950 / cyan-spinner combo the chat app
+         used to default to) before React mounts the AuthGate. -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: oklch(0.18 0 0);
+        color: oklch(0.95 0 0);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

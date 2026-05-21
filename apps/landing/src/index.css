@@ -1,58 +1,513 @@
+@import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Surfaces */
+  --canvas: oklch(0.18 0 0);
+  --canvas-elevated: oklch(0.22 0 0);
+  --canvas-overlay: oklch(0.10 0 0 / 0.85);
+  --code-bg: oklch(0.16 0 0);
+  --code-highlight: oklch(0.26 0 0);
+
+  /* Text */
+  --ink: oklch(0.95 0 0);
+  --ink-muted: oklch(0.68 0 0);
+  --ink-dim: oklch(0.50 0 0);
+
+  /* Rules & borders */
+  --rule: oklch(0.30 0 0);
+  --rule-strong: oklch(0.40 0 0);
+
+  /* Accent — used <5% of total surface area */
+  --accent: oklch(0.74 0.16 230);
+  --accent-ink: oklch(0.18 0 0);
+
+  /* Warm brand accent — restricted to the landing hero CTA */
+  --accent-warm: oklch(0.74 0.18 280);
+
+  /* Fonts */
+  --font-display: 'Fraunces Variable', 'Fraunces', 'Tiempos Headline', 'GT Sectra', Georgia, serif;
+  --font-body: 'Inter Variable', 'Inter', 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 20px;
+  --space-5: 32px;
+  --space-6: 52px;
+  --space-7: 84px;
+  --space-8: 136px;
+
+  /* Motion */
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Z-index */
+  --z-nav: 10;
+  --z-sticky: 20;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
+    background: var(--canvas);
+    color: var(--ink);
   }
 
   body {
-    @apply antialiased;
+    font-family: var(--font-body);
+    font-weight: 400;
+    background: var(--canvas);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--ink);
   }
 
   ::selection {
-    @apply bg-aura-500/30;
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  a {
+    color: inherit;
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: var(--space-5) 0;
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    color: var(--ink-muted);
+    background: transparent;
   }
 }
 
 @layer components {
-  .btn-primary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
-           bg-gradient-to-r from-aura-500 to-primary-500 text-white
-           hover:from-aura-400 hover:to-primary-400
-           transition-all duration-200 shadow-lg shadow-aura-500/25
-           hover:shadow-xl hover:shadow-aura-500/30;
+  /* Buttons */
+  .btn-outline {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: color var(--motion-duration-base) var(--motion-ease),
+                border-color var(--motion-duration-base) var(--motion-ease);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .btn-outline:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .btn-outline:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
-  .btn-secondary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
-           bg-gray-800 text-gray-100 border border-gray-700
-           hover:bg-gray-700 hover:border-gray-600
-           transition-all duration-200;
+  /* Warm variant — landing hero CTA only */
+  .btn-outline--warm:hover {
+    color: var(--accent-warm);
+    border-color: var(--accent-warm);
+  }
+  .btn-outline--warm:focus-visible {
+    outline-color: var(--accent-warm);
   }
 
-  .card {
-    @apply bg-gray-900/50 border border-gray-800 rounded-xl p-6
-           backdrop-blur-sm hover:border-gray-700 transition-colors;
+  /* Brand wordmark image used in nav (logo-horizontal.svg).
+     Iterated: 28 → 36 → 44px. The redesign's editorial typography
+     dwarfs anything smaller; at 44px the mark holds its own next
+     to the Fraunces hero without becoming a banner. Mobile keeps
+     a smaller variant so it doesn't crowd the nav links. */
+  .brand-wordmark {
+    display: block;
+    height: 44px;
+    width: auto;
+  }
+  @media (max-width: 640px) {
+    .brand-wordmark {
+      height: 34px;
+    }
   }
 
-  .gradient-text {
-    @apply bg-gradient-to-r from-aura-400 to-primary-400 bg-clip-text text-transparent;
+  /* Hero accent — used on a single keyword in the display headline
+     and on each "§ NN" section marker. Restrained to ~3-5% of total
+     pigment per the editorial-minimal slop test. Cyan/blue lifts the
+     Fraunces specimen without becoming a gradient. */
+  .accent {
+    color: var(--accent);
+  }
+  .accent-warm {
+    color: var(--accent-warm);
+  }
+
+  /* Typographic link */
+  .link {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--rule);
+    transition: text-decoration-color var(--motion-duration-base) var(--motion-ease);
+  }
+  .link:hover {
+    text-decoration-color: var(--ink);
+  }
+
+  /* Prose measure */
+  .prose-measure {
+    max-width: 68ch;
   }
 }
 
-/* Code block styling */
-pre {
-  @apply bg-gray-900 rounded-lg p-4 overflow-x-auto;
+/* Callout */
+[data-callout] {
+  border-left: 1px solid var(--rule);
+  padding-left: var(--space-3);
+  margin: var(--space-5) 0;
+}
+.callout-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: var(--space-1);
+}
+[data-callout="danger"] .callout-label {
+  color: var(--accent);
 }
 
+/* Code block — "terminal" treatment.
+   Left accent rule + slightly elevated background distinguishes
+   prose from code without going full "macOS window chrome" (which
+   would clash with the editorial-minimal voice). The accent rule
+   is the same cyan used elsewhere; restraints land on color, not
+   shape. */
+.code-block {
+  margin: var(--space-5) 0;
+}
+.code-block-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: var(--space-2);
+  display: block;
+}
+.code-block pre,
+.editorial-pre {
+  background: var(--code-bg);
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) + var(--space-2));
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--ink);
+  margin: 0;
+  /* Tabular figures so column-aligned token counts in examples
+     line up cleanly across rows. */
+  font-variant-numeric: tabular-nums;
+}
+.code-block code {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+/* Lightweight token coloring for the editorial pres on App.tsx
+   (which don't go through Prism). Comments dim, strings warm,
+   numbers cool. Applied via <span class="t-*"> tags. */
+.t-comment { color: var(--ink-dim); font-style: italic; }
+.t-string  { color: oklch(0.78 0.10 60); }
+.t-number  { color: oklch(0.78 0.10 230); }
+.t-keyword { color: var(--accent-warm); }
+.t-key     { color: var(--ink-muted); }
+
+/* Inline code (when used as a markdown component) */
 code {
-  @apply font-mono text-sm;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
 }
 
-/* Glow effects */
-.glow {
-  box-shadow: 0 0 40px rgba(14, 165, 233, 0.15),
-              0 0 80px rgba(99, 102, 241, 0.1);
+/* Steps */
+.steps {
+  counter-reset: step;
+  margin: var(--space-5) 0;
 }
+.step {
+  display: grid;
+  grid-template-columns: var(--space-6) 1fr;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+.step::before {
+  counter-increment: step;
+  content: counter(step, decimal-leading-zero) ".";
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.step-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.25rem;
+  color: var(--ink);
+  margin: 0 0 var(--space-2) 0;
+  letter-spacing: -0.01em;
+}
+.step-body {
+  color: var(--ink);
+}
+.step-body > *:first-child {
+  margin-top: 0;
+}
+.step-body > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Disclosure */
+.disclosure {
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: var(--space-3) 0;
+  margin: var(--space-4) 0;
+}
+.disclosure + .disclosure {
+  border-top: none;
+  margin-top: -1px;
+}
+.disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-body);
+  color: var(--ink);
+  padding: 0;
+}
+.disclosure summary::after {
+  content: "+";
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  font-size: 1.125rem;
+  margin-left: var(--space-3);
+}
+.disclosure[open] summary::after {
+  content: "−";
+}
+.disclosure summary::-webkit-details-marker {
+  display: none;
+}
+.disclosure-body {
+  margin-top: var(--space-3);
+}
+.disclosure-body > *:first-child {
+  margin-top: 0;
+}
+.disclosure-body > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Search modal */
+.search-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--canvas-overlay);
+  z-index: var(--z-overlay);
+}
+.search-panel {
+  position: fixed;
+  top: 15vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 2rem);
+  max-width: 36rem;
+  background: var(--canvas-elevated);
+  border: 1px solid var(--rule);
+  z-index: var(--z-modal);
+}
+.search-input {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  padding: var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  width: 100%;
+  color: var(--ink);
+  outline: none;
+}
+.search-input::placeholder {
+  color: var(--ink-dim);
+}
+.search-result {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--ink-muted);
+  transition: color var(--motion-duration-base) var(--motion-ease);
+  cursor: pointer;
+}
+.search-result:last-child {
+  border-bottom: none;
+}
+.search-result[data-selected="true"] {
+  background: var(--canvas);
+  color: var(--ink);
+}
+.search-result[data-selected="true"] .search-result-arrow {
+  color: var(--accent);
+}
+
+/* Tables (markdown) */
+.md-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin: var(--space-5) 0;
+}
+.md-content th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.md-content td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  vertical-align: top;
+}
+.md-content tr:last-child td {
+  border-bottom: none;
+}
+
+/* Hanging numbered section marker */
+.section-numbered {
+  position: relative;
+}
+.section-numbered > .section-marker {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  display: block;
+  margin-bottom: var(--space-3);
+}
+
+/* Landing section row — 3fr/2fr on wide, single column under 800px */
+.section-row-grid {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+@media (max-width: 800px) {
+  .section-row-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Docs layout — left rail + content */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  min-height: calc(100vh - 4rem);
+}
+.docs-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+}
+.docs-main {
+  min-width: 0;
+}
+.docs-mobile-toggle {
+  display: none;
+}
+.docs-mobile-backdrop {
+  display: none;
+}
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .docs-mobile-toggle {
+    display: inline-block;
+  }
+  .docs-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 18rem;
+    height: 100vh;
+    z-index: var(--z-modal);
+    transform: translateX(-100%);
+    transition: transform var(--motion-duration-base) var(--motion-ease);
+  }
+  .docs-sidebar.docs-sidebar-open {
+    transform: translateX(0);
+  }
+  .docs-mobile-backdrop {
+    display: block;
+  }
+}
+
+/* Hallmark · genre: editorial-minimal · design-system: design.md · designed-as-app */

@@ -1,207 +1,36 @@
-import { useState } from 'react'
-import {
-  Sparkles, ArrowRight, Zap, BarChart3,
-  Code2, Globe, MessageSquare, BookOpen,
-  Github, ExternalLink, Lock, Network, FileSearch,
-  Layers, Minimize2, RotateCcw
-} from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { GatewayDiagram } from './components/GatewayDiagram'
+import { StockholmFooter } from './components/StockholmFooter'
 
-interface Feature {
-  icon: typeof Globe
-  title: string
-  description: string
-  code: string
-  docsHref: string
-}
+const heroCode = `curl -X POST http://localhost:8080/v1/responses \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "model": "claude-sonnet-4-5",
+    "input": [
+      { "type": "message", "role": "user",
+        "content": "Hello!" }
+    ],
+    "stream": true
+  }'`
 
-const features: Feature[] = [
-  {
-    icon: Globe,
-    title: '7 Providers',
-    description: 'OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, AWS Bedrock — all behind one Open Responses API.',
-    code: `curl /v1/responses -d '{
-  "model": "claude-sonnet-4-5",
-  "input": [{"role": "user",
-    "content": "Hello!"}]
-}'`,
-    docsHref: 'https://docs.aura-llm.dev/docs/providers/anthropic',
-  },
-  {
-    icon: Minimize2,
-    title: 'Prompt Compression',
-    description: 'TOON, AISP, YAML, and JSON compression strategies cut token usage 40–60% on uniform arrays and nested objects.',
-    code: `let compressor = SmartCompressor::builder()
+const compressionCode = `let compressor = SmartCompressor::builder()
     .auto_select(true)
     .build();
 let result = compressor.compress(input)?;
-// 40-60% fewer tokens`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/compression',
-  },
-  {
-    icon: Network,
-    title: 'Smart Routing',
-    description: 'Eight strategies — round-robin, weighted, region-aware, cost-optimized. Circuit breaker fails over to a healthy provider on the same call.',
-    code: `# config.yaml
+// 40-60% fewer tokens on uniform arrays`
+
+const routingCode = `# config.yaml
 routing:
   strategy: cost_optimized
   fallback: [openai, anthropic]
   circuit_breaker:
-    failure_threshold: 3`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/routing',
-  },
-  {
-    icon: BarChart3,
-    title: 'Cost Tracking',
-    description: 'Per-request USD on every response. Track input, output, cached, and reasoning tokens across all seven providers.',
-    code: `// Every response includes:
-"usage": {
-  "input_tokens": 1842,
-  "output_tokens": 318,
-  "cost_usd": 0.00732
-}`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/cost-tracking',
-  },
-  {
-    icon: FileSearch,
-    title: 'Response Validation',
-    description: 'Logprobs, self-consistency, best-of-N sampling, and confidence thresholds — measurably reduce hallucinations.',
-    code: `{
-  "validation": {
-    "strategy": "best_of_n",
-    "n": 3,
-    "min_confidence": 0.85
-  }
-}`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/validation',
-  },
-  {
-    icon: Lock,
-    title: 'Encrypted Credentials',
-    description: 'AES-256-GCM envelope encryption for provider API keys. Master key from KMS or Vault — never written to disk in plaintext.',
-    code: `# Generate master key once
-export AURA_MASTER_KEY=$(openssl rand -hex 32)
-# Provider keys encrypted at rest
-# DEK wrapping per-tenant`,
-    docsHref: 'https://docs.aura-llm.dev/docs/credentials',
-  },
-  {
-    icon: Layers,
-    title: 'Multi-Tenancy',
-    description: 'Hierarchical org → team → project → end-user model with scoped API keys and per-user cost allocation.',
-    code: `POST /v1/responses
-Authorization: Bearer aura_team_...
-{
-  "model": "gpt-5.4-mini",
-  "user": "customer_42",
-  "input": [...]
-}`,
-    docsHref: 'https://docs.aura-llm.dev/docs/organizations',
-  },
-  {
-    icon: Zap,
-    title: 'Production Ready',
-    description: 'Redis-backed rate limiting and response caching, Prometheus metrics, structured logging, and SSE streaming throughout.',
-    code: `# Prometheus metrics
-curl localhost:8080/metrics
-# aura_requests_total
-# aura_request_duration_seconds
-# aura_tokens_total{provider="..."}`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/rate-limiting',
-  },
-  {
-    icon: Code2,
-    title: 'Self-Hosted in Rust',
-    description: 'Single static binary, no runtime deps. Axum + Tokio + reqwest. Built to keep gateway overhead under 10ms.',
-    code: `# Deploy with Helm
-helm install aura \\
-  oci://ghcr.io/umaitech/charts/aura-llm-gateway \\
-  --set secrets.inline.openaiApiKey=sk-...`,
-    docsHref: 'https://github.com/UmaiTech/aura-llm-gateway/blob/main/deploy/charts/aura-llm-gateway/README.md',
-  },
-]
+    failure_threshold: 3`
 
-function FeatureCard({ feature }: { feature: Feature }) {
-  const [flipped, setFlipped] = useState(false)
-  const Icon = feature.icon
-
-  return (
-    <button
-      type="button"
-      onClick={() => setFlipped((v) => !v)}
-      className="group relative w-full text-left h-64 [perspective:1200px] focus:outline-none focus-visible:ring-2 focus-visible:ring-aura-400 rounded-2xl"
-      aria-pressed={flipped}
-      aria-label={`${feature.title} — click to ${flipped ? 'hide' : 'show'} example`}
-    >
-      <div
-        className="relative h-full w-full transition-transform duration-500 [transform-style:preserve-3d]"
-        style={{ transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
-      >
-        {/* Front */}
-        <div
-          className="absolute inset-0 card flex flex-col cursor-pointer"
-          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
-        >
-          <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-aura-500/20 to-primary-500/20 flex items-center justify-center mb-4 group-hover:from-aura-500/30 group-hover:to-primary-500/30 transition-colors">
-            <Icon className="h-6 w-6 text-aura-400" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-          <p className="text-gray-400 text-sm flex-1">{feature.description}</p>
-          <div className="mt-4 text-xs text-gray-500 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <span>Click for example</span>
-            <ArrowRight className="h-3 w-3" />
-          </div>
-        </div>
-
-        {/* Back */}
-        <div
-          className="absolute inset-0 card flex flex-col cursor-pointer"
-          style={{
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-aura-400">{feature.title}</h3>
-            <RotateCcw className="h-3.5 w-3.5 text-gray-500" />
-          </div>
-          <pre className="flex-1 text-xs font-mono text-gray-300 bg-gray-950/70 rounded-md p-3 overflow-hidden whitespace-pre-wrap leading-relaxed">
-            {feature.code}
-          </pre>
-          <a
-            href={feature.docsHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 text-xs text-aura-400 hover:text-aura-300 flex items-center gap-1"
-          >
-            Read the docs <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      </div>
-    </button>
-  )
-}
-
-const codeExample = `// Request to Aura Gateway
-const response = await fetch('http://localhost:8080/v1/responses', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    model: 'gpt-5.4-mini',
-    input: [
-      { type: 'message', role: 'user', content: 'Hello!' }
-    ],
-    stream: true
-  })
-});
-
-// Response includes Aura enrichment
-{
+const responseCode = `{
   "usage": {
-    "input_tokens": 10,
-    "output_tokens": 25,
-    "cost_usd": 0.00035  // 💰 Calculated by gateway
+    "input_tokens": 1842,
+    "output_tokens": 318,
+    "cost_usd": 0.00732
   },
   "metadata": {
     "aura": {
@@ -211,162 +40,385 @@ const response = await fetch('http://localhost:8080/v1/responses', {
   }
 }`
 
+const productionCode = `# Generate master key once
+export AURA_MASTER_KEY=$(openssl rand -hex 32)
+
+# Provider keys encrypted at rest
+# DEK wrapping per-tenant
+# Prometheus at /metrics`
+
+const rustCode = `# Deploy with Helm
+helm install aura \\
+  oci://ghcr.io/umaitech/charts/aura-llm-gateway \\
+  --set secrets.inline.openaiApiKey=sk-...`
+
+interface Stat {
+  value: string
+  label: string
+}
+
+const stats: Stat[] = [
+  { value: '7', label: 'Providers' },
+  { value: '40–60%', label: 'Token reduction' },
+  { value: '<10ms', label: 'Gateway overhead' },
+  { value: '4', label: 'Versions shipped' },
+]
+
+interface Section {
+  marker: string
+  title: string
+  body: string[]
+  code: string
+  codeLabel: string
+}
+
+const sections: Section[] = [
+  {
+    marker: '§ 01 — Providers',
+    title: 'Seven providers, one API',
+    body: [
+      'OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, AWS Bedrock — all behind a single Open Responses API. Switch models with a string, not a rewrite.',
+    ],
+    code: heroCode,
+    codeLabel: 'request.sh',
+  },
+  {
+    marker: '§ 02 — Compression',
+    title: 'Compression that pays for itself',
+    body: [
+      'TOON, AISP, YAML, and JSON compression strategies cut token usage 40–60% on uniform arrays and nested objects. The compressor picks the best strategy per payload.',
+    ],
+    code: compressionCode,
+    codeLabel: 'compress.rs',
+  },
+  {
+    marker: '§ 03 — Routing & cost',
+    title: 'Routes for cost, fails over for uptime',
+    body: [
+      'Eight strategies — round-robin, weighted, region-aware, cost-optimized. The circuit breaker fails over to a healthy provider on the same call. Every response carries per-request USD, calculated from the gateway.',
+    ],
+    code: routingCode,
+    codeLabel: 'config.yaml',
+  },
+  {
+    marker: '§ 04 — Production',
+    title: 'Encrypted, multi-tenant, observable',
+    body: [
+      'AES-256-GCM envelope encryption for provider keys. Hierarchical org → team → project → end-user with scoped API keys and per-user cost allocation. Redis-backed rate limiting and response caching. Prometheus metrics, structured logging, SSE streaming throughout.',
+    ],
+    code: productionCode,
+    codeLabel: 'production.sh',
+  },
+  {
+    marker: '§ 05 — Self-hosted in Rust',
+    title: 'A single static binary',
+    body: [
+      'Axum + Tokio + reqwest. Single static binary, no runtime dependencies. Built to keep gateway overhead under 10ms. Open-sourced under MIT, distributed via Helm chart on GHCR and PyPI.',
+    ],
+    code: rustCode,
+    codeLabel: 'deploy.sh',
+  },
+]
+
+// Editorial pres pick up the .editorial-pre treatment (cyan
+// left rule, tabular numerics, generous line-height) from
+// index.css. Inline styles only override what's distinct here.
+const response = (
+  <pre className="editorial-pre" style={{ fontSize: '0.8125rem' }}>
+    {responseCode}
+  </pre>
+)
+
 export default function App() {
   return (
-    <div className="min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <img src="/icon-square.svg" alt="Aura Logo" className="h-9 w-9" />
-              <span className="font-semibold text-xl">Aura</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <a href="https://docs.aura-llm.dev" className="text-gray-400 hover:text-white transition-colors">
-                Docs
-              </a>
-              <a href="https://roadmap.aura-llm.dev" className="text-gray-400 hover:text-white transition-colors">
-                Roadmap
-              </a>
-              <a
-                href="https://playground.aura-llm.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-white transition-colors flex items-center gap-1"
-              >
-                Playground
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-              <a
-                href="https://github.com/UmaiTech/aura-llm-gateway"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <Github className="h-5 w-5" />
-              </a>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800 text-sm text-gray-300 mb-6">
-            <Sparkles className="h-4 w-4 text-aura-400" />
-            Open Responses API Compatible
-          </div>
-
-          <h1 className="text-5xl sm:text-6xl font-bold mb-6">
-            <span className="gradient-text">Unified LLM Gateway</span>
-            <br />
-            <span className="text-gray-100">for Modern AI Apps</span>
-          </h1>
-
-          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            Route requests across seven providers — OpenAI, Anthropic, Google, Mistral,
-            Ollama, HuggingFace, and AWS Bedrock — with a single API.
-            Built-in cost tracking, observability, and agentic workflow support.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="/docs/quickstart" className="btn-primary gap-2">
-              Get Started
-              <ArrowRight className="h-4 w-4" />
-            </a>
-            <a href="/docs/api" className="btn-secondary gap-2">
-              <BookOpen className="h-4 w-4" />
-              API Reference
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Code Example */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-900/50">
-        <div className="max-w-4xl mx-auto">
-          <div className="card glow">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                <div className="h-3 w-3 rounded-full bg-green-500/80" />
-              </div>
-              <span className="text-sm text-gray-500 ml-2">example.ts</span>
-            </div>
-            <pre className="text-sm overflow-x-auto">
-              <code className="text-gray-300">{codeExample}</code>
-            </pre>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Everything you need</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              A complete LLM gateway built with Rust for performance and reliability.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} />
-            ))}
-          </div>
-          <p className="text-center text-xs text-gray-500 mt-6">
-            Click any card to see a code example.
-          </p>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-900/50 to-gray-950">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <MessageSquare className="h-8 w-8 text-aura-400" />
-          </div>
-          <h2 className="text-3xl font-bold mb-4">Try the Playground</h2>
-          <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-            Test the gateway with our built-in chat interface. Supports agent mode with tool execution.
-          </p>
-          <a
-            href="https://playground.aura-llm.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-primary gap-2"
-          >
-            Open Playground
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-gray-400">
-            <img src="/icon-square.svg" alt="Aura" className="h-4 w-4" />
-            <span className="text-sm">Aura LLM Gateway</span>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-gray-500">
-            <a href="/docs" className="hover:text-gray-300 transition-colors">Documentation</a>
-            <a href="/docs/api" className="hover:text-gray-300 transition-colors">API Reference</a>
-            <a
-              href="https://github.com/UmaiTech/aura-llm-gateway"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-300 transition-colors"
-            >
-              GitHub
-            </a>
-          </div>
-        </div>
-      </footer>
+    <div style={{ background: 'var(--canvas)', color: 'var(--ink)', minHeight: '100vh' }}>
+      <Nav />
+      <Hero />
+      <HowItWorks />
+      <Sections />
+      <ClosingNote />
+      <Footer />
     </div>
   )
 }
+
+/**
+ * Visual architecture section that sits between the hero and the
+ * numbered Sections. Replaces the static "9 feature cards" pattern
+ * the old landing used — same information density but readable in a
+ * glance, and the hover state lets visitors poke around rather than
+ * scroll past a wall of cards.
+ */
+function HowItWorks() {
+  return (
+    <section
+      style={{
+        padding: 'var(--space-7) var(--space-6) var(--space-6) var(--space-6)',
+        borderTop: '1px solid var(--rule)',
+      }}
+    >
+      <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.75rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--accent)',
+            display: 'block',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          § 00 — How it works
+        </span>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            marginBottom: 'var(--space-4)',
+            maxWidth: '24ch',
+          }}
+        >
+          One API, two layers, seven providers.
+        </h2>
+        <p
+          style={{
+            fontSize: '1rem',
+            lineHeight: 1.6,
+            color: 'var(--ink-muted)',
+            maxWidth: '52ch',
+            marginBottom: 'var(--space-5)',
+          }}
+        >
+          Every request flows through a middleware row — auth, rate
+          limits, response cache, compression, structured logging — and
+          a core that resolves the model, calculates the real cost, and
+          enriches the response before it leaves the gateway. Hover or
+          click any block to see what it does.
+        </p>
+        <GatewayDiagram />
+      </div>
+    </section>
+  )
+}
+
+function Nav() {
+  return (
+    <nav
+      style={{
+        background: 'var(--canvas)',
+        padding: 'var(--space-4) var(--space-6) var(--space-4) var(--space-6)',
+      }}
+    >
+      <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <a
+          href="/"
+          aria-label="Aura LLM Gateway — home"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            textDecoration: 'none',
+          }}
+        >
+          {/* Icon-only mark from /icon-square.svg, rendered large
+              enough to actually read. Pairing with a typographic
+              wordmark gives us full control over each piece's size —
+              the horizontal-logo.svg has lots of internal padding
+              that left the icon feeling timid at any reasonable
+              CSS height. */}
+          <img
+            src="/icon-square.svg"
+            alt=""
+            aria-hidden
+            style={{ display: 'block', height: 48, width: 48 }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.5rem',
+              letterSpacing: '-0.01em',
+              color: 'var(--ink)',
+              lineHeight: 1,
+            }}
+          >
+            Aura
+          </span>
+        </a>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', color: 'var(--ink-muted)', letterSpacing: '0.04em' }}>
+          <a href="https://docs.aura-llm.dev" className="link">Docs</a>
+          <span aria-hidden>·</span>
+          <a href="https://roadmap.aura-llm.dev" className="link">Roadmap</a>
+          <span aria-hidden>·</span>
+          <a href="https://playground.aura-llm.dev" className="link">Playground</a>
+          <span aria-hidden>·</span>
+          <a href="https://github.com/UmaiTech/aura-llm-gateway" className="link">GitHub</a>
+        </div>
+      </div>
+    </nav>
+  )
+}
+
+function Hero() {
+  return (
+    <section
+      style={{
+        padding: 'var(--space-8) var(--space-6) var(--space-7) var(--space-6)',
+      }}
+    >
+      <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', display: 'block', marginBottom: 'var(--space-4)' }}>
+          Open Responses API — compatible
+        </span>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 400,
+            fontSize: 'clamp(2.75rem, 6vw, 5rem)',
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            marginBottom: 'var(--space-5)',
+            maxWidth: '20ch',
+          }}
+        >
+          A <span style={{ color: 'var(--accent-warm)' }}>unified</span> LLM gateway. Written in Rust, made for production.
+        </h1>
+        <p style={{ fontSize: '1.0625rem', lineHeight: 1.6, color: 'var(--ink-muted)', maxWidth: '52ch', marginBottom: 'var(--space-6)' }}>
+          Route requests across seven providers behind one Open Responses API.
+          Built-in cost tracking, observability, and agentic workflow support —
+          deploy with a single Helm command.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-5)', borderTop: '1px solid var(--rule)', borderBottom: '1px solid var(--rule)', padding: 'var(--space-5) 0', marginBottom: 'var(--space-6)' }}>
+          {stats.map((stat) => (
+            <div key={stat.label}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 400,
+                  fontSize: '2.5rem',
+                  lineHeight: 1.05,
+                  letterSpacing: '-0.02em',
+                  fontVariantNumeric: 'tabular-nums',
+                  color: 'var(--ink)',
+                }}
+              >
+                {stat.value}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)', marginTop: 'var(--space-2)' }}>
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
+          <a href="/docs/quickstart" className="btn-outline btn-outline--warm">
+            Get started <span aria-hidden>→</span>
+          </a>
+          <a href="/docs/api" className="link" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+            Read the API reference <ArrowRight style={{ display: 'inline', height: '0.875em', width: '0.875em', verticalAlign: 'baseline' }} aria-hidden />
+          </a>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Sections() {
+  return (
+    <div>
+      {sections.map((section, idx) => (
+        <SectionRow
+          key={section.marker}
+          section={section}
+          padTop={idx === 0 ? 'var(--space-6)' : 'var(--space-7)'}
+          padBottom={idx === sections.length - 1 ? 'var(--space-7)' : 'var(--space-6)'}
+          showResponseExtras={idx === 2}
+        />
+      ))}
+    </div>
+  )
+}
+
+function SectionRow({ section, padTop, padBottom, showResponseExtras }: { section: Section; padTop: string; padBottom: string; showResponseExtras: boolean }) {
+  return (
+    <section style={{ padding: `${padTop} var(--space-6) ${padBottom} var(--space-6)`, borderTop: '1px solid var(--rule)' }}>
+      <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 'var(--space-5)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 'var(--space-6)' }} className="section-row-grid">
+          <div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', display: 'block', marginBottom: 'var(--space-3)' }}>
+              {section.marker}
+            </span>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 'clamp(1.75rem, 3vw, 2.25rem)', lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 'var(--space-4)', maxWidth: '22ch' }}>
+              {section.title}
+            </h2>
+            {section.body.map((para, i) => (
+              <p key={i} style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--ink-muted)', maxWidth: '52ch', marginBottom: 'var(--space-3)' }}>
+                {para}
+              </p>
+            ))}
+          </div>
+          <div>
+            <span className="code-block-label">{section.codeLabel}</span>
+            <pre className="editorial-pre" style={{ fontSize: '0.8125rem' }}>
+              {section.code}
+            </pre>
+            {showResponseExtras && (
+              <div style={{ marginTop: 'var(--space-4)' }}>
+                <span className="code-block-label">response.json</span>
+                {response}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ClosingNote() {
+  return (
+    <section style={{ padding: 'var(--space-6) var(--space-6) var(--space-7) var(--space-6)', borderTop: '1px solid var(--rule)' }}>
+      <div style={{ maxWidth: '72rem', margin: '0 auto' }}>
+        <p style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: 'clamp(1.5rem, 2.5vw, 2rem)', lineHeight: 1.3, letterSpacing: '-0.01em', maxWidth: '34ch', color: 'var(--ink)' }}>
+          Try the gateway in the{' '}
+          <a href="https://playground.aura-llm.dev" className="link">browser playground</a>
+          {' '}or read the{' '}
+          <a href="/docs/quickstart" className="link">quickstart</a>.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function Footer() {
+  return (
+    <footer style={{ padding: 'var(--space-6)', borderTop: '1px solid var(--rule)' }}>
+      <div
+        style={{
+          maxWidth: '72rem',
+          margin: '0 auto',
+          display: 'flex',
+          gap: 'var(--space-4)',
+          flexWrap: 'wrap',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+        }}
+      >
+        <p style={{ fontSize: '0.875rem', color: 'var(--ink-muted)', margin: 0 }}>
+          Aura LLM Gateway · open source · MIT ·{' '}
+          <a href="https://github.com/UmaiTech/aura-llm-gateway" className="link">
+            github.com/UmaiTech/aura-llm-gateway <span aria-hidden>→</span>
+          </a>
+        </p>
+        <StockholmFooter />
+      </div>
+    </footer>
+  )
+}
+
+/* Hallmark · genre: editorial-minimal · macrostructure: stat-led · design-system: design.md · designed-as-app */
