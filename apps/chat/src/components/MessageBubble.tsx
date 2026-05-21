@@ -5,9 +5,11 @@ import {
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '../lib/utils'
+import { useChatStore } from '../stores/chatStore'
 import type { Message, ToolInvocation } from '../lib/types'
 
 // Tool-specific icons and colors
@@ -102,7 +104,70 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
               )}>
                 {message.content && (
                   <ReactMarkdown
+                    // GFM unlocks tables, strikethrough, task lists,
+                    // and autolinks — all of which models emit
+                    // routinely. Without this plugin, table syntax
+                    // ("| a | b |...") renders as raw pipes.
+                    remarkPlugins={[remarkGfm]}
                     components={{
+                      // Tables — default browser styling is cramped
+                      // and borderless. Use bordered cells with a
+                      // muted header band.
+                      table: ({ children }) => (
+                        <div className="my-4 overflow-x-auto rounded-lg border border-border">
+                          <table className="w-full text-sm border-collapse">
+                            {children}
+                          </table>
+                        </div>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-muted/40">{children}</thead>
+                      ),
+                      th: ({ children }) => (
+                        <th className="px-3 py-2 text-left font-medium border-b border-border">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-3 py-2 border-b border-border/50 align-top">
+                          {children}
+                        </td>
+                      ),
+                      // Lists need spacing — without it, multi-item
+                      // responses run together.
+                      ul: ({ children }) => (
+                        <ul className="my-2 ml-4 list-disc space-y-1">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="my-2 ml-4 list-decimal space-y-1">{children}</ol>
+                      ),
+                      // Headings inside chat answers — small but
+                      // visually distinct from body.
+                      h1: ({ children }) => (
+                        <h1 className="font-display text-xl font-semibold mt-4 mb-2">{children}</h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="font-display text-lg font-semibold mt-3 mb-2">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-base font-semibold mt-3 mb-1">{children}</h3>
+                      ),
+                      // Block quotes — left rule, muted text.
+                      blockquote: ({ children }) => (
+                        <blockquote className="my-2 pl-3 border-l-2 border-border text-muted-foreground">
+                          {children}
+                        </blockquote>
+                      ),
+                      a: ({ children, href }) => (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {children}
+                        </a>
+                      ),
                       code({ className, children, ...props }) {
                         const inline = !className
                         const match = /language-(\w+)/.exec(className || '')
@@ -111,7 +176,7 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
                         if (inline) {
                           return (
                             <code
-                              className="bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono"
+                              className="bg-muted text-foreground px-1.5 py-0.5 rounded text-sm font-mono"
                               {...props}
                             >
                               {children}
@@ -177,6 +242,16 @@ interface CodeBlockProps {
 
 function CodeBlock({ language, children }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
+  // Theme-aware syntax highlighting: oneDark on dark mode, oneLight
+  // on light. Previously hardcoded to oneDark + `background: '#1e1e2e'`,
+  // which produced a black slab over the message in light mode — the
+  // "black over the code" bug.
+  const theme = useChatStore((s) => s.theme)
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(children)
@@ -185,15 +260,15 @@ function CodeBlock({ language, children }: CodeBlockProps) {
   }
 
   return (
-    <div className="relative group my-4 -mx-4 sm:mx-0 sm:rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-        <span className="text-xs text-gray-400 font-mono">
+    <div className="relative group my-4 -mx-4 sm:mx-0 sm:rounded-lg overflow-hidden border border-border">
+      {/* Header — themed via tokens, not hardcoded gray */}
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-border">
+        <span className="text-xs text-muted-foreground font-mono">
           {language || 'code'}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           {copied ? (
             <>
@@ -211,13 +286,15 @@ function CodeBlock({ language, children }: CodeBlockProps) {
 
       {/* Code */}
       <SyntaxHighlighter
-        style={oneDark}
+        style={isDark ? oneDark : oneLight}
         language={language || 'text'}
         PreTag="div"
         customStyle={{
           margin: 0,
           padding: '1rem',
-          background: '#1e1e2e',
+          // Let the theme set its own background — overriding to a
+          // hardcoded hex was what broke light mode. Both oneDark and
+          // oneLight ship sane backgrounds.
           fontSize: '0.875rem',
         }}
         lineProps={{ style: { backgroundColor: 'transparent' }}}
