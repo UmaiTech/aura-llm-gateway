@@ -184,32 +184,6 @@ export const auth = betterAuth({
     },
   },
 
-  // Cookie domain pinned to the apex (.aura-llm.dev) so the same
-  // session works on both playground.aura-llm.dev and
-  // app.aura-llm.dev. Without this, the cookie defaults to host-only
-  // and the admin app at app.aura-llm.dev can't see sessions minted
-  // on playground.aura-llm.dev — which breaks the shared-auth admin
-  // login flow.
-  //
-  // Only set the domain on prod. Preview deploys live at
-  // *.vercel.app (not under .aura-llm.dev), so setting the parent
-  // domain there would make the cookie fail to attach entirely.
-  // Local dev (no VERCEL_ENV) also leaves the cookie host-only.
-  advanced: {
-    cookies: {
-      session_token: {
-        attributes: {
-          domain:
-            process.env.VERCEL_ENV === 'production'
-              ? '.aura-llm.dev'
-              : undefined,
-          sameSite: 'lax',
-          secure: process.env.VERCEL_ENV !== undefined,
-        },
-      },
-    },
-  },
-
   // Disable email + password auth entirely. GitHub-only for now.
   emailAndPassword: { enabled: false },
 
@@ -227,10 +201,8 @@ export const auth = betterAuth({
   trustedOrigins: (request?: unknown) => {
     const staticOrigins = [
       'https://playground.aura-llm.dev',
-      'https://app.aura-llm.dev',
       'https://aura-llm.dev',
       'http://localhost:3000',
-      'http://localhost:3001',
     ]
     const origin = extractOrigin(request)
     if (origin && /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {

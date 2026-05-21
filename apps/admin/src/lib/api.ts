@@ -27,72 +27,6 @@ import { useAuthStore } from '@/stores'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
-/**
- * Check whether the user has a valid better-auth session by hitting
- * the Vercel /api/auth/get-session endpoint (same-origin from the
- * admin app's perspective — both deploys live under
- * https://app.aura-llm.dev on prod).
- *
- * Returns the session user if logged in, null otherwise. Never
- * throws on a clean "no session" response (200 with `null` body);
- * only network/parse errors throw.
- */
-export async function getCurrentSession(): Promise<{
-  user: { email: string; name: string | null }
-} | null> {
-  const response = await fetch('/api/auth/get-session', {
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new Error(`Session check failed: HTTP ${response.status}`)
-  }
-  const data = await response.json()
-  // better-auth returns null directly when no session exists, or
-  // { user, session } when one does.
-  if (!data || !data.user) return null
-  return {
-    user: { email: data.user.email, name: data.user.name ?? null },
-  }
-}
-
-/**
- * Kick off the GitHub OAuth flow. better-auth's /sign-in/social
- * endpoint responds with a 302/JSON containing the GitHub authorize
- * URL — we navigate the browser there.
- */
-export async function signInWithGithub(callbackUrl: string): Promise<void> {
-  const response = await fetch('/api/auth/sign-in/social', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      provider: 'github',
-      callbackURL: callbackUrl,
-    }),
-  })
-  if (!response.ok) {
-    throw new Error(`GitHub sign-in failed: HTTP ${response.status}`)
-  }
-  const data = await response.json()
-  if (data?.url) {
-    window.location.href = data.url
-  } else {
-    throw new Error('GitHub sign-in did not return a redirect URL')
-  }
-}
-
-/**
- * Sign out of the better-auth session. Clears the cookie on the
- * server side; the caller is responsible for clearing local store
- * state.
- */
-export async function signOutSession(): Promise<void> {
-  await fetch('/api/auth/sign-out', {
-    method: 'POST',
-    credentials: 'include',
-  })
-}
-
 class ApiError extends Error {
   constructor(
     message: string,
@@ -117,12 +51,6 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
   const response = await fetch(url, {
     ...options,
-    // credentials: 'include' is required so the better-auth session
-    // cookie set on `.aura-llm.dev` rides along on cross-origin
-    // requests from app.aura-llm.dev → api.aura-llm.dev. Without
-    // this, the gateway's admin middleware sees no cookie and falls
-    // through to the bearer check (which fails for session users).
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders(),

@@ -1262,29 +1262,11 @@ fn build_cors_layer() -> CorsLayer {
                 );
             }
             info!(origins = ?origins, "Configuring CORS with explicit allowed origins");
-            // allow_credentials(true) is required so the admin app
-            // at app.aura-llm.dev can send the better-auth session
-            // cookie on cross-origin requests to api.aura-llm.dev.
-            // The CORS spec forbids `Any` headers/methods combined
-            // with credentials, so we list them explicitly.
-            use axum::http::{header, Method};
             CorsLayer::new()
                 .allow_origin(origins)
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::PATCH,
-                    Method::DELETE,
-                    Method::OPTIONS,
-                ])
-                .allow_headers([
-                    header::AUTHORIZATION,
-                    header::CONTENT_TYPE,
-                    header::ACCEPT,
-                    header::COOKIE,
-                ])
-                .allow_credentials(true)
+                .allow_methods(Any)
+                .allow_headers(Any)
+                .allow_credentials(false)
         }
     }
 }

@@ -314,64 +314,33 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     }
 
-    // Admin routes accept two auth paths:
-    //
-    // 1. Better-auth session cookie (preferred for human admins).
-    //    Cookie is set by the playground's GitHub OAuth flow on
-    //    `.aura-llm.dev`. We resolve it against playground_auth.session
-    //    + check that the user owns at least one organizations row.
-    //    Owning an org = admin; this reuses migration 021's
-    //    owner_id = your GitHub user id and avoids a separate allowlist.
-    //
-    // 2. AURA_ADMIN_KEY bearer token (fallback for CI / scripts).
-    //    Stays untouched so the existing admin-key login + automation
-    //    scripts keep working.
-    //
-    // Either path admitting is enough; we check cookie first because
-    // most real admin traffic comes from the browser.
+    // Admin routes use separate admin key authentication
     if path.starts_with("/admin") {
-        // Path 1: session cookie
-        if let Some(pool) = state.db_pool() {
-            let cookie_header = request
-                .headers()
-                .get(header::COOKIE)
-                .and_then(|h| h.to_str().ok());
-            if let Some(cookie_str) = cookie_header {
-                if let Some(token) = extract_session_token(cookie_str) {
-                    if validate_admin_session(pool, &token).await {
-                        return Ok(next.run(request).await);
-                    }
-                }
-            }
-        }
-
-        // Path 2: AURA_ADMIN_KEY bearer (fallback)
+        // Get admin key from environment
         let admin_key = std::env::var("AURA_ADMIN_KEY").unwrap_or_default();
 
-        // If no admin key configured AND no DB to validate sessions
-        // against, we're in dev mode — let it through.
-        if admin_key.is_empty() && state.db_pool().is_none() {
+        // If no admin key configured, allow access in development
+        if admin_key.is_empty() {
             return Ok(next.run(request).await);
         }
 
-        // Check Bearer token matches admin key (only meaningful if one
-        // is configured; empty admin_key never matches a real token).
+        // Check Bearer token matches admin key
         let auth_header = request
             .headers()
             .get(header::AUTHORIZATION)
             .and_then(|h| h.to_str().ok());
 
         match auth_header {
-            Some(h) if h.starts_with("Bearer ") && !admin_key.is_empty() => {
+            Some(h) if h.starts_with("Bearer ") => {
                 let token = &h[7..];
                 if token == admin_key {
                     return Ok(next.run(request).await);
                 }
-                warn!("Invalid admin bearer token");
+                warn!("Invalid admin key provided");
                 return Err(AuthError::invalid_key());
             }
             _ => {
-                warn!("Admin route: no valid session cookie or admin bearer");
+                warn!("Admin route missing Authorization header");
                 return Err(AuthError::missing_auth());
             }
         }
@@ -850,93 +819,6 @@ pub async fn revoke_api_key(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Extract the better-auth session token from a Cookie header value.
-///
-/// better-auth uses one of two cookie names depending on environment:
-///   - `better-auth.session_token`           (HTTP / dev)
-///   - `__Secure-better-auth.session_token`  (HTTPS / prod, default)
-///
-/// Both store the same value: `<sessionId>.<HMAC>`. We only need the
-/// `sessionId` portion (the part before the first `.`) to look up the
-/// row in `playground_auth.session`. We do NOT verify the HMAC here —
-/// the session table's `token` column already stores the exact
-/// `sessionId.HMAC` string and a row match is sufficient proof.
-///
-/// Returns the raw token string (including HMAC suffix) so we can do
-/// an exact `WHERE token = $1` lookup. Returns None if no recognised
-/// session cookie is present.
-fn extract_session_token(cookie_header: &str) -> Option<String> {
-    for part in cookie_header.split(';') {
-        let part = part.trim();
-        for prefix in [
-            "__Secure-better-auth.session_token=",
-            "better-auth.session_token=",
-        ] {
-            if let Some(value) = part.strip_prefix(prefix) {
-                if value.is_empty() {
-                    return None;
-                }
-                // URL-decode (better-auth percent-encodes the `.` in
-                // some clients). Safe fallback: use the raw value.
-                return Some(percent_decode_str(value).unwrap_or_else(|| value.to_string()));
-            }
-        }
-    }
-    None
-}
-
-/// Minimal percent-decode — enough to handle the few characters
-/// better-auth might encode in the session token (`.`, `=`, `+`).
-/// Returns None on malformed escapes so the caller can fall back to
-/// the raw value.
-fn percent_decode_str(s: &str) -> Option<String> {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '%' {
-            let h1 = chars.next()?;
-            let h2 = chars.next()?;
-            let byte = u8::from_str_radix(&format!("{h1}{h2}"), 16).ok()?;
-            out.push(byte as char);
-        } else {
-            out.push(c);
-        }
-    }
-    Some(out)
-}
-
-/// Validate a session token against `playground_auth.session` and
-/// confirm the owning user is an admin (defined as: owns at least one
-/// row in `organizations`). Returns true only if both checks pass and
-/// the session is not expired.
-///
-/// Single query — joins session → organizations on userId/owner_id so
-/// we don't make two round-trips. The migration that set you as
-/// owner_id of the Playground (Demo) org is what makes this lookup
-/// admit you.
-async fn validate_admin_session(pool: &sqlx::PgPool, token: &str) -> bool {
-    let row: Result<(i64,), _> = sqlx::query_as(
-        r#"
-        SELECT COUNT(*)
-        FROM playground_auth.session s
-        JOIN organizations o ON o.owner_id = s."userId"
-        WHERE s.token = $1
-          AND s."expiresAt" > NOW()
-        "#,
-    )
-    .bind(token)
-    .fetch_one(pool)
-    .await;
-
-    match row {
-        Ok((count,)) => count > 0,
-        Err(err) => {
-            warn!(error = %err, "Admin session lookup failed");
-            false
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1094,37 +976,5 @@ mod tests {
 
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0].key_id, "owned-key");
-    }
-
-    #[test]
-    fn extract_session_token_handles_secure_prefix() {
-        let header = "__Secure-better-auth.session_token=abc123.def456; other=x";
-        assert_eq!(
-            extract_session_token(header),
-            Some("abc123.def456".to_string())
-        );
-    }
-
-    #[test]
-    fn extract_session_token_handles_unprefixed_cookie() {
-        let header = "better-auth.session_token=plain-token";
-        assert_eq!(
-            extract_session_token(header),
-            Some("plain-token".to_string())
-        );
-    }
-
-    #[test]
-    fn extract_session_token_skips_unrelated_cookies() {
-        let header = "csrf=abc; session_other=xyz";
-        assert_eq!(extract_session_token(header), None);
-    }
-
-    #[test]
-    fn extract_session_token_decodes_percent_encoding() {
-        // "%2E" → "." — better-auth occasionally percent-encodes the
-        // separator dot in cross-domain set-cookie responses.
-        let header = "better-auth.session_token=abc%2Edef";
-        assert_eq!(extract_session_token(header), Some("abc.def".to_string()));
     }
 }
