@@ -255,6 +255,30 @@ VITE_TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
 3. Update models in `aura-db`
 4. Run `sqlx migrate run`
 
+### Vercel Serverless Functions (`/api/*.ts`)
+
+The playground (`playground.aura-llm.dev`) is served by Vercel and uses serverless functions in `/api/`. These functions run under `@vercel/node@5` and **must be emitted as ESM**, because the auth stack (`better-auth@1.6+`) is ESM-only and any `require()` of it throws `ERR_REQUIRE_ESM` at module load.
+
+ESM emit is held together by four settings that must move together. Changing one without the others produces a different failure each time — we burned four deploys learning this:
+
+1. **`/package.json`** has `"type": "module"`. Without this, Node loads the emitted `.js` as CJS and `require()`s an ESM-only dep — `ERR_REQUIRE_ESM`.
+2. **`/tsconfig.json`** has `"module": "ESNext"` + `"moduleResolution": "Bundler"`. Without this, `@vercel/node@5`'s TypeScript pass emits CJS (`exports.foo = ...`) even when `package.json` says `module` — runtime then throws `ReferenceError: exports is not defined in ES module scope`. Scoped via `"include": ["api/**/*.ts"]` so apps' own tsconfigs are untouched.
+3. **Source files stay `.ts`** (NOT `.mts`). `@vercel/node@5` does map `.mts → .mjs` on emit, but the AWS Lambda Node runtime then rejects the handler name itself: `Runtime.MalformedHandlerName: 'api/auth/[...all].mts' is not a valid handler name`.
+4. **Relative imports use explicit `.js` extensions**, even though source is `.ts`. Native ESM in Node refuses extensionless relative imports — `Cannot find module '/var/task/api/_lib/auth' imported from /var/task/api/auth/[...all].js`. `moduleResolution: Bundler` lets tsc still resolve to the `.ts` source at compile time.
+
+#### Adding a new `/api` function
+
+1. Create `api/<name>/<route>.ts`. Keep the `.ts` extension. Default-export an `async function handler(req: IncomingMessage, res: ServerResponse)`.
+2. Use ESM syntax only: `import`/`export`. Never `require`, `module.exports`, `__dirname`, or `__filename`.
+3. Any relative import between `/api` files **must** end in `.js`:
+   ```ts
+   import { auth } from '../_lib/auth.js'    // ✅
+   import { auth } from '../_lib/auth'       // ❌ ERR_MODULE_NOT_FOUND at runtime
+   ```
+4. Bare module specifiers (`'better-auth/node'`, `'pg'`, `'node:http'`) don't need extensions.
+5. New deps go in **root** `/package.json`, not an app's. Run `npm install <pkg>` from the repo root.
+6. Test locally with `npx tsc --noEmit` from the repo root — picks up `/tsconfig.json` and catches import-shape mistakes before deploy.
+
 ### CORS Configuration
 
 The gateway uses `tower-http` CORS middleware to allow cross-origin requests from frontend apps.
@@ -297,6 +321,19 @@ use http::Method;
 ```
 
 ## Troubleshooting
+
+### Vercel `/api/*` Function Failures
+
+If `playground.aura-llm.dev/api/*` returns `FUNCTION_INVOCATION_FAILED`, match the error in Vercel's runtime logs against this table BEFORE patching — every one of these has a wrong "fix" that just surfaces the next error:
+
+| Error | Root cause | Fix |
+|---|---|---|
+| `Error [ERR_REQUIRE_ESM]: require() of ES Module ... not supported` | Function emitted as CJS but importing an ESM-only dep (e.g. `better-auth/node`). | Confirm `/package.json` has `"type": "module"` AND `/tsconfig.json` has `"module": "ESNext"`. |
+| `ReferenceError: exports is not defined in ES module scope` | CJS-style emit (`exports.foo = ...`) loaded as ESM. Means `tsconfig.json` is missing or has `"module": "CommonJS"`. | Set `/tsconfig.json` `compilerOptions.module` to `ESNext` (NOT `NodeNext` — see below). |
+| `Runtime.MalformedHandlerName: '...mts' is not a valid handler name` | A `/api/*.mts` source file. AWS Lambda's Node runtime only accepts `.js`/`.mjs`/`.cjs` handler names — `@vercel/node@5` passes the `.mts` filename through verbatim. | Rename back to `.ts`. Force ESM via `tsconfig.json`, not via the file extension. |
+| `ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/api/_lib/<name>'` | An extensionless relative import (`from '../_lib/auth'`) — Node's native ESM loader refuses these. | Add `.js` to every relative import in `/api/*.ts`, even though source is `.ts`. |
+
+See "Vercel Serverless Functions" under Common Tasks for the full four-setting ESM contract. Don't change just one of {`package.json type`, `tsconfig.json module`, source extension, import extensions} — they're a quartet.
 
 ### Git Repository Issues
 
