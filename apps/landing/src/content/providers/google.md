@@ -71,7 +71,7 @@ GOOGLE_API_KEY=AIza...
 ### Basic Completion
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3-flash",
@@ -84,7 +84,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### With System Instructions
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3-pro",
@@ -98,7 +98,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### Vision Input (Image Analysis)
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3-pro",
@@ -121,7 +121,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### Audio Input
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3-pro",
@@ -144,7 +144,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### Video Input
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-2.5-pro",
@@ -167,7 +167,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### With Function Calling
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3-flash",
@@ -231,7 +231,7 @@ Gemini excels at multimodal tasks:
 Force structured JSON output:
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3-flash",

@@ -67,7 +67,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 ### Basic Completion
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-5",
@@ -80,7 +80,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### With System Instructions
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-5",
@@ -94,7 +94,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### With Tool Use
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-5",
@@ -118,7 +118,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### Vision Input
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-5",
@@ -165,7 +165,7 @@ Cache hits can reduce latency by up to 85% for repeated requests.
 Claude 4.5 models support extended thinking for complex reasoning tasks. Enable with:
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-opus-4-5",
@@ -186,7 +186,7 @@ The response will include reasoning items showing the model's thought process.
 Force JSON output with:
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-5",

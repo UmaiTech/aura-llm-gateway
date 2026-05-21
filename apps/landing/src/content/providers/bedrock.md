@@ -85,7 +85,7 @@ export AWS_REGION=us-east-1
 ## Example Usage
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "anthropic.claude-sonnet-4-5-20250929-v1:0",

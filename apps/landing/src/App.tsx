@@ -142,7 +142,7 @@ Authorization: Bearer aura_team_...
 ]
 
 const codeExample = `// Request to Aura Gateway
-const response = await fetch('http://localhost:8080/v1/responses', {
+const response = await fetch('https://api.aura-llm.dev/v1/responses', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({

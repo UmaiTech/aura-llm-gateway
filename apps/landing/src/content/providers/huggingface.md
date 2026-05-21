@@ -63,7 +63,7 @@ Get a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/
 ## Example Usage
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "meta-llama/Llama-3.3-70B-Instruct",

@@ -129,7 +129,7 @@ POST /v1/responses
 ## Example Request
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.5-mini",
@@ -247,7 +247,7 @@ When using validation, consistency, and compression:
 ## With Tools
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.5",
@@ -291,7 +291,7 @@ When the model decides to call a tool, the response will include:
 Submit the tool result to continue:
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.5",

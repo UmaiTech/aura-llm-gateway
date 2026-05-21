@@ -167,7 +167,7 @@ Create API keys with limited scope and rate limits for testing.
 <Steps>
   <Step title="Create a test API key">
     <CodeBlock language="bash">
-{`curl -X POST http://localhost:8080/v1/api-keys \\
+{`curl -X POST https://api.aura-llm.dev/v1/api-keys \\
   -H "Authorization: Bearer \$AURA_ADMIN_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -197,7 +197,7 @@ client = AuraClient(
   <Step title="Clean up after tests">
     <CodeBlock language="bash">
 {`# Delete test API key
-curl -X DELETE http://localhost:8080/v1/api-keys/key_test123 \\
+curl -X DELETE https://api.aura-llm.dev/v1/api-keys/key_test123 \\
   -H "Authorization: Bearer \$AURA_ADMIN_KEY"`}
     </CodeBlock>
   </Step>

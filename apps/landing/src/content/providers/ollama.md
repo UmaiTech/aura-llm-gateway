@@ -54,7 +54,7 @@ No API key is required — Ollama doesn't authenticate by default. If you've put
 ### Basic Completion
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "llama3.3",
@@ -67,7 +67,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### Streaming
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "qwen2.5",

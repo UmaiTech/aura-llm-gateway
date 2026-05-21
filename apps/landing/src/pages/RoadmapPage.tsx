@@ -1,4 +1,4 @@
-import { Check, Clock, Rocket, Sparkles, Github, MessageSquare, ArrowLeft, Map } from 'lucide-react'
+import { Github, MessageSquare, ArrowLeft, Map } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 type Phase = 'shipped' | 'active' | 'planned' | 'considering'
@@ -10,6 +10,8 @@ interface ReleaseItem {
 
 interface Release {
   version: string
+  /** Calendar date for shipped releases. Free-form for planned. */
+  when: string
   phase: Phase
   title: string
   subtitle: string
@@ -17,9 +19,21 @@ interface Release {
   issueRefs?: string[]
 }
 
+/**
+ * Roadmap — editorial timeline.
+ *
+ * Data sourced directly from CHANGELOG.md as of 2026-05-21. When you
+ * ship a new minor version, update CHANGELOG and add a release row
+ * here. The latest shipped row sets phase='shipped' with the date;
+ * the next-up row sets phase='active'.
+ *
+ * Latest shipped: v0.9.2 (2026-05-20)
+ * In progress: v0.10 (admin + playground polish, validation strategies)
+ */
 const releases: Release[] = [
   {
-    version: 'v0.1.x',
+    version: 'v0.1',
+    when: 'Jan 2026',
     phase: 'shipped',
     title: 'Foundation',
     subtitle: 'Core gateway, three providers, Python SDK',
@@ -29,18 +43,18 @@ const releases: Release[] = [
       { label: 'Streaming via Server-Sent Events' },
       { label: 'Cost tracking per request' },
       { label: 'PostgreSQL request logging' },
-      { label: 'API key authentication' },
       { label: 'Python SDK (aura-llm on PyPI)' },
     ],
   },
   {
-    version: 'v0.2.x',
+    version: 'v0.2',
+    when: 'Jan 2026',
     phase: 'shipped',
-    title: 'Production Readiness',
+    title: 'Production readiness',
     subtitle: 'Caching, rate limits, encryption, multi-tenancy',
     items: [
-      { label: 'Response caching', note: 'Redis, SHA-256 keys, TTL' },
-      { label: 'Rate limiting', note: 'token bucket per API key' },
+      { label: 'Redis response caching', note: 'SHA-256 keys, TTL' },
+      { label: 'Token-bucket rate limiting per API key' },
       { label: 'Prometheus metrics at /metrics' },
       { label: 'AES-256-GCM credential encryption' },
       { label: 'Hierarchical orgs', note: 'org → team → project' },
@@ -48,9 +62,10 @@ const releases: Release[] = [
     ],
   },
   {
-    version: 'v0.3.x',
+    version: 'v0.3',
+    when: 'Feb 2026',
     phase: 'shipped',
-    title: 'Multi-Provider Expansion',
+    title: 'Multi-provider expansion',
     subtitle: 'Four new providers, smart routing, prompt compression',
     items: [
       { label: 'Mistral AI provider' },
@@ -59,45 +74,112 @@ const releases: Release[] = [
       { label: 'AWS Bedrock provider', note: 'Claude family' },
       { label: 'Smart routing', note: '8 strategies, circuit breaker, health tracking' },
       { label: 'Admin dashboard foundation' },
-      { label: 'TOON, AISP, JSON, YAML prompt compression' },
+      { label: 'TOON, AISP, JSON, YAML compression' },
     ],
   },
   {
-    version: 'v0.4.x',
+    version: 'v0.4',
+    when: 'May 2026',
     phase: 'shipped',
-    title: 'OSS Launch & Distribution',
-    subtitle: 'Public release, Helm chart, PyPI publishing, dedicated domain',
+    title: 'OSS launch & distribution',
+    subtitle: 'Public release, Helm chart, PyPI, dedicated domain',
     items: [
       { label: 'Open-sourced at github.com/UmaiTech/aura-llm-gateway' },
-      { label: 'Helm chart on ghcr.io', note: 'OCI registry, one-command k8s install' },
-      { label: 'Python SDK published on PyPI', note: 'trusted publishing via OIDC' },
-      { label: 'aura-llm.dev launched', note: 'landing, docs, roadmap, playground subdomains' },
+      { label: 'Helm chart on ghcr.io', note: 'OCI registry' },
+      { label: 'Python SDK on PyPI via trusted publishing (OIDC)' },
+      { label: 'aura-llm.dev launched', note: 'landing, docs, roadmap subdomains' },
       { label: 'Chat playground deployed' },
-      { label: '9-feature landing page with full capability map' },
     ],
   },
   {
-    version: 'v0.5.x',
-    phase: 'active',
-    title: 'Observability & SDK Parity',
-    subtitle: 'TypeScript SDK, distributed tracing, provider completions',
+    version: 'v0.5',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Playground & content',
+    subtitle: 'Bundled playground, new model registrations, docs polish',
     items: [
-      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
-      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
-      { label: 'HF Classic Inference API', note: '#74' },
-      { label: 'Bedrock Llama / Mistral / Titan families', note: '#73' },
-      { label: 'Mistral FIM completions', note: '#75' },
-      { label: 'Hosted demo gateway at api.aura-llm.dev' },
+      { label: 'Chat playground bundled at /playground' },
+      { label: 'Roadmap subdomain split out' },
+      { label: 'GPT-5.4/5.5 + Claude 4.6/4.7 models registered' },
+      { label: 'MDX docs with interactive components' },
     ],
-    issueRefs: ['#73', '#74', '#75'],
+  },
+  {
+    version: 'v0.6',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Harness & resilience',
+    subtitle: 'Agentic harness, CORS robustness, model coverage',
+    items: [
+      { label: 'Agentic harness runnable end-to-end' },
+      { label: 'Claude Haiku 4.5 registration + pricing' },
+      { label: 'AURA_CORS_ALLOWED_ORIGINS fail-open + loud log' },
+      { label: 'Robust `migrate` subcommand (duplicate-argv tolerance)' },
+    ],
+  },
+  {
+    version: 'v0.7',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Per-user scoping',
+    subtitle: 'API key ownership and CI hardening',
+    items: [
+      { label: 'API key routes scoped to authenticated user' },
+      { label: 'Version-preview workflow skips fork PRs' },
+      { label: 'Python SDK version sync hook' },
+    ],
+  },
+  {
+    version: 'v0.8',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Vercel + analytics',
+    subtitle: 'Move /api to repo root, TLS on Fly Postgres, analytics',
+    items: [
+      { label: 'Moved api/ to repo root for Vercel deploy' },
+      { label: 'TLS enabled on pg Pool (Fly Postgres)' },
+      { label: 'Vercel Analytics on landing, chat, admin' },
+      { label: 'Node 22.x pinned for Vercel builds' },
+    ],
+  },
+  {
+    version: 'v0.9',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Current — playground stability',
+    subtitle: 'better-auth, daily caps, ESM /api, security fixes',
+    items: [
+      { label: 'GitHub OAuth for playground via better-auth' },
+      { label: 'Per-user gateway keys auto-minted on sign-in' },
+      { label: 'Free-tier daily message cap (20/day UTC)' },
+      { label: '/api/* emits ESM so better-auth loads' },
+      { label: 'Compression view + dashboard NUMERIC f64 panic fixes' },
+      { label: 'Playground (Demo) org rollup in admin' },
+    ],
+  },
+  {
+    version: 'v0.10',
+    when: 'next',
+    phase: 'active',
+    title: 'Admin polish & content audit',
+    subtitle: 'Editorial redesign, admin app, design-audit cleanup',
+    items: [
+      { label: 'Admin dashboard at app.aura-llm.dev' },
+      { label: 'Editorial redesign across landing/docs/roadmap/admin/chat' },
+      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
+      { label: 'Validation strategies actually consume request.validation', note: '#155' },
+      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
+    ],
+    issueRefs: ['#155'],
   },
   {
     version: 'v1.0',
+    when: 'later',
     phase: 'planned',
     title: 'Stabilization',
-    subtitle: 'Enterprise security, HA deployment, 99.9% uptime',
+    subtitle: 'Enterprise security, HA deployment, uptime commitment',
     items: [
-      { label: 'Webhook callbacks for async response completion' },
+      { label: 'Webhook callbacks for async completion' },
       { label: 'Auto-updating pricing scraper' },
       { label: 'API key rotation' },
       { label: 'IP allowlisting' },
@@ -108,8 +190,9 @@ const releases: Release[] = [
   },
   {
     version: 'Future',
+    when: '—',
     phase: 'considering',
-    title: 'Under Consideration',
+    title: 'Under consideration',
     subtitle: 'Evaluating based on community feedback',
     items: [
       { label: 'Budget hard caps per user / key' },
@@ -122,157 +205,117 @@ const releases: Release[] = [
   },
 ]
 
-const phaseConfig = {
-  shipped: {
-    icon: Check,
-    iconBg: 'bg-green-500/15',
-    iconBorder: 'border-green-500/30',
-    iconColor: 'text-green-400',
-    nodeBg: 'bg-green-500',
-    cardBorder: 'border-gray-800',
-    cardBg: 'bg-gray-900/40',
-    versionColor: 'text-green-400',
-    label: 'Shipped',
-    labelColor: 'text-green-400 bg-green-500/10 border-green-500/20',
-    opacity: 'opacity-100',
-  },
-  active: {
-    icon: Clock,
-    iconBg: 'bg-primary-500/15',
-    iconBorder: 'border-primary-500/30',
-    iconColor: 'text-primary-400',
-    nodeBg: 'bg-primary-500',
-    cardBorder: 'border-primary-500/40',
-    cardBg: 'bg-gray-900/60',
-    versionColor: 'text-primary-400',
-    label: 'In Progress',
-    labelColor: 'text-primary-400 bg-primary-500/10 border-primary-500/20',
-    opacity: 'opacity-100',
-  },
-  planned: {
-    icon: Rocket,
-    iconBg: 'bg-gray-700/40',
-    iconBorder: 'border-gray-600/40',
-    iconColor: 'text-gray-400',
-    nodeBg: 'bg-gray-600',
-    cardBorder: 'border-gray-700/50',
-    cardBg: 'bg-gray-900/20',
-    versionColor: 'text-gray-400',
-    label: 'Planned',
-    labelColor: 'text-gray-400 bg-gray-700/20 border-gray-600/20',
-    opacity: 'opacity-80',
-  },
-  considering: {
-    icon: Sparkles,
-    iconBg: 'bg-gray-800/40',
-    iconBorder: 'border-gray-700/30',
-    iconColor: 'text-gray-600',
-    nodeBg: 'bg-gray-700',
-    cardBorder: 'border-gray-800/40',
-    cardBg: 'bg-gray-900/10',
-    versionColor: 'text-gray-600',
-    label: 'Considering',
-    labelColor: 'text-gray-600 bg-gray-800/30 border-gray-700/20',
-    opacity: 'opacity-60',
-  },
+// Use a manual reverse-find instead of Array.prototype.findLast — the
+// latter needs lib=es2023 which isn't on this tsconfig. Keeps the
+// build target compatible while still picking the latest shipped row.
+const LATEST_SHIPPED_VERSION = (() => {
+  for (let i = releases.length - 1; i >= 0; i--) {
+    if (releases[i].phase === 'shipped') return releases[i].version
+  }
+  return 'v0.9'
+})()
+
+function phaseLabel(phase: Phase) {
+  switch (phase) {
+    case 'shipped':
+      return 'shipped'
+    case 'active':
+      return 'in progress'
+    case 'planned':
+      return 'planned'
+    case 'considering':
+      return 'considering'
+  }
 }
 
-function TimelineNode({ phase, isLast }: { phase: Phase; isLast: boolean }) {
-  const cfg = phaseConfig[phase]
-  return (
-    <div className="flex flex-col items-center">
-      <div
-        className={`
-          relative h-3 w-3 rounded-full flex-shrink-0
-          ${cfg.nodeBg}
-          ${phase === 'active' ? 'shadow-[0_0_12px_3px_rgba(99,102,241,0.4)]' : ''}
-        `}
-      >
-        {phase === 'active' && (
-          <span className="absolute inset-0 rounded-full animate-ping bg-primary-500 opacity-30" />
-        )}
-      </div>
-      {!isLast && (
-        <div
-          className={`
-            w-px flex-1 min-h-8
-            ${phase === 'shipped' ? 'bg-gradient-to-b from-green-500/40 to-gray-700/40' : 'bg-gray-800'}
-          `}
-        />
-      )}
-    </div>
-  )
+function phaseDot(phase: Phase) {
+  switch (phase) {
+    case 'shipped':
+      return 'bg-green-500'
+    case 'active':
+      return 'bg-aura-400'
+    case 'planned':
+      return 'bg-gray-500'
+    case 'considering':
+      return 'bg-gray-700'
+  }
 }
 
-function ReleaseCard({ release }: { release: Release }) {
-  const cfg = phaseConfig[release.phase]
-  const Icon = cfg.icon
+function ReleaseRow({
+  release,
+  isLast,
+}: {
+  release: Release
+  isLast: boolean
+}) {
+  const dim =
+    release.phase === 'planned'
+      ? 'opacity-80'
+      : release.phase === 'considering'
+        ? 'opacity-60'
+        : 'opacity-100'
 
   return (
-    <div className={`${cfg.opacity} group`}>
-      <div
-        className={`
-          rounded-xl border p-5 sm:p-6 transition-all duration-200
-          ${cfg.cardBg} ${cfg.cardBorder}
-          ${release.phase === 'active' ? 'shadow-[0_0_30px_-5px_rgba(99,102,241,0.2)]' : ''}
-          hover:border-gray-600/60
-        `}
-      >
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 border ${cfg.iconBg} ${cfg.iconBorder}`}>
-              <Icon className={`h-4.5 w-4.5 ${cfg.iconColor}`} style={{ height: '1.125rem', width: '1.125rem' }} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`font-mono text-sm font-semibold ${cfg.versionColor}`}>
-                  {release.version}
-                </span>
-                {release.phase === 'shipped' && (
-                  <span className="font-mono text-xs text-gray-600">—</span>
-                )}
-                <h2 className="font-semibold text-white text-base">{release.title}</h2>
-              </div>
-              <p className="text-sm text-gray-500 mt-0.5">{release.subtitle}</p>
-            </div>
-          </div>
-          <span className={`hidden sm:inline-flex flex-shrink-0 text-xs font-medium px-2 py-1 rounded-full border ${cfg.labelColor}`}>
-            {cfg.label}
+    <article className={`${dim} relative grid grid-cols-12 gap-6 sm:gap-8 pb-12 ${!isLast ? 'border-b border-gray-800' : ''} pt-12 first:pt-0 first:border-t-0`}>
+      {/* Margin: version + date */}
+      <div className="col-span-12 sm:col-span-3 lg:col-span-2">
+        <div className="flex items-center gap-2">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${phaseDot(release.phase)} ${
+              release.phase === 'active' ? 'animate-pulse' : ''
+            }`}
+            aria-hidden
+          />
+          <span className="font-mono text-xs uppercase tracking-wider text-gray-500">
+            {phaseLabel(release.phase)}
           </span>
         </div>
+        <div className="font-display text-3xl sm:text-4xl font-semibold text-gray-100 leading-none mt-3">
+          {release.version}
+        </div>
+        <div className="font-mono text-xs text-gray-500 mt-2">
+          {release.when}
+        </div>
+      </div>
 
-        <ul className="space-y-1.5 ml-12">
+      {/* Main: title + body */}
+      <div className="col-span-12 sm:col-span-9 lg:col-span-10">
+        <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-gray-100">
+          {release.title}
+        </h2>
+        <p className="text-gray-400 text-sm mt-1">{release.subtitle}</p>
+        <ul className="mt-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
           {release.items.map((item, i) => (
-            <li key={i} className="flex items-baseline gap-2 text-sm">
+            <li key={i} className="text-gray-300 flex items-baseline gap-2">
               <span
-                className={`
-                  mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0
-                  ${release.phase === 'shipped' ? 'bg-green-500/60' :
-                    release.phase === 'active' ? 'bg-primary-500/60' :
-                    'bg-gray-600'}
-                `}
-              />
-              <span className={release.phase === 'considering' ? 'text-gray-600' : 'text-gray-300'}>
-                {item.label}
+                aria-hidden
+                className="text-gray-600 font-mono text-xs flex-shrink-0"
+              >
+                ·
               </span>
-              {item.note && (
-                <span className="text-gray-600 font-mono text-xs">{item.note}</span>
-              )}
+              <span>
+                {item.label}
+                {item.note && (
+                  <span className="text-gray-500 font-mono text-xs ml-1">
+                    ({item.note})
+                  </span>
+                )}
+              </span>
             </li>
           ))}
         </ul>
       </div>
-    </div>
+    </article>
   )
 }
 
 export function RoadmapPage() {
-  const shippedCount = releases.filter(r => r.phase === 'shipped').length
+  const shippedCount = releases.filter((r) => r.phase === 'shipped').length
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <div className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <Link
             to="/docs"
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-white transition-colors"
@@ -287,91 +330,105 @@ export function RoadmapPage() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-8">
-        <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/80 text-xs text-gray-400 mb-5 border border-gray-700/50">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 inline-block" />
-            Current release
-            <span className="font-mono text-green-400 font-semibold">v0.4.1</span>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-16">
+        {/* Hero — editorial */}
+        <header className="mb-16">
+          <div className="font-mono text-xs uppercase tracking-wider text-gray-500 mb-6">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
+              Latest release
+            </span>
+            <span className="mx-2">·</span>
+            <span className="font-semibold text-green-400">
+              {LATEST_SHIPPED_VERSION}
+            </span>
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-semibold mb-4 tracking-tight">
             <span className="text-gray-100">Building in public.</span>
             <br />
             <span className="text-gray-400">Here&apos;s where we are.</span>
           </h1>
-          <p className="text-lg text-gray-400 max-w-xl leading-relaxed">
-            Four major versions shipped. Seven LLM providers unified behind a
-            single API. Open-sourced, on PyPI, on GHCR, ready to deploy. This is
-            what we've done — and what comes next.
+          <p className="text-lg text-gray-400 max-w-2xl leading-relaxed">
+            Nine minor versions shipped through {LATEST_SHIPPED_VERSION}. Seven
+            LLM providers behind one API. Open source on GitHub, on PyPI, on
+            GHCR — sourced directly from the changelog.
           </p>
 
-          <div className="flex items-center gap-6 mt-8">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{shippedCount}</div>
-              <div className="text-xs text-gray-500 mt-0.5">versions shipped</div>
-            </div>
-            <div className="h-8 w-px bg-gray-800" />
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">7</div>
-              <div className="text-xs text-gray-500 mt-0.5">LLM providers</div>
-            </div>
-            <div className="h-8 w-px bg-gray-800" />
-            <div className="text-center">
-              <div className="font-display text-2xl font-semibold text-aura-400">v0.5</div>
-              <div className="text-xs text-gray-500 mt-0.5">in progress</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative">
-          <div
-            className="absolute left-[5px] top-3 bottom-0 w-px bg-gradient-to-b from-green-500/50 via-primary-500/30 to-gray-800/0"
-            aria-hidden="true"
-          />
-
-          <div className="space-y-6">
-            {releases.map((release, i) => (
-              <div key={release.version} className="flex gap-5">
-                <TimelineNode
-                  phase={release.phase}
-                  isLast={i === releases.length - 1}
-                />
-                <div className="flex-1 pb-2 min-w-0">
-                  <ReleaseCard release={release} />
-                </div>
+          {/* Stat row — same vocabulary as the landing */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mt-12 border-t border-gray-800 pt-8">
+            <div>
+              <div className="font-display text-3xl font-semibold text-gray-100 leading-none">
+                {shippedCount}
               </div>
-            ))}
+              <div className="font-mono text-xs text-gray-500 uppercase tracking-wider mt-2">
+                versions shipped
+              </div>
+            </div>
+            <div>
+              <div className="font-display text-3xl font-semibold text-gray-100 leading-none">
+                7
+              </div>
+              <div className="font-mono text-xs text-gray-500 uppercase tracking-wider mt-2">
+                LLM providers
+              </div>
+            </div>
+            <div>
+              <div className="font-display text-3xl font-semibold text-green-400 leading-none">
+                {LATEST_SHIPPED_VERSION}
+              </div>
+              <div className="font-mono text-xs text-gray-500 uppercase tracking-wider mt-2">
+                current
+              </div>
+            </div>
+            <div>
+              <div className="font-display text-3xl font-semibold text-aura-400 leading-none">
+                v0.10
+              </div>
+              <div className="font-mono text-xs text-gray-500 uppercase tracking-wider mt-2">
+                in progress
+              </div>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <div className="mt-14 rounded-xl border border-gray-800 bg-gray-900/30 p-6 sm:p-8">
-          <h2 className="text-lg font-semibold text-white mb-2">Help shape the roadmap</h2>
-          <p className="text-sm text-gray-400 mb-5 max-w-lg">
-            Open an issue to request a feature, vote on existing proposals, or
-            contribute a PR. We read everything.
-          </p>
-          <div className="flex flex-wrap gap-3">
+        {/* Timeline — flat, no cards, hairline rules between rows */}
+        <section>
+          {releases.map((release, i) => (
+            <ReleaseRow
+              key={release.version}
+              release={release}
+              isLast={i === releases.length - 1}
+            />
+          ))}
+        </section>
+
+        {/* CTA — single-sentence typographic */}
+        <section className="mt-20 pt-16 border-t border-gray-800">
+          <p className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-gray-100 max-w-3xl leading-tight">
+            Help shape what&apos;s next.{' '}
             <a
               href="https://github.com/UmaiTech/aura-llm-gateway/issues"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-primary gap-2 text-sm px-4 py-2"
+              className="text-aura-400 hover:text-aura-300 transition-colors underline-offset-4 hover:underline inline-flex items-baseline gap-1.5"
             >
-              <Github className="h-4 w-4" />
+              <Github className="h-5 w-5 self-center" />
               Open an issue
             </a>
+            {' or '}
             <a
               href="https://github.com/UmaiTech/aura-llm-gateway/discussions"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-secondary gap-2 text-sm px-4 py-2"
+              className="text-aura-400 hover:text-aura-300 transition-colors underline-offset-4 hover:underline inline-flex items-baseline gap-1.5"
             >
-              <MessageSquare className="h-4 w-4" />
-              Discussions
+              <MessageSquare className="h-5 w-5 self-center" />
+              start a discussion
             </a>
-          </div>
-        </div>
-      </div>
+            .
+          </p>
+        </section>
+      </main>
     </div>
   )
 }

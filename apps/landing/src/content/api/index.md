@@ -10,7 +10,7 @@ Aura implements the [Open Responses API](https://www.openresponses.org/specifica
 ## Base URL
 
 ```text
-http://localhost:8080
+https://api.aura-llm.dev
 ```
 
 ## Interactive API Explorer
@@ -28,7 +28,7 @@ You can also fetch the raw OpenAPI 3.1 specification at [`https://api.aura-llm.d
 All API requests require a valid API key in the `Authorization` header:
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Authorization: Bearer aura_live_abc123..." \
   -H "Content-Type: application/json" \
   -d '{"model": "gpt-4.5", "input": [...]}'

@@ -82,7 +82,7 @@ OPENAI_API_KEY=sk-proj-...
 ### Basic Completion
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.1-mini",
@@ -95,7 +95,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### With Function Calling
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.1",
@@ -122,7 +122,7 @@ curl -X POST http://localhost:8080/v1/responses \
 ### Reasoning Model (o3-mini)
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "o3-mini",
@@ -160,7 +160,7 @@ Cached tokens are billed at a lower rate (see pricing table above).
 ### Vision Inputs (GPT-4o/GPT-5)
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.5",

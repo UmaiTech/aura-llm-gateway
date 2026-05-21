@@ -38,7 +38,7 @@ sequenceDiagram
 ### First Message (Start Conversation)
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Authorization: Bearer aura_live_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -68,7 +68,7 @@ Response:
 ### Follow-up Message (Continue Conversation)
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Authorization: Bearer aura_live_..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -184,7 +184,7 @@ All responses in a conversation are stored with:
 ```python
 from aura import AuraClient
 
-client = AuraClient(base_url="http://localhost:8080")
+client = AuraClient(base_url="https://api.aura-llm.dev")
 
 # Start conversation
 response1 = client.responses.create(

@@ -12,7 +12,7 @@ Aura supports Server-Sent Events (SSE) for streaming responses, allowing you to 
 Set `stream: true` in your request:
 
 ```bash
-curl -X POST http://localhost:8080/v1/responses \
+curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4.5-mini",
@@ -143,7 +143,7 @@ Sent if the response fails.
 ## JavaScript Example
 
 ```javascript
-const response = await fetch('http://localhost:8080/v1/responses', {
+const response = await fetch('https://api.aura-llm.dev/v1/responses', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -187,7 +187,7 @@ import requests
 import json
 
 response = requests.post(
-    'http://localhost:8080/v1/responses',
+    'https://api.aura-llm.dev/v1/responses',
     json={
         'model': 'gpt-4.5-mini',
         'input': [{'type': 'message', 'role': 'user', 'content': 'Hello!'}],
