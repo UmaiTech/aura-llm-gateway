@@ -71,6 +71,9 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
+        // Display serif for the WelcomeScreen headline and any
+        // empty-state hero text. See docs/design-audit/REDESIGN.md.
+        display: ['Fraunces', 'Georgia', 'serif'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

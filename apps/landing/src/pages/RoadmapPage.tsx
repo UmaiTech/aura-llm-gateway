@@ -271,7 +271,7 @@ export function RoadmapPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <div className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-lg sticky top-0 z-10">
+      <div className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <Link
             to="/docs"
@@ -294,10 +294,10 @@ export function RoadmapPage() {
             Current release
             <span className="font-mono text-green-400 font-semibold">v0.4.1</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
-            <span className="gradient-text">Building in public.</span>
+          <h1 className="font-display text-4xl sm:text-5xl font-semibold mb-4 tracking-tight">
+            <span className="text-gray-100">Building in public.</span>
             <br />
-            <span className="text-gray-200">Here's where we are.</span>
+            <span className="text-gray-400">Here&apos;s where we are.</span>
           </h1>
           <p className="text-lg text-gray-400 max-w-xl leading-relaxed">
             Four major versions shipped. Seven LLM providers unified behind a
@@ -317,7 +317,7 @@ export function RoadmapPage() {
             </div>
             <div className="h-8 w-px bg-gray-800" />
             <div className="text-center">
-              <div className="text-2xl font-bold gradient-text">v0.5</div>
+              <div className="font-display text-2xl font-semibold text-aura-400">v0.5</div>
               <div className="text-xs text-gray-500 mt-0.5">in progress</div>
             </div>
           </div>

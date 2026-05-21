@@ -259,10 +259,10 @@ export default function App() {
             Open Responses API Compatible
           </div>
 
-          <h1 className="text-5xl sm:text-6xl font-bold mb-6">
-            <span className="gradient-text">Unified LLM Gateway</span>
+          <h1 className="font-display text-5xl sm:text-6xl font-semibold mb-6 tracking-tight">
+            <span className="text-gray-100">Unified LLM Gateway</span>
             <br />
-            <span className="text-gray-100">for Modern AI Apps</span>
+            <span className="text-gray-400">for Modern AI Apps</span>
           </h1>
 
           <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
@@ -288,13 +288,13 @@ export default function App() {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-900/50">
         <div className="max-w-4xl mx-auto">
           <div className="card glow">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                <div className="h-3 w-3 rounded-full bg-green-500/80" />
-              </div>
-              <span className="text-sm text-gray-500 ml-2">example.ts</span>
+            {/* Filename hangs above the code block — no fake macOS
+                traffic-light dots. The code block is just a code
+                block, not a pretend window. */}
+            <div className="flex items-center mb-4">
+              <span className="font-mono text-xs text-gray-500 tracking-wide uppercase">
+                example.ts
+              </span>
             </div>
             <pre className="text-sm overflow-x-auto">
               <code className="text-gray-300">{codeExample}</code>

@@ -159,9 +159,8 @@ function SignInScreen() {
               <Sparkles className="h-3 w-3" />
               Free, no credit card
             </div>
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]">
-              Try the{' '}
-              <span className="gradient-text">Aura Playground</span>
+            <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
+              Try the <span className="text-aura-400">Aura Playground</span>
             </h1>
             <p className="text-gray-400 leading-relaxed text-base sm:text-lg max-w-md mx-auto">
               The Open Responses API live — across OpenAI, Anthropic, Google,
