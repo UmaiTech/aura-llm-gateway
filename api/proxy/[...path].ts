@@ -29,8 +29,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fromNodeHeaders } from 'better-auth/node'
-import { auth } from '../_lib/auth'
-import { getUserApiKey, mintPlaygroundApiKey } from '../_lib/mint-key'
+import { auth } from '../_lib/auth.js'
+import { getUserApiKey, mintPlaygroundApiKey } from '../_lib/mint-key.js'
 
 // Trim + strip trailing slash so accidental whitespace or a trailing
 // `/` in the Vercel env var doesn't produce malformed URLs like

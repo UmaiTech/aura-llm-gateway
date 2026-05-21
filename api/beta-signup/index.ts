@@ -18,7 +18,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { fromNodeHeaders } from 'better-auth/node'
-import { auth, pool } from '../_lib/auth'
+import { auth, pool } from '../_lib/auth.js'
 
 const ALLOWED_SOURCES = new Set([
   'rate_limit_429',

@@ -24,8 +24,8 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { toNodeHandler } from 'better-auth/node'
-import { auth } from '../_lib/auth'
-import { mintPlaygroundApiKey } from '../_lib/mint-key'
+import { auth } from '../_lib/auth.js'
+import { mintPlaygroundApiKey } from '../_lib/mint-key.js'
 
 const authNodeHandler = toNodeHandler(auth)
 

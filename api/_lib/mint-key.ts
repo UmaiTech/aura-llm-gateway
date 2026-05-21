@@ -14,7 +14,7 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import { fromNodeHeaders } from 'better-auth/node'
-import { auth, pool } from './auth'
+import { auth, pool } from './auth.js'
 
 /**
  * Generate a key in the gateway's format:
