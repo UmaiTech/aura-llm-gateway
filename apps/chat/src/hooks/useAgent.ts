@@ -16,8 +16,10 @@ import type { Message, Tool, ToolInvocation, MessageUsage } from '../lib/types'
 
 // In prod, requests flow through /api/proxy (the serverless function holds
 // the per-user gateway API key). In local dev with `vercel dev`, same path.
-// To bypass the proxy and hit a local gateway directly, set VITE_API_BASE_URL.
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/proxy'
+// To bypass the proxy and hit a local gateway directly, set
+// VITE_PROXY_BASE_URL (NOT VITE_API_BASE_URL — that one belongs to the
+// admin app on the shared Vercel project).
+const API_BASE = import.meta.env.VITE_PROXY_BASE_URL || '/api/proxy'
 
 /**
  * Turn a raw error into a UI-friendly message. Surfaces special copy for

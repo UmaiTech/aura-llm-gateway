@@ -67,13 +67,20 @@ export function parseIntHeader(value: string | null | undefined): number | undef
 // the request to api.aura-llm.dev. The browser never sees the API key.
 //
 // In local dev, you can either:
-//   1. Run the chat against the local gateway directly: VITE_API_BASE_URL=http://localhost:8080
+//   1. Run the chat against the local gateway directly: VITE_PROXY_BASE_URL=http://localhost:8080
 //   2. Run `vercel dev` to get the proxy locally
+//
+// NOTE: chat uses VITE_PROXY_BASE_URL, NOT VITE_API_BASE_URL — the
+// latter is the admin app's gateway URL on Vercel prod (admin reads it
+// directly because admin doesn't have a serverless proxy). If chat
+// read it, chat would bypass /api/proxy and try to hit
+// api.aura-llm.dev with credentials:'include', which strict-mode CORS
+// rejects (no allow_credentials true in the gateway).
 //
 // VITE_AURA_API_KEY is intentionally not read here anymore — the proxy is
 // the only path that knows the key, and only on the server side.
-const API_BASE = import.meta.env.VITE_API_BASE_URL
-  ? `${import.meta.env.VITE_API_BASE_URL}/v1`
+const API_BASE = import.meta.env.VITE_PROXY_BASE_URL
+  ? `${import.meta.env.VITE_PROXY_BASE_URL}/v1`
   : '/api/proxy/v1'
 
 // The session cookie is the implicit credential. No bearer token in the

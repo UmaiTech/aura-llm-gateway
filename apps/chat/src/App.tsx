@@ -10,10 +10,15 @@ import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } f
 import { calculateCost } from './lib/pricing'
 import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
 
-// In production the chat hits same-origin /api/proxy (a serverless function
-// that holds the per-user gateway API key). VITE_API_BASE_URL is only used
-// for local-dev to talk directly to a running gateway.
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/proxy'
+// In production the chat hits same-origin /api/proxy (a serverless
+// function that holds the per-user gateway API key).
+// VITE_PROXY_BASE_URL is only used for local-dev to talk directly to a
+// running gateway. NOTE: chat uses VITE_PROXY_BASE_URL, NOT
+// VITE_API_BASE_URL — the latter is the admin app's gateway URL on
+// Vercel prod, and if chat read it we'd bypass the proxy and try to
+// hit api.aura-llm.dev with credentials:'include', which strict-mode
+// CORS rejects.
+const API_BASE = import.meta.env.VITE_PROXY_BASE_URL || '/api/proxy'
 const API_KEY = '' // Frontend never holds the API key; session cookie is the credential
 
 export default function App() {
@@ -58,10 +63,11 @@ export default function App() {
 
   // Create API instance with all strategy configs.
   // Defaults to the same-origin proxy at /api/proxy/v1 in prod; can be
-  // overridden via VITE_API_BASE_URL for local-dev against a direct gateway.
+  // overridden via VITE_PROXY_BASE_URL for local-dev against a direct
+  // gateway.
   const api = new AuraAPI({
-    baseUrl: import.meta.env.VITE_API_BASE_URL
-      ? `${import.meta.env.VITE_API_BASE_URL}/v1`
+    baseUrl: import.meta.env.VITE_PROXY_BASE_URL
+      ? `${import.meta.env.VITE_PROXY_BASE_URL}/v1`
       : '/api/proxy/v1',
     apiKey: API_KEY,
     routingStrategy,

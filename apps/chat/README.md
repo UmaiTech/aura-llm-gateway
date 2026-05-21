@@ -32,8 +32,9 @@ npm run build
 Create a `.env` file in the `apps/chat/` directory:
 
 ```env
-# Aura Gateway URL (defaults to localhost:8080)
-VITE_API_BASE_URL=http://localhost:8080
+# Aura Gateway URL (defaults to localhost:8080). NOTE: chat uses
+# VITE_PROXY_BASE_URL, not VITE_API_BASE_URL — see .env.example.
+VITE_PROXY_BASE_URL=http://localhost:8080
 
 # Tavily API key for web search (optional)
 VITE_TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
@@ -134,7 +135,7 @@ The chat app connects to the Aura Gateway's `/v1/responses` endpoint:
 
 ```typescript
 // The gateway URL is configurable via environment variable
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const API_BASE = import.meta.env.VITE_PROXY_BASE_URL || 'http://localhost:8080'
 
 // Requests follow the Open Responses API format
 const response = await fetch(`${API_BASE}/v1/responses`, {

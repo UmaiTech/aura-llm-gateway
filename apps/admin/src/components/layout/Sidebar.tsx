@@ -67,8 +67,18 @@ const navigation: NavGroup[] = [
 ]
 
 const externalLinks = [
-  { name: 'Docs', href: '/docs', icon: Book2Line },
-  { name: 'GitHub', href: 'https://github.com', icon: GithubLine, external: true },
+  {
+    name: 'Docs',
+    href: 'https://aura-llm.dev/docs',
+    icon: Book2Line,
+    external: true,
+  },
+  {
+    name: 'GitHub',
+    href: 'https://github.com/UmaiTech/aura-llm-gateway',
+    icon: GithubLine,
+    external: true,
+  },
 ]
 
 export function Sidebar() {
