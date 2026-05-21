@@ -74,6 +74,12 @@
       "has": [{ "type": "host", "value": "playground.aura-llm.dev" }],
       "destination": "/chat",
       "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "app.aura-llm.dev" }],
+      "destination": "/app/",
+      "permanent": false
     }
   ],
   "rewrites": [
