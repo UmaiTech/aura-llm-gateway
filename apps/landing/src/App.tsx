@@ -1,93 +1,134 @@
-import { useState } from 'react'
 import {
-  Sparkles, ArrowRight, Zap, BarChart3,
-  Code2, Globe, MessageSquare, BookOpen,
-  Github, ExternalLink, Lock, Network, FileSearch,
-  Layers, Minimize2, RotateCcw
+  ArrowRight,
+  Github,
+  ExternalLink,
 } from 'lucide-react'
 
-interface Feature {
-  icon: typeof Globe
+/**
+ * Landing page — Stat-Led editorial layout.
+ *
+ * Per docs/design-audit/REDESIGN.md, this page is the only one in the
+ * app where every claim is a real, defensible number. So the page is
+ * organized around those numbers as its structural spine:
+ *
+ *   00 — Hero: stat row in display serif
+ *   01..05 — Numbered sections, one per defensible claim, with
+ *            adjacent code (no card-flip).
+ *   end — Typographic CTA + single-line footer.
+ *
+ * No 3-column feature grid, no card-flip, no centered playground CTA
+ * with an orphan icon, no glassmorphic surfaces, no two-stop
+ * gradients. One accent (aura-400). Spacing varies by content
+ * weight, not by a uniform py-20.
+ */
+
+interface NumberedSection {
+  /** "01", "02", ... rendered hanging in the margin */
+  index: string
+  /** Section title — short, declarative. */
   title: string
-  description: string
+  /** Body text — two or three sentences max. */
+  body: React.ReactNode
+  /** Code or config example shown adjacent to text. */
   code: string
+  /** Programming language for the mono label. */
+  lang: string
+  /** Where the "Read the docs" link points. */
   docsHref: string
+  /** Optional inline stat above the title ("7 providers", etc.). */
+  stat?: { value: string; unit: string }
 }
 
-const features: Feature[] = [
+const SECTIONS: NumberedSection[] = [
   {
-    icon: Globe,
-    title: '7 Providers',
-    description: 'OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, AWS Bedrock — all behind one Open Responses API.',
+    index: '01',
+    stat: { value: '7', unit: 'providers' },
+    title: 'One API, every model.',
+    body: (
+      <>
+        OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, and AWS
+        Bedrock — all behind the Open Responses API. Switch providers by
+        changing one string.
+      </>
+    ),
     code: `curl /v1/responses -d '{
   "model": "claude-sonnet-4-5",
-  "input": [{"role": "user",
-    "content": "Hello!"}]
+  "input": [{
+    "role": "user",
+    "content": "Hello!"
+  }]
 }'`,
+    lang: 'bash',
     docsHref: 'https://docs.aura-llm.dev/docs/providers/anthropic',
   },
   {
-    icon: Minimize2,
-    title: 'Prompt Compression',
-    description: 'TOON, AISP, YAML, and JSON compression strategies cut token usage 40–60% on uniform arrays and nested objects.',
+    index: '02',
+    stat: { value: '40–60%', unit: 'fewer tokens' },
+    title: 'Compression that actually compresses.',
+    body: (
+      <>
+        TOON, AISP, YAML, and JSON compression strategies cut token usage
+        on uniform arrays and nested objects. The compressor auto-selects
+        the right strategy for the payload shape.
+      </>
+    ),
     code: `let compressor = SmartCompressor::builder()
     .auto_select(true)
     .build();
 let result = compressor.compress(input)?;
 // 40-60% fewer tokens`,
+    lang: 'rust',
     docsHref: 'https://docs.aura-llm.dev/docs/api/compression',
   },
   {
-    icon: Network,
-    title: 'Smart Routing',
-    description: 'Eight strategies — round-robin, weighted, region-aware, cost-optimized. Circuit breaker fails over to a healthy provider on the same call.',
+    index: '03',
+    stat: { value: '<10ms', unit: 'gateway overhead' },
+    title: 'Routing that knows when to fail over.',
+    body: (
+      <>
+        Eight strategies — round-robin, weighted, region-aware,
+        cost-optimized. The circuit breaker fails over to a healthy
+        provider on the same call, not the next one.
+      </>
+    ),
     code: `# config.yaml
 routing:
   strategy: cost_optimized
   fallback: [openai, anthropic]
   circuit_breaker:
     failure_threshold: 3`,
+    lang: 'yaml',
     docsHref: 'https://docs.aura-llm.dev/docs/api/routing',
   },
   {
-    icon: BarChart3,
-    title: 'Cost Tracking',
-    description: 'Per-request USD on every response. Track input, output, cached, and reasoning tokens across all seven providers.',
+    index: '04',
+    title: 'Cost on every response.',
+    body: (
+      <>
+        Per-request USD attached to every response, calculated by the
+        gateway. Track input, output, cached, and reasoning tokens across
+        all seven providers without instrumenting your app.
+      </>
+    ),
     code: `// Every response includes:
 "usage": {
   "input_tokens": 1842,
   "output_tokens": 318,
   "cost_usd": 0.00732
 }`,
+    lang: 'json',
     docsHref: 'https://docs.aura-llm.dev/docs/api/cost-tracking',
   },
   {
-    icon: FileSearch,
-    title: 'Response Validation',
-    description: 'Logprobs, self-consistency, best-of-N sampling, and confidence thresholds — measurably reduce hallucinations.',
-    code: `{
-  "validation": {
-    "strategy": "best_of_n",
-    "n": 3,
-    "min_confidence": 0.85
-  }
-}`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/validation',
-  },
-  {
-    icon: Lock,
-    title: 'Encrypted Credentials',
-    description: 'AES-256-GCM envelope encryption for provider API keys. Master key from KMS or Vault — never written to disk in plaintext.',
-    code: `# Generate master key once
-export AURA_MASTER_KEY=$(openssl rand -hex 32)
-# Provider keys encrypted at rest
-# DEK wrapping per-tenant`,
-    docsHref: 'https://docs.aura-llm.dev/docs/credentials',
-  },
-  {
-    icon: Layers,
-    title: 'Multi-Tenancy',
-    description: 'Hierarchical org → team → project → end-user model with scoped API keys and per-user cost allocation.',
+    index: '05',
+    title: 'Multi-tenant, end-user-aware.',
+    body: (
+      <>
+        Hierarchical org → team → project → end-user, with scoped API
+        keys and per-user cost allocation. Pass <code className="font-mono text-sm">user</code> on
+        any request to roll up usage by customer.
+      </>
+    ),
     code: `POST /v1/responses
 Authorization: Bearer aura_team_...
 {
@@ -95,93 +136,10 @@ Authorization: Bearer aura_team_...
   "user": "customer_42",
   "input": [...]
 }`,
+    lang: 'http',
     docsHref: 'https://docs.aura-llm.dev/docs/organizations',
   },
-  {
-    icon: Zap,
-    title: 'Production Ready',
-    description: 'Redis-backed rate limiting and response caching, Prometheus metrics, structured logging, and SSE streaming throughout.',
-    code: `# Prometheus metrics
-curl localhost:8080/metrics
-# aura_requests_total
-# aura_request_duration_seconds
-# aura_tokens_total{provider="..."}`,
-    docsHref: 'https://docs.aura-llm.dev/docs/api/rate-limiting',
-  },
-  {
-    icon: Code2,
-    title: 'Self-Hosted in Rust',
-    description: 'Single static binary, no runtime deps. Axum + Tokio + reqwest. Built to keep gateway overhead under 10ms.',
-    code: `# Deploy with Helm
-helm install aura \\
-  oci://ghcr.io/umaitech/charts/aura-llm-gateway \\
-  --set secrets.inline.openaiApiKey=sk-...`,
-    docsHref: 'https://github.com/UmaiTech/aura-llm-gateway/blob/main/deploy/charts/aura-llm-gateway/README.md',
-  },
 ]
-
-function FeatureCard({ feature }: { feature: Feature }) {
-  const [flipped, setFlipped] = useState(false)
-  const Icon = feature.icon
-
-  return (
-    <button
-      type="button"
-      onClick={() => setFlipped((v) => !v)}
-      className="group relative w-full text-left h-64 [perspective:1200px] focus:outline-none focus-visible:ring-2 focus-visible:ring-aura-400 rounded-2xl"
-      aria-pressed={flipped}
-      aria-label={`${feature.title} — click to ${flipped ? 'hide' : 'show'} example`}
-    >
-      <div
-        className="relative h-full w-full transition-transform duration-500 [transform-style:preserve-3d]"
-        style={{ transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
-      >
-        {/* Front */}
-        <div
-          className="absolute inset-0 card flex flex-col cursor-pointer"
-          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
-        >
-          <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-aura-500/20 to-primary-500/20 flex items-center justify-center mb-4 group-hover:from-aura-500/30 group-hover:to-primary-500/30 transition-colors">
-            <Icon className="h-6 w-6 text-aura-400" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-          <p className="text-gray-400 text-sm flex-1">{feature.description}</p>
-          <div className="mt-4 text-xs text-gray-500 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <span>Click for example</span>
-            <ArrowRight className="h-3 w-3" />
-          </div>
-        </div>
-
-        {/* Back */}
-        <div
-          className="absolute inset-0 card flex flex-col cursor-pointer"
-          style={{
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-aura-400">{feature.title}</h3>
-            <RotateCcw className="h-3.5 w-3.5 text-gray-500" />
-          </div>
-          <pre className="flex-1 text-xs font-mono text-gray-300 bg-gray-950/70 rounded-md p-3 overflow-hidden whitespace-pre-wrap leading-relaxed">
-            {feature.code}
-          </pre>
-          <a
-            href={feature.docsHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 text-xs text-aura-400 hover:text-aura-300 flex items-center gap-1"
-          >
-            Read the docs <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      </div>
-    </button>
-  )
-}
 
 const codeExample = `// Request to Aura Gateway
 const response = await fetch('http://localhost:8080/v1/responses', {
@@ -201,7 +159,7 @@ const response = await fetch('http://localhost:8080/v1/responses', {
   "usage": {
     "input_tokens": 10,
     "output_tokens": 25,
-    "cost_usd": 0.00035  // 💰 Calculated by gateway
+    "cost_usd": 0.00035
   },
   "metadata": {
     "aura": {
@@ -211,29 +169,93 @@ const response = await fetch('http://localhost:8080/v1/responses', {
   }
 }`
 
+function NumberedBlock({ section }: { section: NumberedSection }) {
+  return (
+    <section className="border-t border-gray-800 py-12 sm:py-16">
+      <div className="grid grid-cols-12 gap-6 sm:gap-8">
+        {/* Margin: index + optional stat */}
+        <div className="col-span-12 sm:col-span-3 lg:col-span-2">
+          <div className="font-mono text-xs uppercase tracking-wider text-gray-500">
+            {section.index}
+          </div>
+          {section.stat && (
+            <div className="mt-4">
+              <div className="font-display text-3xl sm:text-4xl font-semibold text-gray-100 leading-none">
+                {section.stat.value}
+              </div>
+              <div className="font-mono text-xs text-gray-500 uppercase tracking-wider mt-1">
+                {section.stat.unit}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main: title + body */}
+        <div className="col-span-12 sm:col-span-9 lg:col-span-5">
+          <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-gray-100">
+            {section.title}
+          </h2>
+          <p className="mt-3 text-gray-400 leading-relaxed">{section.body}</p>
+          <a
+            href={section.docsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-aura-400 hover:text-aura-300 transition-colors"
+          >
+            Read the docs
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+
+        {/* Code: adjacent, not behind a flip */}
+        <div className="col-span-12 lg:col-span-5">
+          <div className="rounded-lg border border-gray-800 bg-gray-900/30 overflow-hidden">
+            <div className="px-4 py-2 border-b border-gray-800 font-mono text-xs uppercase tracking-wide text-gray-500">
+              {section.lang}
+            </div>
+            <pre className="p-4 overflow-x-auto text-sm">
+              <code className="text-gray-300 font-mono leading-relaxed">
+                {section.code}
+              </code>
+            </pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function App() {
   return (
-    <div className="min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800">
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      {/* Nav — solid background, no backdrop-blur */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950 border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <img src="/icon-square.svg" alt="Aura Logo" className="h-9 w-9" />
-              <span className="font-semibold text-xl">Aura</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <a href="https://docs.aura-llm.dev" className="text-gray-400 hover:text-white transition-colors">
+          <div className="flex items-center justify-between h-14">
+            <a href="/" className="flex items-center gap-2">
+              <img src="/icon-square.svg" alt="" className="h-6 w-6" />
+              <span className="font-display font-semibold text-lg tracking-tight">
+                Aura
+              </span>
+            </a>
+            <div className="flex items-center gap-5 text-sm">
+              <a
+                href="https://docs.aura-llm.dev"
+                className="text-gray-400 hover:text-gray-100 transition-colors"
+              >
                 Docs
               </a>
-              <a href="https://roadmap.aura-llm.dev" className="text-gray-400 hover:text-white transition-colors">
+              <a
+                href="https://roadmap.aura-llm.dev"
+                className="text-gray-400 hover:text-gray-100 transition-colors"
+              >
                 Roadmap
               </a>
               <a
                 href="https://playground.aura-llm.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-white transition-colors flex items-center gap-1"
+                className="text-gray-400 hover:text-gray-100 transition-colors inline-flex items-center gap-1"
               >
                 Playground
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -242,129 +264,141 @@ export default function App() {
                 href="https://github.com/UmaiTech/aura-llm-gateway"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-gray-100 transition-colors"
+                aria-label="GitHub"
               >
-                <Github className="h-5 w-5" />
+                <Github className="h-4 w-4" />
               </a>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800 text-sm text-gray-300 mb-6">
-            <Sparkles className="h-4 w-4 text-aura-400" />
-            Open Responses API Compatible
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Hero — stat-led. Big serif headline, then the stat row. */}
+        <section className="pt-32 pb-16 sm:pt-40 sm:pb-20">
+          <div className="font-mono text-xs uppercase tracking-wider text-gray-500 mb-6">
+            Open Responses API · v0.4.1 · Rust
           </div>
-
-          <h1 className="font-display text-5xl sm:text-6xl font-semibold mb-6 tracking-tight">
-            <span className="text-gray-100">Unified LLM Gateway</span>
-            <br />
-            <span className="text-gray-400">for Modern AI Apps</span>
+          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight max-w-3xl text-gray-100 leading-[1.05]">
+            A unified LLM gateway,{' '}
+            <span className="text-gray-400">built for production.</span>
           </h1>
-
-          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            Route requests across seven providers — OpenAI, Anthropic, Google, Mistral,
-            Ollama, HuggingFace, and AWS Bedrock — with a single API.
-            Built-in cost tracking, observability, and agentic workflow support.
+          <p className="mt-6 text-lg text-gray-400 leading-relaxed max-w-2xl">
+            Seven providers behind one API. Cost on every response.
+            Compression that cuts tokens 40–60%. Self-hosted Rust binary,
+            under 10ms overhead.
           </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <a href="/docs/quickstart" className="btn-primary gap-2">
               Get Started
               <ArrowRight className="h-4 w-4" />
             </a>
-            <a href="/docs/api" className="btn-secondary gap-2">
-              <BookOpen className="h-4 w-4" />
-              API Reference
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Code Example */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-900/50">
-        <div className="max-w-4xl mx-auto">
-          <div className="card glow">
-            {/* Filename hangs above the code block — no fake macOS
-                traffic-light dots. The code block is just a code
-                block, not a pretend window. */}
-            <div className="flex items-center mb-4">
-              <span className="font-mono text-xs text-gray-500 tracking-wide uppercase">
-                example.ts
-              </span>
-            </div>
-            <pre className="text-sm overflow-x-auto">
-              <code className="text-gray-300">{codeExample}</code>
-            </pre>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Everything you need</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              A complete LLM gateway built with Rust for performance and reliability.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} />
-            ))}
-          </div>
-          <p className="text-center text-xs text-gray-500 mt-6">
-            Click any card to see a code example.
-          </p>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-900/50 to-gray-950">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <MessageSquare className="h-8 w-8 text-aura-400" />
-          </div>
-          <h2 className="text-3xl font-bold mb-4">Try the Playground</h2>
-          <p className="text-gray-400 mb-8 max-w-xl mx-auto">
-            Test the gateway with our built-in chat interface. Supports agent mode with tool execution.
-          </p>
-          <a
-            href="https://playground.aura-llm.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-primary gap-2"
-          >
-            Open Playground
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-gray-400">
-            <img src="/icon-square.svg" alt="Aura" className="h-4 w-4" />
-            <span className="text-sm">Aura LLM Gateway</span>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-gray-500">
-            <a href="/docs" className="hover:text-gray-300 transition-colors">Documentation</a>
-            <a href="/docs/api" className="hover:text-gray-300 transition-colors">API Reference</a>
             <a
               href="https://github.com/UmaiTech/aura-llm-gateway"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-gray-300 transition-colors"
+              className="btn-secondary gap-2"
             >
-              GitHub
+              <Github className="h-4 w-4" />
+              View on GitHub
             </a>
           </div>
+        </section>
+
+        {/* Stat row — the page's structural anchor */}
+        <section className="border-t border-gray-800 py-12 grid grid-cols-2 sm:grid-cols-4 gap-8">
+          {[
+            { value: '7', unit: 'providers' },
+            { value: '40–60%', unit: 'token reduction' },
+            { value: '<10ms', unit: 'overhead' },
+            { value: 'v0.4.1', unit: 'shipping' },
+          ].map((s) => (
+            <div key={s.unit}>
+              <div className="font-display text-3xl sm:text-4xl font-semibold text-gray-100 leading-none">
+                {s.value}
+              </div>
+              <div className="font-mono text-xs text-gray-500 uppercase tracking-wider mt-2">
+                {s.unit}
+              </div>
+            </div>
+          ))}
+        </section>
+
+        {/* Inline "what a request looks like" — no fake window chrome */}
+        <section className="border-t border-gray-800 py-12 sm:py-16 grid grid-cols-12 gap-8">
+          <div className="col-span-12 lg:col-span-4">
+            <div className="font-mono text-xs uppercase tracking-wider text-gray-500">
+              the request
+            </div>
+            <h2 className="mt-3 font-display text-2xl font-semibold tracking-tight text-gray-100">
+              Looks like the API you already use.
+            </h2>
+            <p className="mt-3 text-gray-400 leading-relaxed">
+              Drop-in compatible with the Open Responses specification.
+              Every Aura response carries the upstream fields plus a
+              <code className="font-mono text-sm text-aura-400"> usage</code>{' '}
+              block with cost calculated by the gateway.
+            </p>
+          </div>
+          <div className="col-span-12 lg:col-span-8">
+            <div className="rounded-lg border border-gray-800 bg-gray-900/30 overflow-hidden">
+              <div className="px-4 py-2 border-b border-gray-800 font-mono text-xs uppercase tracking-wide text-gray-500">
+                example.ts
+              </div>
+              <pre className="p-4 overflow-x-auto text-sm">
+                <code className="text-gray-300 font-mono leading-relaxed">
+                  {codeExample}
+                </code>
+              </pre>
+            </div>
+          </div>
+        </section>
+
+        {/* Numbered sections — the stat-led body */}
+        {SECTIONS.map((section) => (
+          <NumberedBlock key={section.index} section={section} />
+        ))}
+
+        {/* Playground CTA — single-sentence typographic */}
+        <section className="border-t border-gray-800 py-16 sm:py-20">
+          <p className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-gray-100 max-w-3xl leading-tight">
+            Or just try it.{' '}
+            <a
+              href="https://playground.aura-llm.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-aura-400 hover:text-aura-300 transition-colors underline-offset-4 hover:underline"
+            >
+              Open the playground →
+            </a>
+          </p>
+        </section>
+      </main>
+
+      {/* Footer — single line of running prose */}
+      <footer className="border-t border-gray-800 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-sm text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-gray-400">Aura LLM Gateway</span>
+          <span aria-hidden>·</span>
+          <span>open source</span>
+          <span aria-hidden>·</span>
+          <a
+            href="https://github.com/UmaiTech/aura-llm-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-gray-300 transition-colors inline-flex items-center gap-1"
+          >
+            <Github className="h-3.5 w-3.5" />
+            GitHub
+          </a>
+          <span aria-hidden>·</span>
+          <a
+            href="https://docs.aura-llm.dev"
+            className="hover:text-gray-300 transition-colors"
+          >
+            Docs
+          </a>
         </div>
       </footer>
     </div>
