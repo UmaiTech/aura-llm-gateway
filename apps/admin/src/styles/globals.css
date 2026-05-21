@@ -134,19 +134,9 @@
      polish pass. Use `font-display` Fraunces + a single accent
      colour for emphasis. See docs/design-audit/AUDIT.md item L1. */
 
-  /* Stats card */
-  .stats-card {
-    @apply relative overflow-hidden rounded-xl border bg-card p-6 transition-colors duration-200 hover:shadow-premium;
-  }
-
-  .stats-card::before {
-    @apply absolute inset-0 bg-aura-500/[0.03] opacity-0 transition-opacity duration-200;
-    content: '';
-  }
-
-  .stats-card:hover::before {
-    @apply opacity-100;
-  }
+  /* `.stats-card` removed in 2026-05-21 polish pass — dashboard
+     stats now use a flat hairline-rule grid (see DashboardPage).
+     Reinstate if some other page wants the old style. */
 
   /* Sidebar styles */
   .sidebar-item {

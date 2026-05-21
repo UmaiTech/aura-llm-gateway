@@ -135,23 +135,24 @@ export function Sidebar() {
               <ul className="space-y-1">
                 {group.items.map((item) => {
                   const isActive = location.pathname === item.href
+                  // Editorial nav item: hanging left rule + accent
+                  // text on active. No filled background, no rounded
+                  // tile. Hover gets a faint rule colour so it still
+                  // signals interactivity.
                   return (
                     <li key={item.name}>
                       <NavLink
                         to={item.href}
                         className={cn(
-                          'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                          'flex items-center gap-3 pl-3 pr-3 py-2 text-sm transition-colors border-l-2',
                           isActive
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                          sidebarCollapsed && 'justify-center px-0'
+                            ? 'border-aura-400 text-foreground font-medium'
+                            : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
+                          sidebarCollapsed && 'justify-center px-0 border-l-0'
                         )}
                         title={sidebarCollapsed ? item.name : undefined}
                       >
-                        {isActive && (
-                          <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
-                        )}
-                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                        <item.icon className="h-4 w-4 flex-shrink-0" />
                         {!sidebarCollapsed && <span>{item.name}</span>}
                       </NavLink>
                     </li>
@@ -172,12 +173,12 @@ export function Sidebar() {
                   target={item.external ? '_blank' : undefined}
                   rel={item.external ? 'noopener noreferrer' : undefined}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                    sidebarCollapsed && 'justify-center px-0'
+                    'flex items-center gap-3 pl-3 pr-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground border-l-2 border-transparent hover:border-border',
+                    sidebarCollapsed && 'justify-center px-0 border-l-0'
                   )}
                   title={sidebarCollapsed ? item.name : undefined}
                 >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
                   {!sidebarCollapsed && (
                     <>
                       <span>{item.name}</span>
