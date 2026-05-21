@@ -6,8 +6,11 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import mermaid from 'mermaid'
 import {
+  // Sidebar icons are no longer rendered (audit D1), but the icon
+  // import list is kept because the docSections data structure still
+  // includes `icon:` entries — they're tolerated, just unused.
   BookOpen, Zap, Server, Code2, Settings,
-  ChevronRight, ChevronLeft, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
+  ChevronLeft, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
   Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical, Home, Rocket
 } from 'lucide-react'
 import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
@@ -209,29 +212,33 @@ function MermaidDiagram({ chart }: { chart: string }) {
 
     const renderDiagram = async () => {
       try {
+        // Monochrome editorial Mermaid theme — no aura/primary purple
+        // sweep (audit D4). Single accent (aura-400) reserved for
+        // primary nodes; everything else is greyscale that matches
+        // the rest of the docs surface.
         mermaid.initialize({
           startOnLoad: false,
-          theme: 'dark',
+          theme: 'base',
           themeVariables: {
-            primaryColor: '#818cf8',
-            primaryTextColor: '#e5e7eb',
-            primaryBorderColor: '#6366f1',
-            lineColor: '#9ca3af',
-            secondaryColor: '#374151',
-            tertiaryColor: '#1f2937',
-            background: '#111827',
+            primaryColor: '#1f2937',         // node fill (grey-800)
+            primaryTextColor: '#e5e7eb',     // node text
+            primaryBorderColor: '#38bdf8',   // single accent on borders
+            lineColor: '#6b7280',            // edges (grey-500)
+            secondaryColor: '#111827',       // secondary nodes (grey-900)
+            tertiaryColor: '#0f172a',        // background bands
+            background: '#0a0a0a',           // page bg matches dark mode
             mainBkg: '#1f2937',
-            secondBkg: '#374151',
+            secondBkg: '#111827',
             textColor: '#e5e7eb',
             fontSize: '14px',
-            fontFamily: 'Inter, sans-serif'
+            fontFamily: 'Inter, sans-serif',
           },
           securityLevel: 'loose',
           flowchart: {
             useMaxWidth: true,
             htmlLabels: true,
-            curve: 'basis'
-          }
+            curve: 'basis',
+          },
         })
 
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -285,17 +292,24 @@ function MermaidDiagram({ chart }: { chart: string }) {
 // Markdown components for custom styling
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const markdownComponents: any = {
+  // Doc prose uses Fraunces for h1/h2 (editorial-minimal direction
+  // per docs/design-audit/REDESIGN.md item D3). h3+ stay in Inter so
+  // the body hierarchy doesn't get muddied.
   h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="text-3xl font-bold mb-6 text-white">{children}</h1>
+    <h1 className="font-display text-4xl font-semibold tracking-tight mb-6 text-white">
+      {children}
+    </h1>
   ),
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-2xl font-semibold mt-8 mb-4 text-white">{children}</h2>
+    <h2 className="font-display text-2xl font-semibold tracking-tight mt-10 mb-4 text-white">
+      {children}
+    </h2>
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-xl font-semibold mt-6 mb-3 text-white">{children}</h3>
+    <h3 className="text-lg font-semibold mt-7 mb-3 text-white">{children}</h3>
   ),
   h4: ({ children }: { children?: React.ReactNode }) => (
-    <h4 className="text-lg font-semibold mt-4 mb-2 text-white">{children}</h4>
+    <h4 className="text-base font-semibold mt-5 mb-2 text-white">{children}</h4>
   ),
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
@@ -383,17 +397,24 @@ const markdownComponents: any = {
 // MDX wrapper components - these are passed to MDX files
 const mdxWrapperComponents = {
   // Standard HTML elements with styling
+  // Doc prose uses Fraunces for h1/h2 (editorial-minimal direction
+  // per docs/design-audit/REDESIGN.md item D3). h3+ stay in Inter so
+  // the body hierarchy doesn't get muddied.
   h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="text-3xl font-bold mb-6 text-white">{children}</h1>
+    <h1 className="font-display text-4xl font-semibold tracking-tight mb-6 text-white">
+      {children}
+    </h1>
   ),
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-2xl font-semibold mt-8 mb-4 text-white">{children}</h2>
+    <h2 className="font-display text-2xl font-semibold tracking-tight mt-10 mb-4 text-white">
+      {children}
+    </h2>
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-xl font-semibold mt-6 mb-3 text-white">{children}</h3>
+    <h3 className="text-lg font-semibold mt-7 mb-3 text-white">{children}</h3>
   ),
   h4: ({ children }: { children?: React.ReactNode }) => (
-    <h4 className="text-lg font-semibold mt-4 mb-2 text-white">{children}</h4>
+    <h4 className="text-base font-semibold mt-5 mb-2 text-white">{children}</h4>
   ),
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
@@ -589,6 +610,10 @@ export function DocsPage() {
                     const itemHasContent = isStandalone || hasContent(item.path)
                     const isExternal = 'external' in item && item.external
 
+                    // Sidebar = typographic table of contents. No
+                    // per-item icons (audit D1). Active state shown
+                    // by a left border-rule + accent text rather than
+                    // a filled background tile.
                     if (isExternal) {
                       return (
                         <li key={item.path}>
@@ -596,11 +621,10 @@ export function DocsPage() {
                             href={item.path}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-gray-400 hover:text-white hover:bg-gray-800"
+                            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded text-sm transition-colors text-gray-400 hover:text-white"
                           >
-                            <item.icon className="h-4 w-4" />
-                            {item.title}
-                            <ExternalLink className="h-3 w-3 ml-auto" />
+                            <span>{item.title}</span>
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
                           </a>
                         </li>
                       )
@@ -612,18 +636,16 @@ export function DocsPage() {
                           to={item.path}
                           onClick={() => setSidebarOpen(false)}
                           className={`
-                            flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
+                            flex items-center gap-2 pl-3 pr-3 py-1.5 text-sm transition-colors border-l-2
                             ${isActive
-                              ? 'bg-aura-500/10 text-aura-400'
+                              ? 'border-aura-400 text-aura-400'
                               : itemHasContent
-                                ? 'text-gray-400 hover:text-white hover:bg-gray-800'
-                                : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800/50'
+                                ? 'border-transparent text-gray-400 hover:text-white hover:border-gray-600'
+                                : 'border-transparent text-gray-600 hover:text-gray-400 hover:border-gray-700'
                             }
                           `}
                         >
-                          <item.icon className="h-4 w-4" />
                           {item.title}
-                          {isActive && <ChevronRight className="h-3 w-3 ml-auto" />}
                         </Link>
                       </li>
                     )
