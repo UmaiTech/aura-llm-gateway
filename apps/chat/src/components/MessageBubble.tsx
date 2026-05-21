@@ -1,5 +1,5 @@
 import {
-  User, Sparkles, Copy, Check, Wrench, Loader2, CheckCircle2, XCircle,
+  User, Sparkles, Copy, Check, Wrench, Loader2,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
   Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send, Code2
 } from 'lucide-react'
@@ -50,40 +50,44 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   return (
     <div
       className={cn(
-        "flex gap-4 group/message",
-        isUser ? "flex-row-reverse" : "flex-row"
+        'flex gap-3 group/message',
+        isUser ? 'flex-row-reverse' : 'flex-row'
       )}
     >
-      {/* Avatar */}
+      {/* Avatar — small, mono-tone, no gradient. User gets a filled
+          dot, assistant gets an outlined square. The visual mass of
+          a chat is in the prose; the avatar is a tag, not a face. */}
       <div
         className={cn(
-          "flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center",
+          'flex-shrink-0 h-7 w-7 rounded-md flex items-center justify-center',
           isUser
-            ? "bg-primary-500"
-            : "bg-gradient-to-br from-aura-400 to-primary-500"
+            ? 'bg-foreground text-background'
+            : 'border border-border bg-background text-foreground'
         )}
       >
         {isUser ? (
-          <User className="h-4 w-4 text-white" />
+          <User className="h-3.5 w-3.5" />
         ) : (
-          <Sparkles className="h-4 w-4 text-white" />
+          <Sparkles className="h-3.5 w-3.5" />
         )}
       </div>
 
       {/* Message content */}
       <div
         className={cn(
-          "flex-1 min-w-0 max-w-[85%]",
-          isUser && "flex flex-col items-end"
+          'flex-1 min-w-0 max-w-[85%]',
+          isUser && 'flex flex-col items-end'
         )}
       >
         <div className="relative">
+          {/* User: solid neutral pill on the right.
+              Assistant: hanging prose with a thin left rule.
+              No gradient, no backdrop-blur, no fake shadows. */}
           <div
             className={cn(
-              "rounded-2xl px-4 py-3 shadow-premium",
               isUser
-                ? "bg-primary-500 text-white rounded-tr-md"
-                : "bg-secondary/80 backdrop-blur-sm rounded-tl-md"
+                ? 'rounded-2xl rounded-tr-sm px-4 py-2.5 bg-muted text-foreground'
+                : 'pl-4 border-l-2 border-border'
             )}
           >
             {isUser ? (
@@ -346,73 +350,69 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
         const ToolIcon = config.icon
         const isExpanded = expandedTools.has(invocation.toolCallId)
 
+        // Editorial card: a single rounded-lg surface with a
+        // hairline border, no shadow/blur/colored tile. Status is a
+        // dot + label on the right, not a coloured background. Tool
+        // name is monospace because it's a code-ish identifier.
+        const stateLabel =
+          invocation.state === 'pending'
+            ? 'running'
+            : invocation.state === 'result'
+              ? 'ok'
+              : 'error'
+        const stateDot =
+          invocation.state === 'pending'
+            ? 'bg-muted-foreground/50 animate-pulse'
+            : invocation.state === 'result'
+              ? 'bg-green-500'
+              : 'bg-red-500'
+
         return (
           <div
             key={invocation.toolCallId}
-            className={cn(
-              "rounded-xl border overflow-hidden transition-all duration-300 ease-out shadow-premium",
-              "animate-in fade-in slide-in-from-top-2 backdrop-blur-sm",
-              invocation.state === 'pending'
-                ? "border-border/50 bg-background/40"
-                : invocation.state === 'result'
-                ? "border-green-500/30 bg-green-500/10"
-                : "border-red-500/30 bg-red-500/10"
-            )}
+            className="rounded-lg border border-border overflow-hidden bg-background animate-in fade-in slide-in-from-top-1"
             style={{
               animationDelay: `${index * 50}ms`,
-              animationFillMode: 'backwards'
+              animationFillMode: 'backwards',
             }}
           >
             {/* Tool Card Header */}
             <button
               onClick={() => toggleTool(invocation.toolCallId)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors text-left"
             >
-              {/* Tool Icon with colored background */}
-              <div className={cn(
-                "flex-shrink-0 h-9 w-9 rounded-lg flex items-center justify-center",
-                config.bgColor
-              )}>
-                <ToolIcon className={cn("h-4.5 w-4.5", config.color)} />
-              </div>
+              {/* Tool icon — small, single-tone, no coloured tile */}
+              <ToolIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
 
-              {/* Tool Info */}
-              <div className="flex-1 text-left min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">
-                    {formatToolName(invocation.toolName)}
-                  </span>
-                  {/* Status Badge */}
-                  {invocation.state === 'pending' ? (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Running...
-                    </span>
-                  ) : invocation.state === 'result' ? (
-                    <span className="flex items-center gap-1 text-xs text-green-400">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Success
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-red-400">
-                      <XCircle className="h-3 w-3" />
-                      Error
-                    </span>
-                  )}
-                </div>
-                {/* Show brief args preview when collapsed */}
-                {!isExpanded && Object.keys(invocation.args).length > 0 && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {formatArgsPreview(invocation.args)}
-                  </p>
+              {/* Tool name — mono, since it's an identifier */}
+              <span className="font-mono text-xs text-foreground min-w-0 truncate">
+                {invocation.toolName}
+              </span>
+
+              {/* Args preview when collapsed */}
+              {!isExpanded && Object.keys(invocation.args).length > 0 && (
+                <span className="text-xs text-muted-foreground/70 truncate min-w-0 flex-1">
+                  {formatArgsPreview(invocation.args)}
+                </span>
+              )}
+
+              {/* Status: dot + label */}
+              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-shrink-0 ml-auto">
+                {invocation.state === 'pending' && (
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 )}
-              </div>
+                <span className={cn('h-1.5 w-1.5 rounded-full', stateDot)} />
+                <span className="font-mono uppercase tracking-wide">
+                  {stateLabel}
+                </span>
+              </span>
 
-              {/* Expand/Collapse Arrow */}
-              <ChevronDown className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                isExpanded && "rotate-180"
-              )} />
+              <ChevronDown
+                className={cn(
+                  'h-3.5 w-3.5 text-muted-foreground/70 transition-transform flex-shrink-0',
+                  isExpanded && 'rotate-180'
+                )}
+              />
             </button>
 
             {/* Expanded Content */}
@@ -454,11 +454,10 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
   )
 }
 
-function formatToolName(name: string): string {
-  return name
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-}
+// formatToolName removed in 2026-05-21 polish — tool names now
+// render in monospace as the raw identifier (e.g. `web_search`),
+// matching how the API reports them. Reinstate if a humanized name
+// is needed elsewhere.
 
 function formatArgsPreview(args: Record<string, unknown>): string {
   const entries = Object.entries(args)
