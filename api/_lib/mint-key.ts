@@ -51,6 +51,49 @@ const FREE_TIER_RATE_LIMIT_RPM = 5
 const FREE_TIER_DAILY_MESSAGE_LIMIT = 20
 const FREE_TIER_MONTHLY_TOKEN_LIMIT = 50_000
 
+/**
+ * Slug of the organizations row that owns every playground-minted key.
+ * Seeded by migration 021_playground_demo_organization.sql. Keeping the
+ * lookup keyed on slug (not a hardcoded UUID) means we don't have to
+ * round-trip through an env var on every deploy.
+ */
+const PLAYGROUND_ORG_SLUG = 'playground'
+
+/**
+ * Cached lookup of the playground organization's UUID. Resolved on
+ * first call per cold start; every concurrent caller awaits the same
+ * Promise. If the lookup ever fails (org row missing — should not
+ * happen post-migration) we throw and let the mint transaction roll
+ * back so we don't insert keys with NULL organization_id.
+ */
+let playgroundOrgIdPromise: Promise<string> | null = null
+
+function getPlaygroundOrgId(): Promise<string> {
+  if (!playgroundOrgIdPromise) {
+    playgroundOrgIdPromise = pool
+      .query<{ id: string }>(
+        'SELECT id FROM organizations WHERE slug = $1 LIMIT 1',
+        [PLAYGROUND_ORG_SLUG],
+      )
+      .then((result) => {
+        if (!result.rowCount) {
+          throw new Error(
+            `[mint-key] Playground organization (slug='${PLAYGROUND_ORG_SLUG}') not found in DB. Did migration 021 run?`,
+          )
+        }
+        return result.rows[0].id
+      })
+      .catch((err) => {
+        // Reset so the next request retries. Otherwise a transient
+        // failure during cold start would poison every subsequent
+        // call in the same warm function instance.
+        playgroundOrgIdPromise = null
+        throw err
+      })
+  }
+  return playgroundOrgIdPromise
+}
+
 // Accept either a Web Request (Headers instance) or a Node-style
 // header map. better-auth ships `fromNodeHeaders` to convert the
 // latter into a Headers instance; pass-through for the former.
@@ -82,6 +125,7 @@ export async function mintPlaygroundApiKey(req: {
   }
 
   const { key, keyId, keyHash } = generateApiKey()
+  const organizationId = await getPlaygroundOrgId()
 
   // Write to BOTH tables atomically:
   //   public.api_keys                 — the gateway's source of truth
@@ -95,15 +139,16 @@ export async function mintPlaygroundApiKey(req: {
 
     await client.query(
       `INSERT INTO api_keys (
-        key_id, key_hash, name, description, user_id, scopes,
+        key_id, key_hash, name, description, user_id, organization_id, scopes,
         rate_limit_rpm, monthly_token_limit, daily_message_limit, status
-      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, 'active')`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, 'active')`,
       [
         keyId,
         keyHash,
         `playground:${userName || userEmail || userId}`,
         `Auto-minted for playground user ${userEmail} on first sign-in.`,
         userId,
+        organizationId,
         JSON.stringify(['responses:create', 'conversations:read', 'usage:read']),
         FREE_TIER_RATE_LIMIT_RPM,
         FREE_TIER_MONTHLY_TOKEN_LIMIT,
