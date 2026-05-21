@@ -1,12 +1,12 @@
 /**
  * better-auth configuration for the playground (server-only).
  *
- * Lives under /api/_lib/ — outside apps/chat/ — because apps/chat's
- * package.json declares `"type": "module"`. Vercel's @vercel/node
- * compiles .ts to CJS (`exports.foo = ...`), which Node refuses to
- * load from an ESM-typed package. Putting this file under the repo-root
- * /api/ tree keeps it in the implicit CJS scope of the root
- * package.json (no `type: module` there).
+ * Lives under /api/_lib/ — outside apps/chat/ — so it inherits the
+ * root /package.json, which sets `"type": "module"`. That makes
+ * @vercel/node@5 emit these handlers as ESM, which is required because
+ * better-auth@1.6 ships ESM-only (`.mjs`) — requiring it from a CJS
+ * function throws `ERR_REQUIRE_ESM` at runtime. apps/chat has its own
+ * package.json, so its module scope is unaffected by the root setting.
  *
  * Imported by:
  *   - api/auth/[...all].ts  — the Vercel serverless function that
