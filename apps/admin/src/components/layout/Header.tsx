@@ -1,6 +1,7 @@
 import { useSettingsStore, useAuthStore } from '@/stores'
 import { Button } from '@/components/ui'
 import { SunLine, MoonLine, User2Line, ExitLine } from '@mingcute/react'
+import { signOutSession } from '@/lib/api'
 
 interface HeaderProps {
   title: string
@@ -10,10 +11,26 @@ interface HeaderProps {
 
 export function Header({ title, description, actions }: HeaderProps) {
   const { theme, setTheme } = useSettingsStore()
-  const { logout } = useAuthStore()
+  const { logout, sessionUser } = useAuthStore()
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark')
+  }
+
+  // If the user signed in via GitHub, also clear the server-side
+  // better-auth session cookie. Bearer-key logins just need the
+  // local store cleared.
+  const handleLogout = async () => {
+    if (sessionUser) {
+      try {
+        await signOutSession()
+      } catch {
+        // Even if the server call fails, clear local state so the
+        // user isn't stuck looking at the dashboard with a stale
+        // session.
+      }
+    }
+    logout()
   }
 
   return (
@@ -43,19 +60,33 @@ export function Header({ title, description, actions }: HeaderProps) {
 
         <div className="mx-2 h-6 w-px bg-border" />
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground"
-        >
-          <User2Line className="h-5 w-5" />
-        </Button>
+        {sessionUser ? (
+          <div className="flex items-center gap-2 text-sm">
+            <User2Line className="h-4 w-4 text-muted-foreground" />
+            <span
+              className="text-muted-foreground max-w-[180px] truncate"
+              title={sessionUser.email}
+            >
+              {sessionUser.name ?? sessionUser.email}
+            </span>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
+            title="Signed in via admin key"
+          >
+            <User2Line className="h-5 w-5" />
+          </Button>
+        )}
 
         <Button
           variant="ghost"
           size="icon"
-          onClick={logout}
+          onClick={handleLogout}
           className="text-muted-foreground hover:text-destructive"
+          title="Sign out"
         >
           <ExitLine className="h-5 w-5" />
         </Button>
