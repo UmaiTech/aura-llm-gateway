@@ -8,7 +8,11 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow duration-200',
+      // Editorial card surface: hairline border, no rounded-xl
+      // (reads as a Stripe template), no shadow-sm (separation
+      // comes from rule + space, not lift). Bumped to rounded-lg
+      // so corners are still soft but less candy-like.
+      'rounded-lg border bg-card text-card-foreground transition-colors duration-200',
       className
     )}
     {...props}

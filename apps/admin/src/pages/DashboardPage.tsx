@@ -255,50 +255,46 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div ref={statsRef} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Stats — editorial. Big serif number first, mono uppercase
+            label, trend chip on the right. No coloured icon tile;
+            the stat itself is the visual anchor. */}
+        <div ref={statsRef} className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-4 border border-border rounded-lg overflow-hidden bg-border">
           {stats.map((stat, index) => (
-            <Card key={stat.title} className="stats-card">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="rounded-lg bg-primary/10 p-2">
-                    <stat.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  {stat.change !== 0 && (
-                    <div
-                      className={cn(
-                        'flex items-center gap-1 text-xs font-medium',
-                        stat.trend === 'up' && stat.title !== 'Success Rate'
-                          ? 'text-success'
-                          : stat.trend === 'down' && stat.title === 'Success Rate'
-                            ? 'text-destructive'
-                            : stat.trend === 'up'
-                              ? 'text-success'
-                              : 'text-success'
-                      )}
-                    >
-                      {stat.change > 0 ? (
-                        <ArrowUpLine className="h-3 w-3" />
-                      ) : (
-                        <ArrowDownLine className="h-3 w-3" />
-                      )}
-                      {Math.abs(stat.change)}%
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4">
+            <div
+              key={stat.title}
+              className="stats-card bg-card p-6 flex flex-col"
+            >
+              <div className="flex items-baseline gap-3 justify-between">
+                <span
+                  ref={(el) => {
+                    numberRefs.current[index] = el
+                  }}
+                  className="font-display text-3xl font-semibold tracking-tight leading-none"
+                >
+                  {stat.format(0)}
+                </span>
+                {stat.change !== 0 && (
                   <span
-                    ref={(el) => {
-                      numberRefs.current[index] = el
-                    }}
-                    className="text-2xl font-bold"
+                    className={cn(
+                      'inline-flex items-center gap-0.5 text-xs font-mono',
+                      stat.trend === 'down' && stat.title === 'Success Rate'
+                        ? 'text-destructive'
+                        : 'text-success'
+                    )}
                   >
-                    {stat.format(0)}
+                    {stat.change > 0 ? (
+                      <ArrowUpLine className="h-3 w-3" />
+                    ) : (
+                      <ArrowDownLine className="h-3 w-3" />
+                    )}
+                    {Math.abs(stat.change)}%
                   </span>
-                  <p className="text-sm text-muted-foreground mt-1">{stat.title}</p>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+              </div>
+              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mt-3">
+                {stat.title}
+              </p>
+            </div>
           ))}
         </div>
 
