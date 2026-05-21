@@ -660,19 +660,40 @@ export function HarnessPage() {
           )}
 
           {activeTab === 'prompts' && (
-            <div className="flex-1 p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search prompts..." className="max-w-sm" icon={<SearchLine className="h-4 w-4" />} />
-                <Button className="gap-2">
-                  <Message1Line className="h-4 w-4" />
-                  New Prompt
-                </Button>
-              </div>
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Message1Line className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-1">Prompt Management</p>
-                <p className="text-sm">Coming soon - manage and version your prompts</p>
-              </div>
+            <div className="flex-1 p-6">
+              <Card className="max-w-2xl mx-auto mt-8">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Message1Line className="h-5 w-5" />
+                    Prompt Management — on the roadmap
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-muted-foreground">
+                  <p>
+                    Versioned prompts (commit messages, A/B variants,
+                    rollback) aren&apos;t implemented yet. For now,
+                    prompts live in your application code — the
+                    gateway logs the rendered <code className="text-xs bg-muted px-1 py-0.5 rounded">input</code>{' '}
+                    on every request so you can inspect what was
+                    actually sent under{' '}
+                    <a href="/dev-logs" className="text-primary hover:underline">
+                      Dev Logs
+                    </a>.
+                  </p>
+                  <p>
+                    Tracked in the public roadmap. If you want this
+                    sooner, open a feature request on{' '}
+                    <a
+                      href="https://github.com/UmaiTech/aura-llm-gateway/issues"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      GitHub
+                    </a>.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           )}
 

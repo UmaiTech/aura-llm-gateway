@@ -1568,16 +1568,24 @@ async fn get_tool_usage(
 
     let interval = params.to_interval();
 
-    // Tool usage is stored in metadata JSONB - extract tool calls
+    // Tool usage is stored in metadata JSONB at:
+    //   metadata.aura.agentic.tools_used (array of tool name strings)
+    // Gateway writes this in main.rs:359 — the previous version of
+    // this query read `metadata->'tools_used'` (flat) which never
+    // matched, so Tool Usage was always empty.
     let query = format!(
         r#"
         WITH tool_data AS (
             SELECT
-                jsonb_array_elements_text(metadata->'tools_used') as tool_name
+                jsonb_array_elements_text(
+                    metadata->'aura'->'agentic'->'tools_used'
+                ) as tool_name
             FROM request_logs
             WHERE created_at >= NOW() - INTERVAL '{}'
-              AND metadata ? 'tools_used'
-              AND jsonb_array_length(metadata->'tools_used') > 0
+              AND metadata->'aura'->'agentic' ? 'tools_used'
+              AND jsonb_array_length(
+                  metadata->'aura'->'agentic'->'tools_used'
+              ) > 0
         ),
         tool_counts AS (
             SELECT
