@@ -1,19 +1,20 @@
 /**
  * better-auth configuration for the playground (server-only).
  *
- * Lives under /api/_lib/ — outside apps/chat/ — so it inherits the
- * root /package.json, which sets `"type": "module"`. That makes
- * @vercel/node@5 emit these handlers as ESM, which is required because
- * better-auth@1.6 ships ESM-only (`.mjs`) — requiring it from a CJS
- * function throws `ERR_REQUIRE_ESM` at runtime. apps/chat has its own
- * package.json, so its module scope is unaffected by the root setting.
+ * Lives under /api/_lib/ with a `.mts` extension. @vercel/node@5 maps
+ * `.mts` -> `.mjs` on emit, so the compiled function is ESM at runtime.
+ * That's required because better-auth@1.6 ships ESM-only (`.mjs`) —
+ * requiring it from a CJS function throws `ERR_REQUIRE_ESM` at module
+ * load (which is what was blowing up /api/auth/* in prod). Using `.mts`
+ * is more reliable than relying on the root package.json `"type": "module"`
+ * field, which @vercel/node@5 doesn't always honor for its emit decision.
  *
  * Imported by:
- *   - api/auth/[...all].ts  — the Vercel serverless function that
+ *   - api/auth/[...all].mts — the Vercel serverless function that
  *     handles every /api/auth/* request (sign-in, callback, sign-out, etc.)
- *   - api/proxy/[...path].ts — the serverless proxy validates the
+ *   - api/proxy/[...path].mts — the serverless proxy validates the
  *     session before forwarding LLM calls to api.aura-llm.dev
- *   - api/_lib/mint-key.ts — writes the per-user gateway API key
+ *   - api/_lib/mint-key.mts — writes the per-user gateway API key
  *
  * NOT imported by the React client. The client uses better-auth/react
  * via apps/chat/src/lib/auth-client.ts, which stays in the React app.

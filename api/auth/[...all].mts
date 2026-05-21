@@ -15,8 +15,11 @@
  *   GET  /api/auth/get-session           — current session info
  *   POST /api/auth/sign-out              — clear session
  *
- * The [...all].ts naming is Vercel's "catch-all rest segment"
+ * The [...all].mts naming is Vercel's "catch-all rest segment"
  * convention — every URL under /api/auth/ maps to this single file.
+ * `.mts` is required so @vercel/node@5 emits ESM, which is what lets
+ * `import { toNodeHandler } from 'better-auth/node'` resolve at runtime
+ * — better-auth@1.6 ships ESM-only. See ../_lib/auth.mts.
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -132,6 +135,6 @@ function sessionHeadersFromResponse(
 
 // Runs on Vercel's default Node.js runtime (@vercel/node). The
 // explicit `config.runtime` export was removed because Vercel
-// deprecated that key — Node is the default for /api/*.ts handlers
+// deprecated that key — Node is the default for /api/*.mts handlers
 // under @vercel/node@5. better-auth depends on `pg`, which only
 // works on Node, not Edge.
