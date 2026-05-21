@@ -6,15 +6,15 @@
  * playground.aura-llm.dev, and writes to:
  *   - public.api_keys                — with organization_id pointing at
  *                                       the Playground (Demo) org
- *                                       (see migration 021)
+ *                                       (see scripts/setup_playground_org.sql)
  *   - playground_auth.user_api_key   — playground-only link table
  *
  * It does NOT run for normal org/key provisioning. Customer orgs and
  * their keys are created via the gateway's regular admin endpoints
  * (POST /v1/organizations, POST /v1/api-keys) — those flows are
- * untouched by this code path. The migration's backfill UPDATE is
- * likewise scoped via a join on playground_auth.user_api_key, so non-
- * playground keys keep whatever organization_id they already had.
+ * untouched by this code path. The setup script's backfill UPDATE
+ * is likewise scoped via a join on playground_auth.user_api_key, so
+ * non-playground keys keep whatever organization_id they already had.
  *
  * Called from the GitHub OAuth callback handler. Idempotent — if the user
  * already has a key in playground_auth.user_api_key, this is a no-op.
@@ -77,9 +77,9 @@ const FREE_TIER_MONTHLY_TOKEN_LIMIT = 50_000
 
 /**
  * Slug of the organizations row that owns every playground-minted key.
- * Seeded by migration 021_playground_demo_organization.sql. Keeping the
- * lookup keyed on slug (not a hardcoded UUID) means we don't have to
- * round-trip through an env var on every deploy.
+ * Seeded once by scripts/setup_playground_org.sql before deploy.
+ * Keeping the lookup keyed on slug (not a hardcoded UUID) means we
+ * don't have to round-trip through an env var on every deploy.
  */
 const PLAYGROUND_ORG_SLUG = 'playground'
 
@@ -102,7 +102,8 @@ function getPlaygroundOrgId(): Promise<string> {
       .then((result) => {
         if (!result.rowCount) {
           throw new Error(
-            `[mint-key] Playground organization (slug='${PLAYGROUND_ORG_SLUG}') not found in DB. Did migration 021 run?`,
+            `[mint-key] Playground organization (slug='${PLAYGROUND_ORG_SLUG}') not found in DB. ` +
+              `Run scripts/setup_playground_org.sql against prod before deploying — see that file for instructions.`,
           )
         }
         return result.rows[0].id

@@ -319,9 +319,26 @@ pub async fn auth_middleware(
         // Get admin key from environment
         let admin_key = std::env::var("AURA_ADMIN_KEY").unwrap_or_default();
 
-        // If no admin key configured, allow access in development
+        // FAIL-CLOSED when AURA_ADMIN_KEY is unset. Previous behavior
+        // (allow everything) was an attractive nuisance — anyone
+        // deploying this repo without reading the env var table
+        // ended up with a wide-open admin panel. The escape hatch
+        // for local dev is AURA_ADMIN_NO_AUTH=1, which makes the
+        // bypass explicit and grep-able.
         if admin_key.is_empty() {
-            return Ok(next.run(request).await);
+            let no_auth = std::env::var("AURA_ADMIN_NO_AUTH").unwrap_or_default();
+            if no_auth == "1" || no_auth.eq_ignore_ascii_case("true") {
+                warn!(
+                    "AURA_ADMIN_NO_AUTH is set — admin routes are unauthenticated. \
+                     This must NEVER be set in production."
+                );
+                return Ok(next.run(request).await);
+            }
+            warn!(
+                "Admin route blocked: AURA_ADMIN_KEY is not set on the server. \
+                 Set it to a strong secret, or set AURA_ADMIN_NO_AUTH=1 for local dev."
+            );
+            return Err(AuthError::missing_auth());
         }
 
         // Check Bearer token matches admin key
