@@ -19,17 +19,29 @@ use super::{EventStream, Provider, ProviderError};
 
 const TOGETHER_API_BASE: &str = "https://api.together.xyz/v1";
 
+// Captured from https://docs.together.ai/docs/serverless/models on 2026-05-21.
+// Keep this curated chat-model subset in sync with CostCalculator pricing.
 const SUPPORTED_MODELS: &[&str] = &[
     "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    "meta-llama/Llama-3.1-405B-Instruct-Turbo",
-    "meta-llama/Llama-3.1-70B-Instruct-Turbo",
-    "meta-llama/Llama-3.1-8B-Instruct-Turbo",
-    "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "Qwen/Qwen2.5-72B-Instruct-Turbo",
-    "Qwen/Qwen2.5-32B-Instruct-Turbo",
-    "deepseek-ai/DeepSeek-V3",
-    "deepseek-ai/DeepSeek-R1",
-    "databricks/dbrx-instruct",
+    "meta-llama/Meta-Llama-3-8B-Instruct-Lite",
+    "deepseek-ai/DeepSeek-V4-Pro",
+    "Qwen/Qwen3.5-397B-A17B",
+    "Qwen/Qwen3.6-Plus",
+    "Qwen/Qwen3.5-9B",
+    "Qwen/Qwen2.5-7B-Instruct-Turbo",
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "moonshotai/Kimi-K2.6",
+    "moonshotai/Kimi-K2.5",
+    "zai-org/GLM-5.1",
+    "zai-org/GLM-5",
+    "essentialai/rnj-1-instruct",
+    "google/gemma-4-31B-it",
+    "google/gemma-3n-E4B-it",
+    "LiquidAI/LFM2-24B-A2B",
+    "deepcogito/cogito-v2-1-671b",
 ];
 
 pub struct TogetherProvider {
@@ -78,45 +90,47 @@ impl TogetherProvider {
                         InputContent::Parts(parts) => {
                             let parts = parts
                                 .iter()
-                                .map(|part| match part {
-                                    ContentPart::Text { text } => {
-                                        TogetherContentPart::Text { text: text.clone() }
-                                    }
+                                .filter_map(|part| match part {
+                                    ContentPart::Text { text } => Some(TogetherContentPart::Text {
+                                        text: text.clone(),
+                                    }),
                                     ContentPart::Image {
                                         url,
                                         data,
                                         media_type,
                                     } => {
                                         if let Some(url) = url {
-                                            TogetherContentPart::ImageUrl {
+                                            Some(TogetherContentPart::ImageUrl {
                                                 image_url: TogetherImageUrl { url: url.clone() },
-                                            }
+                                            })
                                         } else if let Some(data) = data {
                                             let media =
                                                 media_type.as_deref().unwrap_or("image/png");
-                                            TogetherContentPart::ImageUrl {
+                                            Some(TogetherContentPart::ImageUrl {
                                                 image_url: TogetherImageUrl {
                                                     url: format!("data:{};base64,{}", media, data),
                                                 },
-                                            }
+                                            })
                                         } else {
-                                            TogetherContentPart::Text {
+                                            Some(TogetherContentPart::Text {
                                                 text: "[Invalid image]".to_string(),
-                                            }
+                                            })
                                         }
                                     }
-                                    ContentPart::Audio { data, media_type } => {
-                                        TogetherContentPart::Text {
-                                            text: format!(
-                                                "[Audio: {} bytes, type: {}]",
-                                                data.len(),
-                                                media_type.as_deref().unwrap_or("audio/mp3"),
-                                            ),
-                                        }
+                                    ContentPart::Audio { media_type, .. } => {
+                                        warn!(
+                                            media_type = media_type.as_deref().unwrap_or("unknown"),
+                                            "Dropping audio content part because Together chat completions do not accept audio"
+                                        );
+                                        None
                                     }
                                 })
-                                .collect();
-                            TogetherContent::Parts(parts)
+                                .collect::<Vec<_>>();
+                            if parts.is_empty() {
+                                TogetherContent::Text(String::new())
+                            } else {
+                                TogetherContent::Parts(parts)
+                            }
                         }
                     };
 
@@ -626,8 +640,55 @@ mod tests {
     fn test_supports_model() {
         let provider = TogetherProvider::new("test-key");
         assert!(provider.supports_model("meta-llama/Llama-3.3-70B-Instruct-Turbo"));
-        assert!(provider.supports_model("deepseek-ai/DeepSeek-V3"));
+        assert!(provider.supports_model("deepseek-ai/DeepSeek-V4-Pro"));
         assert!(!provider.supports_model("gpt-4o"));
+    }
+
+    #[test]
+    fn test_supported_models_have_cost_pricing() {
+        let provider = TogetherProvider::new("test-key");
+        let calculator = crate::CostCalculator::new();
+
+        for model in provider.models() {
+            assert!(
+                calculator.get_pricing(model).is_some(),
+                "Together model {model} should have CostCalculator pricing",
+            );
+        }
+    }
+
+    #[test]
+    fn test_transform_request_drops_audio_parts() {
+        let provider = TogetherProvider::new("test-key");
+        let request = CreateResponseRequest::new(
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            vec![InputItem::user(InputContent::parts(vec![
+                ContentPart::text("Summarize this context"),
+                ContentPart::Audio {
+                    data: "AAAA".to_string(),
+                    media_type: Some("audio/wav".to_string()),
+                },
+            ]))],
+        );
+
+        let together_request = provider.transform_request(&request);
+        let content = together_request.messages[0]
+            .content
+            .as_ref()
+            .expect("content should be present");
+
+        match content {
+            TogetherContent::Parts(parts) => {
+                assert_eq!(parts.len(), 1);
+                match &parts[0] {
+                    TogetherContentPart::Text { text } => {
+                        assert_eq!(text, "Summarize this context");
+                    }
+                    other => panic!("expected text part, got {:?}", other),
+                }
+            }
+            other => panic!("expected parts content, got {:?}", other),
+        }
     }
 
     #[test]

@@ -91,6 +91,7 @@ impl CostCalculator {
     /// - Anthropic: <https://www.anthropic.com/pricing>
     /// - Google: <https://ai.google.dev/gemini-api/docs/pricing>
     /// - Mistral: <https://mistral.ai/technology/#pricing>
+    /// - Together AI: <https://docs.together.ai/docs/serverless/models>
     /// - Ollama: local inference, no cost
     /// - HuggingFace Inference Endpoints: <https://huggingface.co/pricing#endpoints>
     ///   NOTE: HF Inference Endpoints are billed per compute-hour, not per token.
@@ -453,6 +454,83 @@ impl CostCalculator {
         pricing.insert(
             "ministral-3b-latest".to_string(),
             ModelPricing::new(0.04, 0.04),
+        );
+
+        // =================================================================
+        // Together AI serverless chat pricing (captured 2026-05-21)
+        // Source: https://docs.together.ai/docs/serverless/models
+        // =================================================================
+
+        pricing.insert(
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo".to_string(),
+            ModelPricing::new(0.88, 0.88),
+        );
+        pricing.insert(
+            "meta-llama/Meta-Llama-3-8B-Instruct-Lite".to_string(),
+            ModelPricing::new(0.10, 0.10),
+        );
+        pricing.insert(
+            "deepseek-ai/DeepSeek-V4-Pro".to_string(),
+            ModelPricing::new(2.10, 4.40).with_cached(0.20),
+        );
+        pricing.insert(
+            "Qwen/Qwen3.5-397B-A17B".to_string(),
+            ModelPricing::new(0.60, 3.60),
+        );
+        pricing.insert(
+            "Qwen/Qwen3.6-Plus".to_string(),
+            ModelPricing::new(0.50, 3.00),
+        );
+        pricing.insert("Qwen/Qwen3.5-9B".to_string(), ModelPricing::new(0.10, 0.15));
+        pricing.insert(
+            "Qwen/Qwen2.5-7B-Instruct-Turbo".to_string(),
+            ModelPricing::new(0.30, 0.30),
+        );
+        pricing.insert(
+            "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8".to_string(),
+            ModelPricing::new(2.00, 2.00),
+        );
+        pricing.insert(
+            "Qwen/Qwen3-235B-A22B-Instruct-2507-tput".to_string(),
+            ModelPricing::new(0.20, 0.60),
+        );
+        pricing.insert(
+            "openai/gpt-oss-120b".to_string(),
+            ModelPricing::new(0.15, 0.60),
+        );
+        pricing.insert(
+            "openai/gpt-oss-20b".to_string(),
+            ModelPricing::new(0.05, 0.20),
+        );
+        pricing.insert(
+            "moonshotai/Kimi-K2.6".to_string(),
+            ModelPricing::new(1.20, 4.50).with_cached(0.20),
+        );
+        pricing.insert(
+            "moonshotai/Kimi-K2.5".to_string(),
+            ModelPricing::new(0.50, 2.80),
+        );
+        pricing.insert("zai-org/GLM-5.1".to_string(), ModelPricing::new(1.40, 4.40));
+        pricing.insert("zai-org/GLM-5".to_string(), ModelPricing::new(1.00, 3.20));
+        pricing.insert(
+            "essentialai/rnj-1-instruct".to_string(),
+            ModelPricing::new(0.15, 0.15),
+        );
+        pricing.insert(
+            "google/gemma-4-31B-it".to_string(),
+            ModelPricing::new(0.20, 0.50),
+        );
+        pricing.insert(
+            "google/gemma-3n-E4B-it".to_string(),
+            ModelPricing::new(0.06, 0.12),
+        );
+        pricing.insert(
+            "LiquidAI/LFM2-24B-A2B".to_string(),
+            ModelPricing::new(0.03, 0.12),
+        );
+        pricing.insert(
+            "deepcogito/cogito-v2-1-671b".to_string(),
+            ModelPricing::new(1.25, 1.25),
         );
 
         // =================================================================
