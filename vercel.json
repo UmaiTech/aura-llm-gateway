@@ -5,7 +5,7 @@
   "installCommand": "echo 'install handled in buildCommand'",
   "framework": null,
   "functions": {
-    "api/**/*.ts": {
+    "api/**/*.mts": {
       "runtime": "@vercel/node@5.0.0"
     }
   },
