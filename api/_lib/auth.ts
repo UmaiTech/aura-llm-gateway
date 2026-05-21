@@ -1,20 +1,27 @@
 /**
  * better-auth configuration for the playground (server-only).
  *
- * Lives under /api/_lib/ with a `.mts` extension. @vercel/node@5 maps
- * `.mts` -> `.mjs` on emit, so the compiled function is ESM at runtime.
- * That's required because better-auth@1.6 ships ESM-only (`.mjs`) —
- * requiring it from a CJS function throws `ERR_REQUIRE_ESM` at module
- * load (which is what was blowing up /api/auth/* in prod). Using `.mts`
- * is more reliable than relying on the root package.json `"type": "module"`
- * field, which @vercel/node@5 doesn't always honor for its emit decision.
+ * Lives under /api/_lib/ — outside apps/chat/. ESM emit is forced by
+ * two settings working together:
+ *   1. Root tsconfig.json sets `module: NodeNext` so @vercel/node@5's
+ *      TypeScript pass emits real `import`/`export` syntax instead of
+ *      CJS `exports.foo = ...`.
+ *   2. Root package.json has `"type": "module"` so Node treats the
+ *      emitted `.js` as ESM at runtime.
+ * Both are required: without (1) the file is CJS code but loaded as
+ * ESM (`ReferenceError: exports is not defined`); without (2) the file
+ * is ESM-ish but loaded as CJS, which then can't `require()` the
+ * ESM-only better-auth (`ERR_REQUIRE_ESM`).
+ *
+ * apps/chat / apps/landing / apps/admin each have their own package.json
+ * and tsconfig.json, so their build pipelines are unaffected.
  *
  * Imported by:
- *   - api/auth/[...all].mts — the Vercel serverless function that
+ *   - api/auth/[...all].ts — the Vercel serverless function that
  *     handles every /api/auth/* request (sign-in, callback, sign-out, etc.)
- *   - api/proxy/[...path].mts — the serverless proxy validates the
+ *   - api/proxy/[...path].ts — the serverless proxy validates the
  *     session before forwarding LLM calls to api.aura-llm.dev
- *   - api/_lib/mint-key.mts — writes the per-user gateway API key
+ *   - api/_lib/mint-key.ts — writes the per-user gateway API key
  *
  * NOT imported by the React client. The client uses better-auth/react
  * via apps/chat/src/lib/auth-client.ts, which stays in the React app.
