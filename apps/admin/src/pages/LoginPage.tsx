@@ -5,8 +5,16 @@ import { useAuthStore } from '@/stores'
 import { Key2Line, EyeLine, EyeCloseLine } from '@mingcute/react'
 
 export function LoginPage() {
-  // Pre-fill admin key from env var in development for convenience
-  const defaultKey = import.meta.env.VITE_ADMIN_KEY || ''
+  // Pre-fill admin key from env var in development for convenience.
+  // NEVER auto-fill in production builds, even if VITE_ADMIN_KEY is
+  // set in the Vercel env — that value would get bundled into the
+  // public JS and made available to anyone who opens devtools. The
+  // .env.example file warns against it but this guard is the actual
+  // backstop. Operators can still paste their key into the form.
+  const defaultKey =
+    import.meta.env.MODE === 'production'
+      ? ''
+      : import.meta.env.VITE_ADMIN_KEY || ''
   const [key, setKey] = useState(defaultKey)
   const [showKey, setShowKey] = useState(false)
   const [loading, setLoading] = useState(false)
