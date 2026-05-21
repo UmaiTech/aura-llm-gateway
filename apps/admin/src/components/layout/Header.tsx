@@ -56,6 +56,7 @@ export function Header({ title, description, actions }: HeaderProps) {
           size="icon"
           onClick={logout}
           className="text-muted-foreground hover:text-destructive"
+          title="Sign out"
         >
           <ExitLine className="h-5 w-5" />
         </Button>

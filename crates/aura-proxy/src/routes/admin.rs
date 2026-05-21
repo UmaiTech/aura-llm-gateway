@@ -510,20 +510,28 @@ async fn get_overview_stats(
         input_tokens_24h: stats_row.get::<i64, _>("input_tokens_24h"),
         output_tokens_24h: stats_row.get::<i64, _>("output_tokens_24h"),
         cached_tokens_24h: stats_row.get::<i64, _>("cached_tokens_24h"),
-        cost_24h: stats_row.get::<f64, _>("cost_24h"),
+        // cost_* columns: `COALESCE(SUM(cost_usd), 0)` in the view
+        // returns NUMERIC (because the `0` literal is INTEGER and
+        // Postgres widens). f64 decode panics on NUMERIC. Migration
+        // 022 patches the view to cast explicitly to FLOAT8; the
+        // try_get + unwrap_or here is defense-in-depth so any DB
+        // without that migration applied returns 0.0 instead of
+        // crashing the tokio worker (which last time took the whole
+        // gateway machine down for a Fly health-check cycle).
+        cost_24h: stats_row.try_get::<f64, _>("cost_24h").unwrap_or(0.0),
         avg_latency_24h: stats_row.get::<i32, _>("avg_latency_24h"),
         success_rate_24h: stats_row
             .try_get::<f64, _>("success_rate_24h")
             .unwrap_or(100.0),
         total_requests_7d: stats_row.get::<i64, _>("total_requests_7d"),
         total_tokens_7d: stats_row.get::<i64, _>("total_tokens_7d"),
-        cost_7d: stats_row.get::<f64, _>("cost_7d"),
+        cost_7d: stats_row.try_get::<f64, _>("cost_7d").unwrap_or(0.0),
         total_requests_30d: stats_row.get::<i64, _>("total_requests_30d"),
         total_tokens_30d: stats_row.get::<i64, _>("total_tokens_30d"),
-        cost_30d: stats_row.get::<f64, _>("cost_30d"),
+        cost_30d: stats_row.try_get::<f64, _>("cost_30d").unwrap_or(0.0),
         total_requests_all: stats_row.get::<i64, _>("total_requests_all"),
         total_tokens_all: stats_row.get::<i64, _>("total_tokens_all"),
-        cost_all: stats_row.get::<f64, _>("cost_all"),
+        cost_all: stats_row.try_get::<f64, _>("cost_all").unwrap_or(0.0),
         active_providers: provider_count as i32,
         active_api_keys: api_key_count as i32,
         total_organizations: org_count as i32,
