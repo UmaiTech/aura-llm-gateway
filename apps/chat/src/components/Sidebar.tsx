@@ -1,6 +1,13 @@
 import { Plus, MessageSquare, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { cn, formatDate } from '../lib/utils'
 import type { Conversation } from '../lib/types'
+
+// In prod the chat hits the gateway via /api/proxy. /health lives at
+// the gateway root, not under /v1, so we have to construct the URL
+// directly. The /api/proxy Vercel function strips the /api/proxy
+// prefix and forwards as-is.
+const HEALTH_URL = '/api/proxy/health'
 
 interface SidebarProps {
   isOpen: boolean
@@ -12,6 +19,31 @@ interface SidebarProps {
   onDeleteConversation: (id: string) => void
 }
 
+/**
+ * Fetch the gateway's actual version from /health once per mount.
+ * Falls back to `null` (rendered as `—`) if the fetch fails so we
+ * never display a stale hardcoded "v0.1.0" again.
+ */
+function useGatewayVersion(): string | null {
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch(HEALTH_URL)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { version?: string } | null) => {
+        if (!cancelled && data?.version) setVersion(data.version)
+      })
+      .catch(() => {
+        // Network blip — leave null. The footer will show `—`
+        // rather than misleading us into thinking we're on v0.1.0.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return version
+}
+
 export function Sidebar({
   isOpen,
   onToggle,
@@ -21,6 +53,8 @@ export function Sidebar({
   onSelectConversation,
   onDeleteConversation,
 }: SidebarProps) {
+  const gatewayVersion = useGatewayVersion()
+
   // Group conversations by date
   const groupedConversations = conversations.reduce((groups, conv) => {
     const dateKey = formatDate(conv.createdAt)
@@ -41,11 +75,24 @@ export function Sidebar({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar.
+          Closed state: slides fully off-screen at every breakpoint.
+          Previously used `lg:w-0 lg:opacity-0` on desktop, which
+          kept the element in DOM at zero width — and the reopen
+          toggle didn't reliably reflow the layout, so users saw
+          the hamburger but clicking it did nothing visible. Slide-
+          out via translate-x is deterministic.
+          Width: kept `lg:relative` so when open on desktop it
+          occupies its slot; on mobile it overlays via `fixed`. */}
       <aside
         className={cn(
-          "fixed lg:relative inset-y-0 left-0 z-50 w-72 glass border-r border-border/50 flex flex-col transition-transform duration-200 ease-in-out shadow-premium-lg",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0"
+          "fixed lg:relative inset-y-0 left-0 z-50 w-72 bg-background border-r border-border flex flex-col transition-transform duration-200 ease-in-out",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+          // When closed on desktop, also collapse the slot so the
+          // main content takes the full width. `hidden lg:flex` +
+          // the translate handles both the visibility and the
+          // layout reflow.
+          !isOpen && "lg:hidden"
         )}
       >
         {/* Header */}
@@ -102,8 +149,8 @@ export function Sidebar({
 
         {/* Footer */}
         <div className="p-4 border-t border-border">
-          <div className="text-xs text-muted-foreground text-center">
-            Aura LLM Gateway v0.1.0
+          <div className="text-xs text-muted-foreground text-center font-mono">
+            Aura LLM Gateway · v{gatewayVersion ?? '—'}
           </div>
         </div>
       </aside>
