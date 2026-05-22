@@ -16,7 +16,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use tracing::{debug, error, instrument, warn};
-
+use uuid;
 use super::{EventStream, Provider, ProviderError};
 
 const TOGETHER_API_BASE: &str = "https://api.together.xyz/v1";
