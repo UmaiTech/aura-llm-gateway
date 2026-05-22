@@ -3,6 +3,25 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity, CompressionStrategy, CompressionConfig } from '../lib/types'
 import { generateId } from '../lib/utils'
 
+/**
+ * Default principles for the Constitutional consistency strategy.
+ * Used when the user selects "Constitutional" without customizing
+ * the list. Without these, the gateway sees `principles: []` and
+ * the strategy is a silent no-op (see
+ * crates/aura-proxy/src/routes/responses.rs around the
+ * ConsistencyStrategy::Constitutional match arm — augmentation is
+ * gated on principles being non-empty).
+ *
+ * Kept short and broadly useful. The user can override by setting
+ * consistencyPrinciples explicitly.
+ */
+const DEFAULT_CONSTITUTIONAL_PRINCIPLES = [
+  'Be honest about uncertainty and limitations.',
+  'Cite sources or label content as opinion when the answer is contested.',
+  'Refuse to fabricate facts, numbers, citations, or quotes.',
+  'Prefer concise, direct answers over hedging or filler.',
+]
+
 interface ChatState {
   // Conversations
   conversations: Conversation[]
@@ -309,8 +328,17 @@ export const useChatStore = create<ChatState>()(
           apply_calibration: consistencyApplyCalibration,
         }
 
-        if (consistencyStrategy === 'constitutional' && consistencyPrinciples.length > 0) {
-          config.principles = consistencyPrinciples
+        if (consistencyStrategy === 'constitutional') {
+          // Default constitutional principles so selecting the chip
+          // actually does something out of the box. Gateway gates
+          // augmentation on principles being non-empty (responses.rs
+          // around line 268), so passing [] = silent no-op.
+          // Users can still override via setConsistencyPrinciples
+          // from a settings panel (none built yet).
+          config.principles =
+            consistencyPrinciples.length > 0
+              ? consistencyPrinciples
+              : DEFAULT_CONSTITUTIONAL_PRINCIPLES
         }
 
         if (consistencyStrategy === 'style_profile') {

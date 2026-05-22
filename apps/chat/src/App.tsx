@@ -150,20 +150,27 @@ export default function App() {
       }
       addMessage(assistantMessage)
 
-      // Get the latest user message and previous assistant response ID for threading
-      const userMessage = conversationMessages[conversationMessages.length - 1]
+      // Send the full conversation history. We *also* set
+      // previous_response_id, but the gateway doesn't currently
+      // replay context from prior responses (tracked in issue
+      // #156), so relying on threading alone leaves the model
+      // amnesic between turns. Including history in `input` is
+      // belt-and-braces: it works today, and remains correct once
+      // the gateway-side replay lands.
       const previousAssistantMessages = conversationMessages
         .filter(m => m.role === 'assistant' && m.responseId)
       const previousResponseId = previousAssistantMessages.length > 0
         ? previousAssistantMessages[previousAssistantMessages.length - 1].responseId
         : undefined
 
-      // Send only the latest user message with conversation threading
-      const input = [{
-        type: 'message' as const,
-        role: userMessage.role,
-        content: userMessage.content,
-      }]
+      const input = conversationMessages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .filter(m => m.content && m.content.trim().length > 0)
+        .map(m => ({
+          type: 'message' as const,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }))
 
       let fullContent = ''
       let responseId: string | undefined
