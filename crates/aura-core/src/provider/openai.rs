@@ -165,6 +165,44 @@ impl OpenAIProvider {
                         name: None,
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    // Emit a synthesized assistant message carrying
+                    // this tool_call so the upstream OpenAI Chat
+                    // Completions API sees the expected
+                    // assistant→tool pairing. Without this, sending a
+                    // role:'tool' message after only a user message
+                    // returns "messages with role 'tool' must be a
+                    // response to a preceeding message with
+                    // 'tool_calls'".
+                    //
+                    // Note: this emits one assistant message PER
+                    // function_call. If the prior turn emitted
+                    // multiple parallel tool calls, the right shape
+                    // is one assistant message with multiple
+                    // tool_calls entries. We could batch consecutive
+                    // FunctionCall items into a single assistant
+                    // message here, but doing so requires lookahead
+                    // and OpenAI accepts the one-per-message form
+                    // too — leaving the simpler shape for now.
+                    messages.push(OpenAIMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_calls: Some(vec![OpenAIToolCallRequest {
+                            id: call_id.clone(),
+                            r#type: "function".to_string(),
+                            function: OpenAIFunctionCall {
+                                name: name.clone(),
+                                arguments: arguments.clone(),
+                            },
+                        }]),
+                        tool_call_id: None,
+                        name: None,
+                    });
+                }
             }
         }
 

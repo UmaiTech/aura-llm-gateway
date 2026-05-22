@@ -168,6 +168,28 @@ impl MistralProvider {
                         tool_call_id: Some(call_id.clone()),
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    // Synthesized prior-assistant tool_use. Same
+                    // OpenAI-compatible shape Mistral uses. See the
+                    // OpenAI adapter for the full rationale.
+                    messages.push(MistralMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_calls: Some(vec![MistralToolCallRequest {
+                            id: call_id.clone(),
+                            r#type: "function".to_string(),
+                            function: MistralFunctionCall {
+                                name: name.clone(),
+                                arguments: arguments.clone(),
+                            },
+                        }]),
+                        tool_call_id: None,
+                    });
+                }
             }
         }
 

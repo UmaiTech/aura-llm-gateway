@@ -160,6 +160,25 @@ impl OllamaProvider {
                         tool_call_id: None,
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    messages.push(OllamaMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_calls: Some(vec![OllamaToolCallRequest {
+                            id: call_id.clone(),
+                            r#type: "function".to_string(),
+                            function: OllamaFunctionCall {
+                                name: name.clone(),
+                                arguments: arguments.clone(),
+                            },
+                        }]),
+                        tool_call_id: None,
+                    });
+                }
                 InputItem::FunctionCallOutput { call_id, output } => {
                     messages.push(OllamaMessage {
                         role: "tool".to_string(),

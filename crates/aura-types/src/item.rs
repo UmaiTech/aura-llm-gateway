@@ -370,6 +370,33 @@ pub enum InputItem {
         /// Content of the message (can be string or content parts)
         content: InputContent,
     },
+    /// A function call that the assistant emitted in a prior turn.
+    ///
+    /// This variant is normally NOT set by API clients directly —
+    /// clients send `FunctionCallOutput` for tool results and rely on
+    /// `previous_response_id` to carry prior assistant context. The
+    /// gateway synthesizes `FunctionCall` items server-side when
+    /// `previous_response_id` is provided AND the request body
+    /// contains `FunctionCallOutput` items, reconstructing the
+    /// assistant→tool pairing the upstream providers require.
+    ///
+    /// See `crates/aura-proxy/src/routes/responses.rs` for the
+    /// replay logic and the per-provider adapters for how each one
+    /// emits this back into its native tool-use format (OpenAI
+    /// `tool_calls` array, Anthropic `tool_use` block, Google
+    /// `functionCall` content part).
+    FunctionCall {
+        /// Stable call_id so the matching `FunctionCallOutput` can
+        /// be paired with this call across the assistant turn.
+        call_id: String,
+        /// The tool / function name the assistant invoked.
+        name: String,
+        /// Arguments the assistant passed, serialized as JSON-encoded
+        /// string (matching OpenAI's `tool_calls[].function.arguments`
+        /// shape — Anthropic and Google adapters parse it back into
+        /// a JSON object before forwarding).
+        arguments: String,
+    },
     /// Output from a function call
     FunctionCallOutput {
         /// The call_id this output corresponds to
