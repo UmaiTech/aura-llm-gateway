@@ -4,6 +4,7 @@
   "create-response": "Create Response",
   "conversations": "Conversations",
   "streaming": "Streaming",
+  "tool-roundtrips": "Tool Roundtrips",
   "cost-tracking": "Cost Tracking",
   "rate-limiting": "Rate Limiting",
   "routing": "Smart Routing",
