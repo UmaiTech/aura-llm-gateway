@@ -130,6 +130,36 @@ impl AnthropicProvider {
                         }],
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    // Emit a synthesized assistant message containing
+                    // a `tool_use` block. Without this preceding the
+                    // tool_result, Anthropic rejects with:
+                    //   "unexpected tool_use_id found in tool_result
+                    //    blocks: <id>. Each tool_result block must
+                    //    have a corresponding tool_use block in the
+                    //    previous message."
+                    //
+                    // Arguments are a JSON-encoded string in our
+                    // InputItem schema (matching OpenAI's wire
+                    // format). Anthropic wants the parsed object
+                    // here, so we deserialize. If parsing fails,
+                    // pass the raw string as a single-property object
+                    // — better than dropping the call entirely.
+                    let input_value: serde_json::Value = serde_json::from_str(arguments)
+                        .unwrap_or_else(|_| serde_json::json!({ "raw_arguments": arguments }));
+                    messages.push(AnthropicMessage {
+                        role: "assistant".to_string(),
+                        content: vec![AnthropicContentBlock::ToolUse {
+                            id: call_id.clone(),
+                            name: name.clone(),
+                            input: input_value,
+                        }],
+                    });
+                }
             }
         }
 

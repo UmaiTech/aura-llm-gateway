@@ -152,6 +152,25 @@ impl HuggingFaceProvider {
                         tool_call_id: None,
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    messages.push(HfMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_calls: Some(vec![HfToolCallRequest {
+                            id: call_id.clone(),
+                            r#type: "function".to_string(),
+                            function: HfFunctionCall {
+                                name: name.clone(),
+                                arguments: arguments.clone(),
+                            },
+                        }]),
+                        tool_call_id: None,
+                    });
+                }
                 InputItem::FunctionCallOutput { call_id, output } => {
                     messages.push(HfMessage {
                         role: "tool".to_string(),

@@ -245,6 +245,26 @@ impl BedrockProvider {
                         content: content_blocks,
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    // Bedrock's Anthropic-family models use the same
+                    // tool_use shape as Anthropic direct. JSON-parse
+                    // arguments; fall back to a raw_arguments object
+                    // if parsing fails so the call isn't dropped.
+                    let input_value: serde_json::Value = serde_json::from_str(arguments)
+                        .unwrap_or_else(|_| serde_json::json!({ "raw_arguments": arguments }));
+                    messages.push(BedrockMessage {
+                        role: "assistant".to_string(),
+                        content: vec![BedrockContentBlock::ToolUse {
+                            id: call_id.clone(),
+                            name: name.clone(),
+                            input: input_value,
+                        }],
+                    });
+                }
                 InputItem::FunctionCallOutput { call_id, output } => {
                     messages.push(BedrockMessage {
                         role: "user".to_string(),

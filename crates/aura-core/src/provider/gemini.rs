@@ -113,6 +113,30 @@ impl GeminiProvider {
                         parts,
                     });
                 }
+                InputItem::FunctionCall {
+                    call_id: _,
+                    name,
+                    arguments,
+                } => {
+                    // Gemini uses functionCall parts inside a model
+                    // (assistant) content block. Note Gemini doesn't
+                    // carry the call_id in the same way OpenAI does
+                    // — it pairs by function name + position, so we
+                    // drop the call_id here. The arguments string is
+                    // JSON-parsed; fallback to wrapping the raw
+                    // string under a `raw_arguments` key if invalid.
+                    let args_value: serde_json::Value = serde_json::from_str(arguments)
+                        .unwrap_or_else(|_| serde_json::json!({ "raw_arguments": arguments }));
+                    contents.push(GeminiContent {
+                        role: "model".to_string(),
+                        parts: vec![GeminiPart::FunctionCall {
+                            function_call: GeminiFunctionCall {
+                                name: name.clone(),
+                                args: args_value,
+                            },
+                        }],
+                    });
+                }
                 InputItem::FunctionCallOutput { call_id, output } => {
                     // Function responses in Gemini use functionResponse part
                     // The call_id is used as the function name in Gemini
