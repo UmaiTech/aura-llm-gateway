@@ -287,13 +287,20 @@ export const AVAILABLE_MODELS: Model[] = [
   { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', tier: 'free' },
 
-  // Google — Pro locked, Flash family free.
-  // gemini-3-5-flash was announced in a Deepmind blog but isn't in
-  // the gateway's SUPPORTED_MODELS yet (it routes to Vertex/AI Studio
-  // and our gemini.rs doesn't list it). Using gemini-3-flash as the
-  // free-tier default until we wire 3-5 into the provider.
-  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'google', tier: 'beta' },
-  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', provider: 'google', tier: 'free' },
+  // Google — names verified against Google's models.list endpoint at
+  //   https://generativelanguage.googleapis.com/v1beta/models
+  // on 2026-05-22. The previously-shipped 'gemini-3-pro' and
+  // 'gemini-3-flash' ids were Aura-internal hallucinations — Google
+  // serves these as -preview variants. Mismatched ids surfaced as
+  //   "Model not found: models/gemini-3-flash is not found for API
+  //    version v1beta"
+  // when sending requests. See /v1/models against the gateway for
+  // the canonical list at any time.
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'google', tier: 'beta' },
+  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', provider: 'google', tier: 'free' },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (preview)', provider: 'google', tier: 'beta' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (preview)', provider: 'google', tier: 'free' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google', tier: 'beta' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', tier: 'free' },
   { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'google', tier: 'free' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'google', tier: 'free' },
 ]

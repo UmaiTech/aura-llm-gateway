@@ -19,26 +19,39 @@ use super::{EventStream, Provider, ProviderError};
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta";
 
 /// Supported Gemini models
+/// Supported Gemini models.
+///
+/// IDs verified against Google's `models.list` endpoint
+///   GET https://generativelanguage.googleapis.com/v1beta/models?key=$KEY
+/// on 2026-05-22. The previous list contained Aura-internal
+/// hallucinations (`gemini-3-pro`, `gemini-3-flash`,
+/// `gemini-3-pro-latest`) that Google's API rejected with
+///   "Model not found: models/gemini-3-flash is not found for API
+///    version v1beta, or is not supported for generateContent"
+/// when forwarded. To refresh: hit models.list, keep only entries
+/// whose `supportedGenerationMethods` includes `generateContent`,
+/// drop anything not returned.
 const SUPPORTED_MODELS: &[&str] = &[
-    // Gemini 3 family (2026)
-    "gemini-3-pro",
-    "gemini-3-flash",
-    "gemini-3-pro-latest",
-    // Gemini 2.5 family (2025)
+    // Gemini 3.x family
+    "gemini-3.5-flash",
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
+    // Gemini 2.5 family (GA)
     "gemini-2.5-pro",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     // Gemini 2.0 family
     "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
+    "gemini-2.0-flash-001",
     "gemini-2.0-flash-lite",
-    // Gemini 1.5 family
-    "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash-8b",
-    // Legacy
-    "gemini-pro",
+    "gemini-2.0-flash-lite-001",
+    // Floating aliases — always resolve to Google's current pick
+    "gemini-pro-latest",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
 ];
 
 /// Google Gemini provider implementation
@@ -1153,12 +1166,23 @@ mod tests {
     #[test]
     fn test_supports_model() {
         let provider = GeminiProvider::new("test-key");
-        assert!(provider.supports_model("gemini-1.5-pro"));
-        assert!(provider.supports_model("gemini-1.5-flash"));
+        // Verify a sample from each family — full list is in
+        // SUPPORTED_MODELS and is sourced from Google's models.list
+        // endpoint. Don't add gemini-1.x or invented gemini-3-pro;
+        // those don't exist in Google's API.
         assert!(provider.supports_model("gemini-2.0-flash"));
-        assert!(provider.supports_model("gemini-3-pro"));
+        assert!(provider.supports_model("gemini-2.5-pro"));
+        assert!(provider.supports_model("gemini-2.5-flash"));
+        assert!(provider.supports_model("gemini-3-pro-preview"));
+        assert!(provider.supports_model("gemini-3-flash-preview"));
+        assert!(provider.supports_model("gemini-3.5-flash"));
+        assert!(provider.supports_model("gemini-pro-latest"));
         assert!(!provider.supports_model("gpt-4"));
         assert!(!provider.supports_model("claude-3-opus"));
+        // Negative cases for the previously-hallucinated ids:
+        assert!(!provider.supports_model("gemini-3-pro"));
+        assert!(!provider.supports_model("gemini-3-flash"));
+        assert!(!provider.supports_model("gemini-1.5-pro"));
     }
 
     #[test]
