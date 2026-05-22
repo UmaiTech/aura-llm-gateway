@@ -8,11 +8,13 @@
 use async_trait::async_trait;
 use aura_types::{
     ContentPart, CreateResponseRequest, FunctionCallItem, IncompleteReason, InputContent,
-    InputItem, Item, MessageItem, Response, ResponseError, Role, Tool, ToolChoice, ToolChoiceAuto,
-    Usage,
+    InputItem, Item, MessageItem, Response, ResponseError, Role, StreamEvent, Tool, ToolChoice,
+    ToolChoiceAuto, Usage,
 };
+use futures_util::{Stream, StreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use tracing::{debug, error, instrument, warn};
 
 use super::{EventStream, Provider, ProviderError};
@@ -363,13 +365,290 @@ impl Provider for TogetherProvider {
         Ok(self.transform_response(together_response, &model))
     }
 
+    #[instrument(skip(self, request), fields(model = %request.model))]
     async fn complete_stream(
         &self,
-        _request: CreateResponseRequest,
+        request: CreateResponseRequest,
     ) -> Result<EventStream, ProviderError> {
-        Err(ProviderError::internal(
-            "Together streaming is not implemented yet",
-        ))
+        let model = request.model.clone();
+        let mut together_request = self.transform_request(&request);
+        together_request.stream = Some(true);
+
+        debug!(model = %model, "Starting streaming request to Together");
+
+        let response = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&together_request)
+            .send()
+            .await?;
+
+        let status = response.status().as_u16();
+        if !response.status().is_success() {
+            let body = response.text().await.unwrap_or_default();
+            error!(status = %status, body = %body, "Together API error");
+            return Err(self.parse_error_response(status, &body));
+        }
+
+        let stream = response.bytes_stream();
+        let transformer = TogetherStreamTransformer::new(model);
+
+        Ok(Box::pin(transformer.transform(stream)))
+    }
+}
+
+/// Transforms Together's OpenAI-compatible SSE stream to Open Responses events.
+struct TogetherStreamTransformer {
+    model: String,
+    response_id: String,
+    buffer: String,
+    accumulated_text: String,
+    accumulated_tool_calls: HashMap<usize, PartialToolCall>,
+    accumulated_usage: Option<aura_types::Usage>,
+    pending_events: VecDeque<StreamEvent>,
+    sent_created: bool,
+    sent_in_progress: bool,
+    output_item_added: bool,
+    content_part_added: bool,
+}
+
+#[derive(Default)]
+struct PartialToolCall {
+    id: String,
+    name: String,
+    arguments: String,
+}
+
+impl TogetherStreamTransformer {
+    fn new(model: String) -> Self {
+        Self {
+            model,
+            response_id: format!("resp_tog_{}", uuid::Uuid::new_v4()),
+            buffer: String::new(),
+            accumulated_text: String::new(),
+            accumulated_tool_calls: HashMap::new(),
+            accumulated_usage: None,
+            pending_events: VecDeque::new(),
+            sent_created: false,
+            sent_in_progress: false,
+            output_item_added: false,
+            content_part_added: false,
+        }
+    }
+
+    fn transform<S>(self, stream: S) -> impl Stream<Item = Result<StreamEvent, ProviderError>>
+    where
+        S: Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send + 'static,
+    {
+        futures_util::stream::unfold(
+            (self, stream.boxed()),
+            |(mut transformer, mut stream)| async move {
+                loop {
+                    if !transformer.sent_created {
+                        transformer.sent_created = true;
+                        let response = Response::in_progress(
+                            transformer.response_id.clone(),
+                            transformer.model.clone(),
+                        );
+                        return Some((
+                            Ok(StreamEvent::response_created(response)),
+                            (transformer, stream),
+                        ));
+                    }
+
+                    if !transformer.sent_in_progress {
+                        transformer.sent_in_progress = true;
+                        let response = Response::in_progress(
+                            transformer.response_id.clone(),
+                            transformer.model.clone(),
+                        );
+                        return Some((
+                            Ok(StreamEvent::response_in_progress(response)),
+                            (transformer, stream),
+                        ));
+                    }
+
+                    if let Some(event) = transformer.pending_events.pop_front() {
+                        return Some((Ok(event), (transformer, stream)));
+                    }
+
+                    if let Some(line_end) = transformer.buffer.find('\n') {
+                        let line = transformer.buffer[..line_end].trim().to_string();
+                        transformer.buffer = transformer.buffer[line_end + 1..].to_string();
+
+                        if line.is_empty() {
+                            continue;
+                        }
+
+                        if line == "data: [DONE]" {
+                            if !transformer.accumulated_text.is_empty() {
+                                transformer.pending_events.push_back(
+                                    StreamEvent::output_text_done(
+                                        0,
+                                        0,
+                                        transformer.accumulated_text.clone(),
+                                    ),
+                                );
+                            }
+
+                            let mut output = Vec::new();
+                            if !transformer.accumulated_text.is_empty() {
+                                output.push(Item::Message(MessageItem::assistant(
+                                    "msg_0",
+                                    &transformer.accumulated_text,
+                                )));
+                            }
+                            for (idx, tc) in &transformer.accumulated_tool_calls {
+                                output.push(Item::FunctionCall(FunctionCallItem::new(
+                                    format!("fc_{}", idx),
+                                    &tc.id,
+                                    &tc.name,
+                                    &tc.arguments,
+                                )));
+                            }
+
+                            let mut builder = Response::builder(
+                                transformer.response_id.clone(),
+                                transformer.model.clone(),
+                            )
+                            .outputs(output)
+                            .completed();
+
+                            if let Some(usage) = transformer.accumulated_usage.clone() {
+                                builder = builder.usage(usage);
+                            }
+
+                            let response = builder.build();
+
+                            transformer
+                                .pending_events
+                                .push_back(StreamEvent::response_completed(response));
+
+                            if let Some(event) = transformer.pending_events.pop_front() {
+                                return Some((Ok(event), (transformer, stream)));
+                            }
+                        }
+
+                        if let Some(data) = line.strip_prefix("data: ") {
+                            match serde_json::from_str::<TogetherStreamChunk>(data) {
+                                Ok(chunk) => {
+                                    if let Some(usage) = chunk.usage {
+                                        transformer.accumulated_usage = Some(aura_types::Usage {
+                                            input_tokens: usage.prompt_tokens,
+                                            output_tokens: usage.completion_tokens,
+                                            total_tokens: usage.total_tokens,
+                                            cached_tokens: None,
+                                            reasoning_tokens: None,
+                                            cost_usd: None,
+                                        });
+                                    }
+
+                                    if let Some(choice) = chunk.choices.first() {
+                                        if let Some(content) = &choice.delta.content {
+                                            if !transformer.output_item_added {
+                                                transformer.output_item_added = true;
+                                                let item = Item::Message(MessageItem::assistant(
+                                                    "msg_0", "",
+                                                ));
+                                                transformer.pending_events.push_back(
+                                                    StreamEvent::output_item_added(0, item),
+                                                );
+                                            }
+
+                                            if !transformer.content_part_added {
+                                                transformer.content_part_added = true;
+                                                transformer.pending_events.push_back(
+                                                    StreamEvent::content_part_added(0, 0, "text"),
+                                                );
+                                            }
+
+                                            transformer.accumulated_text.push_str(content);
+                                            transformer.pending_events.push_back(
+                                                StreamEvent::output_text_delta(
+                                                    0,
+                                                    0,
+                                                    content.clone(),
+                                                ),
+                                            );
+
+                                            if let Some(event) =
+                                                transformer.pending_events.pop_front()
+                                            {
+                                                return Some((Ok(event), (transformer, stream)));
+                                            }
+                                        }
+
+                                        if let Some(tool_calls) = &choice.delta.tool_calls {
+                                            for tool_call in tool_calls {
+                                                let entry = transformer
+                                                    .accumulated_tool_calls
+                                                    .entry(tool_call.index)
+                                                    .or_default();
+
+                                                if let Some(id) = &tool_call.id {
+                                                    entry.id = id.clone();
+                                                }
+                                                if let Some(function) = &tool_call.function {
+                                                    if let Some(name) = &function.name {
+                                                        entry.name = name.clone();
+                                                    }
+                                                    if let Some(arguments) = &function.arguments {
+                                                        entry.arguments.push_str(arguments);
+                                                        transformer.pending_events.push_back(
+                                                            StreamEvent::function_call_arguments_delta(
+                                                                tool_call.index,
+                                                                arguments.clone(),
+                                                            ),
+                                                        );
+
+                                                        if let Some(event) =
+                                                            transformer.pending_events.pop_front()
+                                                        {
+                                                            return Some((
+                                                                Ok(event),
+                                                                (transformer, stream),
+                                                            ));
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(error) => {
+                                    warn!(
+                                        error = %error,
+                                        data = %data,
+                                        "Failed to parse Together stream chunk"
+                                    );
+                                }
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    match stream.next().await {
+                        Some(Ok(bytes)) => {
+                            if let Ok(text) = String::from_utf8(bytes.to_vec()) {
+                                transformer.buffer.push_str(&text);
+                            }
+                        }
+                        Some(Err(error)) => {
+                            return Some((
+                                Err(ProviderError::stream_error(error.to_string())),
+                                (transformer, stream),
+                            ));
+                        }
+                        None => {
+                            return None;
+                        }
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -503,8 +782,44 @@ impl TogetherArguments {
 struct TogetherUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
-    #[allow(dead_code)]
     total_tokens: u32,
+}
+
+// Streaming types
+
+#[derive(Debug, Deserialize)]
+struct TogetherStreamChunk {
+    #[allow(dead_code)]
+    id: String,
+    choices: Vec<TogetherStreamChoice>,
+    #[allow(dead_code)]
+    usage: Option<TogetherUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TogetherStreamChoice {
+    delta: TogetherStreamDelta,
+    #[allow(dead_code)]
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TogetherStreamDelta {
+    content: Option<String>,
+    tool_calls: Option<Vec<TogetherStreamToolCall>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TogetherStreamToolCall {
+    index: usize,
+    id: Option<String>,
+    function: Option<TogetherStreamFunction>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TogetherStreamFunction {
+    name: Option<String>,
+    arguments: Option<String>,
 }
 
 #[cfg(test)]
@@ -706,5 +1021,54 @@ mod tests {
             r#"{"error":{"message":"Rate limit exceeded","type":"rate_limit"}}"#,
         );
         assert!(matches!(err, ProviderError::RateLimit { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_stream_transform_preserves_first_text_delta() {
+        let stream = futures_util::stream::iter(vec![
+            Ok(bytes::Bytes::from(
+                r#"data: {"id":"chunk_1","choices":[{"delta":{"content":"Hello"},"finish_reason":null}]}"#,
+            )),
+            Ok(bytes::Bytes::from("\n\n")),
+            Ok(bytes::Bytes::from("data: [DONE]\n\n")),
+        ]);
+
+        let events =
+            TogetherStreamTransformer::new("meta-llama/Llama-3.3-70B-Instruct-Turbo".to_string())
+                .transform(stream)
+                .collect::<Vec<_>>()
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .expect("stream should parse");
+
+        assert!(matches!(events[0], StreamEvent::ResponseCreated { .. }));
+        assert!(matches!(events[1], StreamEvent::ResponseInProgress { .. }));
+        assert!(matches!(events[2], StreamEvent::OutputItemAdded { .. }));
+        assert!(matches!(events[3], StreamEvent::ContentPartAdded { .. }));
+
+        match &events[4] {
+            StreamEvent::OutputTextDelta { delta, .. } => assert_eq!(delta, "Hello"),
+            event => panic!("expected text delta, got {:?}", event),
+        }
+
+        match &events[5] {
+            StreamEvent::OutputTextDone { text, .. } => assert_eq!(text, "Hello"),
+            event => panic!("expected text done, got {:?}", event),
+        }
+
+        match &events[6] {
+            StreamEvent::ResponseCompleted { response } => {
+                assert_eq!(response.output.len(), 1);
+                assert_eq!(
+                    response.output[0]
+                        .as_message()
+                        .expect("message output")
+                        .text(),
+                    "Hello"
+                );
+            }
+            event => panic!("expected completed response, got {:?}", event),
+        }
     }
 }
