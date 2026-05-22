@@ -473,6 +473,28 @@ impl ResponseRepo {
         Ok(row.map(|r| r.get("conversation_id")))
     }
 
+    /// Fetch just the `output_items` JSON for one response, by id.
+    ///
+    /// Used by the gateway's response-replay path
+    /// (crates/aura-proxy/src/routes/responses.rs) to reconstruct
+    /// prior assistant tool_calls when a request arrives with
+    /// `previous_response_id` set AND `FunctionCallOutput` items in
+    /// its current input.
+    ///
+    /// Returns the raw JSONB value as stored. Callers walk it for
+    /// `type == "function_call"` items; full row decode isn't
+    /// needed for the replay path.
+    pub async fn find_output_items_by_id(
+        pool: &DbPool,
+        response_id: &str,
+    ) -> Result<Option<serde_json::Value>, DbError> {
+        let row = sqlx::query("SELECT output_items FROM responses WHERE id = $1")
+            .bind(response_id)
+            .fetch_optional(pool)
+            .await?;
+        Ok(row.map(|r| r.get("output_items")))
+    }
+
     /// Get all responses in a conversation (ordered chronologically)
     pub async fn get_by_conversation(
         pool: &DbPool,
