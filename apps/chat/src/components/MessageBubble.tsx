@@ -246,16 +246,22 @@ interface CodeBlockProps {
 
 function CodeBlock({ language, children }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
-  // Theme-aware syntax highlighting: oneDark on dark mode, oneLight
-  // on light. Previously hardcoded to oneDark + `background: '#1e1e2e'`,
-  // which produced a black slab over the message in light mode — the
-  // "black over the code" bug.
-  const theme = useChatStore((s) => s.theme)
+  // Theme-aware syntax highlighting: oneDark in dark mode, oneLight
+  // in light. Read the `dark` class that ThemeToggle puts on
+  // <html> — that's the single source of truth for the applied
+  // theme. Re-running matchMedia here was wrong because it ignored
+  // an explicit user override of the system preference (e.g. system
+  // dark, page set to light → matchMedia said dark, but the page is
+  // actually light, so we rendered a navy code block on a white
+  // message background).
+  //
+  // Subscribe to store.theme so we re-render on the toggle even
+  // though we don't read its value directly — the class update
+  // happens in the ThemeToggle effect.
+  useChatStore((s) => s.theme)
   const isDark =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
+    typeof document !== 'undefined' &&
+    document.documentElement.classList.contains('dark')
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(children)
@@ -263,21 +269,38 @@ function CodeBlock({ language, children }: CodeBlockProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Compose the code surface from a single themed background. The
+  // header sits inline with the code (same background, just a
+  // mono label + copy button hung on top). No outer border, no
+  // bg-muted/40 secondary band — those layered up to produce the
+  // "black band around the code" + invisible header text bug seen
+  // in 2026-05-22 screenshots.
+  const surfaceBg = isDark ? '#282c34' : '#fafafa' // matches oneDark/oneLight body bg
+  const surfaceFg = isDark ? '#abb2bf' : '#383a42' // muted text on each theme
+
   return (
-    <div className="relative group my-4 -mx-4 sm:mx-0 sm:rounded-lg overflow-hidden border border-border">
-      {/* Header — themed via tokens, not hardcoded gray */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-b border-border">
-        <span className="text-xs text-muted-foreground font-mono">
+    <div
+      className="relative group my-4 -mx-4 sm:mx-0 sm:rounded-lg overflow-hidden"
+      style={{ background: surfaceBg }}
+    >
+      {/* Header — same background as the code body so they read as
+          one surface. Mono label + copy button hang on top in
+          a muted colour that contrasts the surface in both themes. */}
+      <div
+        className="flex items-center justify-between px-4 pt-3 pb-2"
+        style={{ color: surfaceFg }}
+      >
+        <span className="text-xs font-mono uppercase tracking-wider">
           {language || 'code'}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-xs font-mono hover:opacity-70 transition-opacity"
         >
           {copied ? (
             <>
               <Check className="h-3.5 w-3.5" />
-              Copied!
+              Copied
             </>
           ) : (
             <>
@@ -288,20 +311,20 @@ function CodeBlock({ language, children }: CodeBlockProps) {
         </button>
       </div>
 
-      {/* Code */}
+      {/* Code — theme's background lives on the SyntaxHighlighter pre.
+          We pad sides+bottom to match the header's pt-3; the
+          highlighter handles font/colors via the prism theme. */}
       <SyntaxHighlighter
         style={isDark ? oneDark : oneLight}
         language={language || 'text'}
         PreTag="div"
         customStyle={{
           margin: 0,
-          padding: '1rem',
-          // Let the theme set its own background — overriding to a
-          // hardcoded hex was what broke light mode. Both oneDark and
-          // oneLight ship sane backgrounds.
+          padding: '0 1rem 1rem 1rem',
+          background: 'transparent',
           fontSize: '0.875rem',
         }}
-        lineProps={{ style: { backgroundColor: 'transparent' }}}
+        lineProps={{ style: { backgroundColor: 'transparent' } }}
         wrapLongLines={true}
       >
         {children}
@@ -415,18 +438,21 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
               />
             </button>
 
-            {/* Expanded Content */}
+            {/* Expanded Content — themed via tokens so it works in
+                both light and dark mode. Previously hardcoded
+                bg-black/20 + bg-gray-900/80 which produced a dark
+                slab on light-mode message backgrounds. */}
             {isExpanded && (
-              <div className="border-t border-border/30 px-4 py-3 space-y-3 bg-black/20">
+              <div className="border-t border-border px-3 py-3 space-y-3 bg-muted/20">
                 {/* Arguments Section */}
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <Zap className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
                       Input
                     </span>
                   </div>
-                  <pre className="text-xs bg-gray-900/80 rounded-lg p-3 overflow-x-auto border border-border/30">
+                  <pre className="text-xs bg-background border border-border rounded p-2.5 overflow-x-auto font-mono text-foreground">
                     {JSON.stringify(invocation.args, null, 2)}
                   </pre>
                 </div>
@@ -436,11 +462,11 @@ function ToolInvocations({ invocations }: ToolInvocationsProps) {
                   <div>
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Server className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
                         Output
                       </span>
                     </div>
-                    <pre className="text-xs bg-gray-900/80 rounded-lg p-3 overflow-x-auto max-h-48 overflow-y-auto border border-border/30">
+                    <pre className="text-xs bg-background border border-border rounded p-2.5 overflow-x-auto max-h-48 overflow-y-auto font-mono text-foreground">
                       {formatToolResult(invocation.result)}
                     </pre>
                   </div>
