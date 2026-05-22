@@ -5,6 +5,7 @@
 //! value. This adapter normalizes both shapes back to the Open Responses API
 //! JSON-string representation.
 
+use super::{EventStream, Provider, ProviderError};
 use async_trait::async_trait;
 use aura_types::{
     ContentPart, CreateResponseRequest, FunctionCallItem, IncompleteReason, InputContent,
@@ -17,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use tracing::{debug, error, instrument, warn};
 use uuid;
-use super::{EventStream, Provider, ProviderError};
 
 const TOGETHER_API_BASE: &str = "https://api.together.xyz/v1";
 
