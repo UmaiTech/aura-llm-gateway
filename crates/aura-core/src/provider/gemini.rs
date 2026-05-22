@@ -84,8 +84,26 @@ impl GeminiProvider {
     fn transform_request(&self, request: &CreateResponseRequest) -> GeminiRequest {
         let mut contents = Vec::new();
 
+        // Batch consecutive FunctionCall items into a single `model`
+        // content block carrying multiple `functionCall` parts.
+        // Gemini requires parallel tool calls to be in one model
+        // content; emitting one model content per call breaks the
+        // tool-call/tool-response pairing.
+        let mut pending_function_calls: Vec<GeminiPart> = Vec::new();
+        let flush_pending = |contents: &mut Vec<GeminiContent>, pending: &mut Vec<GeminiPart>| {
+            if !pending.is_empty() {
+                contents.push(GeminiContent {
+                    role: "model".to_string(),
+                    parts: std::mem::take(pending),
+                });
+            }
+        };
+
         // Transform input items to Gemini contents
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut contents, &mut pending_function_calls);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     // Skip system messages - they go in system_instruction
@@ -118,23 +136,23 @@ impl GeminiProvider {
                     name,
                     arguments,
                 } => {
-                    // Gemini uses functionCall parts inside a model
-                    // (assistant) content block. Note Gemini doesn't
-                    // carry the call_id in the same way OpenAI does
-                    // — it pairs by function name + position, so we
-                    // drop the call_id here. The arguments string is
-                    // JSON-parsed; fallback to wrapping the raw
-                    // string under a `raw_arguments` key if invalid.
+                    // Buffer into the current batch. Gemini groups
+                    // parallel tool calls as multiple functionCall
+                    // parts inside ONE model content block — see
+                    // flush_pending above.
+                    //
+                    // Gemini pairs functionCall→functionResponse by
+                    // name + position rather than call_id, so we
+                    // drop the call_id here. arguments is
+                    // JSON-parsed; on parse failure we wrap raw
+                    // under raw_arguments rather than dropping.
                     let args_value: serde_json::Value = serde_json::from_str(arguments)
                         .unwrap_or_else(|_| serde_json::json!({ "raw_arguments": arguments }));
-                    contents.push(GeminiContent {
-                        role: "model".to_string(),
-                        parts: vec![GeminiPart::FunctionCall {
-                            function_call: GeminiFunctionCall {
-                                name: name.clone(),
-                                args: args_value,
-                            },
-                        }],
+                    pending_function_calls.push(GeminiPart::FunctionCall {
+                        function_call: GeminiFunctionCall {
+                            name: name.clone(),
+                            args: args_value,
+                        },
                     });
                 }
                 InputItem::FunctionCallOutput { call_id, output } => {
@@ -157,6 +175,8 @@ impl GeminiProvider {
                 }
             }
         }
+        // Flush any trailing FunctionCall batch.
+        flush_pending(&mut contents, &mut pending_function_calls);
 
         // Build system instruction from instructions and system messages
         let system_instruction = self.extract_system_instruction(request);
@@ -1285,5 +1305,47 @@ mod tests {
         } else {
             panic!("Expected FunctionResponse part");
         }
+    }
+
+    /// Two parallel FunctionCall items should batch into one `model`
+    /// content block with TWO functionCall parts. Gemini requires
+    /// this — separate model content blocks break the
+    /// functionCall→functionResponse pairing.
+    #[test]
+    fn test_consecutive_function_calls_batch_into_one_model_content() {
+        let provider = GeminiProvider::new("test-key");
+        let mut request = CreateResponseRequest::text("gemini-2.5-flash", "weather in two cities?");
+        request.input.extend(vec![
+            InputItem::FunctionCall {
+                call_id: "ignored_1".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Paris"}"#.into(),
+            },
+            InputItem::FunctionCall {
+                call_id: "ignored_2".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Tokyo"}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "get_weather".into(),
+                output: r#"{"temp":15}"#.into(),
+            },
+        ]);
+
+        let req = provider.transform_request(&request);
+
+        // Expected: [user, model(parts=[fc_1, fc_2]), user(parts=[fr])]
+        assert_eq!(req.contents.len(), 3, "contents = {:#?}", req.contents);
+        assert_eq!(req.contents[1].role, "model");
+        let function_call_parts: Vec<_> = req.contents[1]
+            .parts
+            .iter()
+            .filter(|p| matches!(p, GeminiPart::FunctionCall { .. }))
+            .collect();
+        assert_eq!(
+            function_call_parts.len(),
+            2,
+            "two parallel calls should batch into one model content with two functionCall parts"
+        );
     }
 }

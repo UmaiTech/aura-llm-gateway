@@ -86,8 +86,31 @@ impl OpenAIProvider {
             });
         }
 
+        // Batch consecutive FunctionCall items into a single
+        // assistant message with multiple tool_calls. OpenAI requires
+        // all parallel tool calls emitted by the assistant in one
+        // turn to be in ONE assistant message — not one message per
+        // call. See issue feedback on PR #164.
+        let mut pending_tool_calls: Vec<OpenAIToolCallRequest> = Vec::new();
+        let flush_pending = |messages: &mut Vec<OpenAIMessage>,
+                             pending: &mut Vec<OpenAIToolCallRequest>| {
+            if !pending.is_empty() {
+                messages.push(OpenAIMessage {
+                    role: "assistant".to_string(),
+                    content: None,
+                    tool_calls: Some(std::mem::take(pending)),
+                    tool_call_id: None,
+                    name: None,
+                });
+            }
+        };
+
         // Transform input items to OpenAI messages
         for item in &request.input {
+            // Any non-FunctionCall item ends the current batch.
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_calls);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     let oai_content = match content {
@@ -170,41 +193,27 @@ impl OpenAIProvider {
                     name,
                     arguments,
                 } => {
-                    // Emit a synthesized assistant message carrying
-                    // this tool_call so the upstream OpenAI Chat
-                    // Completions API sees the expected
-                    // assistant→tool pairing. Without this, sending a
-                    // role:'tool' message after only a user message
-                    // returns "messages with role 'tool' must be a
-                    // response to a preceeding message with
-                    // 'tool_calls'".
-                    //
-                    // Note: this emits one assistant message PER
-                    // function_call. If the prior turn emitted
-                    // multiple parallel tool calls, the right shape
-                    // is one assistant message with multiple
-                    // tool_calls entries. We could batch consecutive
-                    // FunctionCall items into a single assistant
-                    // message here, but doing so requires lookahead
-                    // and OpenAI accepts the one-per-message form
-                    // too — leaving the simpler shape for now.
-                    messages.push(OpenAIMessage {
-                        role: "assistant".to_string(),
-                        content: None,
-                        tool_calls: Some(vec![OpenAIToolCallRequest {
-                            id: call_id.clone(),
-                            r#type: "function".to_string(),
-                            function: OpenAIFunctionCall {
-                                name: name.clone(),
-                                arguments: arguments.clone(),
-                            },
-                        }]),
-                        tool_call_id: None,
-                        name: None,
+                    // Buffer this call into the current batch. The
+                    // batch is flushed into a single assistant
+                    // message when the NEXT non-FunctionCall item is
+                    // seen (or at end of loop). This is what makes
+                    // parallel tool calls land in one message
+                    // rather than N.
+                    pending_tool_calls.push(OpenAIToolCallRequest {
+                        id: call_id.clone(),
+                        r#type: "function".to_string(),
+                        function: OpenAIFunctionCall {
+                            name: name.clone(),
+                            arguments: arguments.clone(),
+                        },
                     });
                 }
             }
         }
+        // Flush any trailing FunctionCall batch (last item(s) were
+        // FunctionCalls — the in-loop flush only fires on the NEXT
+        // non-FunctionCall item).
+        flush_pending(&mut messages, &mut pending_tool_calls);
 
         // Transform tools
         let tools = request.tools.as_ref().map(|tools| {
@@ -1066,5 +1075,84 @@ mod tests {
             r#"{"error":{"message":"Service unavailable","type":"server_error"}}"#,
         );
         assert!(matches!(err, ProviderError::ServiceUnavailable { .. }));
+    }
+
+    /// Two parallel FunctionCall items + one FunctionCallOutput
+    /// should land as one assistant message carrying both tool_calls,
+    /// followed by one tool message — not two separate assistant
+    /// messages with one tool_call each. OpenAI requires the
+    /// batched shape.
+    #[test]
+    fn test_consecutive_function_calls_batch_into_one_assistant_message() {
+        let provider = OpenAIProvider::new("test-key");
+        let mut request = CreateResponseRequest::text("gpt-4", "what's the weather in two cities?");
+        request.input.extend(vec![
+            InputItem::FunctionCall {
+                call_id: "call_1".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Paris"}"#.into(),
+            },
+            InputItem::FunctionCall {
+                call_id: "call_2".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Tokyo"}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "call_1".into(),
+                output: r#"{"temp":15}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "call_2".into(),
+                output: r#"{"temp":22}"#.into(),
+            },
+        ]);
+
+        let oai = provider.transform_request(&request);
+
+        // Expected message sequence:
+        //   [user, assistant(tool_calls=[call_1, call_2]), tool(call_1), tool(call_2)]
+        assert_eq!(oai.messages.len(), 4, "messages = {:#?}", oai.messages);
+        assert_eq!(oai.messages[0].role, "user");
+        assert_eq!(oai.messages[1].role, "assistant");
+        let tool_calls = oai.messages[1]
+            .tool_calls
+            .as_ref()
+            .expect("assistant message should carry tool_calls");
+        assert_eq!(
+            tool_calls.len(),
+            2,
+            "two parallel calls should batch into one assistant message"
+        );
+        assert_eq!(tool_calls[0].id, "call_1");
+        assert_eq!(tool_calls[1].id, "call_2");
+        assert_eq!(oai.messages[2].role, "tool");
+        assert_eq!(oai.messages[3].role, "tool");
+    }
+
+    /// Single FunctionCall still produces one assistant message with
+    /// one tool_call. (No regression on the non-parallel case.)
+    #[test]
+    fn test_single_function_call_still_works() {
+        let provider = OpenAIProvider::new("test-key");
+        let mut request = CreateResponseRequest::text("gpt-4", "weather?");
+        request.input.extend(vec![
+            InputItem::FunctionCall {
+                call_id: "call_x".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Paris"}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "call_x".into(),
+                output: r#"{"temp":15}"#.into(),
+            },
+        ]);
+
+        let oai = provider.transform_request(&request);
+
+        // [user, assistant(tool_calls=[call_x]), tool]
+        assert_eq!(oai.messages.len(), 3);
+        let tool_calls = oai.messages[1].tool_calls.as_ref().unwrap();
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].id, "call_x");
     }
 }

@@ -85,7 +85,26 @@ impl HuggingFaceProvider {
             });
         }
 
+        // Batch consecutive FunctionCall items into one assistant
+        // message. HuggingFace TGI exposes OpenAI-compatible
+        // tool_calls; see the OpenAI adapter for the rationale.
+        let mut pending_tool_calls: Vec<HfToolCallRequest> = Vec::new();
+        let flush_pending = |messages: &mut Vec<HfMessage>,
+                             pending: &mut Vec<HfToolCallRequest>| {
+            if !pending.is_empty() {
+                messages.push(HfMessage {
+                    role: "assistant".to_string(),
+                    content: None,
+                    tool_calls: Some(std::mem::take(pending)),
+                    tool_call_id: None,
+                });
+            }
+        };
+
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_calls);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     if *role == Role::System {
@@ -157,18 +176,13 @@ impl HuggingFaceProvider {
                     name,
                     arguments,
                 } => {
-                    messages.push(HfMessage {
-                        role: "assistant".to_string(),
-                        content: None,
-                        tool_calls: Some(vec![HfToolCallRequest {
-                            id: call_id.clone(),
-                            r#type: "function".to_string(),
-                            function: HfFunctionCall {
-                                name: name.clone(),
-                                arguments: arguments.clone(),
-                            },
-                        }]),
-                        tool_call_id: None,
+                    pending_tool_calls.push(HfToolCallRequest {
+                        id: call_id.clone(),
+                        r#type: "function".to_string(),
+                        function: HfFunctionCall {
+                            name: name.clone(),
+                            arguments: arguments.clone(),
+                        },
                     });
                 }
                 InputItem::FunctionCallOutput { call_id, output } => {
@@ -181,6 +195,8 @@ impl HuggingFaceProvider {
                 }
             }
         }
+        // Flush any trailing FunctionCall batch.
+        flush_pending(&mut messages, &mut pending_tool_calls);
 
         // Transform tools
         let tools = request.tools.as_ref().map(|tools| {

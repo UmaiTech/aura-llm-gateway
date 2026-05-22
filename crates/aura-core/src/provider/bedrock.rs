@@ -173,7 +173,25 @@ impl BedrockProvider {
     fn transform_claude_request(&self, request: &CreateResponseRequest) -> BedrockClaudeRequest {
         let mut messages = Vec::new();
 
+        // Batch consecutive FunctionCall items into a single
+        // assistant message with multiple tool_use blocks. Same
+        // rationale as the Anthropic native adapter — Bedrock's
+        // Claude wire format is identical.
+        let mut pending_tool_uses: Vec<BedrockContentBlock> = Vec::new();
+        let flush_pending = |messages: &mut Vec<BedrockMessage>,
+                             pending: &mut Vec<BedrockContentBlock>| {
+            if !pending.is_empty() {
+                messages.push(BedrockMessage {
+                    role: "assistant".to_string(),
+                    content: std::mem::take(pending),
+                });
+            }
+        };
+
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_uses);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     if *role == Role::System {
@@ -250,19 +268,16 @@ impl BedrockProvider {
                     name,
                     arguments,
                 } => {
-                    // Bedrock's Anthropic-family models use the same
-                    // tool_use shape as Anthropic direct. JSON-parse
-                    // arguments; fall back to a raw_arguments object
-                    // if parsing fails so the call isn't dropped.
+                    // Buffer into the current batch; flushed as a
+                    // single assistant message with multiple
+                    // tool_use blocks at the next non-FunctionCall
+                    // item or end of loop.
                     let input_value: serde_json::Value = serde_json::from_str(arguments)
                         .unwrap_or_else(|_| serde_json::json!({ "raw_arguments": arguments }));
-                    messages.push(BedrockMessage {
-                        role: "assistant".to_string(),
-                        content: vec![BedrockContentBlock::ToolUse {
-                            id: call_id.clone(),
-                            name: name.clone(),
-                            input: input_value,
-                        }],
+                    pending_tool_uses.push(BedrockContentBlock::ToolUse {
+                        id: call_id.clone(),
+                        name: name.clone(),
+                        input: input_value,
                     });
                 }
                 InputItem::FunctionCallOutput { call_id, output } => {
@@ -277,6 +292,8 @@ impl BedrockProvider {
                 }
             }
         }
+        // Flush any trailing FunctionCall batch.
+        flush_pending(&mut messages, &mut pending_tool_uses);
 
         // Extract system prompt from instructions and system messages
         let mut system_parts = Vec::new();
