@@ -89,7 +89,26 @@ impl OllamaProvider {
             });
         }
 
+        // Batch consecutive FunctionCall items into one assistant
+        // message. Ollama uses OpenAI-compatible tool_calls; see the
+        // OpenAI adapter for the rationale.
+        let mut pending_tool_calls: Vec<OllamaToolCallRequest> = Vec::new();
+        let flush_pending = |messages: &mut Vec<OllamaMessage>,
+                             pending: &mut Vec<OllamaToolCallRequest>| {
+            if !pending.is_empty() {
+                messages.push(OllamaMessage {
+                    role: "assistant".to_string(),
+                    content: None,
+                    tool_calls: Some(std::mem::take(pending)),
+                    tool_call_id: None,
+                });
+            }
+        };
+
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_calls);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     if *role == Role::System {
@@ -165,18 +184,13 @@ impl OllamaProvider {
                     name,
                     arguments,
                 } => {
-                    messages.push(OllamaMessage {
-                        role: "assistant".to_string(),
-                        content: None,
-                        tool_calls: Some(vec![OllamaToolCallRequest {
-                            id: call_id.clone(),
-                            r#type: "function".to_string(),
-                            function: OllamaFunctionCall {
-                                name: name.clone(),
-                                arguments: arguments.clone(),
-                            },
-                        }]),
-                        tool_call_id: None,
+                    pending_tool_calls.push(OllamaToolCallRequest {
+                        id: call_id.clone(),
+                        r#type: "function".to_string(),
+                        function: OllamaFunctionCall {
+                            name: name.clone(),
+                            arguments: arguments.clone(),
+                        },
                     });
                 }
                 InputItem::FunctionCallOutput { call_id, output } => {
@@ -189,6 +203,8 @@ impl OllamaProvider {
                 }
             }
         }
+        // Flush any trailing FunctionCall batch.
+        flush_pending(&mut messages, &mut pending_tool_calls);
 
         // Transform tools (Ollama ≥ 0.3 OpenAI-compatible format)
         let tools = request.tools.as_ref().map(|tools| {

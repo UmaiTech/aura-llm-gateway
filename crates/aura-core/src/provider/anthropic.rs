@@ -88,8 +88,28 @@ impl AnthropicProvider {
     fn transform_request(&self, request: &CreateResponseRequest) -> AnthropicRequest {
         let mut messages = Vec::new();
 
+        // Batch consecutive FunctionCall items into a single
+        // assistant message with multiple tool_use blocks. Anthropic
+        // requires all parallel tool calls emitted in one turn to be
+        // in ONE assistant message — not one per call. The
+        // tool_result blocks that follow then pair against those
+        // tool_use blocks by tool_use_id.
+        let mut pending_tool_uses: Vec<AnthropicContentBlock> = Vec::new();
+        let flush_pending = |messages: &mut Vec<AnthropicMessage>,
+                             pending: &mut Vec<AnthropicContentBlock>| {
+            if !pending.is_empty() {
+                messages.push(AnthropicMessage {
+                    role: "assistant".to_string(),
+                    content: std::mem::take(pending),
+                });
+            }
+        };
+
         // Transform input items to Anthropic messages
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_uses);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     let anthropic_content = match content {
@@ -135,33 +155,34 @@ impl AnthropicProvider {
                     name,
                     arguments,
                 } => {
-                    // Emit a synthesized assistant message containing
-                    // a `tool_use` block. Without this preceding the
-                    // tool_result, Anthropic rejects with:
+                    // Buffer into the current batch. Anthropic
+                    // requires parallel tool_use blocks to land in
+                    // ONE assistant message; flush_pending above
+                    // emits them all together when the next non-
+                    // FunctionCall item (or end-of-loop) is hit.
+                    //
+                    // Without batching, Anthropic rejects with:
                     //   "unexpected tool_use_id found in tool_result
                     //    blocks: <id>. Each tool_result block must
                     //    have a corresponding tool_use block in the
                     //    previous message."
                     //
-                    // Arguments are a JSON-encoded string in our
-                    // InputItem schema (matching OpenAI's wire
-                    // format). Anthropic wants the parsed object
-                    // here, so we deserialize. If parsing fails,
-                    // pass the raw string as a single-property object
-                    // — better than dropping the call entirely.
+                    // Arguments are JSON-encoded in our InputItem
+                    // schema; Anthropic wants the parsed object.
+                    // Fall back to a raw_arguments wrapper on parse
+                    // failure rather than dropping the call.
                     let input_value: serde_json::Value = serde_json::from_str(arguments)
                         .unwrap_or_else(|_| serde_json::json!({ "raw_arguments": arguments }));
-                    messages.push(AnthropicMessage {
-                        role: "assistant".to_string(),
-                        content: vec![AnthropicContentBlock::ToolUse {
-                            id: call_id.clone(),
-                            name: name.clone(),
-                            input: input_value,
-                        }],
+                    pending_tool_uses.push(AnthropicContentBlock::ToolUse {
+                        id: call_id.clone(),
+                        name: name.clone(),
+                        input: input_value,
                     });
                 }
             }
         }
+        // Flush any trailing FunctionCall batch.
+        flush_pending(&mut messages, &mut pending_tool_uses);
 
         // Build system prompt from instructions or system messages in input
         let system = self.extract_system_prompt(request);
@@ -958,5 +979,52 @@ mod tests {
             r#"{"error":{"message":"Overloaded","type":"overloaded_error"}}"#,
         );
         assert!(matches!(err, ProviderError::ServiceUnavailable { .. }));
+    }
+
+    /// Two parallel FunctionCall items should batch into one
+    /// assistant message carrying TWO tool_use blocks. Anthropic
+    /// requires this — separate assistant messages with one
+    /// tool_use each break the tool_result pairing.
+    #[test]
+    fn test_consecutive_function_calls_batch_into_one_assistant_message() {
+        let provider = AnthropicProvider::new("test-key");
+        let mut request =
+            CreateResponseRequest::text("claude-sonnet-4-5", "weather in two cities?");
+        request.input.extend(vec![
+            InputItem::FunctionCall {
+                call_id: "tu_1".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Paris"}"#.into(),
+            },
+            InputItem::FunctionCall {
+                call_id: "tu_2".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Tokyo"}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "tu_1".into(),
+                output: r#"{"temp":15}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "tu_2".into(),
+                output: r#"{"temp":22}"#.into(),
+            },
+        ]);
+
+        let req = provider.transform_request(&request);
+
+        // [user, assistant(content: [tool_use_1, tool_use_2]), user(tool_result_1), user(tool_result_2)]
+        assert_eq!(req.messages.len(), 4, "messages = {:#?}", req.messages);
+        assert_eq!(req.messages[1].role, "assistant");
+        let tool_uses: Vec<_> = req.messages[1]
+            .content
+            .iter()
+            .filter(|b| matches!(b, AnthropicContentBlock::ToolUse { .. }))
+            .collect();
+        assert_eq!(
+            tool_uses.len(),
+            2,
+            "two parallel calls should batch into one assistant message with two tool_use blocks"
+        );
     }
 }

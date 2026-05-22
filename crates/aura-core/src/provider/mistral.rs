@@ -92,8 +92,27 @@ impl MistralProvider {
             });
         }
 
+        // Batch consecutive FunctionCall items into a single
+        // assistant message. Mistral uses OpenAI-compatible
+        // tool_calls — see the OpenAI adapter for the rationale.
+        let mut pending_tool_calls: Vec<MistralToolCallRequest> = Vec::new();
+        let flush_pending =
+            |messages: &mut Vec<MistralMessage>, pending: &mut Vec<MistralToolCallRequest>| {
+                if !pending.is_empty() {
+                    messages.push(MistralMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_calls: Some(std::mem::take(pending)),
+                        tool_call_id: None,
+                    });
+                }
+            };
+
         // Transform input items to Mistral messages
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_calls);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     // Skip system messages — already handled via instructions field
@@ -173,25 +192,23 @@ impl MistralProvider {
                     name,
                     arguments,
                 } => {
-                    // Synthesized prior-assistant tool_use. Same
-                    // OpenAI-compatible shape Mistral uses. See the
-                    // OpenAI adapter for the full rationale.
-                    messages.push(MistralMessage {
-                        role: "assistant".to_string(),
-                        content: None,
-                        tool_calls: Some(vec![MistralToolCallRequest {
-                            id: call_id.clone(),
-                            r#type: "function".to_string(),
-                            function: MistralFunctionCall {
-                                name: name.clone(),
-                                arguments: arguments.clone(),
-                            },
-                        }]),
-                        tool_call_id: None,
+                    // Buffer into the current batch; flushed into
+                    // one assistant message on the next non-
+                    // FunctionCall item or at end of loop.
+                    pending_tool_calls.push(MistralToolCallRequest {
+                        id: call_id.clone(),
+                        r#type: "function".to_string(),
+                        function: MistralFunctionCall {
+                            name: name.clone(),
+                            arguments: arguments.clone(),
+                        },
                     });
                 }
             }
         }
+        // Flush trailing FunctionCall batch (last item was a
+        // FunctionCall — in-loop flush only fires on next non-FC).
+        flush_pending(&mut messages, &mut pending_tool_calls);
 
         // Transform tools
         let tools = request.tools.as_ref().map(|tools| {
