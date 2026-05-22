@@ -77,10 +77,32 @@ impl TogetherProvider {
                 role: "system".to_string(),
                 content: Some(TogetherContent::Text(instructions.clone())),
                 tool_call_id: None,
+                tool_calls: None,
             });
         }
 
+        // Batch consecutive FunctionCall items into one assistant
+        // message. Together.ai's chat-completions endpoint is OpenAI-
+        // compatible — parallel tool calls must be in ONE assistant
+        // message's tool_calls array, not one message per call. See
+        // the OpenAI adapter for the rationale.
+        let mut pending_tool_calls: Vec<TogetherToolCallRequest> = Vec::new();
+        let flush_pending =
+            |messages: &mut Vec<TogetherMessage>, pending: &mut Vec<TogetherToolCallRequest>| {
+                if !pending.is_empty() {
+                    messages.push(TogetherMessage {
+                        role: "assistant".to_string(),
+                        content: None,
+                        tool_call_id: None,
+                        tool_calls: Some(std::mem::take(pending)),
+                    });
+                }
+            };
+
         for item in &request.input {
+            if !matches!(item, InputItem::FunctionCall { .. }) {
+                flush_pending(&mut messages, &mut pending_tool_calls);
+            }
             match item {
                 InputItem::Message { role, content } => {
                     if *role == Role::System {
@@ -147,6 +169,26 @@ impl TogetherProvider {
                         },
                         content: Some(together_content),
                         tool_call_id: None,
+                        tool_calls: None,
+                    });
+                }
+                InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                } => {
+                    // Buffer this call into the current batch; the
+                    // flush_pending closure emits all consecutive
+                    // FunctionCall items as one assistant message
+                    // when the next non-FunctionCall item arrives
+                    // (or at end of loop).
+                    pending_tool_calls.push(TogetherToolCallRequest {
+                        id: call_id.clone(),
+                        r#type: "function".to_string(),
+                        function: TogetherFunctionCallRequest {
+                            name: name.clone(),
+                            arguments: arguments.clone(),
+                        },
                     });
                 }
                 InputItem::FunctionCallOutput { call_id, output } => {
@@ -154,10 +196,13 @@ impl TogetherProvider {
                         role: "tool".to_string(),
                         content: Some(TogetherContent::Text(output.clone())),
                         tool_call_id: Some(call_id.clone()),
+                        tool_calls: None,
                     });
                 }
             }
         }
+        // Flush any trailing FunctionCall batch.
+        flush_pending(&mut messages, &mut pending_tool_calls);
 
         let tools = request.tools.as_ref().map(|tools| {
             tools
@@ -677,6 +722,29 @@ struct TogetherMessage {
     content: Option<TogetherContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
+    /// Set on assistant messages that emitted tool calls in a prior
+    /// turn. Together.ai's API is OpenAI-compatible — multiple
+    /// parallel calls go in one array on one assistant message, not
+    /// one message per call. See the FunctionCall handling in
+    /// transform_request and the batching helper.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<TogetherToolCallRequest>>,
+}
+
+#[derive(Debug, Serialize)]
+struct TogetherToolCallRequest {
+    id: String,
+    #[serde(rename = "type")]
+    r#type: String,
+    function: TogetherFunctionCallRequest,
+}
+
+#[derive(Debug, Serialize)]
+struct TogetherFunctionCallRequest {
+    name: String,
+    /// JSON-encoded string, matching OpenAI's
+    /// `tool_calls[].function.arguments` shape.
+    arguments: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -1070,5 +1138,58 @@ mod tests {
             }
             event => panic!("expected completed response, got {:?}", event),
         }
+    }
+
+    /// Two parallel FunctionCall items should land in one assistant
+    /// message with two tool_calls — same shape OpenAI requires.
+    #[test]
+    fn test_consecutive_function_calls_batch_into_one_assistant_message() {
+        let provider = TogetherProvider::new("test-key");
+        let mut request = CreateResponseRequest::text(
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "weather in two cities?",
+        );
+        request.input.extend(vec![
+            InputItem::FunctionCall {
+                call_id: "call_a".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Paris"}"#.into(),
+            },
+            InputItem::FunctionCall {
+                call_id: "call_b".into(),
+                name: "get_weather".into(),
+                arguments: r#"{"city":"Tokyo"}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "call_a".into(),
+                output: r#"{"temp":15}"#.into(),
+            },
+            InputItem::FunctionCallOutput {
+                call_id: "call_b".into(),
+                output: r#"{"temp":22}"#.into(),
+            },
+        ]);
+
+        let together = provider.transform_request(&request);
+
+        // [user, assistant(tool_calls=[a, b]), tool(a), tool(b)]
+        assert_eq!(
+            together.messages.len(),
+            4,
+            "messages = {:#?}",
+            together.messages
+        );
+        assert_eq!(together.messages[1].role, "assistant");
+        let tool_calls = together.messages[1]
+            .tool_calls
+            .as_ref()
+            .expect("assistant message should carry tool_calls");
+        assert_eq!(
+            tool_calls.len(),
+            2,
+            "two parallel calls should batch into one assistant message"
+        );
+        assert_eq!(tool_calls[0].id, "call_a");
+        assert_eq!(tool_calls[1].id, "call_b");
     }
 }
