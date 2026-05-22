@@ -143,6 +143,35 @@ export default async function handler(
     let body: Buffer | undefined
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       body = await readBody(req)
+
+      // Inject `user: <playground_user_id>` on /v1/responses calls so
+      // the gateway creates an `end_users` row per playground user
+      // under the Playground (Demo) org. Without this, every
+      // playground request looks anonymous to the gateway and the
+      // admin "End Users" view filtered to the Playground org stays
+      // empty. We only do this for /v1/responses — other endpoints
+      // (admin, organizations, etc.) don't accept a `user` field.
+      //
+      // Don't clobber an explicit `user` already on the body — if a
+      // client passes one (e.g. a customer building on top of the
+      // playground key), respect their value.
+      if (upstreamPath.startsWith('/v1/responses') && body.length > 0) {
+        try {
+          const parsed = JSON.parse(body.toString('utf-8'))
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            typeof parsed.user !== 'string'
+          ) {
+            parsed.user = session.user.id
+            body = Buffer.from(JSON.stringify(parsed), 'utf-8')
+          }
+        } catch (err) {
+          // Body wasn't JSON — leave it alone. The gateway will
+          // 400 the request itself if that's a real problem.
+          console.warn('[proxy] Body not JSON; skipping user injection:', err)
+        }
+      }
     }
 
     // 6. Forward the request to the gateway.
