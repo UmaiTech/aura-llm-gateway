@@ -9,7 +9,7 @@
 //! To bypass caching, set the `X-Cache-Control: no-cache` header.
 
 use aura_core::{cache, compression, metrics, ProviderError};
-use aura_db::NewRequestLog;
+use aura_db::{DbPool, NewRequestLog, ResponseRepo};
 use aura_types::{
     CompressionMetadata, ConsistencyStrategy, CreateResponseRequest, InputItem, PromptAugmenter,
     ResponseStatus, StreamEvent,
@@ -114,6 +114,138 @@ fn extract_routing_strategy(headers: &HeaderMap) -> Option<String> {
         .get(ROUTING_STRATEGY_HEADER)
         .and_then(|v| v.to_str().ok())
         .map(|v| v.to_string())
+}
+
+/// Should the gateway synthesize prior assistant tool_calls from
+/// `previous_response_id` when the current request's input has
+/// `FunctionCallOutput` items?
+///
+/// Default: enabled (env var unset or `1`/`true`). Set
+/// `AURA_REPLAY_TOOL_CONTEXT=false` to disable for safe rollback if
+/// the replay path causes regressions on any provider.
+fn tool_context_replay_enabled() -> bool {
+    match std::env::var("AURA_REPLAY_TOOL_CONTEXT") {
+        Ok(v) => {
+            let v = v.trim().to_ascii_lowercase();
+            !(v == "0" || v == "false" || v == "no" || v == "off")
+        }
+        Err(_) => true,
+    }
+}
+
+/// Reconstruct synthesized `InputItem::FunctionCall` items from a
+/// prior response's `output_items`. Returns empty Vec on any of:
+///   - replay disabled via env var
+///   - previous_response_id unset
+///   - current input contains no FunctionCallOutput (no tool flow)
+///   - DB lookup fails or returns no row
+///   - output_items has no `function_call` entries
+///
+/// This is a best-effort enhancement: errors are logged but never
+/// propagated, because the request can still proceed (just without
+/// the synthesized context). The upstream provider will be the one
+/// to reject if the context is genuinely required and missing —
+/// matching the pre-replay behavior.
+///
+/// See issue #156 for the full architectural rationale.
+async fn replay_prior_tool_calls(pool: &DbPool, request: &CreateResponseRequest) -> Vec<InputItem> {
+    if !tool_context_replay_enabled() {
+        return Vec::new();
+    }
+
+    let Some(prev_id) = request.previous_response_id.as_deref() else {
+        return Vec::new();
+    };
+
+    // Only replay when the caller is actually in the middle of a
+    // tool roundtrip — i.e. they sent at least one
+    // FunctionCallOutput. For plain chat continuation
+    // (Message-only input + previous_response_id), the providers
+    // don't need a synthesized assistant turn; the conversation
+    // text is sufficient.
+    let has_tool_output = request
+        .input
+        .iter()
+        .any(|i| matches!(i, InputItem::FunctionCallOutput { .. }));
+    if !has_tool_output {
+        return Vec::new();
+    }
+
+    let output_items = match ResponseRepo::find_output_items_by_id(pool, prev_id).await {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            debug!(
+                previous_response_id = %prev_id,
+                "Tool-context replay: prior response not found in DB"
+            );
+            return Vec::new();
+        }
+        Err(err) => {
+            warn!(
+                previous_response_id = %prev_id,
+                error = %err,
+                "Tool-context replay: DB lookup failed; continuing without"
+            );
+            return Vec::new();
+        }
+    };
+
+    // output_items is stored as a JSON array. Each entry is an
+    // `Item` — we only care about ones with `type == "function_call"`.
+    let Some(items) = output_items.as_array() else {
+        return Vec::new();
+    };
+
+    let mut synthesized = Vec::new();
+    for item in items {
+        let Some(item_type) = item.get("type").and_then(|t| t.as_str()) else {
+            continue;
+        };
+        if item_type != "function_call" {
+            continue;
+        }
+        // Item shape (see crates/aura-types/src/item.rs::FunctionCallItem):
+        //   { "type": "function_call", "id": "...", "call_id": "...",
+        //     "name": "...", "arguments": "<json-string>", "status": "..." }
+        let call_id = item
+            .get("call_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let name = item
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let arguments = item
+            .get("arguments")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "{}".to_string());
+
+        match (call_id, name) {
+            (Some(call_id), Some(name)) => {
+                synthesized.push(InputItem::FunctionCall {
+                    call_id,
+                    name,
+                    arguments,
+                });
+            }
+            _ => {
+                debug!(
+                    item = ?item,
+                    "Tool-context replay: function_call item missing call_id or name; skipping"
+                );
+            }
+        }
+    }
+
+    if !synthesized.is_empty() {
+        debug!(
+            previous_response_id = %prev_id,
+            synthesized_count = synthesized.len(),
+            "Tool-context replay: injected prior tool_calls"
+        );
+    }
+    synthesized
 }
 
 /// Result of preprocessing a request
@@ -387,8 +519,27 @@ pub async fn create_response(
         has_validation = request.validation.is_some(),
         has_consistency = request.consistency.is_some(),
         has_compression = request.compression.is_some(),
+        has_previous_response = request.previous_response_id.is_some(),
         "Creating response"
     );
+
+    // Tool-context replay: when previous_response_id is set and the
+    // current input has FunctionCallOutput items, reconstruct prior
+    // tool_calls from the stored response and prepend them. This is
+    // what lets OpenAI/Anthropic/Google see the expected assistant→
+    // tool pairing on the second roundtrip. Issue #156.
+    //
+    // Best-effort: errors are logged inside the helper, never raised.
+    // Gated on AURA_REPLAY_TOOL_CONTEXT (defaults on).
+    let mut request = request;
+    if let Some(pool) = state.db_pool() {
+        let synthesized = replay_prior_tool_calls(pool, &request).await;
+        if !synthesized.is_empty() {
+            let mut new_input = synthesized;
+            new_input.append(&mut request.input);
+            request.input = new_input;
+        }
+    }
 
     // Preprocess request with compression and consistency
     let preprocess_result = preprocess_request(request);
@@ -1003,5 +1154,48 @@ mod tests {
         let (status, json) = ApiError::from_provider_error(&err);
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(json.0.error.code, "authentication_error");
+    }
+
+    // -----------------------------------------------------------
+    // Tool-context replay (issue #156)
+    // -----------------------------------------------------------
+    //
+    // These tests mutate AURA_REPLAY_TOOL_CONTEXT, which is process-
+    // global state. Cargo runs tests in parallel by default, so use
+    // a single test function that exercises the parsing serially
+    // and restores the prior env-var value. Avoids the per-test
+    // dance with serial_test or std::sync::Mutex.
+
+    #[test]
+    fn test_tool_context_replay_enabled_parsing() {
+        let prior = std::env::var("AURA_REPLAY_TOOL_CONTEXT").ok();
+
+        // unset → default on
+        std::env::remove_var("AURA_REPLAY_TOOL_CONTEXT");
+        assert!(tool_context_replay_enabled());
+
+        // explicit on
+        for v in ["1", "true", "TRUE", "yes", "on"] {
+            std::env::set_var("AURA_REPLAY_TOOL_CONTEXT", v);
+            assert!(
+                tool_context_replay_enabled(),
+                "expected {v:?} to be parsed as enabled"
+            );
+        }
+
+        // explicit off
+        for v in ["0", "false", "FALSE", "no", "off"] {
+            std::env::set_var("AURA_REPLAY_TOOL_CONTEXT", v);
+            assert!(
+                !tool_context_replay_enabled(),
+                "expected {v:?} to be parsed as disabled"
+            );
+        }
+
+        // Restore prior env state so other tests aren't affected.
+        match prior {
+            Some(v) => std::env::set_var("AURA_REPLAY_TOOL_CONTEXT", v),
+            None => std::env::remove_var("AURA_REPLAY_TOOL_CONTEXT"),
+        }
     }
 }
