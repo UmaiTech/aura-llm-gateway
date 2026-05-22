@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { BetaUpsellModal } from './components/BetaUpsellModal'
 import { ChatContainer } from './components/ChatContainer'
+import { CompareView } from './components/CompareView'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { useChatStore } from './stores/chatStore'
@@ -54,6 +55,7 @@ export default function App() {
     updateMessage,
     setModel,
     getCurrentConversation,
+    compareMode,
   } = useChatStore()
 
   // Get configs from store
@@ -639,26 +641,33 @@ export default function App() {
             429, and as BetaUpsellModal when they tap a beta-locked
             model in the picker. */}
 
-        {/* Chat area */}
-        <ChatContainer
-          messages={messages}
-          isLoading={isLoading}
-          error={error}
-          onSendMessage={handleSendMessage}
-          onStopGeneration={handleStopGeneration}
-          model={selectedModel}
-          models={AVAILABLE_MODELS}
-          onModelChange={handleModelChange}
-          onLockedModelClick={(m) => setLockedModelPrompt(m)}
-          routingStrategy={routingStrategy}
-          onRoutingStrategyChange={setRoutingStrategy}
-          validationStrategy={validationStrategy}
-          onValidationStrategyChange={setValidationStrategy}
-          consistencyStrategy={consistencyStrategy}
-          onConsistencyStrategyChange={setConsistencyStrategy}
-          compressionStrategy={compressionStrategy}
-          onCompressionStrategyChange={setCompressionStrategy}
-        />
+        {/* Chat area — CompareView takes over when the header
+            toggle is on. The single-pane ChatContainer's
+            conversation state is left untouched in the store, so
+            toggling back restores the previous chat. */}
+        {compareMode ? (
+          <CompareView />
+        ) : (
+          <ChatContainer
+            messages={messages}
+            isLoading={isLoading}
+            error={error}
+            onSendMessage={handleSendMessage}
+            onStopGeneration={handleStopGeneration}
+            model={selectedModel}
+            models={AVAILABLE_MODELS}
+            onModelChange={handleModelChange}
+            onLockedModelClick={(m) => setLockedModelPrompt(m)}
+            routingStrategy={routingStrategy}
+            onRoutingStrategyChange={setRoutingStrategy}
+            validationStrategy={validationStrategy}
+            onValidationStrategyChange={setValidationStrategy}
+            consistencyStrategy={consistencyStrategy}
+            onConsistencyStrategyChange={setConsistencyStrategy}
+            compressionStrategy={compressionStrategy}
+            onCompressionStrategyChange={setCompressionStrategy}
+          />
+        )}
       </div>
 
       <BetaUpsellModal

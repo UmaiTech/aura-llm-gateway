@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, LogOut, Menu, Wrench } from 'lucide-react'
+import { ChevronDown, Columns, LogOut, Menu, Wrench } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSession, signOut } from '../lib/auth-client'
 import { useChatStore } from '../stores/chatStore'
@@ -26,6 +26,8 @@ export function Header({
   // component that doesn't need to know about Zustand.
   const enabledTools = useChatStore((s) => s.enabledTools)
   const toggleTool = useChatStore((s) => s.toggleTool)
+  const compareMode = useChatStore((s) => s.compareMode)
+  const setCompareMode = useChatStore((s) => s.setCompareMode)
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/50 glass px-4 shadow-premium">
@@ -56,6 +58,30 @@ export function Header({
 
         {/* Theme toggle */}
         <ThemeToggle />
+
+        {/* Compare mode toggle — fan-out one prompt across up to 3
+            panes, each with its own model/system-prompt/strategies.
+            See CompareView for the full flow. Mutually exclusive
+            with the single-pane chat (which keeps running its
+            current conversation, just hidden). */}
+        <button
+          onClick={() => setCompareMode(!compareMode)}
+          className={cn(
+            'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors',
+            compareMode
+              ? 'border-aura-400 bg-aura-400/10 text-aura-400'
+              : 'border-border text-muted-foreground hover:text-foreground'
+          )}
+          title={
+            compareMode
+              ? 'Exit compare mode.'
+              : 'Compare outputs across up to 3 models side-by-side.'
+          }
+          aria-pressed={compareMode}
+        >
+          <Columns className="h-4 w-4" />
+          <span className="text-sm font-medium hidden sm:inline">Compare</span>
+        </button>
 
         {/* Agent tools — split control. The label/wrench toggles agent
             mode in one click (which is what the label "Agent"/"Chat"

@@ -27,6 +27,10 @@ interface ChatState {
   consistencyApplyCalibration: boolean
   compressionStrategy: CompressionStrategy
 
+  // Compare Mode — see `PaneConfig` in lib/types.ts for the full
+  // rationale. Ephemeral: not persisted; clears on toggle-off.
+  compareMode: boolean
+
   // Actions
   createConversation: () => string
   selectConversation: (id: string) => void
@@ -60,6 +64,9 @@ interface ChatState {
   setCompressionStrategy: (strategy: CompressionStrategy) => void
   getCompressionConfig: () => CompressionConfig | undefined
 
+  // Compare mode actions
+  setCompareMode: (enabled: boolean) => void
+
   // Computed
   getCurrentConversation: () => Conversation | null
 }
@@ -75,6 +82,7 @@ export const useChatStore = create<ChatState>()(
       agentMode: false,
       enabledTools: [],
       theme: 'system',
+      compareMode: false,
       routingStrategy: 'round_robin',
       validationStrategy: 'none',
       validationN: 3,
@@ -320,6 +328,11 @@ export const useChatStore = create<ChatState>()(
       },
 
       setCompressionStrategy: (compressionStrategy) => set({ compressionStrategy }),
+
+      // Compare mode toggle. Persisted in localStorage like other UI
+      // state, but the panes themselves live in component state so
+      // they don't pollute storage.
+      setCompareMode: (enabled) => set({ compareMode: enabled }),
 
       getCompressionConfig: () => {
         const { compressionStrategy } = get()

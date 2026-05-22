@@ -129,6 +129,37 @@ export interface Model {
   tier?: 'free' | 'beta'
 }
 
+/**
+ * One pane in Compare Mode. The user can spawn up to 3 of these to
+ * fan-out a single prompt across different model/strategy/system-prompt
+ * choices and compare the outputs side-by-side.
+ *
+ * Compare panes are intentionally ephemeral — they don't persist across
+ * conversation switches or page reloads. Persistence would balloon
+ * localStorage and the whole point of compare mode is "throwaway
+ * experiment", not "save my A/B/C session forever". When the user
+ * toggles compare mode off, the pane state is dropped.
+ */
+export interface PaneConfig {
+  /** Stable id so React can key panes correctly across re-renders. */
+  id: string
+  /** Per-pane model picker. */
+  model: string
+  /** Per-pane system prompt. Empty string = no instructions sent. */
+  systemPrompt: string
+  /** Per-pane strategy chips (matching the single-pane chat shape). */
+  routingStrategy: RoutingStrategy
+  validationStrategy: ValidationStrategy
+  consistencyStrategy: ConsistencyStrategy
+  compressionStrategy: CompressionStrategy
+  /** Live transcript for this pane (cleared when the pane is reset). */
+  messages: Message[]
+  /** True while a response is streaming into this pane. */
+  isStreaming: boolean
+  /** Last error message for this pane, if the most recent send failed. */
+  error: string | null
+}
+
 export interface Conversation {
   id: string
   title: string
