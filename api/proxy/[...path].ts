@@ -61,7 +61,19 @@ const HOP_BY_HOP_HEADERS = new Set([
 // `cookie` carries the session token and we don't want to leak it to
 // the gateway. `authorization` will be replaced with the user's
 // gateway API key. `host` must be the upstream host, not ours.
-const REQUEST_HEADERS_TO_DROP = new Set(['cookie', 'authorization', 'host'])
+// `content-length` MUST be dropped because we re-serialize the JSON
+// body to inject `user` (see step 5). Forwarding the inbound length
+// against a re-serialized body of a different size produced the
+// `gateway_unreachable` storm in May 2026 — undici truncated the
+// write at the inbound length and Fly's edge RST'd the half-sent
+// request, never reaching the aura-proxy app. fetch() computes the
+// correct length from the body Buffer on its own.
+const REQUEST_HEADERS_TO_DROP = new Set([
+  'cookie',
+  'authorization',
+  'host',
+  'content-length',
+])
 
 export default async function handler(
   req: IncomingMessage,
@@ -175,9 +187,17 @@ export default async function handler(
     }
 
     // 6. Forward the request to the gateway.
+    //
+    // Stale-pooled-socket retry: Vercel Fluid Compute reuses function
+    // instances and undici keeps a connection pool keyed by origin.
+    // Fly's edge closes idle TCP connections after ~60-90s. The next
+    // request can grab a half-closed socket from the pool — undici
+    // throws `UND_ERR_SOCKET` with `bytesWritten: 0` because the FIN
+    // arrived before our request bytes did. Nothing was sent upstream
+    // so retrying once is idempotent regardless of HTTP method.
     let upstream: Response
     try {
-      upstream = await fetch(upstreamUrl, {
+      upstream = await fetchWithStaleSocketRetry(upstreamUrl, {
         method: req.method ?? 'GET',
         headers: upstreamHeaders,
         body,
@@ -248,6 +268,29 @@ async function readBody(req: IncomingMessage): Promise<Buffer> {
     req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
+}
+
+// Retry exactly once when undici hands us a half-closed pooled socket
+// (Fly edge closes idle TCP after ~60-90s; Vercel Fluid Compute keeps
+// the undici pool warm across invocations). Identified by
+// `UND_ERR_SOCKET` with `bytesWritten === 0` — request bytes never
+// left the socket, so retrying is safe for any HTTP method.
+async function fetchWithStaleSocketRetry(
+  url: string,
+  init: Parameters<typeof fetch>[1],
+): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (err) {
+    if (!isStalePooledSocketError(err)) throw err
+    console.warn('[proxy] Retrying once after stale pooled socket to', url)
+    return await fetch(url, init)
+  }
+}
+
+function isStalePooledSocketError(err: unknown): boolean {
+  const cause = (err as { cause?: { code?: string; socket?: { bytesWritten?: number } } })?.cause
+  return cause?.code === 'UND_ERR_SOCKET' && cause?.socket?.bytesWritten === 0
 }
 
 // Runs on Vercel's default Node.js runtime. Edge is not viable here:
