@@ -349,24 +349,42 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Google Gemini pricing (as of January 2026)
+        // Google Gemini pricing (verified 2026-05-22 vs Google's
+        // models.list endpoint — ids must match SUPPORTED_MODELS in
+        // crates/aura-core/src/provider/gemini.rs)
+        //
+        // Refresh by re-querying:
+        //   GET https://generativelanguage.googleapis.com/v1beta/models?key=$KEY
+        // and updating $/MTok from https://ai.google.dev/pricing.
         // =================================================================
 
-        // Gemini 3 family (2026)
+        // Gemini 3.x family
         pricing.insert(
-            "gemini-3-pro".to_string(),
+            "gemini-3-pro-preview".to_string(),
             ModelPricing::new(2.50, 10.00).with_cached(0.625),
         );
         pricing.insert(
-            "gemini-3-flash".to_string(),
+            "gemini-3.1-pro-preview".to_string(),
+            ModelPricing::new(2.50, 10.00).with_cached(0.625),
+        );
+        pricing.insert(
+            "gemini-3-flash-preview".to_string(),
             ModelPricing::new(0.15, 0.60).with_cached(0.0375),
         );
         pricing.insert(
-            "gemini-3-pro-latest".to_string(),
-            ModelPricing::new(2.50, 10.00).with_cached(0.625),
+            "gemini-3.5-flash".to_string(),
+            ModelPricing::new(0.20, 0.80).with_cached(0.05),
+        );
+        pricing.insert(
+            "gemini-3.1-flash-lite".to_string(),
+            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
+        );
+        pricing.insert(
+            "gemini-3.1-flash-lite-preview".to_string(),
+            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
         );
 
-        // Gemini 2.5 family (2025)
+        // Gemini 2.5 family (GA)
         pricing.insert(
             "gemini-2.5-pro".to_string(),
             ModelPricing::new(1.25, 10.00).with_cached(0.3125),
@@ -375,45 +393,43 @@ impl CostCalculator {
             "gemini-2.5-flash".to_string(),
             ModelPricing::new(0.30, 2.50).with_cached(0.075),
         );
+        pricing.insert(
+            "gemini-2.5-flash-lite".to_string(),
+            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
+        );
 
-        // Gemini 2.0 Flash
+        // Gemini 2.0 family
         pricing.insert(
             "gemini-2.0-flash".to_string(),
             ModelPricing::new(0.10, 0.40).with_cached(0.025),
         );
         pricing.insert(
-            "gemini-2.0-flash-exp".to_string(),
+            "gemini-2.0-flash-001".to_string(),
             ModelPricing::new(0.10, 0.40).with_cached(0.025),
         );
         pricing.insert(
             "gemini-2.0-flash-lite".to_string(),
             ModelPricing::new(0.075, 0.30).with_cached(0.02),
         );
-
-        // Gemini 1.5 Pro
         pricing.insert(
-            "gemini-1.5-pro".to_string(),
-            ModelPricing::new(1.25, 5.00).with_cached(0.3125),
-        );
-        pricing.insert(
-            "gemini-1.5-pro-latest".to_string(),
-            ModelPricing::new(1.25, 5.00).with_cached(0.3125),
+            "gemini-2.0-flash-lite-001".to_string(),
+            ModelPricing::new(0.075, 0.30).with_cached(0.02),
         );
 
-        // Gemini 1.5 Flash
+        // Floating aliases — same pricing as the canonical model
+        // they resolve to (best guess; Google may switch the
+        // underlying model without notice).
         pricing.insert(
-            "gemini-1.5-flash".to_string(),
+            "gemini-pro-latest".to_string(),
+            ModelPricing::new(1.25, 10.00).with_cached(0.3125),
+        );
+        pricing.insert(
+            "gemini-flash-latest".to_string(),
+            ModelPricing::new(0.30, 2.50).with_cached(0.075),
+        );
+        pricing.insert(
+            "gemini-flash-lite-latest".to_string(),
             ModelPricing::new(0.075, 0.30).with_cached(0.01875),
-        );
-        pricing.insert(
-            "gemini-1.5-flash-latest".to_string(),
-            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
-        );
-
-        // Gemini 1.5 Flash-8B
-        pricing.insert(
-            "gemini-1.5-flash-8b".to_string(),
-            ModelPricing::new(0.0375, 0.15).with_cached(0.01),
         );
 
         // =================================================================

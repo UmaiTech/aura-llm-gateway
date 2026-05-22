@@ -34,11 +34,16 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // claude-haiku-4-5-20251001.
   'claude-3-5-haiku-20241022': { inputPerMillion: 0.80, outputPerMillion: 4.00 },
 
-  // Google
-  'gemini-3-pro': { inputPerMillion: 1.50, outputPerMillion: 6.00 },
-  'gemini-3-flash': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
+  // Google — ids match Google's models.list (verified 2026-05-22).
+  // Approximate $/MTok numbers from the public pricing page; refresh
+  // when Google publishes 3.x GA pricing.
+  'gemini-3.5-flash': { inputPerMillion: 0.20, outputPerMillion: 0.80 },
+  'gemini-3.1-flash-lite': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
+  'gemini-3-pro-preview': { inputPerMillion: 1.50, outputPerMillion: 6.00 },
+  'gemini-3-flash-preview': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
+  'gemini-2.5-pro': { inputPerMillion: 1.25, outputPerMillion: 5.00 },
+  'gemini-2.5-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
   'gemini-2.0-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
-  'gemini-1.5-pro': { inputPerMillion: 1.25, outputPerMillion: 5.00 },
 }
 
 // Calculate cost for a given model and token counts
