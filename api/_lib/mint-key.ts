@@ -26,14 +26,12 @@
  * public.api_keys + playground_auth.user_api_key in a transaction, using
  * the same hashing convention the gateway uses.
  *
- * KNOWN LIMITATION: per-user breakdowns in the admin's End Users view
- * will be empty for the Playground org until the playground proxy
- * starts forwarding a `user` field on LLM requests. The gateway only
- * creates `end_users` rows when a request body carries `user: "..."`
- * (see crates/aura-proxy/src/main.rs:813), and api/proxy/[...path].ts
- * doesn't currently inject one. The Organizations page still shows
- * accurate api_key / token / cost / request totals — those come from
- * api_keys joins.
+ * Per-user end_users rollup: api/proxy/[...path].ts now injects
+ * `user: session.user.id` on /v1/responses calls (see the inline
+ * comment in step 5 of that handler). The gateway's main.rs:813
+ * end_user resolution then creates one `end_users` row per playground
+ * user under the Playground (Demo) org. The admin End Users view
+ * filtered to that org shows real per-user usage as a result.
  */
 
 import { createHash, randomBytes } from 'node:crypto'
