@@ -248,13 +248,19 @@ impl OpenAIProvider {
             },
         });
 
-        // Determine if we need logprobs based on validation config
+        // Determine if we need logprobs based on validation config.
+        // OpenAI rejects top_logprobs unless logprobs is also true, so we only
+        // send top_logprobs when logprobs is enabled.
         let (logprobs, top_logprobs) = if let Some(ref validation) = request.validation {
             match validation.strategy {
                 ValidationStrategy::Logprobs | ValidationStrategy::ConfidenceThreshold => {
                     let include = validation.include_logprobs.unwrap_or(true);
-                    let top = validation.top_logprobs.unwrap_or(5).min(20);
-                    (Some(include), Some(top))
+                    if include {
+                        let top = validation.top_logprobs.unwrap_or(5).min(20);
+                        (Some(true), Some(top))
+                    } else {
+                        (Some(false), None)
+                    }
                 }
                 ValidationStrategy::BestOfN | ValidationStrategy::SelfConsistency => {
                     // Also enable logprobs for selection if highest confidence is used
@@ -1007,6 +1013,33 @@ mod tests {
         assert_eq!(oai_request.model, "gpt-4");
         assert_eq!(oai_request.messages.len(), 1);
         assert_eq!(oai_request.messages[0].role, "user");
+    }
+
+    #[test]
+    fn test_top_logprobs_suppressed_when_logprobs_disabled() {
+        // OpenAI rejects top_logprobs unless logprobs is true. When the client
+        // sets include_logprobs=false (e.g. confidence_threshold strategy),
+        // we must NOT send top_logprobs at all.
+        use aura_types::{ValidationConfig, ValidationStrategy};
+
+        let provider = OpenAIProvider::new("test-key");
+        let validation = ValidationConfig {
+            strategy: ValidationStrategy::ConfidenceThreshold,
+            min_confidence: Some(0.7),
+            n: None,
+            selection: None,
+            include_logprobs: Some(false),
+            top_logprobs: None,
+        };
+        let request = CreateResponseRequest::text("gpt-4", "Hello!").with_validation(validation);
+
+        let oai_request = provider.transform_request(&request);
+
+        assert_eq!(oai_request.logprobs, Some(false));
+        assert_eq!(
+            oai_request.top_logprobs, None,
+            "top_logprobs must be omitted when logprobs is not true",
+        );
     }
 
     #[test]

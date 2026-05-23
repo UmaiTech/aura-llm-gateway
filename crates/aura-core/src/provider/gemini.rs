@@ -219,17 +219,21 @@ impl GeminiProvider {
             }
         });
 
-        // Determine candidate count based on validation config
-        let candidate_count = if let Some(ref validation) = request.validation {
-            match validation.strategy {
-                ValidationStrategy::BestOfN | ValidationStrategy::SelfConsistency => {
-                    // Gemini supports up to 8 candidates
-                    Some(validation.n.unwrap_or(3).min(8) as u32)
-                }
-                _ => Some(1),
+        // Determine candidate count based on validation config.
+        // Gemini 3.x rejects the candidateCount field with "Only one candidate
+        // can be specified in the current model" even when set to 1. Omit the
+        // field unless we actually need >1 for best_of_n / self_consistency.
+        let candidate_count = match request.validation.as_ref().map(|v| &v.strategy) {
+            Some(ValidationStrategy::BestOfN | ValidationStrategy::SelfConsistency) => {
+                let n = request
+                    .validation
+                    .as_ref()
+                    .and_then(|v| v.n)
+                    .unwrap_or(3)
+                    .min(8) as u32;
+                Some(n)
             }
-        } else {
-            Some(1)
+            _ => None,
         };
 
         // Build generation config
@@ -1146,6 +1150,27 @@ mod tests {
 
         assert_eq!(gemini_request.contents.len(), 1);
         assert_eq!(gemini_request.contents[0].role, "user");
+    }
+
+    #[test]
+    fn test_candidate_count_omitted_when_no_validation() {
+        // Gemini 3.x rejects any candidateCount field, even =1.
+        // Without best_of_n / self_consistency, the field must be omitted entirely.
+        let provider = GeminiProvider::new("test-key");
+        let request = CreateResponseRequest::text("gemini-3-pro-preview", "Hello!");
+
+        let gemini_request = provider.transform_request(&request);
+        let gen_config = gemini_request.generation_config.unwrap();
+        assert!(
+            gen_config.candidate_count.is_none(),
+            "candidate_count must be None so it serializes as omitted",
+        );
+
+        let serialized = serde_json::to_string(&gen_config).unwrap();
+        assert!(
+            !serialized.contains("candidateCount"),
+            "candidateCount must not appear in serialized JSON, got: {serialized}",
+        );
     }
 
     #[test]
