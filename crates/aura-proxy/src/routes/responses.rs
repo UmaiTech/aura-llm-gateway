@@ -700,17 +700,30 @@ pub async fn create_response(
                                     metadata: log_metadata,
                                 };
 
-                                // Save response and record API key usage
+                                // Save response and record API key usage.
+                                //
+                                // save_response is awaited (not spawned) so the
+                                // responses.output_items row exists in Postgres
+                                // before the client receives response.completed
+                                // and fires its next roundtrip. Without this,
+                                // replay_prior_tool_calls races the background
+                                // write and returns None — Anthropic then sees
+                                // tool_result without prior tool_use and 400s
+                                // ("unexpected tool_use_id"). Adds ~5-20ms to
+                                // tail latency on the final event. Other work
+                                // (log_request, message rows, usage) stays
+                                // backgrounded — none of it gates replay.
                                 if let Some(conv_id) = conversation_id {
+                                    state_clone
+                                        .save_response(conv_id, &request_clone, &response)
+                                        .await;
+
                                     let state_bg = state_clone.clone();
                                     let response_bg = response.clone();
                                     let request_bg = request_clone.clone();
                                     let auth_bg = auth_clone.clone();
                                     tokio::spawn(async move {
                                         state_bg.log_request(log).await;
-                                        state_bg
-                                            .save_response(conv_id, &request_bg, &response_bg)
-                                            .await;
                                         state_bg
                                             .save_messages_from_items(
                                                 conv_id,
@@ -1096,6 +1109,15 @@ pub async fn create_response(
             metadata: log_metadata,
         };
 
+        // Persist the response synchronously before returning so the
+        // row exists in Postgres if the client immediately submits a
+        // follow-up request with previous_response_id (e.g. tool
+        // roundtrips). See the streaming branch above for the full
+        // rationale. Other work stays backgrounded.
+        if let Some(conv_id) = conversation_id {
+            state.save_response(conv_id, &request, &response).await;
+        }
+
         // CRITICAL: Clone AFTER enrichment to preserve usage/cost data
         let response_for_bg = response.clone();
         let request_for_bg = request.clone();
@@ -1107,11 +1129,8 @@ pub async fn create_response(
             // Log to request_logs
             state_for_bg.log_request(log).await;
 
-            // Save full response and messages if conversation exists
+            // Save per-message rows for the conversation view
             if let Some(conv_id) = conversation_id {
-                state_for_bg
-                    .save_response(conv_id, &request_for_bg, &response_for_bg)
-                    .await;
                 state_for_bg
                     .save_messages_from_items(conv_id, &response_for_bg.id, &response_for_bg.output)
                     .await;
