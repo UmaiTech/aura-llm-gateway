@@ -18,7 +18,13 @@ import {
   CoinLine,
   FlashLine,
 } from '@mingcute/react'
-import { getOrganizations, type OrganizationSummary } from '@/lib/api'
+import {
+  getOrganizations,
+  createOrganization,
+  updateOrganization,
+  deleteOrganization,
+  type OrganizationSummary,
+} from '@/lib/api'
 
 export function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
@@ -28,6 +34,56 @@ export function OrganizationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingOrg, setEditingOrg] = useState<OrganizationSummary | null>(null)
   const [newOrg, setNewOrg] = useState({ name: '', slug: '' })
+  const [formError, setFormError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const openCreate = () => {
+    setNewOrg({ name: '', slug: '' })
+    setFormError(null)
+    setShowCreateModal(true)
+  }
+
+  const handleCreate = async () => {
+    if (!newOrg.name || !newOrg.slug) {
+      setFormError('Name and slug are required.')
+      return
+    }
+    setSubmitting(true)
+    setFormError(null)
+    try {
+      await createOrganization({ name: newOrg.name, slug: newOrg.slug })
+      setShowCreateModal(false)
+      await fetchData()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Create failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingOrg) return
+    setSubmitting(true)
+    try {
+      await updateOrganization(editingOrg.id, { name: editingOrg.name })
+      setEditingOrg(null)
+      await fetchData()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (org: OrganizationSummary) => {
+    if (!confirm(`Delete organization "${org.name}"? This cascades to all teams and keys.`)) return
+    try {
+      await deleteOrganization(org.id)
+      await fetchData()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Delete failed')
+    }
+  }
 
   const fetchData = async () => {
     try {
@@ -95,7 +151,7 @@ export function OrganizationsPage() {
             >
               <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
             </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={openCreate}>
               <AddLine className="w-4 h-4 mr-2" />
               Create Organization
             </Button>
@@ -265,7 +321,7 @@ export function OrganizationsPage() {
                         >
                           <EditLine className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(org)}>
                           <DeleteLine className="w-4 h-4 text-red-400" />
                         </Button>
                       </div>
@@ -291,6 +347,11 @@ export function OrganizationsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {formError && (
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                  {formError}
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium mb-1 block">Name</label>
                 <Input
@@ -314,9 +375,9 @@ export function OrganizationsPage() {
                 <Button variant="outline" onClick={() => setShowCreateModal(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => setShowCreateModal(false)}>
+                <Button onClick={handleCreate} disabled={submitting}>
                   <CheckLine className="w-4 h-4 mr-2" />
-                  Create
+                  {submitting ? 'Creating...' : 'Create'}
                 </Button>
               </div>
             </CardContent>
@@ -339,19 +400,27 @@ export function OrganizationsPage() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Name</label>
-                <Input defaultValue={editingOrg.name} />
+                <Input
+                  value={editingOrg.name}
+                  onChange={(e) =>
+                    setEditingOrg({ ...editingOrg, name: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Slug</label>
-                <Input defaultValue={editingOrg.slug} />
+                <Input value={editingOrg.slug} disabled />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Slugs are immutable once set.
+                </p>
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditingOrg(null)}>
                   Cancel
                 </Button>
-                <Button onClick={() => setEditingOrg(null)}>
+                <Button onClick={handleSaveEdit} disabled={submitting}>
                   <CheckLine className="w-4 h-4 mr-2" />
-                  Save Changes
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
             </CardContent>

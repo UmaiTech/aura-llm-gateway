@@ -11,7 +11,15 @@ import {
   CoinLine,
   Refresh1Line,
 } from '@mingcute/react'
-import { getEndUsers } from '@/lib/api'
+import {
+  getEndUsers,
+  getOrganizations,
+  createEndUser,
+  updateEndUser,
+  deleteEndUser,
+} from '@/lib/api'
+import type { OrganizationSummary } from '@/lib/types'
+import { AddLine, DeleteLine } from '@mingcute/react'
 import { useOrgFilterStore } from '@/stores/orgFilterStore'
 import { OrgFilter } from '@/components/OrgFilter'
 import type { EndUserSummary } from '@/lib/types'
@@ -23,15 +31,89 @@ export function EndUsersPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked'>('all')
   const [selectedUser, setSelectedUser] = useState<EndUserSummary | null>(null)
   const [users, setUsers] = useState<EndUserSummary[]>([])
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newUser, setNewUser] = useState({
+    organization_id: '',
+    external_id: '',
+    name: '',
+    email: '',
+  })
+  const [formError, setFormError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const openCreate = () => {
+    setNewUser({
+      organization_id: organizations[0]?.id || '',
+      external_id: '',
+      name: '',
+      email: '',
+    })
+    setFormError(null)
+    setShowCreateModal(true)
+  }
+
+  const handleCreate = async () => {
+    if (!newUser.organization_id || !newUser.external_id) {
+      setFormError('Organization and external_id are required.')
+      return
+    }
+    setSubmitting(true)
+    setFormError(null)
+    try {
+      await createEndUser({
+        organization_id: newUser.organization_id,
+        external_id: newUser.external_id,
+        name: newUser.name || undefined,
+        email: newUser.email || undefined,
+      })
+      setShowCreateModal(false)
+      await fetchUsers()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Create failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleToggleBlock = async (user: EndUserSummary) => {
+    setSubmitting(true)
+    try {
+      await updateEndUser(user.id, { blocked: !user.is_blocked })
+      setSelectedUser(null)
+      await fetchUsers()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (user: EndUserSummary) => {
+    if (!confirm(`Delete end user "${user.external_id}"? This cannot be undone.`)) return
+    try {
+      await deleteEndUser(user.id)
+      setSelectedUser(null)
+      await fetchUsers()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Delete failed')
+    }
+  }
 
   const fetchUsers = async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await getEndUsers(selectedOrgId)
-      setUsers(data)
+      // Fetch orgs alongside users so the Create modal can populate
+      // its org dropdown. Both endpoints are admin-gated and small.
+      const [usersData, orgsData] = await Promise.all([
+        getEndUsers(selectedOrgId),
+        getOrganizations().catch(() => []),
+      ])
+      setUsers(usersData)
+      setOrganizations(orgsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch users')
     } finally {
@@ -48,7 +130,7 @@ export function EndUsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrgId])
 
-  const organizations = [...new Set(users.map((u) => u.organization_name))]
+  const orgNamesForFilter = [...new Set(users.map((u) => u.organization_name))]
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -129,6 +211,10 @@ export function EndUsersPage() {
               <Refresh1Line className="w-4 h-4 mr-2" />
               Refresh
             </Button>
+            <Button size="sm" onClick={openCreate}>
+              <AddLine className="w-4 h-4 mr-2" />
+              Create User
+            </Button>
           </div>
         }
       />
@@ -151,7 +237,7 @@ export function EndUsersPage() {
             className="px-3 py-2 bg-background border border-border rounded-md text-sm"
           >
             <option value="all">All Organizations</option>
-            {organizations.map((org) => (
+            {orgNamesForFilter.map((org) => (
               <option key={org} value={org}>
                 {org}
               </option>
@@ -409,20 +495,107 @@ export function EndUsersPage() {
                   Close
                 </Button>
                 <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(selectedUser)}
+                  title="Permanently delete this user"
+                >
+                  <DeleteLine className="w-4 h-4 mr-2 text-red-400" />
+                  Delete
+                </Button>
+                <Button
                   variant={selectedUser.is_blocked ? 'default' : 'destructive'}
-                  onClick={() => setSelectedUser(null)}
+                  onClick={() => handleToggleBlock(selectedUser)}
+                  disabled={submitting}
                 >
                   {selectedUser.is_blocked ? (
                     <>
                       <CheckLine className="w-4 h-4 mr-2" />
-                      Unblock User
+                      {submitting ? 'Unblocking...' : 'Unblock User'}
                     </>
                   ) : (
                     <>
                       <ForbidCircleLine className="w-4 h-4 mr-2" />
-                      Block User
+                      {submitting ? 'Blocking...' : 'Block User'}
                     </>
                   )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Create End User modal. External_id is the caller-provided
+          identity the gateway uses for usage rollup; auto-created on
+          first /v1/responses request that includes `user: "..."`, so
+          this admin path is for manually pre-provisioning. */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Create End User</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setShowCreateModal(false)}>
+                  <CloseLine className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {formError && (
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                  {formError}
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Organization</label>
+                <select
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                  value={newUser.organization_id}
+                  onChange={(e) => setNewUser({ ...newUser, organization_id: e.target.value })}
+                >
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">External ID</label>
+                <Input
+                  placeholder="user_abc123"
+                  value={newUser.external_id}
+                  onChange={(e) => setNewUser({ ...newUser, external_id: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  The identity you'll pass as <code>user</code> in /v1/responses requests.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Name (optional)</label>
+                <Input
+                  placeholder="Alice Customer"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Email (optional)</label>
+                <Input
+                  type="email"
+                  placeholder="alice@example.com"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={submitting}>
+                  <CheckLine className="w-4 h-4 mr-2" />
+                  {submitting ? 'Creating...' : 'Create'}
                 </Button>
               </div>
             </CardContent>
