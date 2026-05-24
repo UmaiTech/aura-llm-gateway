@@ -631,6 +631,25 @@ pub async fn create_response(
     })?;
 
     let provider_name = provider.name().to_string();
+
+    // best_of_n / self_consistency must run non-streaming because the
+    // fanout selects a winner only after all N candidates complete.
+    // We force-degrade here so the rest of the dispatch routes through
+    // the non-streaming path; the fanout call below stamps a warning
+    // into ValidationMetadata.warning so the client can surface it.
+    let mut request = request;
+    let needs_fanout = matches!(
+        request.validation.as_ref().map(|v| v.strategy),
+        Some(aura_types::ValidationStrategy::BestOfN)
+            | Some(aura_types::ValidationStrategy::SelfConsistency)
+    );
+    if needs_fanout && request.stream {
+        debug!(
+            strategy = ?request.validation.as_ref().map(|v| v.strategy),
+            "Fanout requested with stream=true; degrading to non-streaming"
+        );
+        request.stream = false;
+    }
     let is_streaming = request.stream;
 
     // Record request metric
@@ -1012,38 +1031,74 @@ pub async fn create_response(
             }
         };
 
-        let response = provider.complete(request.clone()).await.map_err(|e| {
-            // Decrement active requests on error
-            metrics::decrement_active_requests(&provider_name);
-            metrics::record_provider_error(&provider_name, e.error_code());
-
-            error!(error = %e, "Request failed");
-
-            // Log failed request (with conversation_id if available)
-            let log = NewRequestLog {
-                response_id: request_id.clone(),
-                conversation_id,
-                provider_name: provider_name.clone(),
-                model_id: model_id.clone(),
-                user_id: request.user.clone(),
-                input_tokens: None,
-                output_tokens: None,
-                cached_tokens: None,
-                reasoning_tokens: None,
-                cost_usd: None,
-                latency_ms: Some(start.elapsed().as_millis() as i32),
-                status: "failed".to_string(),
-                error_code: Some(e.error_code().to_string()),
-                error_message: Some(e.to_string()),
-                metadata: None,
+        // Route through fanout when validation requested best_of_n /
+        // self_consistency. Otherwise issue a single provider call.
+        let response = if needs_fanout {
+            let n = request
+                .validation
+                .as_ref()
+                .and_then(|v| v.n)
+                .unwrap_or(3)
+                .clamp(1, 8);
+            let selector = match request.validation.as_ref().map(|v| v.strategy) {
+                Some(aura_types::ValidationStrategy::SelfConsistency) => {
+                    aura_core::FanoutSelector::MostFrequent
+                }
+                _ => aura_core::FanoutSelector::HighestLogprob,
             };
-            tokio::spawn({
-                let state = state.clone();
-                async move { state.log_request(log).await }
-            });
+            aura_core::run_fanout(provider.clone(), request.clone(), n, selector)
+                .await
+                .map_err(|e| {
+                    metrics::decrement_active_requests(&provider_name);
+                    error!(error = %e, "Fanout failed");
+                    match e {
+                        aura_core::FanoutError::AllCandidatesFailed { source, .. } => {
+                            metrics::record_provider_error(&provider_name, source.error_code());
+                            ApiError::from_provider_error(&source)
+                        }
+                        aura_core::FanoutError::InvalidN(n) => (
+                            StatusCode::BAD_REQUEST,
+                            Json(ApiError::new(
+                                "invalid_request",
+                                format!("validation.n must be between 1 and 8, got {n}"),
+                            )),
+                        ),
+                    }
+                })?
+        } else {
+            provider.complete(request.clone()).await.map_err(|e| {
+                // Decrement active requests on error
+                metrics::decrement_active_requests(&provider_name);
+                metrics::record_provider_error(&provider_name, e.error_code());
 
-            ApiError::from_provider_error(&e)
-        })?;
+                error!(error = %e, "Request failed");
+
+                // Log failed request (with conversation_id if available)
+                let log = NewRequestLog {
+                    response_id: request_id.clone(),
+                    conversation_id,
+                    provider_name: provider_name.clone(),
+                    model_id: model_id.clone(),
+                    user_id: request.user.clone(),
+                    input_tokens: None,
+                    output_tokens: None,
+                    cached_tokens: None,
+                    reasoning_tokens: None,
+                    cost_usd: None,
+                    latency_ms: Some(start.elapsed().as_millis() as i32),
+                    status: "failed".to_string(),
+                    error_code: Some(e.error_code().to_string()),
+                    error_message: Some(e.to_string()),
+                    metadata: None,
+                };
+                tokio::spawn({
+                    let state = state.clone();
+                    async move { state.log_request(log).await }
+                });
+
+                ApiError::from_provider_error(&e)
+            })?
+        };
 
         let latency_ms = start.elapsed().as_millis() as u64;
 

@@ -306,12 +306,10 @@ export interface ValidationMetadata {
   warning?: string
 }
 
-// Validation strategies — IMPORTANT: only `none` currently runs in
-// the gateway. The other four are wired through the request body and
-// logged on receipt, but no validation logic consumes them yet.
-// Marked `preview: true` so the chat UI can render a `(preview)` chip
-// rather than implying the option is live. Drop the flag once the
-// gateway-side validator lands.
+// Validation strategies — all four are now wired end-to-end in the
+// gateway (issue #155). The `preview` flag stays on the type so a
+// strategy can be re-marked preview in the future without a schema
+// change, but it's no longer set on the live options.
 export const VALIDATION_STRATEGIES: {
   id: ValidationStrategy
   name: string
@@ -322,26 +320,22 @@ export const VALIDATION_STRATEGIES: {
   {
     id: 'logprobs',
     name: 'Log Probabilities',
-    description: 'Use token logprobs for confidence (OpenAI only)',
-    preview: true,
+    description: 'Use token logprobs for confidence (OpenAI/Gemini)',
   },
   {
     id: 'best_of_n',
     name: 'Best of N',
-    description: 'Generate N responses, select best',
-    preview: true,
+    description: 'Generate N responses in parallel, pick highest-confidence. Costs N× the single-call price.',
   },
   {
     id: 'self_consistency',
     name: 'Self-Consistency',
-    description: 'Generate N responses, pick most consistent',
-    preview: true,
+    description: 'Generate N responses, pick the most-common answer. Costs N× the single-call price.',
   },
   {
     id: 'confidence_threshold',
     name: 'Confidence Threshold',
-    description: 'Reject responses below threshold',
-    preview: true,
+    description: 'Flag responses as incomplete if confidence falls below threshold',
   },
 ]
 
