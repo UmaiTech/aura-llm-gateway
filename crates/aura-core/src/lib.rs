@@ -15,6 +15,7 @@ pub mod rate_limit;
 pub mod redis;
 pub mod router;
 pub mod state;
+pub mod validation;
 
 pub use cache::{CacheError, CacheHit, CacheStats, ResponseCache};
 pub use compression::{
@@ -42,6 +43,7 @@ pub use router::{
     RoutingWeights, SmartRouter, SmartRouterBuilder, StrategySelector,
 };
 pub use state::{AppState, AppStateBuilder};
+pub use validation::{run_fanout, FanoutError, FanoutSelector};
 
 /// Returns the crate version
 pub fn version() -> &'static str {
