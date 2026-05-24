@@ -885,22 +885,30 @@ pub async fn create_response(
                                     metadata: response.metadata.clone(),
                                 };
 
-                                if let Some(conv_id) = conversation_id {
-                                    let state_bg = state_clone.clone();
-                                    let response_bg = response.clone();
-                                    let request_bg = request_clone.clone();
-                                    tokio::spawn(async move {
-                                        state_bg.log_request(log).await;
+                                // Record api_key_usage even for failed responses so
+                                // the billing/usage rollups capture attribution.
+                                // Failed responses typically carry zero usage on
+                                // their `usage` field (the provider didn't finish
+                                // tokenizing), but the per-key request count still
+                                // matters for rate-limit accounting + observability.
+                                let state_bg = state_clone.clone();
+                                let response_bg = response.clone();
+                                let request_bg = request_clone.clone();
+                                let auth_bg = auth_clone.clone();
+                                let conv_id_opt = conversation_id;
+                                tokio::spawn(async move {
+                                    if let Some(auth) = &auth_bg {
+                                        state_bg
+                                            .record_api_key_usage(auth, &response_bg, &request_bg)
+                                            .await;
+                                    }
+                                    state_bg.log_request(log).await;
+                                    if let Some(conv_id) = conv_id_opt {
                                         state_bg
                                             .save_response(conv_id, &request_bg, &response_bg)
                                             .await;
-                                    });
-                                } else {
-                                    tokio::spawn({
-                                        let state = state_clone.clone();
-                                        async move { state.log_request(log).await }
-                                    });
-                                }
+                                    }
+                                });
 
                                 StreamEvent::ResponseFailed { response }
                             }
@@ -933,22 +941,29 @@ pub async fn create_response(
                                     metadata: response.metadata.clone(),
                                 };
 
-                                if let Some(conv_id) = conversation_id {
-                                    let state_bg = state_clone.clone();
-                                    let response_bg = response.clone();
-                                    let request_bg = request_clone.clone();
-                                    tokio::spawn(async move {
-                                        state_bg.log_request(log).await;
+                                // Record api_key_usage. Incomplete responses
+                                // (e.g. max_tokens, content_filter, confidence_threshold
+                                // gate) consumed provider tokens — those tokens
+                                // are billable and must be attributed to the key
+                                // even though the response wasn't fully delivered.
+                                let state_bg = state_clone.clone();
+                                let response_bg = response.clone();
+                                let request_bg = request_clone.clone();
+                                let auth_bg = auth_clone.clone();
+                                let conv_id_opt = conversation_id;
+                                tokio::spawn(async move {
+                                    if let Some(auth) = &auth_bg {
+                                        state_bg
+                                            .record_api_key_usage(auth, &response_bg, &request_bg)
+                                            .await;
+                                    }
+                                    state_bg.log_request(log).await;
+                                    if let Some(conv_id) = conv_id_opt {
                                         state_bg
                                             .save_response(conv_id, &request_bg, &response_bg)
                                             .await;
-                                    });
-                                } else {
-                                    tokio::spawn({
-                                        let state = state_clone.clone();
-                                        async move { state.log_request(log).await }
-                                    });
-                                }
+                                    }
+                                });
 
                                 StreamEvent::ResponseIncomplete { response }
                             }
