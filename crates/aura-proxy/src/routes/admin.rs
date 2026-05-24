@@ -1253,7 +1253,7 @@ fn mock_routing_rules() -> Vec<RoutingRule> {
                 },
                 RoutingAction {
                     provider: "anthropic".to_string(),
-                    model: "claude-3-haiku".to_string(),
+                    model: "claude-3-haiku-20240307".to_string(),
                     weight: Some(30),
                 },
             ],
