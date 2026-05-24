@@ -68,6 +68,27 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      # Bump Chart.yaml `version` AND `appVersion` to match the GitHub
+      # release tag. Without this every push lands on `:0.1.0` (the
+      # committed value) and overwrites the previous chart, leaving
+      # users with no way to pin to a specific gateway version. See
+      # ghcr.io/umaitech/charts/aura-llm-gateway — every prior chart
+      # before this fix has an empty tag list.
+      - name: Sync chart version to release tag
+        run: |
+          set -euo pipefail
+          # github.event.release.tag_name is like "v0.11.0"; helm wants
+          # the bare semver without the v prefix in Chart.yaml.
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "Setting Chart.yaml version=${VERSION} appVersion=${VERSION}"
+          # In-place edit. The `version:` and `appVersion:` keys are
+          # always at top-level of Chart.yaml so a simple sed is safe.
+          sed -i -E "s/^version: .*$/version: ${VERSION}/" deploy/charts/aura-llm-gateway/Chart.yaml
+          sed -i -E "s/^appVersion: .*$/appVersion: \"${VERSION}\"/" deploy/charts/aura-llm-gateway/Chart.yaml
+          # Echo the result so the change is visible in run logs.
+          grep -E '^(version|appVersion):' deploy/charts/aura-llm-gateway/Chart.yaml
+
       - name: Build dependencies
         run: |
           helm dependency update deploy/charts/aura-llm-gateway
