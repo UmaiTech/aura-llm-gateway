@@ -35,6 +35,12 @@ export interface ValidationMetadataResponse {
   min_confidence?: number
   selection?: string
   include_logprobs?: boolean
+  // Populated by the gateway after the strategy actually runs.
+  // The chat surfaces this in the MessageBubble footer so users
+  // can see whether the picked strategy made any difference.
+  confidence?: number
+  candidates_count?: number
+  selected_index?: number
 }
 
 // Consistency metadata in response
@@ -209,6 +215,17 @@ export interface Response {
   output: OutputItem[]
   usage?: Usage
   error?: ResponseError
+  metadata?: {
+    aura?: {
+      provider?: string
+      gateway_version?: string
+      latency_ms?: number
+      request_id?: string
+      compression?: CompressionMetadata
+      consistency?: ConsistencyMetadataResponse
+      validation?: ValidationMetadataResponse
+    }
+  }
 }
 
 export interface OutputItem {

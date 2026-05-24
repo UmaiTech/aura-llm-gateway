@@ -5,7 +5,7 @@ import { WelcomeScreen } from './WelcomeScreen'
 import { RateLimitNotice } from './RateLimitNotice'
 import { RATE_LIMIT_SENTINEL } from '../hooks/useAgent'
 import { useQuotaStore } from '../stores/quotaStore'
-import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
+import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity } from '../lib/types'
 
 interface ChatContainerProps {
   messages: Message[]
@@ -23,6 +23,14 @@ interface ChatContainerProps {
   onValidationStrategyChange: (strategy: ValidationStrategy) => void
   consistencyStrategy: ConsistencyStrategy
   onConsistencyStrategyChange: (strategy: ConsistencyStrategy) => void
+  consistencyPrinciples: string[]
+  onConsistencyPrinciplesChange: (principles: string[]) => void
+  consistencyStyleTone: Tone
+  onConsistencyStyleToneChange: (tone: Tone) => void
+  consistencyStyleFormality: Formality
+  onConsistencyStyleFormalityChange: (formality: Formality) => void
+  consistencyStyleVerbosity: Verbosity
+  onConsistencyStyleVerbosityChange: (verbosity: Verbosity) => void
   compressionStrategy: CompressionStrategy
   onCompressionStrategyChange: (strategy: CompressionStrategy) => void
 }
@@ -43,6 +51,14 @@ export function ChatContainer({
   onValidationStrategyChange,
   consistencyStrategy,
   onConsistencyStrategyChange,
+  consistencyPrinciples,
+  onConsistencyPrinciplesChange,
+  consistencyStyleTone,
+  onConsistencyStyleToneChange,
+  consistencyStyleFormality,
+  onConsistencyStyleFormalityChange,
+  consistencyStyleVerbosity,
+  onConsistencyStyleVerbosityChange,
   compressionStrategy,
   onCompressionStrategyChange,
 }: ChatContainerProps) {
@@ -115,6 +131,14 @@ export function ChatContainer({
         onValidationStrategyChange={onValidationStrategyChange}
         consistencyStrategy={consistencyStrategy}
         onConsistencyStrategyChange={onConsistencyStrategyChange}
+        consistencyPrinciples={consistencyPrinciples}
+        onConsistencyPrinciplesChange={onConsistencyPrinciplesChange}
+        consistencyStyleTone={consistencyStyleTone}
+        onConsistencyStyleToneChange={onConsistencyStyleToneChange}
+        consistencyStyleFormality={consistencyStyleFormality}
+        onConsistencyStyleFormalityChange={onConsistencyStyleFormalityChange}
+        consistencyStyleVerbosity={consistencyStyleVerbosity}
+        onConsistencyStyleVerbosityChange={onConsistencyStyleVerbosityChange}
         compressionStrategy={compressionStrategy}
         onCompressionStrategyChange={onCompressionStrategyChange}
       />

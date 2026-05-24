@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive, Lock } from 'lucide-react'
 import { cn } from '../lib/utils'
-import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy } from '../lib/types'
+import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity } from '../lib/types'
 import { useQuotaStore } from '../stores/quotaStore'
 import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES } from '../lib/types'
+import { DEFAULT_CONSTITUTIONAL_PRINCIPLES } from '../stores/chatStore'
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>
@@ -27,6 +28,16 @@ interface ChatInputProps {
   onValidationStrategyChange: (strategy: ValidationStrategy) => void
   consistencyStrategy: ConsistencyStrategy
   onConsistencyStrategyChange: (strategy: ConsistencyStrategy) => void
+  // Parametric consistency controls — surfaced inside the consistency
+  // popover when the chosen strategy needs configuration.
+  consistencyPrinciples: string[]
+  onConsistencyPrinciplesChange: (principles: string[]) => void
+  consistencyStyleTone: Tone
+  onConsistencyStyleToneChange: (tone: Tone) => void
+  consistencyStyleFormality: Formality
+  onConsistencyStyleFormalityChange: (formality: Formality) => void
+  consistencyStyleVerbosity: Verbosity
+  onConsistencyStyleVerbosityChange: (verbosity: Verbosity) => void
   compressionStrategy: CompressionStrategy
   onCompressionStrategyChange: (strategy: CompressionStrategy) => void
 }
@@ -47,6 +58,14 @@ export function ChatInput({
   onValidationStrategyChange,
   consistencyStrategy,
   onConsistencyStrategyChange,
+  consistencyPrinciples,
+  onConsistencyPrinciplesChange,
+  consistencyStyleTone,
+  onConsistencyStyleToneChange,
+  consistencyStyleFormality,
+  onConsistencyStyleFormalityChange,
+  consistencyStyleVerbosity,
+  onConsistencyStyleVerbosityChange,
   compressionStrategy,
   onCompressionStrategyChange,
 }: ChatInputProps) {
@@ -309,7 +328,7 @@ export function ChatInput({
               <ChevronDown className={cn("h-3 w-3", activeDropdown === 'consistency' && "rotate-180")} />
             </button>
             {activeDropdown === 'consistency' && (
-              <div className="absolute bottom-full left-0 mb-2 w-72 max-h-72 overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="absolute bottom-full left-0 mb-2 w-80 max-h-[28rem] overflow-y-auto rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <div className="p-2">
                   <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
                     Response Consistency
@@ -319,7 +338,11 @@ export function ChatInput({
                       key={strategy.id}
                       onClick={() => {
                         onConsistencyStrategyChange(strategy.id)
-                        setActiveDropdown(null)
+                        // Keep popover open if the new strategy has
+                        // params the user might want to tweak.
+                        if (strategy.id !== 'constitutional' && strategy.id !== 'style_profile') {
+                          setActiveDropdown(null)
+                        }
                       }}
                       className={cn(
                         "w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-left text-xs hover:bg-secondary transition-colors",
@@ -335,6 +358,57 @@ export function ChatInput({
                       {strategy.id === consistencyStrategy && <Check className="h-3.5 w-3.5 text-amber-400 mt-0.5" />}
                     </button>
                   ))}
+
+                  {/* Constitutional: editable principles. Empty value
+                      = fall back to gateway defaults (see chatStore
+                      getConsistencyConfig). */}
+                  {consistencyStrategy === 'constitutional' && (
+                    <div className="mt-2 pt-2 border-t border-border px-1">
+                      <div className="px-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        Principles · one per line
+                      </div>
+                      <textarea
+                        value={consistencyPrinciples.join('\n')}
+                        onChange={(e) => {
+                          const lines = e.target.value
+                            .split('\n')
+                            .map((l) => l.trim())
+                            .filter((l) => l.length > 0)
+                          onConsistencyPrinciplesChange(lines)
+                        }}
+                        placeholder={DEFAULT_CONSTITUTIONAL_PRINCIPLES.join('\n')}
+                        rows={5}
+                        className="w-full px-2 py-1.5 rounded-md bg-secondary/50 border border-border text-xs font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/40"
+                      />
+                      <div className="px-2 pt-1 text-[10px] text-muted-foreground">
+                        Empty = use {DEFAULT_CONSTITUTIONAL_PRINCIPLES.length} sensible defaults.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Style Profile: tone/formality/verbosity dropdowns. */}
+                  {consistencyStrategy === 'style_profile' && (
+                    <div className="mt-2 pt-2 border-t border-border px-1 space-y-2">
+                      <ConsistencyStyleSelect
+                        label="Tone"
+                        value={consistencyStyleTone}
+                        onChange={onConsistencyStyleToneChange}
+                        options={['professional', 'friendly', 'neutral', 'authoritative', 'empathetic']}
+                      />
+                      <ConsistencyStyleSelect
+                        label="Formality"
+                        value={consistencyStyleFormality}
+                        onChange={onConsistencyStyleFormalityChange}
+                        options={['formal', 'standard', 'casual']}
+                      />
+                      <ConsistencyStyleSelect
+                        label="Verbosity"
+                        value={consistencyStyleVerbosity}
+                        onChange={onConsistencyStyleVerbosityChange}
+                        options={['concise', 'balanced', 'detailed']}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -491,6 +565,37 @@ export function ChatInput({
           Aura can make mistakes. Consider checking important information.
         </p>
       </div>
+    </div>
+  )
+}
+
+function ConsistencyStyleSelect<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: T
+  onChange: (v: T) => void
+  options: readonly T[]
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-2">
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="text-xs bg-secondary/50 border border-border rounded-md px-2 py-1 text-foreground focus:outline-none focus:border-amber-500/40 capitalize"
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt} className="capitalize">
+            {opt}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

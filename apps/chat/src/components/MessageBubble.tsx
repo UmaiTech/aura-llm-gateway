@@ -1,7 +1,8 @@
 import {
   User, Sparkles, Copy, Check, Wrench, Loader2,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
-  Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send, Code2
+  Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send, Code2,
+  Gauge
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -525,6 +526,19 @@ interface UsageDisplayProps {
       strategies?: string[]
       latency_ms?: number
     }
+    consistency?: {
+      strategy?: string
+      has_principles?: boolean
+      principles_count?: number
+    }
+    validation?: {
+      strategy?: string
+      confidence?: number
+      min_confidence?: number
+      n?: number
+      selection?: string
+      include_logprobs?: boolean
+    }
   }
   responseId?: string
   rawResponse?: unknown
@@ -650,7 +664,10 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
 
       {/* Compression stats */}
       {aura?.compression && aura.compression.savings_percent !== undefined && aura.compression.savings_percent > 0 && (
-        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+        <span
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400"
+          title={aura.compression.strategies ? `Strategies: ${aura.compression.strategies.join(', ')}` : undefined}
+        >
           <Zap className="h-3 w-3" />
           <span className="font-medium">{aura.compression.savings_percent.toFixed(1)}%</span>
           <span>saved</span>
@@ -658,6 +675,48 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
             <span className="text-muted-foreground ml-1">
               ({aura.compression.original_tokens} → {aura.compression.compressed_tokens})
             </span>
+          )}
+        </span>
+      )}
+
+      {/* Consistency chip — only renders when a non-none strategy
+          actually ran on this response. */}
+      {aura?.consistency?.strategy && aura.consistency.strategy !== 'none' && (
+        <span
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400"
+          title={
+            aura.consistency.has_principles
+              ? `Strategy: ${aura.consistency.strategy} · ${aura.consistency.principles_count ?? 0} principles`
+              : `Strategy: ${aura.consistency.strategy}`
+          }
+        >
+          <Sparkles className="h-3 w-3" />
+          <span className="font-medium capitalize">{aura.consistency.strategy.replace(/_/g, ' ')}</span>
+        </span>
+      )}
+
+      {/* Validation chip — color-coded if confidence dipped below the
+          configured threshold. */}
+      {aura?.validation?.strategy && aura.validation.strategy !== 'none' && (
+        <span
+          className={cn(
+            "flex items-center gap-1 px-1.5 py-0.5 rounded",
+            aura.validation.confidence !== undefined &&
+              aura.validation.min_confidence !== undefined &&
+              aura.validation.confidence < aura.validation.min_confidence
+              ? "bg-red-500/10 text-red-400"
+              : "bg-blue-500/10 text-blue-400",
+          )}
+          title={
+            aura.validation.min_confidence !== undefined
+              ? `Strategy: ${aura.validation.strategy} · min ${aura.validation.min_confidence.toFixed(2)}`
+              : `Strategy: ${aura.validation.strategy}`
+          }
+        >
+          <Gauge className="h-3 w-3" />
+          <span className="font-medium capitalize">{aura.validation.strategy.replace(/_/g, ' ')}</span>
+          {aura.validation.confidence !== undefined && (
+            <span className="ml-0.5">{aura.validation.confidence.toFixed(2)}</span>
           )}
         </span>
       )}

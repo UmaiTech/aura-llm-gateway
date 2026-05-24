@@ -9,7 +9,7 @@ import { generateId } from './lib/utils'
 import { AuraAPI } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, CompressionMetadata, ConsistencyMetadataResponse, ValidationMetadataResponse } from './lib/types'
 
 // In production the chat hits same-origin /api/proxy (a serverless
 // function that holds the per-user gateway API key).
@@ -45,6 +45,14 @@ export default function App() {
     getValidationConfig,
     consistencyStrategy,
     setConsistencyStrategy,
+    consistencyPrinciples,
+    setConsistencyPrinciples,
+    consistencyStyleTone,
+    setConsistencyStyleTone,
+    consistencyStyleFormality,
+    setConsistencyStyleFormality,
+    consistencyStyleVerbosity,
+    setConsistencyStyleVerbosity,
     compressionStrategy,
     setCompressionStrategy,
     enabledTools,
@@ -203,6 +211,10 @@ export default function App() {
               provider?: string
               gateway_version?: string
               latency_ms?: number
+              request_id?: string
+              compression?: CompressionMetadata
+              consistency?: ConsistencyMetadataResponse
+              validation?: ValidationMetadataResponse
             } }
           }
 
@@ -235,6 +247,10 @@ export default function App() {
             provider: auraMetadata.provider || 'unknown',
             gatewayVersion: auraMetadata.gateway_version || '',
             latencyMs: auraMetadata.latency_ms,
+            requestId: auraMetadata.request_id,
+            compression: auraMetadata.compression,
+            consistency: auraMetadata.consistency,
+            validation: auraMetadata.validation,
           } : undefined
 
           console.log('[Standard Chat] Response completed:', {
@@ -460,13 +476,31 @@ export default function App() {
                       }
                     }
 
-                    // Extract Aura metadata
-                    const metadata = event.response.metadata as { aura?: { provider?: string; gateway_version?: string; latency_ms?: number } } | undefined
+                    // Extract Aura metadata. Includes compression /
+                    // consistency / validation outcomes that the
+                    // MessageBubble footer renders as chips so users
+                    // can see whether the strategies they picked did
+                    // anything on this response.
+                    const metadata = event.response.metadata as {
+                      aura?: {
+                        provider?: string
+                        gateway_version?: string
+                        latency_ms?: number
+                        request_id?: string
+                        compression?: CompressionMetadata
+                        consistency?: ConsistencyMetadataResponse
+                        validation?: ValidationMetadataResponse
+                      }
+                    } | undefined
                     if (metadata?.aura) {
                       aura = {
                         provider: metadata.aura.provider || 'unknown',
                         gatewayVersion: metadata.aura.gateway_version || '',
                         latencyMs: metadata.aura.latency_ms,
+                        requestId: metadata.aura.request_id,
+                        compression: metadata.aura.compression,
+                        consistency: metadata.aura.consistency,
+                        validation: metadata.aura.validation,
                       }
                     }
 
@@ -671,6 +705,14 @@ export default function App() {
             onValidationStrategyChange={setValidationStrategy}
             consistencyStrategy={consistencyStrategy}
             onConsistencyStrategyChange={setConsistencyStrategy}
+            consistencyPrinciples={consistencyPrinciples}
+            onConsistencyPrinciplesChange={setConsistencyPrinciples}
+            consistencyStyleTone={consistencyStyleTone}
+            onConsistencyStyleToneChange={setConsistencyStyleTone}
+            consistencyStyleFormality={consistencyStyleFormality}
+            onConsistencyStyleFormalityChange={setConsistencyStyleFormality}
+            consistencyStyleVerbosity={consistencyStyleVerbosity}
+            onConsistencyStyleVerbosityChange={setConsistencyStyleVerbosity}
             compressionStrategy={compressionStrategy}
             onCompressionStrategyChange={setCompressionStrategy}
           />

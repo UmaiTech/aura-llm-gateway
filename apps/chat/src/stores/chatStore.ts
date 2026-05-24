@@ -15,7 +15,7 @@ import { generateId } from '../lib/utils'
  * Kept short and broadly useful. The user can override by setting
  * consistencyPrinciples explicitly.
  */
-const DEFAULT_CONSTITUTIONAL_PRINCIPLES = [
+export const DEFAULT_CONSTITUTIONAL_PRINCIPLES = [
   'Be honest about uncertainty and limitations.',
   'Cite sources or label content as opinion when the answer is contested.',
   'Refuse to fabricate facts, numbers, citations, or quotes.',
