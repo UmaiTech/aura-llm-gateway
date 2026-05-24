@@ -204,3 +204,169 @@ export async function checkApiHealth(): Promise<boolean> {
 // Export types for convenience
 export type { ApiError }
 export * from './types'
+
+// ---------------------------------------------------------------------------
+// CRUD — Organizations
+// ---------------------------------------------------------------------------
+
+export interface OrganizationRecord {
+  id: string
+  name: string
+  slug: string
+  owner_id: string
+  settings?: unknown
+  created_at: string
+  updated_at: string
+}
+
+export async function createOrganization(payload: {
+  name: string
+  slug: string
+  owner_id?: string
+}): Promise<OrganizationRecord> {
+  return fetchApi<OrganizationRecord>('/admin/organizations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateOrganization(
+  id: string,
+  payload: { name?: string; settings?: unknown }
+): Promise<OrganizationRecord> {
+  return fetchApi<OrganizationRecord>(`/admin/organizations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteOrganization(id: string): Promise<void> {
+  await fetch(`${API_BASE_URL}/admin/organizations/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  }).then((r) => {
+    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// CRUD — Teams
+// ---------------------------------------------------------------------------
+
+export interface TeamRecord {
+  id: string
+  organization_id: string
+  name: string
+  slug: string
+  description?: string
+  monthly_token_limit?: number
+  current_month_tokens: number
+  created_at: string
+}
+
+export async function createTeam(payload: {
+  organization_id: string
+  name: string
+  slug: string
+  description?: string
+  monthly_token_limit?: number
+}): Promise<TeamRecord> {
+  return fetchApi<TeamRecord>('/admin/teams', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateTeam(
+  id: string,
+  payload: { name?: string; description?: string; monthly_token_limit?: number }
+): Promise<void> {
+  await fetch(`${API_BASE_URL}/admin/teams/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  }).then((r) => {
+    if (!r.ok) throw new ApiError(`Update failed: ${r.status}`, r.status)
+  })
+}
+
+export async function deleteTeam(id: string): Promise<void> {
+  await fetch(`${API_BASE_URL}/admin/teams/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  }).then((r) => {
+    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// CRUD — End Users
+// ---------------------------------------------------------------------------
+
+export async function createEndUser(payload: {
+  organization_id: string
+  external_id: string
+  name?: string
+  email?: string
+}): Promise<EndUserSummary> {
+  return fetchApi<EndUserSummary>('/admin/end-users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateEndUser(
+  id: string,
+  payload: { monthly_token_limit?: number; blocked?: boolean }
+): Promise<void> {
+  await fetch(`${API_BASE_URL}/admin/end-users/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  }).then((r) => {
+    if (!r.ok) throw new ApiError(`Update failed: ${r.status}`, r.status)
+  })
+}
+
+export async function deleteEndUser(id: string): Promise<void> {
+  await fetch(`${API_BASE_URL}/admin/end-users/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  }).then((r) => {
+    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// CRUD — API Keys
+// ---------------------------------------------------------------------------
+
+export interface CreatedApiKey {
+  /** Full key — shown once, never retrievable again. */
+  key: string
+  key_id: string
+  name: string
+}
+
+export async function createApiKey(payload: {
+  name: string
+  description?: string
+  organization_id: string
+  rate_limit_rpm?: number
+  monthly_token_limit?: number
+  daily_message_limit?: number
+}): Promise<CreatedApiKey> {
+  return fetchApi<CreatedApiKey>('/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteApiKey(id: string): Promise<void> {
+  await fetch(`${API_BASE_URL}/admin/api-keys/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  }).then((r) => {
+    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
+  })
+}
