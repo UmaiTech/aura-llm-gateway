@@ -351,3 +351,41 @@ export async function createApiKey(payload: {
 export async function deleteApiKey(id: string): Promise<void> {
   await fetchApi<void>(`/admin/api-keys/${id}`, { method: 'DELETE' })
 }
+
+// ---------------------------------------------------------------------------
+// Feature stats (compression / validation / consistency)
+// ---------------------------------------------------------------------------
+
+export interface StrategyBreakdown {
+  strategy: string
+  request_count: number
+}
+
+export interface CompressionFeatureStats {
+  requests_compressed: number
+  total_tokens_saved: number
+  avg_savings_percent: number
+  by_strategy: StrategyBreakdown[]
+}
+
+export interface ValidationFeatureStats {
+  requests_validated: number
+  avg_confidence: number | null
+  by_strategy: StrategyBreakdown[]
+}
+
+export interface ConsistencyFeatureStats {
+  requests_applied: number
+  requests_with_principles: number
+  by_strategy: StrategyBreakdown[]
+}
+
+export interface FeatureStats {
+  compression: CompressionFeatureStats
+  validation: ValidationFeatureStats
+  consistency: ConsistencyFeatureStats
+}
+
+export async function getFeatureStats(period: TimeRange = '24h'): Promise<FeatureStats> {
+  return fetchApi<FeatureStats>(`/admin/stats/features?period=${period}`)
+}

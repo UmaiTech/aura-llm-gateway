@@ -202,7 +202,7 @@ export interface RoutingRule {
 }
 
 // Time range for dashboard queries
-export type TimeRange = '24h' | '2d' | '3d' | '4d' | '5d' | '6d' | '7d'
+export type TimeRange = '24h' | '2d' | '3d' | '4d' | '5d' | '6d' | '7d' | 'all'
 
 // Dynamic stats that support time range filtering
 export interface DynamicStats {
