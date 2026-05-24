@@ -17,7 +17,15 @@ import {
   Refresh1Line,
   Building4Line,
 } from '@mingcute/react'
-import { getTeams, getOrganizations, type TeamSummary, type OrganizationSummary } from '@/lib/api'
+import {
+  getTeams,
+  getOrganizations,
+  createTeam,
+  updateTeam,
+  deleteTeam,
+  type TeamSummary,
+  type OrganizationSummary,
+} from '@/lib/api'
 
 export function TeamsPage() {
   const [teams, setTeams] = useState<TeamSummary[]>([])
@@ -28,6 +36,77 @@ export function TeamsPage() {
   const [orgFilter, setOrgFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingTeam, setEditingTeam] = useState<TeamSummary | null>(null)
+  // Create-modal form state. Initialized to empty; reset when the
+  // modal opens.
+  const [formOrgId, setFormOrgId] = useState('')
+  const [formName, setFormName] = useState('')
+  const [formSlug, setFormSlug] = useState('')
+  const [formDescription, setFormDescription] = useState('')
+  const [formTokenLimit, setFormTokenLimit] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const openCreateModal = () => {
+    setFormOrgId(organizations[0]?.id || '')
+    setFormName('')
+    setFormSlug('')
+    setFormDescription('')
+    setFormTokenLimit('')
+    setFormError(null)
+    setShowCreateModal(true)
+  }
+
+  const handleCreate = async () => {
+    if (!formOrgId || !formName || !formSlug) {
+      setFormError('Organization, name, and slug are required.')
+      return
+    }
+    setSubmitting(true)
+    setFormError(null)
+    try {
+      await createTeam({
+        organization_id: formOrgId,
+        name: formName,
+        slug: formSlug,
+        description: formDescription || undefined,
+        monthly_token_limit: formTokenLimit ? Number(formTokenLimit) : undefined,
+      })
+      setShowCreateModal(false)
+      await fetchData()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Create failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (team: TeamSummary) => {
+    if (!confirm(`Delete team "${team.name}"? This cannot be undone.`)) return
+    try {
+      await deleteTeam(team.id)
+      await fetchData()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Delete failed')
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingTeam) return
+    setSubmitting(true)
+    try {
+      await updateTeam(editingTeam.id, {
+        name: editingTeam.name,
+        description: editingTeam.description || undefined,
+        monthly_token_limit: editingTeam.monthly_token_limit || undefined,
+      })
+      setEditingTeam(null)
+      await fetchData()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const fetchData = async () => {
     try {
@@ -123,7 +202,7 @@ export function TeamsPage() {
             >
               <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
             </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={openCreateModal}>
               <AddLine className="w-4 h-4 mr-2" />
               Create Team
             </Button>
@@ -265,7 +344,7 @@ export function TeamsPage() {
                           <Button variant="ghost" size="sm" onClick={() => setEditingTeam(team)}>
                             <EditLine className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(team)}>
                             <DeleteLine className="w-4 h-4 text-red-400" />
                           </Button>
                         </div>
@@ -333,9 +412,18 @@ export function TeamsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {formError && (
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                  {formError}
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium mb-1 block">Organization</label>
-                <select className="w-full px-3 py-2 bg-background border border-border rounded-md">
+                <select
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                  value={formOrgId}
+                  onChange={(e) => setFormOrgId(e.target.value)}
+                >
                   {organizations.map((org) => (
                     <option key={org.id} value={org.id}>
                       {org.name}
@@ -345,28 +433,45 @@ export function TeamsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Name</label>
-                <Input placeholder="Product Engineering" />
+                <Input
+                  placeholder="Product Engineering"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Slug</label>
-                <Input placeholder="product-eng" />
+                <Input
+                  placeholder="product-eng"
+                  value={formSlug}
+                  onChange={(e) => setFormSlug(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Description</label>
-                <Input placeholder="Team description..." />
+                <Input
+                  placeholder="Team description..."
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Monthly Token Limit</label>
-                <Input type="number" placeholder="5000000" />
+                <Input
+                  type="number"
+                  placeholder="5000000"
+                  value={formTokenLimit}
+                  onChange={(e) => setFormTokenLimit(e.target.value)}
+                />
                 <p className="text-xs text-muted-foreground mt-1">Leave empty for unlimited</p>
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setShowCreateModal(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => setShowCreateModal(false)}>
+                <Button onClick={handleCreate} disabled={submitting}>
                   <CheckLine className="w-4 h-4 mr-2" />
-                  Create
+                  {submitting ? 'Creating...' : 'Create'}
                 </Button>
               </div>
             </CardContent>
@@ -389,17 +494,33 @@ export function TeamsPage() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Name</label>
-                <Input defaultValue={editingTeam.name} />
+                <Input
+                  value={editingTeam.name}
+                  onChange={(e) =>
+                    setEditingTeam({ ...editingTeam, name: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Description</label>
-                <Input defaultValue={editingTeam.description || ''} />
+                <Input
+                  value={editingTeam.description || ''}
+                  onChange={(e) =>
+                    setEditingTeam({ ...editingTeam, description: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Monthly Token Limit</label>
                 <Input
                   type="number"
-                  defaultValue={editingTeam.monthly_token_limit || ''}
+                  value={editingTeam.monthly_token_limit ?? ''}
+                  onChange={(e) =>
+                    setEditingTeam({
+                      ...editingTeam,
+                      monthly_token_limit: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
                   placeholder="Unlimited"
                 />
               </div>
@@ -407,9 +528,9 @@ export function TeamsPage() {
                 <Button variant="outline" onClick={() => setEditingTeam(null)}>
                   Cancel
                 </Button>
-                <Button onClick={() => setEditingTeam(null)}>
+                <Button onClick={handleSaveEdit} disabled={submitting}>
                   <CheckLine className="w-4 h-4 mr-2" />
-                  Save Changes
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
             </CardContent>
