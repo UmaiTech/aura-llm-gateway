@@ -67,6 +67,13 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     )
   }
 
+  // 204 No Content has an empty body; .json() would throw. The DELETE
+  // and update endpoints return 204 — let the caller type T = void and
+  // we return undefined cast.
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   return response.json()
 }
 
@@ -241,12 +248,7 @@ export async function updateOrganization(
 }
 
 export async function deleteOrganization(id: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/organizations/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  }).then((r) => {
-    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
-  })
+  await fetchApi<void>(`/admin/organizations/${id}`, { method: 'DELETE' })
 }
 
 // ---------------------------------------------------------------------------
@@ -281,22 +283,14 @@ export async function updateTeam(
   id: string,
   payload: { name?: string; description?: string; monthly_token_limit?: number }
 ): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/teams/${id}`, {
+  await fetchApi<void>(`/admin/teams/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
-  }).then((r) => {
-    if (!r.ok) throw new ApiError(`Update failed: ${r.status}`, r.status)
   })
 }
 
 export async function deleteTeam(id: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/teams/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  }).then((r) => {
-    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
-  })
+  await fetchApi<void>(`/admin/teams/${id}`, { method: 'DELETE' })
 }
 
 // ---------------------------------------------------------------------------
@@ -319,22 +313,14 @@ export async function updateEndUser(
   id: string,
   payload: { monthly_token_limit?: number; blocked?: boolean }
 ): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/end-users/${id}`, {
+  await fetchApi<void>(`/admin/end-users/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
-  }).then((r) => {
-    if (!r.ok) throw new ApiError(`Update failed: ${r.status}`, r.status)
   })
 }
 
 export async function deleteEndUser(id: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/end-users/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  }).then((r) => {
-    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
-  })
+  await fetchApi<void>(`/admin/end-users/${id}`, { method: 'DELETE' })
 }
 
 // ---------------------------------------------------------------------------
@@ -363,10 +349,5 @@ export async function createApiKey(payload: {
 }
 
 export async function deleteApiKey(id: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/api-keys/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  }).then((r) => {
-    if (!r.ok) throw new ApiError(`Delete failed: ${r.status}`, r.status)
-  })
+  await fetchApi<void>(`/admin/api-keys/${id}`, { method: 'DELETE' })
 }
