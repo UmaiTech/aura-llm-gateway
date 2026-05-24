@@ -32,6 +32,7 @@ const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: '2d', label: '2d' },
   { value: '3d', label: '3d' },
   { value: '7d', label: '7d' },
+  { value: 'all', label: 'All' },
 ]
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -290,7 +291,23 @@ export function InsightsPage() {
               <CardTitle className="text-base font-medium">Token Usage Over Time</CardTitle>
             </CardHeader>
             <CardContent>
-              {tokenTimeline.length > 0 ? (
+              {tokenTimeline.length > 0 ? (() => {
+                // Bucket size on the backend is 1h / 2h / 6h depending on
+                // period (admin.rs get_token_timeline). Render hour labels
+                // (HH:00) for 24h–3d and date labels (MM-DD) for the longer
+                // periods so the x-axis matches what the user picked.
+                const useHourLabels = timeRange === '24h' || timeRange === '2d' || timeRange === '3d'
+                const formatLabel = (timestamp: string): { primary: string; full: string } => {
+                  const d = new Date(timestamp)
+                  if (useHourLabels) {
+                    const hh = d.getHours().toString().padStart(2, '0')
+                    return { primary: `${hh}:00`, full: d.toLocaleString() }
+                  }
+                  const mm = (d.getMonth() + 1).toString().padStart(2, '0')
+                  const dd = d.getDate().toString().padStart(2, '0')
+                  return { primary: `${mm}-${dd}`, full: d.toLocaleDateString() }
+                }
+                return (
                 <>
                   <div className="h-[200px] flex items-end gap-1 relative">
                     {tokenTimeline.slice(-12).map((point, i) => {
@@ -298,6 +315,7 @@ export function InsightsPage() {
                       const outputHeight = (point.output_tokens / maxTokens) * 100
                       const isHovered = hoveredBar === i
                       const totalTokens = point.input_tokens + point.output_tokens
+                      const label = formatLabel(point.timestamp)
                       return (
                         <div
                           key={i}
@@ -309,7 +327,7 @@ export function InsightsPage() {
                           {isHovered && (
                             <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
                               <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs whitespace-nowrap">
-                                <div className="font-medium mb-1">Period {i + 1}</div>
+                                <div className="font-medium mb-1">{label.full}</div>
                                 <div className="space-y-0.5 text-muted-foreground">
                                   <div className="flex items-center gap-2">
                                     <span className="w-2 h-2 rounded bg-primary" />
@@ -345,7 +363,7 @@ export function InsightsPage() {
                               style={{ height: `${outputHeight}%` }}
                             />
                           </div>
-                          <span className="text-2xs text-muted-foreground">{i + 1}</span>
+                          <span className="text-2xs text-muted-foreground">{label.primary}</span>
                         </div>
                       )
                     })}
@@ -359,7 +377,8 @@ export function InsightsPage() {
                     </span>
                   </div>
                 </>
-              ) : (
+                )
+              })() : (
                 <div className="h-[200px] flex items-center justify-center text-muted-foreground">
                   No token usage data available
                 </div>

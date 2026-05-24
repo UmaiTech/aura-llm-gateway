@@ -27,6 +27,7 @@ import {
   getRecentLogs,
   getHourlyTimeline,
   getDailyTimeline,
+  getFeatureStats,
   type OverviewStats,
   type DynamicStats,
   type ProviderHealth,
@@ -35,6 +36,7 @@ import {
   type RecentLog,
   type TimeRange,
   type TimelinePoint,
+  type FeatureStats,
 } from '@/lib/api'
 
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
@@ -45,6 +47,7 @@ const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: '5d', label: '5 Days' },
   { value: '6d', label: '6 Days' },
   { value: '7d', label: '7 Days' },
+  { value: 'all', label: 'All Time' },
 ]
 
 export function DashboardPage() {
@@ -66,6 +69,7 @@ export function DashboardPage() {
   const [routingStats, setRoutingStatsData] = useState<RoutingStats[]>([])
   const [recentRequests, setRecentRequests] = useState<RecentLog[]>([])
   const [timeline, setTimeline] = useState<TimelinePoint[]>([])
+  const [featureStats, setFeatureStats] = useState<FeatureStats | null>(null)
 
   // Refresh handler
   const handleRefresh = () => {
@@ -85,7 +89,7 @@ export function DashboardPage() {
         // Use hourly timeline for 24h-2d, daily for longer periods
         const useHourly = timeRange === '24h' || timeRange === '2d'
 
-        const [overview, dynamic, health, cache, routing, logs, timelineData] = await Promise.all([
+        const [overview, dynamic, health, cache, routing, logs, timelineData, features] = await Promise.all([
           getOverviewStats().catch(() => null),
           getDynamicStats(timeRange).catch(() => null),
           getProviderHealth().catch(() => []),
@@ -93,6 +97,7 @@ export function DashboardPage() {
           getRoutingStats().catch(() => []),
           getRecentLogs({ limit: 5 }).catch(() => []),
           useHourly ? getHourlyTimeline().catch(() => []) : getDailyTimeline().catch(() => []),
+          getFeatureStats(timeRange).catch(() => null),
         ])
 
         setOverviewStats(overview)
@@ -102,6 +107,7 @@ export function DashboardPage() {
         setRoutingStatsData(routing)
         setRecentRequests(logs)
         setTimeline(timelineData)
+        setFeatureStats(features)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
       } finally {
@@ -307,19 +313,37 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               {timeline.length > 0 ? (() => {
-                // Filter to only show days with data for cleaner visualization
+                // Hourly periods (24h, 2d) render label as HH:00 in local time
+                // so the chart matches what the user sees on the wall clock.
+                // Daily periods render MM-DD. We keep up to 30 buckets either
+                // way — that's the limit of the daily view's window and
+                // happens to be more than enough for the hourly view (24).
+                const useHourlyLabels = timeRange === '24h' || timeRange === '2d'
                 const allData = timeline.slice(-30)
+                // For hourly view, keep the full window even when most buckets
+                // are zero — a sparse 24-hour line is more useful than a
+                // collapsed view that hides the gaps in traffic.
+                // For daily view, collapse to only-non-empty days for clarity.
                 const dataWithRequests = allData.filter(t => t.request_count > 0)
                 const totalRequests = allData.reduce((sum, t) => sum + t.request_count, 0)
 
-                // If we have data, show only the days with requests
-                // Otherwise show last 7 days
-                const displayData = dataWithRequests.length > 0
-                  ? dataWithRequests
-                  : allData.slice(-7)
+                const displayData = useHourlyLabels
+                  ? allData
+                  : (dataWithRequests.length > 0 ? dataWithRequests : allData.slice(-7))
                 const maxRequests = Math.max(...displayData.map(t => t.request_count), 1)
 
                 const maxBarHeight = 180 // pixels
+
+                const formatLabel = (timestamp: string | undefined): { primary: string; full: string } => {
+                  if (!timestamp) return { primary: '', full: '' }
+                  if (useHourlyLabels) {
+                    const d = new Date(timestamp)
+                    const hh = d.getHours().toString().padStart(2, '0')
+                    return { primary: `${hh}:00`, full: d.toLocaleString() }
+                  }
+                  const dateStr = timestamp.split('T')[0] || ''
+                  return { primary: dateStr.slice(5), full: dateStr }
+                }
 
                 return (
                   <div className="h-[300px]">
@@ -330,8 +354,7 @@ export function DashboardPage() {
                             // Calculate pixel height - minimum 30px for visibility
                             const heightPx = Math.max(30, Math.round((point.request_count / maxRequests) * maxBarHeight))
                             const hasErrors = point.error_count > 0
-                            const dateStr = point.timestamp?.split('T')[0] || ''
-                            const shortDate = dateStr.slice(5) // MM-DD format
+                            const label = formatLabel(point.timestamp)
                             return (
                               <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-[40px]">
                                 <span className="text-xs font-medium text-foreground mb-1">
@@ -345,10 +368,10 @@ export function DashboardPage() {
                                       : 'bg-gradient-to-t from-primary/60 to-primary'
                                   )}
                                   style={{ height: `${heightPx}px` }}
-                                  title={`${dateStr}: ${point.request_count} requests${hasErrors ? `, ${point.error_count} errors` : ''}`}
+                                  title={`${label.full}: ${point.request_count} requests${hasErrors ? `, ${point.error_count} errors` : ''}`}
                                 />
                                 <span className="text-2xs text-muted-foreground mt-2">
-                                  {shortDate}
+                                  {label.primary}
                                 </span>
                               </div>
                             )
@@ -388,31 +411,31 @@ export function DashboardPage() {
             <CardHeader>
               <CardTitle className="text-base font-medium">Provider Health</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {providers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No provider data available</p>
               ) : (
                 providers.map((provider) => (
-                  <div key={provider.provider_name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          'h-2 w-2 rounded-full',
-                          provider.health_status === 'healthy'
-                            ? 'bg-success'
-                            : provider.health_status === 'degraded'
-                              ? 'bg-warning'
-                              : 'bg-muted'
-                        )}
-                      />
-                      <span className="font-medium">
-                        {provider.display_name || provider.provider_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {formatDuration(provider.avg_latency_ms)}
-                      </span>
+                  <div
+                    key={provider.provider_name}
+                    className="border-b border-border/40 last:border-0 pb-3 last:pb-0"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={cn(
+                            'h-2 w-2 rounded-full',
+                            provider.health_status === 'healthy'
+                              ? 'bg-success'
+                              : provider.health_status === 'degraded'
+                                ? 'bg-warning'
+                                : 'bg-muted'
+                          )}
+                        />
+                        <span className="font-medium text-sm">
+                          {provider.display_name || provider.provider_name}
+                        </span>
+                      </div>
                       {provider.health_status === 'healthy' ? (
                         <CheckLine className="h-4 w-4 text-success" />
                       ) : provider.health_status === 'degraded' ? (
@@ -421,6 +444,40 @@ export function DashboardPage() {
                         <CloseLine className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div>
+                        <div className="text-muted-foreground">Reqs</div>
+                        <div className="font-medium tabular-nums">
+                          {provider.total_requests}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Success</div>
+                        <div className="font-medium tabular-nums">
+                          {provider.total_requests > 0
+                            ? `${((provider.successful_requests / provider.total_requests) * 100).toFixed(1)}%`
+                            : '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Avg</div>
+                        <div className="font-medium tabular-nums">
+                          {formatDuration(provider.avg_latency_ms)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">p95</div>
+                        <div className="font-medium tabular-nums">
+                          {formatDuration(provider.p95_latency_ms)}
+                        </div>
+                      </div>
+                    </div>
+                    {provider.failed_requests > 0 && (
+                      <div className="mt-1 text-2xs text-destructive/80">
+                        {provider.failed_requests} error
+                        {provider.failed_requests !== 1 && 's'}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -566,6 +623,153 @@ export function DashboardPage() {
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   No usage data available
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Gateway Strategy Features Row — compression / validation /
+            consistency rollups for the selected period. Mirrors the
+            Routing/Cache/Usage cards above but for the optional
+            request-modifying strategies. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Compression */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">Compression</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {featureStats && featureStats.compression.requests_compressed > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xl font-bold tabular-nums">
+                        {featureStats.compression.avg_savings_percent.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">Avg savings</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xl font-bold tabular-nums">
+                        {formatNumber(featureStats.compression.total_tokens_saved)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Tokens saved</p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatNumber(featureStats.compression.requests_compressed)} request
+                    {featureStats.compression.requests_compressed !== 1 && 's'} compressed
+                  </div>
+                  {featureStats.compression.by_strategy
+                    .filter((s) => s.strategy !== 'none')
+                    .slice(0, 4)
+                    .map((s) => (
+                      <div
+                        key={s.strategy}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="capitalize text-muted-foreground">
+                          {s.strategy.replace(/_/g, ' ')}
+                        </span>
+                        <span className="font-mono tabular-nums">{s.request_count}</span>
+                      </div>
+                    ))}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No compression activity
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Validation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">Validation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {featureStats && featureStats.validation.requests_validated > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xl font-bold tabular-nums">
+                        {formatNumber(featureStats.validation.requests_validated)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Validated</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xl font-bold tabular-nums">
+                        {featureStats.validation.avg_confidence !== null
+                          ? featureStats.validation.avg_confidence.toFixed(2)
+                          : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Avg confidence</p>
+                    </div>
+                  </div>
+                  {featureStats.validation.by_strategy
+                    .filter((s) => s.strategy !== 'none')
+                    .slice(0, 4)
+                    .map((s) => (
+                      <div
+                        key={s.strategy}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="capitalize text-muted-foreground">
+                          {s.strategy.replace(/_/g, ' ')}
+                        </span>
+                        <span className="font-mono tabular-nums">{s.request_count}</span>
+                      </div>
+                    ))}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No validation activity
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Consistency */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium">Consistency</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {featureStats && featureStats.consistency.requests_applied > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xl font-bold tabular-nums">
+                        {formatNumber(featureStats.consistency.requests_applied)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Applied</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xl font-bold tabular-nums">
+                        {formatNumber(featureStats.consistency.requests_with_principles)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">With principles</p>
+                    </div>
+                  </div>
+                  {featureStats.consistency.by_strategy
+                    .filter((s) => s.strategy !== 'none')
+                    .slice(0, 4)
+                    .map((s) => (
+                      <div
+                        key={s.strategy}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="capitalize text-muted-foreground">
+                          {s.strategy.replace(/_/g, ' ')}
+                        </span>
+                        <span className="font-mono tabular-nums">{s.request_count}</span>
+                      </div>
+                    ))}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No consistency activity
                 </p>
               )}
             </CardContent>

@@ -30,6 +30,7 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/providers", get(get_provider_health))
         .route("/admin/stats/cache", get(get_cache_stats))
         .route("/admin/stats/routing", get(get_routing_stats))
+        .route("/admin/stats/features", get(get_feature_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
         // Insights endpoints
@@ -342,7 +343,11 @@ pub struct PeriodQuery {
 }
 
 impl PeriodQuery {
-    /// Convert period string to PostgreSQL interval
+    /// Convert period string to PostgreSQL interval.
+    ///
+    /// `"all"` returns `100 years` — effectively unbounded for the
+    /// gateway's lifetime, so existing `WHERE created_at >= NOW() - INTERVAL ...`
+    /// queries don't need a separate "no filter" branch.
     fn to_interval(&self) -> &'static str {
         match self.period.as_deref() {
             Some("24h") | Some("1d") => "24 hours",
@@ -352,6 +357,7 @@ impl PeriodQuery {
             Some("5d") => "5 days",
             Some("6d") => "6 days",
             Some("7d") => "7 days",
+            Some("all") => "100 years",
             _ => "24 hours", // default
         }
     }
@@ -1579,6 +1585,9 @@ async fn get_token_timeline(
     let group_interval = match params.period.as_deref() {
         Some("24h") | Some("1d") => "1 hour",
         Some("2d") | Some("3d") => "2 hours",
+        // "all" gets daily buckets — anything finer would balloon the
+        // response for projects with months of history.
+        Some("all") => "1 day",
         _ => "6 hours",
     };
 
@@ -2003,4 +2012,257 @@ fn map_db_error(err: aura_db::DbError, entity: &str) -> (StatusCode, Json<serde_
             Json(serde_json::json!({"error": format!("Database error: {msg}")})),
         )
     }
+}
+
+// ============================================================================
+// Strategy Feature Stats (compression / validation / consistency)
+// ============================================================================
+//
+// Single endpoint that aggregates per-strategy usage over the requested
+// period. The dashboard renders a card per feature next to the existing
+// Routing Distribution / Cache Performance / Usage Summary row, and this
+// single endpoint avoids spinning three separate cards' worth of queries.
+
+#[derive(Debug, Serialize)]
+pub struct StrategyBreakdown {
+    /// The strategy id (e.g. "aisp", "best_of_n", "constitutional"),
+    /// or "none" when the request didn't pick one.
+    pub strategy: String,
+    pub request_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CompressionFeatureStats {
+    /// Number of requests where compression actually ran (regardless
+    /// of whether it saved tokens).
+    pub requests_compressed: i64,
+    /// Total tokens saved across the period.
+    pub total_tokens_saved: i64,
+    /// Aggregate savings percentage — weighted by `original_tokens` so
+    /// a single big compressed request doesn't dominate.
+    pub avg_savings_percent: f64,
+    pub by_strategy: Vec<StrategyBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidationFeatureStats {
+    /// Requests where validation.strategy != "none".
+    pub requests_validated: i64,
+    /// Mean confidence across all responses that actually produced a
+    /// confidence score (i.e. provider supplied logprobs). Null when
+    /// no validated request returned a score.
+    pub avg_confidence: Option<f64>,
+    pub by_strategy: Vec<StrategyBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConsistencyFeatureStats {
+    /// Requests where consistency.strategy != "none".
+    pub requests_applied: i64,
+    /// Count of requests that carried at least one principle, used as
+    /// a proxy for "did Constitutional actually do something".
+    pub requests_with_principles: i64,
+    pub by_strategy: Vec<StrategyBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FeatureStats {
+    pub compression: CompressionFeatureStats,
+    pub validation: ValidationFeatureStats,
+    pub consistency: ConsistencyFeatureStats,
+}
+
+async fn get_feature_stats(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<FeatureStats>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let interval = params.to_interval();
+
+    // Compression rollup — pull from metadata->'aura'->'compression'.
+    // request_count uses COUNT for the "actually ran" filter (savings_percent
+    // > 0 means the gateway selected a strategy that did something);
+    // by_strategy aggregates by the strategies[] array's first element.
+    let compression_query = format!(
+        r#"
+        SELECT
+            COALESCE(COUNT(*) FILTER (
+                WHERE metadata->'aura'->'compression'->>'savings_percent' IS NOT NULL
+            ), 0)::BIGINT AS requests_compressed,
+            COALESCE(SUM(
+                (metadata->'aura'->'compression'->>'original_tokens')::BIGINT
+                - (metadata->'aura'->'compression'->>'compressed_tokens')::BIGINT
+            ), 0)::BIGINT AS total_tokens_saved,
+            COALESCE(
+                SUM(
+                    (metadata->'aura'->'compression'->>'savings_percent')::FLOAT8
+                    * (metadata->'aura'->'compression'->>'original_tokens')::FLOAT8
+                ) / NULLIF(SUM((metadata->'aura'->'compression'->>'original_tokens')::FLOAT8), 0),
+                0.0
+            )::FLOAT8 AS avg_savings_percent
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+          AND status = 'completed'
+          AND metadata->'aura'->'compression' IS NOT NULL
+        "#,
+        interval
+    );
+
+    let compression_row = sqlx::query(&compression_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch compression stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let compression_strategies = fetch_strategy_breakdown(
+        pool,
+        interval,
+        // Strategies live in an array; pull the first element for the
+        // breakdown. Multi-strategy chains roll up under their primary.
+        "metadata->'aura'->'compression'->'strategies'->>0",
+    )
+    .await?;
+
+    let validation_query = format!(
+        r#"
+        SELECT
+            COALESCE(COUNT(*) FILTER (
+                WHERE metadata->'aura'->'validation'->>'strategy' IS NOT NULL
+                  AND metadata->'aura'->'validation'->>'strategy' != 'none'
+            ), 0)::BIGINT AS requests_validated,
+            AVG(NULLIF(
+                (metadata->'aura'->'validation'->>'confidence')::FLOAT8,
+                0.0
+            )) AS avg_confidence
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+          AND status = 'completed'
+        "#,
+        interval
+    );
+
+    let validation_row = sqlx::query(&validation_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch validation stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let validation_strategies = fetch_strategy_breakdown(
+        pool,
+        interval,
+        "metadata->'aura'->'validation'->>'strategy'",
+    )
+    .await?;
+
+    let consistency_query = format!(
+        r#"
+        SELECT
+            COALESCE(COUNT(*) FILTER (
+                WHERE metadata->'aura'->'consistency'->>'strategy' IS NOT NULL
+                  AND metadata->'aura'->'consistency'->>'strategy' != 'none'
+            ), 0)::BIGINT AS requests_applied,
+            COALESCE(COUNT(*) FILTER (
+                WHERE (metadata->'aura'->'consistency'->>'has_principles')::BOOLEAN = TRUE
+            ), 0)::BIGINT AS requests_with_principles
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+          AND status = 'completed'
+        "#,
+        interval
+    );
+
+    let consistency_row = sqlx::query(&consistency_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch consistency stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let consistency_strategies = fetch_strategy_breakdown(
+        pool,
+        interval,
+        "metadata->'aura'->'consistency'->>'strategy'",
+    )
+    .await?;
+
+    Ok(Json(FeatureStats {
+        compression: CompressionFeatureStats {
+            requests_compressed: compression_row.try_get("requests_compressed").unwrap_or(0),
+            total_tokens_saved: compression_row.try_get("total_tokens_saved").unwrap_or(0),
+            avg_savings_percent: compression_row
+                .try_get("avg_savings_percent")
+                .unwrap_or(0.0),
+            by_strategy: compression_strategies,
+        },
+        validation: ValidationFeatureStats {
+            requests_validated: validation_row.try_get("requests_validated").unwrap_or(0),
+            avg_confidence: validation_row.try_get("avg_confidence").ok(),
+            by_strategy: validation_strategies,
+        },
+        consistency: ConsistencyFeatureStats {
+            requests_applied: consistency_row.try_get("requests_applied").unwrap_or(0),
+            requests_with_principles: consistency_row
+                .try_get("requests_with_principles")
+                .unwrap_or(0),
+            by_strategy: consistency_strategies,
+        },
+    }))
+}
+
+/// Helper: group request_logs rows by a JSONB string extracted by
+/// `path_expr` (e.g. `metadata->'aura'->'validation'->>'strategy'`)
+/// and return (strategy, count) tuples ordered by count desc.
+async fn fetch_strategy_breakdown(
+    pool: &aura_db::DbPool,
+    interval: &str,
+    path_expr: &str,
+) -> Result<Vec<StrategyBreakdown>, (StatusCode, Json<serde_json::Value>)> {
+    let query = format!(
+        r#"
+        SELECT
+            COALESCE({path}, 'none') AS strategy,
+            COUNT(*)::BIGINT AS request_count
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{interval}'
+          AND status = 'completed'
+        GROUP BY COALESCE({path}, 'none')
+        ORDER BY request_count DESC
+        LIMIT 8
+        "#,
+        path = path_expr,
+        interval = interval,
+    );
+    let rows = sqlx::query(&query).fetch_all(pool).await.map_err(|e| {
+        tracing::error!("Failed to fetch strategy breakdown for {path_expr}: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {e}")})),
+        )
+    })?;
+    Ok(rows
+        .iter()
+        .map(|row| StrategyBreakdown {
+            strategy: row
+                .try_get("strategy")
+                .unwrap_or_else(|_| "none".to_string()),
+            request_count: row.try_get("request_count").unwrap_or(0),
+        })
+        .collect())
 }
