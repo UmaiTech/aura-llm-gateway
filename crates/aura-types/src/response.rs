@@ -62,6 +62,9 @@ pub enum IncompleteReason {
     ContentFilter,
     /// Request was cancelled
     Cancelled,
+    /// Response confidence fell below the configured threshold
+    /// (validation strategy = confidence_threshold)
+    LowConfidence,
     /// Unknown or unspecified reason
     Unknown,
 }

@@ -248,6 +248,59 @@ async fn replay_prior_tool_calls(pool: &DbPool, request: &CreateResponseRequest)
     synthesized
 }
 
+/// Apply the confidence-threshold validation gate.
+///
+/// When the caller picked `validation.strategy = confidence_threshold`
+/// and supplied a `min_confidence`, this checks the response's measured
+/// confidence (populated by the provider from logprobs) and demotes the
+/// response status to `Incomplete` with reason `LowConfidence` when the
+/// measurement falls short. The content is still returned — the client
+/// decides whether to retry, downgrade, or surface the warning to the
+/// end user.
+///
+/// No-op when:
+/// - validation strategy isn't ConfidenceThreshold
+/// - min_confidence is None
+/// - response carries no validation metadata (provider didn't compute it)
+/// - confidence is missing (provider doesn't support logprobs)
+/// - response already isn't Completed (don't second-guess Failed)
+fn apply_confidence_threshold_gate(
+    request: &aura_types::CreateResponseRequest,
+    response: &mut aura_types::Response,
+) {
+    use aura_types::{IncompleteReason, ResponseStatus, ValidationStrategy};
+
+    let Some(validation_cfg) = request.validation.as_ref() else {
+        return;
+    };
+    if validation_cfg.strategy != ValidationStrategy::ConfidenceThreshold {
+        return;
+    }
+    let Some(min_confidence) = validation_cfg.min_confidence else {
+        return;
+    };
+    if response.status != ResponseStatus::Completed {
+        return;
+    }
+    let Some(measured) = response.validation.as_ref().and_then(|v| v.confidence) else {
+        debug!(
+            "confidence_threshold gate: no confidence on response \
+             (provider didn't supply logprobs); not gating"
+        );
+        return;
+    };
+
+    if measured < min_confidence {
+        debug!(
+            measured = %measured,
+            threshold = %min_confidence,
+            "confidence_threshold gate: demoting response to incomplete"
+        );
+        response.status = ResponseStatus::Incomplete;
+        response.incomplete_reason = Some(IncompleteReason::LowConfidence);
+    }
+}
+
 /// Result of preprocessing a request
 struct PreprocessResult {
     request: CreateResponseRequest,
@@ -645,7 +698,7 @@ pub async fn create_response(
                                 // Calculate latency
                                 let latency_ms = start_for_stream.elapsed().as_millis() as u64;
 
-                                let response = state_clone
+                                let mut response = state_clone
                                     .enrich_response_with_latency(
                                         response,
                                         &request_id_clone,
@@ -656,6 +709,10 @@ pub async fn create_response(
                                         routing_strategy_clone.as_deref(),
                                     )
                                     .await;
+
+                                // Apply confidence_threshold gate (no-op
+                                // for other strategies / missing confidence)
+                                apply_confidence_threshold_gate(&request_clone, &mut response);
 
                                 // Log completed response
                                 let usage = response.usage.as_ref();
@@ -994,7 +1051,7 @@ pub async fn create_response(
         metrics::decrement_active_requests(&provider_name);
 
         // Enrich with cost and latency information
-        let response = state
+        let mut response = state
             .enrich_response_with_latency(
                 response,
                 &request_id,
@@ -1005,6 +1062,9 @@ pub async fn create_response(
                 routing_strategy.as_deref(),
             )
             .await;
+
+        // Apply confidence_threshold gate (no-op for other strategies)
+        apply_confidence_threshold_gate(&request, &mut response);
 
         // Record metrics
         let status_str = match response.status {
@@ -1151,6 +1211,96 @@ pub async fn create_response(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aura_types::{
+        CreateResponseRequest, IncompleteReason, Response, ResponseStatus, ValidationConfig,
+        ValidationMetadata, ValidationStrategy,
+    };
+
+    fn make_completed_response_with_confidence(confidence: Option<f32>) -> Response {
+        let mut response = Response::in_progress("resp_test", "gpt-4");
+        response.status = ResponseStatus::Completed;
+        response.validation = Some(ValidationMetadata {
+            strategy: ValidationStrategy::ConfidenceThreshold,
+            confidence,
+            perplexity: None,
+            candidates_generated: None,
+            selected_index: None,
+            selection_reason: None,
+            passed: true,
+            warning: None,
+            logprobs: None,
+        });
+        response
+    }
+
+    #[test]
+    fn test_confidence_threshold_demotes_when_below() {
+        let validation = ValidationConfig {
+            strategy: ValidationStrategy::ConfidenceThreshold,
+            min_confidence: Some(0.8),
+            ..Default::default()
+        };
+        let request = CreateResponseRequest::text("gpt-4", "Hello!").with_validation(validation);
+        let mut response = make_completed_response_with_confidence(Some(0.6));
+
+        apply_confidence_threshold_gate(&request, &mut response);
+
+        assert_eq!(response.status, ResponseStatus::Incomplete);
+        assert_eq!(
+            response.incomplete_reason,
+            Some(IncompleteReason::LowConfidence)
+        );
+    }
+
+    #[test]
+    fn test_confidence_threshold_keeps_completed_when_above() {
+        let validation = ValidationConfig {
+            strategy: ValidationStrategy::ConfidenceThreshold,
+            min_confidence: Some(0.5),
+            ..Default::default()
+        };
+        let request = CreateResponseRequest::text("gpt-4", "Hello!").with_validation(validation);
+        let mut response = make_completed_response_with_confidence(Some(0.9));
+
+        apply_confidence_threshold_gate(&request, &mut response);
+
+        assert_eq!(response.status, ResponseStatus::Completed);
+        assert_eq!(response.incomplete_reason, None);
+    }
+
+    #[test]
+    fn test_confidence_threshold_no_op_when_strategy_not_threshold() {
+        let validation = ValidationConfig {
+            strategy: ValidationStrategy::Logprobs,
+            min_confidence: Some(0.8),
+            ..Default::default()
+        };
+        let request = CreateResponseRequest::text("gpt-4", "Hello!").with_validation(validation);
+        let mut response = make_completed_response_with_confidence(Some(0.1));
+
+        apply_confidence_threshold_gate(&request, &mut response);
+
+        // Strategy is Logprobs, not ConfidenceThreshold — gate must not fire.
+        assert_eq!(response.status, ResponseStatus::Completed);
+        assert_eq!(response.incomplete_reason, None);
+    }
+
+    #[test]
+    fn test_confidence_threshold_no_op_when_confidence_missing() {
+        // Provider didn't supply logprobs — we can't gate on what we
+        // can't measure. Don't demote a Completed response.
+        let validation = ValidationConfig {
+            strategy: ValidationStrategy::ConfidenceThreshold,
+            min_confidence: Some(0.8),
+            ..Default::default()
+        };
+        let request = CreateResponseRequest::text("gpt-4", "Hello!").with_validation(validation);
+        let mut response = make_completed_response_with_confidence(None);
+
+        apply_confidence_threshold_gate(&request, &mut response);
+
+        assert_eq!(response.status, ResponseStatus::Completed);
+    }
 
     #[test]
     fn test_api_error_serialization() {
