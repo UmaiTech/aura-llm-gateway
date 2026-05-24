@@ -1229,7 +1229,11 @@ async fn list_providers(
 async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingRule>> {
     // Return mock routing rules - real implementation would query database
     // Note: Routing rules table doesn't exist yet, so keeping mock data
-    Json(vec![
+    Json(mock_routing_rules())
+}
+
+fn mock_routing_rules() -> Vec<RoutingRule> {
+    vec![
         RoutingRule {
             id: "rule_1".to_string(),
             name: "Cost Optimization".to_string(),
@@ -1270,12 +1274,12 @@ async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingR
                 },
                 RoutingAction {
                     provider: "anthropic".to_string(),
-                    model: "claude-3-sonnet".to_string(),
+                    model: "claude-sonnet-4-6".to_string(),
                     weight: Some(40),
                 },
                 RoutingAction {
                     provider: "google".to_string(),
-                    model: "gemini-pro".to_string(),
+                    model: "gemini-2.5-flash".to_string(),
                     weight: Some(20),
                 },
             ],
@@ -1299,17 +1303,17 @@ async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingR
                 },
                 RoutingAction {
                     provider: "anthropic".to_string(),
-                    model: "claude-3-sonnet".to_string(),
+                    model: "claude-sonnet-4-6".to_string(),
                     weight: None,
                 },
                 RoutingAction {
                     provider: "google".to_string(),
-                    model: "gemini-pro".to_string(),
+                    model: "gemini-2.5-flash".to_string(),
                     weight: None,
                 },
             ],
         },
-    ])
+    ]
 }
 
 async fn create_routing_rule(
@@ -1746,4 +1750,37 @@ async fn get_token_timeline(
         .collect();
 
     Ok(Json(timeline))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mock_routing_rules;
+    use aura_core::{AnthropicProvider, GeminiProvider, OpenAIProvider, Provider};
+
+    #[test]
+    fn mock_routing_rule_models_match_provider_catalogs() {
+        let openai = OpenAIProvider::new("test-key");
+        let anthropic = AnthropicProvider::new("test-key");
+        let gemini = GeminiProvider::new("test-key");
+
+        for rule in mock_routing_rules() {
+            for action in rule.actions {
+                let is_supported = match action.provider.as_str() {
+                    "openai" => openai.supports_model(&action.model),
+                    "anthropic" => anthropic.supports_model(&action.model),
+                    "google" => gemini.supports_model(&action.model),
+                    provider => panic!("unexpected provider in mock routing rules: {provider}"),
+                };
+
+                assert!(
+                    is_supported,
+                    "provider '{}' does not support demo model '{}' in routing rule '{}' ({})",
+                    action.provider,
+                    action.model,
+                    rule.id,
+                    rule.name,
+                );
+            }
+        }
+    }
 }
