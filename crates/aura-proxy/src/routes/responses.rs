@@ -769,7 +769,7 @@ pub async fn create_response(
                                         .and_then(|u| u.reasoning_tokens)
                                         .map(|t| t as i32),
                                     cost_usd: usage.and_then(|u| u.cost_usd),
-                                    latency_ms: None,
+                                    latency_ms: Some(latency_ms as i32),
                                     status: "completed".to_string(),
                                     error_code: None,
                                     error_message: None,
@@ -798,7 +798,27 @@ pub async fn create_response(
                                     let response_bg = response.clone();
                                     let request_bg = request_clone.clone();
                                     let auth_bg = auth_clone.clone();
+                                    let response_id_for_diag = response.id.clone();
                                     tokio::spawn(async move {
+                                        info!(
+                                            response_id = %response_id_for_diag,
+                                            auth_present = auth_bg.is_some(),
+                                            "persistence-spawn: entered (streaming, with conv_id)"
+                                        );
+                                        // Record API key usage FIRST so a panic
+                                        // in log_request / save_messages_from_items
+                                        // can't block usage accounting. The
+                                        // billing/usage path is the most important
+                                        // side effect of a completed request.
+                                        if let Some(auth) = &auth_bg {
+                                            state_bg
+                                                .record_api_key_usage(
+                                                    auth,
+                                                    &response_bg,
+                                                    &request_bg,
+                                                )
+                                                .await;
+                                        }
                                         state_bg.log_request(log).await;
                                         state_bg
                                             .save_messages_from_items(
@@ -807,35 +827,32 @@ pub async fn create_response(
                                                 &response_bg.output,
                                             )
                                             .await;
-                                        // Record API key usage
-                                        if let Some(auth) = auth_bg {
-                                            state_bg
-                                                .record_api_key_usage(
-                                                    &auth,
-                                                    &response_bg,
-                                                    &request_bg,
-                                                )
-                                                .await;
-                                        }
                                     });
                                 } else {
                                     let auth_bg = auth_clone.clone();
                                     let response_bg = response.clone();
                                     let request_bg = request_clone.clone();
+                                    let response_id_for_diag = response.id.clone();
                                     tokio::spawn({
                                         let state = state_clone.clone();
                                         async move {
-                                            state.log_request(log).await;
-                                            // Record API key usage
-                                            if let Some(auth) = auth_bg {
+                                            info!(
+                                                response_id = %response_id_for_diag,
+                                                auth_present = auth_bg.is_some(),
+                                                "persistence-spawn: entered (streaming, no conv_id)"
+                                            );
+                                            // Record API key usage FIRST.
+                                            // See sibling branch comment.
+                                            if let Some(auth) = &auth_bg {
                                                 state
                                                     .record_api_key_usage(
-                                                        &auth,
+                                                        auth,
                                                         &response_bg,
                                                         &request_bg,
                                                     )
                                                     .await;
                                             }
+                                            state.log_request(log).await;
                                         }
                                     });
                                 }
@@ -843,7 +860,10 @@ pub async fn create_response(
                                 StreamEvent::ResponseCompleted { response }
                             }
                             StreamEvent::ResponseFailed { response } => {
-                                // Log failed response
+                                // Log failed response. latency_ms still meaningful here —
+                                // the request reached the provider before failing, so the
+                                // dashboard latency cards can include failed-request tail.
+                                let latency_ms = start_for_stream.elapsed().as_millis() as i32;
                                 let log = NewRequestLog {
                                     response_id: request_id_clone.clone(),
                                     conversation_id,
@@ -855,7 +875,7 @@ pub async fn create_response(
                                     cached_tokens: None,
                                     reasoning_tokens: None,
                                     cost_usd: None,
-                                    latency_ms: None,
+                                    latency_ms: Some(latency_ms),
                                     status: "failed".to_string(),
                                     error_code: response.error.as_ref().map(|e| e.code.clone()),
                                     error_message: response
@@ -885,7 +905,11 @@ pub async fn create_response(
                                 StreamEvent::ResponseFailed { response }
                             }
                             StreamEvent::ResponseIncomplete { response } => {
-                                // Log incomplete response
+                                // Log incomplete response with the latency we
+                                // accumulated up to the incomplete event — useful
+                                // for triaging (e.g., max-tokens incompletes
+                                // tend to land near the timeout).
+                                let latency_ms = start_for_stream.elapsed().as_millis() as i32;
                                 let usage = response.usage.as_ref();
                                 let log = NewRequestLog {
                                     response_id: request_id_clone.clone(),
@@ -902,7 +926,7 @@ pub async fn create_response(
                                         .and_then(|u| u.reasoning_tokens)
                                         .map(|t| t as i32),
                                     cost_usd: usage.and_then(|u| u.cost_usd),
-                                    latency_ms: None,
+                                    latency_ms: Some(latency_ms),
                                     status: "incomplete".to_string(),
                                     error_code: None,
                                     error_message: None,
@@ -1237,10 +1261,25 @@ pub async fn create_response(
         let response_for_bg = response.clone();
         let request_for_bg = request.clone();
         let auth_for_bg = auth_context.clone();
+        let response_id_for_diag = response.id.clone();
 
         // Spawn background tasks for persistence (non-blocking)
         let state_for_bg = state.clone();
         tokio::spawn(async move {
+            info!(
+                response_id = %response_id_for_diag,
+                auth_present = auth_for_bg.is_some(),
+                "persistence-spawn: entered (non-streaming)"
+            );
+            // Record API key usage FIRST. See streaming branch comment
+            // — billing/usage matters more than the soft data and must
+            // not be blocked by a panic in log_request or
+            // save_messages_from_items.
+            if let Some(auth) = &auth_for_bg {
+                state_for_bg
+                    .record_api_key_usage(auth, &response_for_bg, &request_for_bg)
+                    .await;
+            }
             // Log to request_logs
             state_for_bg.log_request(log).await;
 
@@ -1248,13 +1287,6 @@ pub async fn create_response(
             if let Some(conv_id) = conversation_id {
                 state_for_bg
                     .save_messages_from_items(conv_id, &response_for_bg.id, &response_for_bg.output)
-                    .await;
-            }
-
-            // Record API key usage
-            if let Some(auth) = auth_for_bg {
-                state_for_bg
-                    .record_api_key_usage(&auth, &response_for_bg, &request_for_bg)
                     .await;
             }
         });
