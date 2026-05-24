@@ -46,16 +46,94 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      # Install release-plz directly (instead of via release-plz/action@v0.5)
+      # so we can pass --registry-manifest-path. The action does not expose
+      # that flag, which we need because our crates aren't on crates.io —
+      # without it, release-plz tries to use crates.io as the comparison
+      # baseline, can't find our crates (or finds a stale aura-core@0.8.7),
+      # and falls back to "current Cargo.toml version is the baseline".
+      # That collapses to "no diff, no bump" the moment a real release tag
+      # matches the Cargo.toml version, and the bot stops opening release
+      # PRs. Pointing at a worktree of the previous tag fixes the baseline
+      # to actual git history. See release-plz issue #1029 / our PR #169.
+      - name: Install release-plz binary
+        uses: taiki-e/install-action@v2
+        with:
+          tool: release-plz@0.3.158
+
+      - name: Stage previous release tag as baseline
+        id: prev-tag
+        run: |
+          set -euo pipefail
+          # Find the most recent v-prefixed tag. Falls back gracefully:
+          # if there's no prior tag (e.g. very first release), we skip
+          # the baseline and let release-plz use its default behavior.
+          PREV_TAG=$(git tag --list 'v[0-9]*' --sort=-creatordate | head -n1 || true)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No prior v-tag found; release-plz will use its default baseline"
+            echo "have_baseline=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Using prior tag as baseline: $PREV_TAG"
+          # Worktree of the previous tag in a sibling directory so the
+          # Cargo.toml/Cargo.lock at that revision is available as the
+          # comparison source.
+          BASELINE_DIR="$(mktemp -d)/release-plz-baseline"
+          git worktree add --detach "$BASELINE_DIR" "$PREV_TAG"
+          echo "baseline_manifest=$BASELINE_DIR/Cargo.toml" >> "$GITHUB_OUTPUT"
+          echo "have_baseline=true" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git for release-plz
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Run release-plz
         id: release-plz
-        uses: release-plz/action@v0.5
-        with:
-          command: release-pr
         env:
-          # Use PAT for GitHub API operations (creating PRs, pushing branches)
-          # Falls back to GITHUB_TOKEN but PRs won't trigger CI workflows
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BASELINE_ARGS=()
+          if [ "${{ steps.prev-tag.outputs.have_baseline }}" = "true" ]; then
+            BASELINE_ARGS+=(--registry-manifest-path "${{ steps.prev-tag.outputs.baseline_manifest }}")
+            echo "Using --registry-manifest-path baseline"
+          fi
+
+          release_pr_stderr=$(mktemp)
+          if ! release_pr_output=$(release-plz release-pr \
+              --git-token "${GITHUB_TOKEN}" \
+              --repo-url "https://github.com/${GITHUB_REPOSITORY}" \
+              "${BASELINE_ARGS[@]}" \
+              -o json 2>"$release_pr_stderr")
+          then
+            release_pr_error=$(cat "$release_pr_stderr")
+            # The release-plz/action used to swallow HTTP 422 silently as
+            # {"prs":[]}. We keep that fallback because it can legitimately
+            # mean "PR body exceeded GitHub's 65k limit" — preserving the
+            # behavior avoids surprising the rest of the pipeline.
+            if [[ "$release_pr_error" == *"422"* ]]; then
+              echo "::warning::release-plz release-pr failed with HTTP 422; continuing with no PRs created."
+              release_pr_output='{"prs":[]}'
+            else
+              echo "$release_pr_error" >&2
+              rm -f "$release_pr_stderr"
+              exit 1
+            fi
+          fi
+          rm -f "$release_pr_stderr"
+
+          echo "release_pr_output: $release_pr_output"
+          prs=$(echo "$release_pr_output" | jq -c .prs)
+          echo "prs=$prs" >> "$GITHUB_OUTPUT"
+          prs_length=$(echo "$prs" | jq 'length')
+          if [ "$prs_length" != "0" ]; then
+            echo "prs_created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prs_created=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # release-plz manages the Rust workspace version but doesn't know about
       # sdks/python/pyproject.toml. Sync it to match the new workspace version
