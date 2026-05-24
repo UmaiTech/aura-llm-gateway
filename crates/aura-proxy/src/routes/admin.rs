@@ -2161,18 +2161,13 @@ mod tests {
                     "openai" => openai.supports_model(&action.model),
                     "anthropic" => anthropic.supports_model(&action.model),
                     "google" => gemini.supports_model(&action.model),
-                    provider => panic!(
-                        "unexpected provider in mock routing rules: {provider}"
-                    ),
+                    provider => panic!("unexpected provider in mock routing rules: {provider}"),
                 };
 
                 assert!(
                     is_supported,
                     "provider '{}' does not support demo model '{}' in routing rule '{}' ({})",
-                    action.provider,
-                    action.model,
-                    rule.id,
-                    rule.name,
+                    action.provider, action.model, rule.id, rule.name,
                 );
             }
         }
