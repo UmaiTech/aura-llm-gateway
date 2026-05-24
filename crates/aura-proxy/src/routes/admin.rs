@@ -8,9 +8,9 @@
 //! - Usage timelines
 
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
-    routing::get,
+    routing::{delete, get, put},
     Json, Router,
 };
 use chrono::{DateTime, NaiveDate, Utc};
@@ -47,13 +47,29 @@ pub fn router() -> Router<AppState> {
             axum::routing::post(create_routing_rule),
         )
         // Organizations
-        .route("/admin/organizations", get(list_organizations))
+        .route(
+            "/admin/organizations",
+            get(list_organizations).post(create_organization),
+        )
+        .route(
+            "/admin/organizations/:id",
+            put(update_organization).delete(delete_organization),
+        )
         // Teams
-        .route("/admin/teams", get(list_teams))
+        .route("/admin/teams", get(list_teams).post(create_team))
+        .route("/admin/teams/:id", put(update_team).delete(delete_team))
         // API Keys
-        .route("/admin/api-keys", get(list_api_keys))
+        .route("/admin/api-keys", get(list_api_keys).post(create_api_key))
+        .route("/admin/api-keys/:id", delete(delete_api_key))
         // End Users
-        .route("/admin/end-users", get(list_end_users))
+        .route(
+            "/admin/end-users",
+            get(list_end_users).post(create_end_user),
+        )
+        .route(
+            "/admin/end-users/:id",
+            put(update_end_user).delete(delete_end_user),
+        )
         // Providers (full detail)
         .route("/admin/providers", get(list_providers))
 }
@@ -1752,6 +1768,382 @@ async fn get_token_timeline(
     Ok(Json(timeline))
 }
 
+// ============================================================================
+// CRUD endpoints — Organizations
+// ============================================================================
+//
+// All write endpoints share the same error-mapping shape: an sqlx error
+// becomes 500 with a JSON {error: "..."} body. Slug-uniqueness violations
+// (a 23505 from the unique constraint) get translated to 409 with a
+// human-friendly message so the admin UI can surface it inline. Unknown
+// IDs return 404 instead of 500.
+
+#[derive(Debug, Deserialize)]
+struct CreateOrgPayload {
+    name: String,
+    slug: String,
+    #[serde(default)]
+    owner_id: Option<String>,
+    #[serde(default)]
+    settings: Option<serde_json::Value>,
+}
+
+async fn create_organization(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateOrgPayload>,
+) -> Result<Json<aura_db::Organization>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    // Default owner_id to "admin" when the admin UI doesn't supply one
+    // (org is platform-owned, not tied to a specific end-user identity).
+    let new = aura_db::NewOrganization {
+        name: payload.name,
+        slug: payload.slug,
+        owner_id: payload.owner_id.unwrap_or_else(|| "admin".to_string()),
+        settings: payload.settings,
+    };
+    match aura_db::OrganizationRepo::create(pool, new).await {
+        Ok(org) => Ok(Json(org)),
+        Err(e) => Err(map_db_error(e, "organization")),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateOrgPayload {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    settings: Option<serde_json::Value>,
+}
+
+async fn update_organization(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateOrgPayload>,
+) -> Result<Json<aura_db::Organization>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::OrganizationRepo::update(
+        pool,
+        id,
+        payload.name.as_deref(),
+        payload.settings.as_ref(),
+    )
+    .await
+    {
+        Ok(org) => Ok(Json(org)),
+        Err(e) => Err(map_db_error(e, "organization")),
+    }
+}
+
+async fn delete_organization(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::OrganizationRepo::delete(pool, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(map_db_error(e, "organization")),
+    }
+}
+
+// ============================================================================
+// CRUD endpoints — Teams
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+struct CreateTeamPayload {
+    organization_id: Uuid,
+    name: String,
+    slug: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    monthly_token_limit: Option<i64>,
+    #[serde(default)]
+    settings: Option<serde_json::Value>,
+}
+
+async fn create_team(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateTeamPayload>,
+) -> Result<Json<aura_db::Team>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let new = aura_db::NewTeam {
+        organization_id: payload.organization_id,
+        name: payload.name,
+        slug: payload.slug,
+        description: payload.description,
+        monthly_token_limit: payload.monthly_token_limit,
+        settings: payload.settings,
+    };
+    match aura_db::TeamRepo::create(pool, new).await {
+        Ok(team) => Ok(Json(team)),
+        Err(e) => Err(map_db_error(e, "team")),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateTeamPayload {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    monthly_token_limit: Option<i64>,
+}
+
+async fn update_team(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTeamPayload>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::TeamRepo::update(
+        pool,
+        id,
+        payload.name.as_deref(),
+        payload.description.as_deref(),
+        payload.monthly_token_limit,
+    )
+    .await
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(map_db_error(e, "team")),
+    }
+}
+
+async fn delete_team(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::TeamRepo::delete(pool, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(map_db_error(e, "team")),
+    }
+}
+
+// ============================================================================
+// CRUD endpoints — End Users
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+struct CreateEndUserPayload {
+    organization_id: Uuid,
+    external_id: String,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    email: Option<String>,
+    #[serde(default)]
+    metadata: Option<serde_json::Value>,
+}
+
+async fn create_end_user(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateEndUserPayload>,
+) -> Result<Json<aura_db::EndUser>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let new = aura_db::NewEndUser {
+        organization_id: payload.organization_id,
+        external_id: payload.external_id,
+        name: payload.name,
+        email: payload.email,
+        metadata: payload.metadata,
+    };
+    // upsert here so admin-created users idempotently reconcile with
+    // any auto-created row the gateway might have inserted for the
+    // same external_id under the same org.
+    match aura_db::EndUserRepo::upsert(pool, new).await {
+        Ok(user) => Ok(Json(user)),
+        Err(e) => Err(map_db_error(e, "end_user")),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateEndUserPayload {
+    // EndUserRepo only exposes set_monthly_limit + block/unblock today;
+    // name/email/metadata updates would need a new repo method. Cover
+    // what's available now and defer the rest to a follow-up.
+    #[serde(default)]
+    monthly_token_limit: Option<i64>,
+    #[serde(default)]
+    blocked: Option<bool>,
+}
+
+async fn update_end_user(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateEndUserPayload>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    if let Some(limit) = payload.monthly_token_limit {
+        if let Err(e) = aura_db::EndUserRepo::set_monthly_limit(pool, id, Some(limit)).await {
+            return Err(map_db_error(e, "end_user"));
+        }
+    }
+    if let Some(should_block) = payload.blocked {
+        let result = if should_block {
+            aura_db::EndUserRepo::block(pool, id).await
+        } else {
+            aura_db::EndUserRepo::unblock(pool, id).await
+        };
+        if let Err(e) = result {
+            return Err(map_db_error(e, "end_user"));
+        }
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn delete_end_user(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::EndUserRepo::delete(pool, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(map_db_error(e, "end_user")),
+    }
+}
+
+// ============================================================================
+// CRUD endpoints — API Keys
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+struct CreateApiKeyPayload {
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    organization_id: Uuid,
+    #[serde(default)]
+    rate_limit_rpm: Option<i32>,
+    #[serde(default)]
+    monthly_token_limit: Option<i64>,
+    #[serde(default)]
+    daily_message_limit: Option<i32>,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateApiKeyResponse {
+    /// The full key value — shown ONCE here and never retrievable
+    /// again. The frontend must surface this prominently to the admin
+    /// and warn them to copy it before navigating away.
+    key: String,
+    key_id: String,
+    name: String,
+}
+
+async fn create_api_key(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateApiKeyPayload>,
+) -> Result<Json<CreateApiKeyResponse>, (StatusCode, Json<serde_json::Value>)> {
+    use aura_core::crypto::{generate_api_key, API_KEY_PREFIX_LIVE};
+
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+
+    let generated = generate_api_key(API_KEY_PREFIX_LIVE);
+    let new = aura_db::NewApiKey {
+        key_id: generated.key_id.clone(),
+        key_hash: generated.key_hash,
+        name: payload.name.clone(),
+        description: payload.description,
+        user_id: None,
+        organization_id: Some(payload.organization_id),
+        scopes: serde_json::json!(["responses:create"]),
+        rate_limit_rpm: payload.rate_limit_rpm,
+        monthly_token_limit: payload.monthly_token_limit,
+        daily_message_limit: payload.daily_message_limit,
+        expires_at: None,
+        allowed_ips: None,
+        metadata: None,
+        scope_type: Some("organization".to_string()),
+        scope_id: Some(payload.organization_id),
+    };
+
+    match aura_db::ApiKeyRepo::create(pool, new).await {
+        Ok(api_key) => Ok(Json(CreateApiKeyResponse {
+            key: generated.key,
+            key_id: api_key.key_id,
+            name: api_key.name,
+        })),
+        Err(e) => Err(map_db_error(e, "api_key")),
+    }
+}
+
+async fn delete_api_key(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::ApiKeyRepo::delete(pool, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(map_db_error(e, "api_key")),
+    }
+}
+
+// ============================================================================
+// CRUD error mapping
+// ============================================================================
+
+fn map_db_error(err: aura_db::DbError, entity: &str) -> (StatusCode, Json<serde_json::Value>) {
+    // sqlx unique-constraint violations get a friendly 409. Everything
+    // else falls through to 500 — the admin UI surfaces the error
+    // message inline regardless.
+    let msg = err.to_string();
+    if msg.contains("duplicate key") || msg.contains("unique constraint") {
+        (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "error": format!("A {entity} with that name or slug already exists.")
+            })),
+        )
+    } else if msg.to_lowercase().contains("not found") {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": format!("{entity} not found")})),
+        )
+    } else {
+        tracing::error!(entity = %entity, error = %err, "CRUD failed");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {msg}")})),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::mock_routing_rules;
@@ -1769,7 +2161,9 @@ mod tests {
                     "openai" => openai.supports_model(&action.model),
                     "anthropic" => anthropic.supports_model(&action.model),
                     "google" => gemini.supports_model(&action.model),
-                    provider => panic!("unexpected provider in mock routing rules: {provider}"),
+                    provider => panic!(
+                        "unexpected provider in mock routing rules: {provider}"
+                    ),
                 };
 
                 assert!(

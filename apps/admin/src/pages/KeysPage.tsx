@@ -12,30 +12,43 @@ import {
   SearchLine,
   Refresh1Line,
 } from '@mingcute/react'
-import { getApiKeys } from '@/lib/api'
+import {
+  getApiKeys,
+  getOrganizations,
+  createApiKey,
+  deleteApiKey,
+} from '@/lib/api'
 import { useOrgFilterStore } from '@/stores/orgFilterStore'
 import { OrgFilter } from '@/components/OrgFilter'
-import type { ApiKeySummary } from '@/lib/types'
+import type { ApiKeySummary, OrganizationSummary } from '@/lib/types'
 
 export function KeysPage() {
   const selectedOrgId = useOrgFilterStore((s) => s.selectedOrgId)
   const [keys, setKeys] = useState<ApiKeySummary[]>([])
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyRateLimit, setNewKeyRateLimit] = useState('1000')
+  const [newKeyOrgId, setNewKeyOrgId] = useState('')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const tableRef = useRef<HTMLDivElement>(null)
 
   const fetchKeys = async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await getApiKeys(selectedOrgId)
-      setKeys(data)
+      const [keysData, orgsData] = await Promise.all([
+        getApiKeys(selectedOrgId),
+        getOrganizations().catch(() => []),
+      ])
+      setKeys(keysData)
+      setOrganizations(orgsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch API keys')
     } finally {
@@ -69,12 +82,59 @@ export function KeysPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const handleCreate = () => {
-    // TODO: Implement actual API call to create key
-    const newKeyId = `aura_live_${Math.random().toString(36).substring(2, 14)}`
-    setCreatedKey(newKeyId)
+  const openCreate = () => {
+    // Default org to whatever org is selected in the global filter,
+    // falling back to the first org if "all" is selected.
+    const defaultOrg =
+      selectedOrgId && selectedOrgId !== 'all'
+        ? selectedOrgId
+        : organizations[0]?.id || ''
+    setNewKeyOrgId(defaultOrg)
     setNewKeyName('')
     setNewKeyRateLimit('1000')
+    setFormError(null)
+    setCreatedKey(null)
+    setShowCreateDialog(true)
+  }
+
+  const handleCreate = async () => {
+    if (!newKeyOrgId || !newKeyName) {
+      setFormError('Organization and name are required.')
+      return
+    }
+    setSubmitting(true)
+    setFormError(null)
+    try {
+      const result = await createApiKey({
+        name: newKeyName,
+        organization_id: newKeyOrgId,
+        rate_limit_rpm: newKeyRateLimit ? Number(newKeyRateLimit) : undefined,
+      })
+      // Show the full key — this is the only time the user will see
+      // the secret portion. After they close this dialog we refetch
+      // and it never appears again.
+      setCreatedKey(result.key)
+      await fetchKeys()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Create failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (key: ApiKeySummary) => {
+    if (
+      !confirm(
+        `Delete API key "${key.name}" (${key.key_id})? Existing requests using this key will fail immediately.`,
+      )
+    )
+      return
+    try {
+      await deleteApiKey(key.id)
+      await fetchKeys()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Delete failed')
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -138,7 +198,7 @@ export function KeysPage() {
               <Refresh1Line className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+            <Button onClick={openCreate} className="gap-2">
               <AddLine className="h-4 w-4" />
               Create Key
             </Button>
@@ -241,6 +301,8 @@ export function KeysPage() {
                             variant="ghost"
                             size="icon-sm"
                             className="text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDelete(key)}
+                            title="Delete API key"
                           >
                             <DeleteLine className="h-4 w-4" />
                           </Button>
@@ -327,6 +389,28 @@ export function KeysPage() {
                   </div>
                 ) : (
                   <>
+                    {formError && (
+                      <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                        {formError}
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Organization</label>
+                      <select
+                        className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                        value={newKeyOrgId}
+                        onChange={(e) => setNewKeyOrgId(e.target.value)}
+                      >
+                        {organizations.length === 0 && (
+                          <option value="">— no organizations yet —</option>
+                        )}
+                        {organizations.map((org) => (
+                          <option key={org.id} value={org.id}>
+                            {org.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Name</label>
                       <Input
@@ -352,8 +436,8 @@ export function KeysPage() {
                       >
                         Cancel
                       </Button>
-                      <Button className="flex-1" onClick={handleCreate}>
-                        Create Key
+                      <Button className="flex-1" onClick={handleCreate} disabled={submitting}>
+                        {submitting ? 'Creating...' : 'Create Key'}
                       </Button>
                     </div>
                   </>

@@ -255,6 +255,32 @@ VITE_TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
 3. Update models in `aura-db`
 4. Run `sqlx migrate run`
 
+### Updating the Public Roadmap
+
+The public roadmap at `aura-llm.dev/roadmap` is the source of truth for what the project has shipped and what's coming. It's read by users, prospects, and contributors evaluating the project — keeping it stale undermines trust.
+
+**Rule**: any user-facing change (new feature, new provider, new endpoint, breaking change, deprecations) that ships to production MUST be reflected on the roadmap in the same PR that ships it. Internal refactors, dependency bumps, CI tweaks, and bugfixes that don't change observable behavior do not need a roadmap entry.
+
+**File**: `apps/landing/src/pages/RoadmapPage.tsx`. The `releases` array is a chronological list of `Release` objects.
+
+**When you ship a new feature on an existing in-progress version** (e.g. v0.11 is `phase: 'active'` and you just merged a new provider into it):
+
+1. Find the active release in the `releases` array.
+2. Add a `ReleaseItem` to its `items` list with a 1-line `label` and optional `note` for the detail.
+3. Keep labels short (3-7 words). Notes are for the "what does this actually mean" disambiguation.
+
+**When you cut a new minor version** (e.g. v0.11.0 → v0.12.0):
+
+1. Promote the current active row to `phase: 'shipped'` and set `when` to the calendar date (`Mar 2026` format).
+2. Add a new row above it with `phase: 'active'`, the new version string, a working title, and the first known items.
+3. Update the file-level docstring comment (top of `RoadmapPage.tsx`) — the `Latest shipped` and `In progress` lines.
+
+**When you write a new release note in `CHANGELOG.md`**: cross-reference the roadmap. Anything material in the changelog should also appear (in shorter form) in the roadmap. The changelog is the granular log; the roadmap is the editorial summary.
+
+**Issue references**: if the work closes a GitHub issue worth highlighting, add it to the release's `issueRefs` array (e.g. `['#155', '#161']`). Don't enumerate every issue — pick the user-facing ones.
+
+**Tone**: write for a smart non-engineer evaluating the project. "Tool roundtrip context replay" is right; "PR #164 implementation" is wrong. The roadmap is marketing surface as much as engineering record.
+
 ### Vercel Serverless Functions (`/api/*.ts`)
 
 The playground (`playground.aura-llm.dev`) is served by Vercel and uses serverless functions in `/api/`. These functions run under `@vercel/node@5` and **must be emitted as ESM**, because the auth stack (`better-auth@1.6+`) is ESM-only and any `require()` of it throws `ERR_REQUIRE_ESM` at module load.

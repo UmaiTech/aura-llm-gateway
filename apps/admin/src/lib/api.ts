@@ -67,6 +67,13 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     )
   }
 
+  // 204 No Content has an empty body; .json() would throw. The DELETE
+  // and update endpoints return 204 — let the caller type T = void and
+  // we return undefined cast.
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   return response.json()
 }
 
@@ -204,3 +211,143 @@ export async function checkApiHealth(): Promise<boolean> {
 // Export types for convenience
 export type { ApiError }
 export * from './types'
+
+// ---------------------------------------------------------------------------
+// CRUD — Organizations
+// ---------------------------------------------------------------------------
+
+export interface OrganizationRecord {
+  id: string
+  name: string
+  slug: string
+  owner_id: string
+  settings?: unknown
+  created_at: string
+  updated_at: string
+}
+
+export async function createOrganization(payload: {
+  name: string
+  slug: string
+  owner_id?: string
+}): Promise<OrganizationRecord> {
+  return fetchApi<OrganizationRecord>('/admin/organizations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateOrganization(
+  id: string,
+  payload: { name?: string; settings?: unknown }
+): Promise<OrganizationRecord> {
+  return fetchApi<OrganizationRecord>(`/admin/organizations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteOrganization(id: string): Promise<void> {
+  await fetchApi<void>(`/admin/organizations/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// CRUD — Teams
+// ---------------------------------------------------------------------------
+
+export interface TeamRecord {
+  id: string
+  organization_id: string
+  name: string
+  slug: string
+  description?: string
+  monthly_token_limit?: number
+  current_month_tokens: number
+  created_at: string
+}
+
+export async function createTeam(payload: {
+  organization_id: string
+  name: string
+  slug: string
+  description?: string
+  monthly_token_limit?: number
+}): Promise<TeamRecord> {
+  return fetchApi<TeamRecord>('/admin/teams', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateTeam(
+  id: string,
+  payload: { name?: string; description?: string; monthly_token_limit?: number }
+): Promise<void> {
+  await fetchApi<void>(`/admin/teams/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteTeam(id: string): Promise<void> {
+  await fetchApi<void>(`/admin/teams/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// CRUD — End Users
+// ---------------------------------------------------------------------------
+
+export async function createEndUser(payload: {
+  organization_id: string
+  external_id: string
+  name?: string
+  email?: string
+}): Promise<EndUserSummary> {
+  return fetchApi<EndUserSummary>('/admin/end-users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateEndUser(
+  id: string,
+  payload: { monthly_token_limit?: number; blocked?: boolean }
+): Promise<void> {
+  await fetchApi<void>(`/admin/end-users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteEndUser(id: string): Promise<void> {
+  await fetchApi<void>(`/admin/end-users/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// CRUD — API Keys
+// ---------------------------------------------------------------------------
+
+export interface CreatedApiKey {
+  /** Full key — shown once, never retrievable again. */
+  key: string
+  key_id: string
+  name: string
+}
+
+export async function createApiKey(payload: {
+  name: string
+  description?: string
+  organization_id: string
+  rate_limit_rpm?: number
+  monthly_token_limit?: number
+  daily_message_limit?: number
+}): Promise<CreatedApiKey> {
+  return fetchApi<CreatedApiKey>('/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteApiKey(id: string): Promise<void> {
+  await fetchApi<void>(`/admin/api-keys/${id}`, { method: 'DELETE' })
+}
