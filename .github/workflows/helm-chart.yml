@@ -75,17 +75,36 @@ jobs:
       # ghcr.io/umaitech/charts/aura-llm-gateway — every prior chart
       # before this fix has an empty tag list.
       - name: Sync chart version to release tag
+        env:
+          # Pass the tag through env, not direct interpolation, so an
+          # untrusted tag name can't inject shell. Defense-in-depth on
+          # top of the regex validation below.
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
           # github.event.release.tag_name is like "v0.11.0"; helm wants
           # the bare semver without the v prefix in Chart.yaml.
-          TAG="${{ github.event.release.tag_name }}"
           VERSION="${TAG#v}"
+
+          # Validate VERSION is strict semver before we let it near
+          # sed. SemVer 2.0 grammar (numeric core + optional pre-release
+          # + optional build metadata). This blocks any tag that could
+          # contain sed-special chars (& / \\ newlines) — they wouldn't
+          # match the regex and the job exits before touching Chart.yaml.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag '$TAG' does not parse as semver (got VERSION='$VERSION'); refusing to rewrite Chart.yaml."
+            exit 1
+          fi
+
           echo "Setting Chart.yaml version=${VERSION} appVersion=${VERSION}"
-          # In-place edit. The `version:` and `appVersion:` keys are
-          # always at top-level of Chart.yaml so a simple sed is safe.
-          sed -i -E "s/^version: .*$/version: ${VERSION}/" deploy/charts/aura-llm-gateway/Chart.yaml
-          sed -i -E "s/^appVersion: .*$/appVersion: \"${VERSION}\"/" deploy/charts/aura-llm-gateway/Chart.yaml
+          # `|` as the sed delimiter so a `/` in pre-release / build
+          # metadata (allowed by the regex above? no — but be defensive)
+          # can't end the substitution early. The version-only line is
+          # bare; appVersion is wrapped in literal double quotes per
+          # Helm convention.
+          sed -i -E "s|^version: .*\$|version: ${VERSION}|" deploy/charts/aura-llm-gateway/Chart.yaml
+          sed -i -E "s|^appVersion: .*\$|appVersion: \"${VERSION}\"|" deploy/charts/aura-llm-gateway/Chart.yaml
+
           # Echo the result so the change is visible in run logs.
           grep -E '^(version|appVersion):' deploy/charts/aura-llm-gateway/Chart.yaml
 
