@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
@@ -27,6 +28,7 @@ import {
 } from '@/lib/api'
 
 export function OrganizationsPage() {
+  const navigate = useNavigate()
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -272,7 +274,9 @@ export function OrganizationsPage() {
                 {filteredOrgs.map((org) => (
                   <div
                     key={org.id}
-                    className="flex items-center justify-between p-4 bg-card-alt rounded-lg border border-border/50 hover:border-border transition-colors"
+                    className="flex items-center justify-between p-4 bg-card-alt rounded-lg border border-border/50 hover:border-border transition-colors cursor-pointer"
+                    onClick={() => navigate(`/organizations/${org.id}`)}
+                    title="Open organization detail"
                   >
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-violet-500/20 rounded-lg">
@@ -313,7 +317,7 @@ export function OrganizationsPage() {
                         <p className="font-medium font-mono">{formatCurrency(org.total_cost)}</p>
                         <p className="text-xs text-muted-foreground">total cost</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="sm"

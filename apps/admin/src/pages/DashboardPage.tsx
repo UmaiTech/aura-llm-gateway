@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { cn, formatNumber, formatCurrency, formatDuration } from '@/lib/utils'
@@ -51,6 +52,7 @@ const TIME_RANGES: { value: TimeRange; label: string }[] = [
 ]
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const statsRef = useRef<HTMLDivElement>(null)
   const numberRefs = useRef<(HTMLSpanElement | null)[]>([])
 
@@ -806,7 +808,14 @@ export function DashboardPage() {
                     </tr>
                   ) : (
                     recentRequests.map((request) => (
-                      <tr key={request.id} className="border-t border-border/50">
+                      <tr
+                        key={request.id}
+                        className="border-t border-border/50 cursor-pointer hover:bg-muted/30 transition-colors"
+                        onClick={() =>
+                          navigate(`/dev-logs?focus=${encodeURIComponent(request.response_id)}`)
+                        }
+                        title="Open in Dev Logs"
+                      >
                         <td className="py-3 font-mono text-xs">
                           {request.response_id.slice(0, 16)}...
                         </td>

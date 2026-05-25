@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, Badge, Input } from '@/components/ui'
 import { cn, formatDuration, formatCurrency, formatRelativeTime, formatNumber } from '@/lib/utils'
@@ -45,6 +46,12 @@ function JsonHighlight({ data }: { data: unknown }) {
 }
 
 export function DevLogsPage() {
+  // Honor ?focus=<response_id> coming from the Dashboard's Recent
+  // Requests row link (C1 in #175). When set, we pre-expand the
+  // matching row once logs load and scroll it into view.
+  const [searchParams] = useSearchParams()
+  const focusId = searchParams.get('focus')
+
   const [logs, setLogs] = useState<RecentLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +81,23 @@ export function DevLogsPage() {
   useEffect(() => {
     fetchLogs()
   }, [])
+
+  // When ?focus=<response_id> is in the URL, expand + scroll to that
+  // row once logs land. Runs once per change of focusId/logs.length so
+  // the live-polling cycle doesn't keep stealing scroll position.
+  useEffect(() => {
+    if (!focusId || logs.length === 0) return
+    const match = logs.find((l) => l.response_id === focusId)
+    if (!match) return
+    setExpandedId(match.id)
+    // Defer the scroll until the expand transition has a chance to
+    // queue the row in the DOM at its new height.
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-log-id="${match.id}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, logs.length])
 
   // Live polling
   useEffect(() => {
@@ -286,6 +310,7 @@ export function DevLogsPage() {
                         <>
                           <tr
                             key={log.id}
+                            data-log-id={log.id}
                             onClick={() => handleExpand(log.id)}
                             className={cn(
                               'log-row border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer',

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { cn, formatNumber, formatCurrency, formatDuration } from '@/lib/utils'
@@ -51,6 +52,7 @@ const toolColors = [
 ]
 
 export function InsightsPage() {
+  const navigate = useNavigate()
   const metricsRef = useRef<HTMLDivElement>(null)
   const numberRefs = useRef<(HTMLSpanElement | null)[]>([])
 
@@ -62,6 +64,9 @@ export function InsightsPage() {
   // Hover state for charts
   const [hoveredBar, setHoveredBar] = useState<number | null>(null)
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null)
+  // Click-to-drill-down for heatmap cells (C2 in #175). Opens a modal
+  // with the cell's bucket details + a jump to Dev Logs.
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null)
 
   // Refresh handler
   const handleRefresh = () => {
@@ -483,6 +488,7 @@ export function InsightsPage() {
                                 )}
                                 onMouseEnter={() => setHoveredCell({ row: rowIndex, col: colIndex })}
                                 onMouseLeave={() => setHoveredCell(null)}
+                                onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
                               >
                                 {isHovered && (
                                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
@@ -524,6 +530,84 @@ export function InsightsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Heatmap cell drill-down modal (C2 in #175). Surfaces the
+          underlying request_count + intensity for the clicked cell
+          and offers a Dev Logs link. The heatmap is bucketed by ISO
+          weekday + 4-hour blocks, so finer-grained drill-down would
+          need a new endpoint — keeping it simple for now. */}
+      {selectedCell && (() => {
+        const { row: rowIndex, col: colIndex } = selectedCell
+        // Find the raw data point. Multiple hour_of_day values can map
+        // to a single bucket (4-hour blocks), so we sum across them.
+        const matching = heatmapData.filter(
+          (d) =>
+            d.day_of_week === colIndex && Math.floor(d.hour_of_day / 4) === rowIndex,
+        )
+        const requestCount = matching.reduce((acc, d) => acc + d.request_count, 0)
+        const endHour = rowIndex < 5 ? hours[rowIndex + 1] : '24:00'
+        const intensityLabel =
+          requestCount === 0
+            ? 'No activity'
+            : requestCount <= 5
+              ? 'Low'
+              : requestCount <= 25
+                ? 'Medium'
+                : 'High'
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">
+                    {days[colIndex]} {hours[rowIndex]}–{endHour}
+                  </CardTitle>
+                  <button
+                    onClick={() => setSelectedCell(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-2xl font-bold tabular-nums">{requestCount}</p>
+                    <p className="text-xs text-muted-foreground">Requests</p>
+                  </div>
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-2xl font-bold">{intensityLabel}</p>
+                    <p className="text-xs text-muted-foreground">Activity</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The heatmap bucket aggregates 4 consecutive hours of one weekday across the
+                  selected period. To see the individual requests that landed here, open Dev
+                  Logs and filter by the matching time range.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setSelectedCell(null)}
+                    className="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedCell(null)
+                      navigate('/dev-logs')
+                    }}
+                    className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    Open Dev Logs
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      })()}
     </div>
   )
 }

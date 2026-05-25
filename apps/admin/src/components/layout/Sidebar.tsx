@@ -18,6 +18,7 @@ import {
   Group2Line,
   User2Line,
   DirectionsLine,
+  Sparkles2Line,
 } from '@mingcute/react'
 
 interface NavItem {
@@ -61,6 +62,7 @@ const navigation: NavGroup[] = [
       { name: 'API Keys', href: '/keys', icon: Key2Line },
       { name: 'Providers', href: '/providers', icon: ServerLine },
       { name: 'Routing', href: '/routing', icon: DirectionsLine },
+      { name: 'Features', href: '/features', icon: Sparkles2Line },
       { name: 'Settings', href: '/settings', icon: Settings1Line },
     ],
   },
