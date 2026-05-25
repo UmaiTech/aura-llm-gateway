@@ -23,6 +23,18 @@ Using pip:
 pip install aura-llm
 ```
 
+### Using with LangChain
+
+Install the SDK with the LangChain extra when you want to use Aura's
+OpenAI-compatible `/v1` endpoint through `ChatOpenAI`:
+
+```bash
+uv add 'aura-llm[langchain]'
+```
+
+See [`examples/langchain_usage.py`](./examples/langchain_usage.py) for a complete
+example covering basic chat, tool calling, and an LCEL chain.
+
 ### From Source
 
 ```bash
