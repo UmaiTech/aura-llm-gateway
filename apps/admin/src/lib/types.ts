@@ -179,27 +179,9 @@ export interface ApiKeySummary {
   usage_percentage: number | null
 }
 
-export interface RoutingCondition {
-  condition_type: string
-  value: string
-}
-
-export interface RoutingAction {
-  provider: string
-  model: string
-  weight: number | null
-}
-
-export interface RoutingRule {
-  id: string
-  name: string
-  description: string
-  strategy: string
-  priority: number
-  enabled: boolean
-  conditions: RoutingCondition[]
-  actions: RoutingAction[]
-}
+// RoutingRule / RoutingCondition / RoutingAction types removed alongside
+// the mock CRUD endpoints (#175 / A6). The Routing page is read-only and
+// uses RoutingStats from /admin/stats/routing instead.
 
 // Time range for dashboard queries
 export type TimeRange = '24h' | '2d' | '3d' | '4d' | '5d' | '6d' | '7d'

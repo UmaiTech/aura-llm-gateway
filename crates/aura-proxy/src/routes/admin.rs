@@ -40,12 +40,6 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/token-timeline", get(get_token_timeline))
         // Request logs for dev logs page
         .route("/admin/logs/recent", get(get_recent_logs))
-        // Routing configuration
-        .route("/admin/routing/rules", get(list_routing_rules))
-        .route(
-            "/admin/routing/rules",
-            axum::routing::post(create_routing_rule),
-        )
         // Organizations
         .route(
             "/admin/organizations",
@@ -323,40 +317,10 @@ pub struct ProviderSummary {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RoutingRule {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub strategy: String,
-    pub priority: i32,
-    pub enabled: bool,
-    pub conditions: Vec<RoutingCondition>,
-    pub actions: Vec<RoutingAction>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RoutingCondition {
-    pub condition_type: String,
-    pub value: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RoutingAction {
-    pub provider: String,
-    pub model: String,
-    pub weight: Option<i32>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateRoutingRuleRequest {
-    pub name: String,
-    pub description: String,
-    pub strategy: String,
-    pub priority: i32,
-    pub conditions: Vec<RoutingCondition>,
-    pub actions: Vec<RoutingAction>,
-}
+// RoutingRule / RoutingCondition / RoutingAction / CreateRoutingRuleRequest
+// types removed alongside the mock /admin/routing/rules handlers — those
+// returned hardcoded JSON and never persisted anything (#175 / A6). Add
+// them back when an actual routing_rules table + migration land.
 
 #[derive(Debug, Deserialize)]
 pub struct LogsQuery {
@@ -1238,117 +1202,9 @@ async fn list_providers(
     Ok(Json(providers))
 }
 
-// ============================================================================
-// Routing Configuration Endpoints
-// ============================================================================
-
-async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingRule>> {
-    // Return mock routing rules - real implementation would query database
-    // Note: Routing rules table doesn't exist yet, so keeping mock data
-    Json(vec![
-        RoutingRule {
-            id: "rule_1".to_string(),
-            name: "Cost Optimization".to_string(),
-            description: "Route simple queries to cheaper models".to_string(),
-            strategy: "cost_based".to_string(),
-            priority: 1,
-            enabled: true,
-            conditions: vec![RoutingCondition {
-                condition_type: "input_tokens".to_string(),
-                value: "< 500".to_string(),
-            }],
-            actions: vec![
-                RoutingAction {
-                    provider: "openai".to_string(),
-                    model: "gpt-5.4-nano".to_string(),
-                    weight: Some(70),
-                },
-                RoutingAction {
-                    provider: "anthropic".to_string(),
-                    model: "claude-3-haiku".to_string(),
-                    weight: Some(30),
-                },
-            ],
-        },
-        RoutingRule {
-            id: "rule_2".to_string(),
-            name: "Load Balancing".to_string(),
-            description: "Distribute load across providers".to_string(),
-            strategy: "round_robin".to_string(),
-            priority: 2,
-            enabled: true,
-            conditions: vec![],
-            actions: vec![
-                RoutingAction {
-                    provider: "openai".to_string(),
-                    model: "gpt-5.4-mini".to_string(),
-                    weight: Some(40),
-                },
-                RoutingAction {
-                    provider: "anthropic".to_string(),
-                    model: "claude-3-sonnet".to_string(),
-                    weight: Some(40),
-                },
-                RoutingAction {
-                    provider: "google".to_string(),
-                    model: "gemini-pro".to_string(),
-                    weight: Some(20),
-                },
-            ],
-        },
-        RoutingRule {
-            id: "rule_3".to_string(),
-            name: "Fallback Chain".to_string(),
-            description: "Automatic fallback on provider failures".to_string(),
-            strategy: "fallback".to_string(),
-            priority: 10,
-            enabled: true,
-            conditions: vec![RoutingCondition {
-                condition_type: "on_error".to_string(),
-                value: "true".to_string(),
-            }],
-            actions: vec![
-                RoutingAction {
-                    provider: "openai".to_string(),
-                    model: "gpt-5.4-mini".to_string(),
-                    weight: None,
-                },
-                RoutingAction {
-                    provider: "anthropic".to_string(),
-                    model: "claude-3-sonnet".to_string(),
-                    weight: None,
-                },
-                RoutingAction {
-                    provider: "google".to_string(),
-                    model: "gemini-pro".to_string(),
-                    weight: None,
-                },
-            ],
-        },
-    ])
-}
-
-async fn create_routing_rule(
-    State(_state): State<AppState>,
-    Json(req): Json<CreateRoutingRuleRequest>,
-) -> (StatusCode, Json<RoutingRule>) {
-    // Return mock created rule - real implementation would store in database
-    let rule = RoutingRule {
-        id: format!(
-            "rule_{}",
-            uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
-        ),
-        name: req.name,
-        description: req.description,
-        strategy: req.strategy,
-        priority: req.priority,
-        enabled: true,
-        conditions: req.conditions,
-        actions: req.actions,
-    };
-
-    (StatusCode::CREATED, Json(rule))
-}
+// Routing rules CRUD intentionally removed (#175 / A6). Strategies are
+// configured via aura.yaml on the gateway today; the admin Routing page
+// is read-only and reads from /admin/stats/routing.
 
 // ============================================================================
 // Dynamic Stats with Time Range
@@ -1418,6 +1274,17 @@ async fn get_insights_stats(
 
     let interval = params.to_interval();
 
+    // tool_calls sums the per-request count the gateway writes to
+    // metadata.aura.agentic.tool_calls_count. The JSONB cast is wrapped
+    // in COALESCE because requests without tool activity store no
+    // agentic block at all, and ::BIGINT would fail on NULL.
+    let tool_calls_sum = "COALESCE(SUM(\
+        COALESCE(\
+            (metadata->'aura'->'agentic'->>'tool_calls_count')::BIGINT, \
+            0\
+        )\
+    ), 0)::BIGINT as tool_calls";
+
     // Current period stats
     let current_query = format!(
         r#"
@@ -1426,11 +1293,10 @@ async fn get_insights_stats(
             COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
             COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
             COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
-            0::BIGINT as tool_calls
+            {tool_calls_sum}
         FROM request_logs
-        WHERE created_at >= NOW() - INTERVAL '{}'
+        WHERE created_at >= NOW() - INTERVAL '{interval}'
         "#,
-        interval
     );
 
     // Previous period stats (for comparison)
@@ -1441,12 +1307,11 @@ async fn get_insights_stats(
             COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
             COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
             COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
-            0::BIGINT as tool_calls
+            {tool_calls_sum}
         FROM request_logs
-        WHERE created_at >= NOW() - INTERVAL '{0}' - INTERVAL '{0}'
-          AND created_at < NOW() - INTERVAL '{0}'
+        WHERE created_at >= NOW() - INTERVAL '{interval}' - INTERVAL '{interval}'
+          AND created_at < NOW() - INTERVAL '{interval}'
         "#,
-        interval
     );
 
     let current = sqlx::query(&current_query)

@@ -1,204 +1,137 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
-import { cn } from '@/lib/utils'
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { formatNumber, formatCurrency, formatDuration, cn } from '@/lib/utils'
 import {
-  AddLine,
   DirectionsLine,
-  CheckLine,
-  CloseLine,
-  EditLine,
-  DeleteLine,
   ChartBarLine,
   CoinLine,
   TimeLine,
-  AiLine,
-  Settings1Line,
+  Loading3Line,
+  Refresh1Line,
+  InformationLine,
 } from '@mingcute/react'
+import { getRoutingStats, type RoutingStats } from '@/lib/api'
 
-interface RoutingRule {
-  id: string
-  name: string
-  description: string
-  strategy: 'round_robin' | 'cost_based' | 'latency_based' | 'intent_based' | 'fallback' | 'random' | 'weighted'
-  priority: number
-  enabled: boolean
-  conditions: {
-    type: string
-    value: string
-  }[]
-  actions: {
-    provider: string
-    model: string
-    weight?: number
-  }[]
-  stats: {
-    requestsRouted: number
-    costSaved: number
-    avgLatency: number
-  }
+/**
+ * Routing page — read-only stats view.
+ *
+ * Previously this page rendered a mock "Active Rules" CRUD UI backed by
+ * hardcoded data with no DB persistence (issue #175, A6). We removed the
+ * rules table entirely instead of building a stub routing_rules schema
+ * just to fill the UI — routing is configured today via the gateway's
+ * config file + strategy plumbing in aura-core/router, and per-request
+ * routing decisions are observable here via v_routing_stats.
+ *
+ * When admin-time rule editing lands, this page gets the rule list +
+ * editor back. Tracking issue: #175 (A6 placeholder).
+ */
+const strategyLabels: Record<string, string> = {
+  round_robin: 'Round Robin',
+  weighted: 'Weighted',
+  random: 'Random',
+  least_latency: 'Least Latency',
+  region_based: 'Region Based',
+  priority: 'Priority',
+  trait_based: 'Trait Based',
+  cost_optimized: 'Cost Optimized',
+  tool_aware: 'Tool Aware',
+  context_adaptive: 'Context Adaptive',
+  sticky_session: 'Sticky Session',
+  reasoning_depth: 'Reasoning Depth',
 }
 
-const mockRules: RoutingRule[] = [
-  {
-    id: 'rule_1',
-    name: 'Cost Optimization',
-    description: 'Route simple queries to cheaper models',
-    strategy: 'cost_based',
-    priority: 1,
-    enabled: true,
-    conditions: [
-      { type: 'input_tokens', value: '< 500' },
-      { type: 'complexity', value: 'simple' },
-    ],
-    actions: [
-      { provider: 'openai', model: 'gpt-4o-mini', weight: 70 },
-      { provider: 'anthropic', model: 'claude-3-haiku', weight: 30 },
-    ],
-    stats: {
-      requestsRouted: 12500,
-      costSaved: 345.67,
-      avgLatency: 234,
-    },
-  },
-  {
-    id: 'rule_2',
-    name: 'High Quality Routing',
-    description: 'Route complex queries to best models',
-    strategy: 'intent_based',
-    priority: 2,
-    enabled: true,
-    conditions: [
-      { type: 'complexity', value: 'complex' },
-      { type: 'requires_reasoning', value: 'true' },
-    ],
-    actions: [
-      { provider: 'anthropic', model: 'claude-3-opus', weight: 60 },
-      { provider: 'openai', model: 'gpt-4o', weight: 40 },
-    ],
-    stats: {
-      requestsRouted: 3400,
-      costSaved: 0,
-      avgLatency: 1250,
-    },
-  },
-  {
-    id: 'rule_3',
-    name: 'Load Balancing',
-    description: 'Distribute load across providers',
-    strategy: 'round_robin',
-    priority: 3,
-    enabled: true,
-    conditions: [],
-    actions: [
-      { provider: 'openai', model: 'gpt-4o', weight: 40 },
-      { provider: 'anthropic', model: 'claude-3-sonnet', weight: 40 },
-      { provider: 'google', model: 'gemini-pro', weight: 20 },
-    ],
-    stats: {
-      requestsRouted: 8900,
-      costSaved: 123.45,
-      avgLatency: 456,
-    },
-  },
-  {
-    id: 'rule_4',
-    name: 'Fallback Chain',
-    description: 'Automatic fallback on provider failures',
-    strategy: 'fallback',
-    priority: 10,
-    enabled: true,
-    conditions: [{ type: 'on_error', value: 'true' }],
-    actions: [
-      { provider: 'openai', model: 'gpt-4o' },
-      { provider: 'anthropic', model: 'claude-3-sonnet' },
-      { provider: 'google', model: 'gemini-pro' },
-    ],
-    stats: {
-      requestsRouted: 156,
-      costSaved: 0,
-      avgLatency: 890,
-    },
-  },
-  {
-    id: 'rule_5',
-    name: 'Weighted Distribution',
-    description: 'Distribute traffic with custom weights',
-    strategy: 'weighted',
-    priority: 4,
-    enabled: true,
-    conditions: [],
-    actions: [
-      { provider: 'openai', model: 'gpt-4o', weight: 50 },
-      { provider: 'anthropic', model: 'claude-3-sonnet', weight: 35 },
-      { provider: 'google', model: 'gemini-pro', weight: 15 },
-    ],
-    stats: {
-      requestsRouted: 4200,
-      costSaved: 78.90,
-      avgLatency: 380,
-    },
-  },
-  {
-    id: 'rule_6',
-    name: 'Random Selection',
-    description: 'Random provider for A/B testing',
-    strategy: 'random',
-    priority: 5,
-    enabled: false,
-    conditions: [{ type: 'tag', value: 'experiment' }],
-    actions: [
-      { provider: 'openai', model: 'gpt-4o' },
-      { provider: 'anthropic', model: 'claude-3-opus' },
-    ],
-    stats: {
-      requestsRouted: 890,
-      costSaved: 0,
-      avgLatency: 560,
-    },
-  },
-]
-
-const strategyInfo: Record<string, { label: string; color: string; icon: React.ReactNode; description: string }> = {
-  round_robin: { label: 'Round Robin', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: <DirectionsLine className="w-4 h-4" />, description: 'Distribute requests evenly across providers' },
-  cost_based: { label: 'Cost Based', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: <CoinLine className="w-4 h-4" />, description: 'Route to cheapest provider based on model pricing' },
-  latency_based: { label: 'Latency Based', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <TimeLine className="w-4 h-4" />, description: 'Route to fastest provider based on response times' },
-  intent_based: { label: 'Intent Based', color: 'bg-violet-500/20 text-violet-400 border-violet-500/30', icon: <AiLine className="w-4 h-4" />, description: 'Route based on request complexity and intent' },
-  fallback: { label: 'Fallback', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: <Settings1Line className="w-4 h-4" />, description: 'Try providers in sequence on failure' },
-  random: { label: 'Random', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30', icon: <DirectionsLine className="w-4 h-4" />, description: 'Randomly select from available providers' },
-  weighted: { label: 'Weighted', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30', icon: <ChartBarLine className="w-4 h-4" />, description: 'Route based on configured weights per provider' },
+const strategyDescriptions: Record<string, string> = {
+  round_robin: 'Distribute requests evenly across providers',
+  weighted: 'Route by configured weights per provider',
+  random: 'Randomly select from available providers',
+  least_latency: 'Route to the lowest-latency provider',
+  cost_optimized: 'Route to the cheapest provider per model',
+  tool_aware: 'Route based on which tools the request needs',
+  context_adaptive: 'Route based on request context size',
+  sticky_session: 'Keep a conversation on one provider',
+  reasoning_depth: 'Route by required reasoning depth',
 }
 
 export function RoutingPage() {
-  const [rules, setRules] = useState(mockRules)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingRule, setEditingRule] = useState<RoutingRule | null>(null)
+  const [stats, setStats] = useState<RoutingStats[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const toggleRule = (id: string) => {
-    setRules(rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
+  const fetchData = async () => {
+    try {
+      const data = await getRoutingStats()
+      setStats(data)
+    } catch {
+      setStats([])
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
   }
 
-  const totalRequestsRouted = rules.reduce((acc, r) => acc + r.stats.requestsRouted, 0)
-  const totalCostSaved = rules.reduce((acc, r) => acc + r.stats.costSaved, 0)
-  const avgLatency = Math.round(
-    rules.reduce((acc, r) => acc + r.stats.avgLatency * r.stats.requestsRouted, 0) / totalRequestsRouted
-  )
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    fetchData()
+  }
+
+  const totalRequests = stats.reduce((acc, s) => acc + s.request_count, 0)
+  const totalCost = stats.reduce((acc, s) => acc + s.total_cost, 0)
+  // Weight avg latency by request count so high-traffic strategies dominate.
+  const weightedAvgLatency =
+    totalRequests > 0
+      ? Math.round(
+          stats.reduce((acc, s) => acc + s.avg_latency_ms * s.request_count, 0) /
+            totalRequests,
+        )
+      : 0
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full">
+        <Header title="Routing" description="Observed routing strategy usage" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loading3Line className="h-5 w-5 animate-spin" />
+            <span>Loading routing stats...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">
       <Header
         title="Routing"
-        description="Configure intelligent request routing strategies"
+        description="Observed routing strategy usage"
         actions={
-          <Button onClick={() => setShowCreateModal(true)}>
-            <AddLine className="w-4 h-4 mr-2" />
-            Create Rule
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <Refresh1Line className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
+            Refresh
           </Button>
         }
       />
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Stats Overview */}
+        {/* Heads-up that this is observation only, not configuration. */}
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <InformationLine className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              Routing strategies are configured in <code className="text-foreground">aura.yaml</code> on the
+              gateway. This page surfaces observed per-strategy usage from{' '}
+              <code className="text-foreground">v_routing_stats</code>. Admin-time rule editing is tracked in
+              issue #175.
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Aggregate stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
@@ -207,8 +140,8 @@ export function RoutingPage() {
                   <DirectionsLine className="w-5 h-5 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">{rules.length}</p>
-                  <p className="text-sm text-muted-foreground">Active Rules</p>
+                  <p className="text-2xl font-semibold tabular-nums">{stats.length}</p>
+                  <p className="text-sm text-muted-foreground">Strategies Used</p>
                 </div>
               </div>
             </CardContent>
@@ -220,8 +153,10 @@ export function RoutingPage() {
                   <ChartBarLine className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">{totalRequestsRouted.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Requests Routed</p>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {formatNumber(totalRequests)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Requests</p>
                 </div>
               </div>
             </CardContent>
@@ -233,8 +168,10 @@ export function RoutingPage() {
                   <CoinLine className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">${totalCostSaved.toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground">Cost Saved</p>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {formatCurrency(totalCost)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Cost</p>
                 </div>
               </div>
             </CardContent>
@@ -246,263 +183,91 @@ export function RoutingPage() {
                   <TimeLine className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold">{avgLatency}ms</p>
-                  <p className="text-sm text-muted-foreground">Avg Latency</p>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {formatDuration(weightedAvgLatency)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Weighted Avg Latency</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Routing Flow Diagram */}
+        {/* Per-strategy breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>Routing Flow</CardTitle>
+            <CardTitle className="text-base font-medium">Per-Strategy Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4 overflow-x-auto pb-4">
-              <div className="flex-shrink-0 p-4 bg-violet-500/20 rounded-lg border border-violet-500/30 text-center min-w-[120px]">
-                <p className="font-medium">Request</p>
-                <p className="text-xs text-muted-foreground">Incoming</p>
-              </div>
-              <div className="text-2xl text-muted-foreground">→</div>
-              {rules
-                .filter((r) => r.enabled)
-                .sort((a, b) => a.priority - b.priority)
-                .map((rule, idx) => (
-                  <div key={rule.id} className="flex items-center gap-4">
+            {stats.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No routing activity in the observed window. Strategies appear here as soon as the
+                gateway routes traffic.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {stats.map((s) => {
+                  const label = strategyLabels[s.routing_strategy] || s.routing_strategy
+                  const description = strategyDescriptions[s.routing_strategy]
+                  const pct = totalRequests > 0 ? (s.request_count / totalRequests) * 100 : 0
+                  const successRate =
+                    s.request_count > 0
+                      ? (s.successful_requests / s.request_count) * 100
+                      : 0
+                  return (
                     <div
-                      className={cn(
-                        'flex-shrink-0 p-4 rounded-lg border text-center min-w-[140px]',
-                        strategyInfo[rule.strategy].color
-                      )}
+                      key={s.routing_strategy}
+                      className="p-4 border border-border/40 rounded-lg space-y-3"
                     >
-                      <div className="flex items-center justify-center gap-2 mb-1">
-                        {strategyInfo[rule.strategy].icon}
-                        <p className="font-medium text-sm">{rule.name}</p>
-                      </div>
-                      <p className="text-xs opacity-70">{strategyInfo[rule.strategy].label}</p>
-                    </div>
-                    {idx < rules.filter((r) => r.enabled).length - 1 && (
-                      <div className="text-2xl text-muted-foreground">→</div>
-                    )}
-                  </div>
-                ))}
-              <div className="text-2xl text-muted-foreground">→</div>
-              <div className="flex-shrink-0 p-4 bg-green-500/20 rounded-lg border border-green-500/30 text-center min-w-[120px]">
-                <p className="font-medium">Provider</p>
-                <p className="text-xs text-muted-foreground">Selected</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Rules List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Routing Rules</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {rules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className={cn(
-                    'p-4 rounded-lg border transition-all',
-                    rule.enabled
-                      ? 'bg-card-alt border-border/50 hover:border-border'
-                      : 'bg-muted/30 border-border/30 opacity-60'
-                  )}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={cn('p-2 rounded-lg', strategyInfo[rule.strategy].color)}>
-                        {strategyInfo[rule.strategy].icon}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{rule.name}</h3>
-                          <Badge className={cn('text-xs', strategyInfo[rule.strategy].color)}>
-                            {strategyInfo[rule.strategy].label}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Priority: {rule.priority}
-                          </Badge>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary">{label}</Badge>
+                          {description && (
+                            <span className="text-xs text-muted-foreground">{description}</span>
+                          )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{rule.description}</p>
+                        <span className="text-sm font-mono tabular-nums">{pct.toFixed(1)}%</span>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={rule.enabled ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => toggleRule(rule.id)}
-                      >
-                        {rule.enabled ? 'Enabled' : 'Disabled'}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setEditingRule(rule)}>
-                        <EditLine className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <DeleteLine className="w-4 h-4 text-red-400" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Conditions */}
-                  {rule.conditions.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-xs text-muted-foreground mb-1">Conditions:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {rule.conditions.map((cond, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs font-mono">
-                            {cond.type} {cond.value}
-                          </Badge>
-                        ))}
+                      <div className="grid grid-cols-4 gap-3 text-sm">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Requests</div>
+                          <div className="font-medium tabular-nums">
+                            {formatNumber(s.request_count)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Success</div>
+                          <div className="font-medium tabular-nums">
+                            {s.request_count > 0 ? `${successRate.toFixed(1)}%` : '—'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Avg Latency</div>
+                          <div className="font-medium tabular-nums">
+                            {formatDuration(s.avg_latency_ms)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Cost</div>
+                          <div className="font-medium tabular-nums">
+                            {formatCurrency(s.total_cost)}
+                          </div>
+                        </div>
                       </div>
+                      {s.failed_requests > 0 && (
+                        <div className="text-xs text-destructive/80">
+                          {s.failed_requests} failed request
+                          {s.failed_requests !== 1 && 's'}
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="mb-3">
-                    <p className="text-xs text-muted-foreground mb-1">Route to:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {rule.actions.map((action, idx) => (
-                        <Badge key={idx} className="text-xs bg-muted/50">
-                          {action.provider}/{action.model}
-                          {action.weight && ` (${action.weight}%)`}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex items-center gap-6 pt-3 border-t border-border/50 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Routed:</span>{' '}
-                      <span className="font-medium">{rule.stats.requestsRouted.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Saved:</span>{' '}
-                      <span className="font-medium text-green-400">${rule.stats.costSaved.toFixed(2)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Avg Latency:</span>{' '}
-                      <span className="font-medium">{rule.stats.avgLatency}ms</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Create Rule Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Create Routing Rule</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setShowCreateModal(false)}>
-                  <CloseLine className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Name</label>
-                <Input placeholder="Cost Optimization Rule" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Description</label>
-                <Input placeholder="Route simple queries to cheaper models" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Strategy</label>
-                <select className="w-full px-3 py-2 bg-background border border-border rounded-md">
-                  <option value="round_robin">Round Robin</option>
-                  <option value="weighted">Weighted</option>
-                  <option value="random">Random</option>
-                  <option value="cost_based">Cost Based</option>
-                  <option value="latency_based">Latency Based</option>
-                  <option value="intent_based">Intent Based</option>
-                  <option value="fallback">Fallback Chain</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Priority</label>
-                <Input type="number" placeholder="1" min="1" max="100" />
-                <p className="text-xs text-muted-foreground mt-1">Lower number = higher priority</p>
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setShowCreateModal(false)}>
-                  <CheckLine className="w-4 h-4 mr-2" />
-                  Create Rule
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Edit Rule Modal */}
-      {editingRule && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Edit Routing Rule</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setEditingRule(null)}>
-                  <CloseLine className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Name</label>
-                <Input defaultValue={editingRule.name} />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Description</label>
-                <Input defaultValue={editingRule.description} />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Strategy</label>
-                <select
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
-                  defaultValue={editingRule.strategy}
-                >
-                  <option value="round_robin">Round Robin</option>
-                  <option value="weighted">Weighted</option>
-                  <option value="random">Random</option>
-                  <option value="cost_based">Cost Based</option>
-                  <option value="latency_based">Latency Based</option>
-                  <option value="intent_based">Intent Based</option>
-                  <option value="fallback">Fallback Chain</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Priority</label>
-                <Input type="number" defaultValue={editingRule.priority} min="1" max="100" />
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setEditingRule(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setEditingRule(null)}>
-                  <CheckLine className="w-4 h-4 mr-2" />
-                  Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }

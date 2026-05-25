@@ -12,7 +12,6 @@ import type {
   OrganizationSummary,
   TeamSummary,
   ApiKeySummary,
-  RoutingRule,
   TimeRange,
   DynamicStats,
   InsightsStats,
@@ -163,19 +162,9 @@ export async function getProviders(): Promise<ProviderSummary[]> {
   return fetchApi<ProviderSummary[]>('/admin/providers')
 }
 
-// Routing Rules
-export async function getRoutingRules(): Promise<RoutingRule[]> {
-  return fetchApi<RoutingRule[]>('/admin/routing/rules')
-}
-
-export async function createRoutingRule(
-  rule: Omit<RoutingRule, 'id' | 'enabled'>
-): Promise<RoutingRule> {
-  return fetchApi<RoutingRule>('/admin/routing/rules', {
-    method: 'POST',
-    body: JSON.stringify(rule),
-  })
-}
+// Routing rule CRUD methods removed (#175 / A6) — the backend handlers
+// were mock-only and the RoutingPage now shows read-only stats from
+// /admin/stats/routing. Restore these when a routing_rules table exists.
 
 // Insights Stats
 export async function getInsightsStats(period: TimeRange = '7d'): Promise<InsightsStats> {
