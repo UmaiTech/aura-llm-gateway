@@ -11,9 +11,11 @@ import {
   ProvidersPage,
   SettingsPage,
   OrganizationsPage,
+  OrganizationDetailPage,
   TeamsPage,
   EndUsersPage,
   RoutingPage,
+  FeaturesPage,
 } from '@/pages'
 import { useAuthStore } from '@/stores'
 
@@ -52,11 +54,13 @@ function App() {
         <Route path="/dev-logs" element={<DevLogsPage />} />
         <Route path="/harness" element={<HarnessPage />} />
         <Route path="/organizations" element={<OrganizationsPage />} />
+        <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/end-users" element={<EndUsersPage />} />
         <Route path="/keys" element={<KeysPage />} />
         <Route path="/providers" element={<ProvidersPage />} />
         <Route path="/routing" element={<RoutingPage />} />
+        <Route path="/features" element={<FeaturesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
