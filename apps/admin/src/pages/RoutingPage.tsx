@@ -57,13 +57,20 @@ export function RoutingPage() {
   const [stats, setStats] = useState<RoutingStats[]>([])
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = async () => {
+    setError(null)
     try {
       const data = await getRoutingStats()
       setStats(data)
-    } catch {
+    } catch (err) {
+      // Don't silently render the empty-state copy ("No routing
+      // activity in the observed window") on a network/auth failure
+      // — that's misleading. Surface the actual error and let the
+      // user retry.
       setStats([])
+      setError(err instanceof Error ? err.message : 'Failed to load routing stats')
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -99,6 +106,31 @@ export function RoutingPage() {
             <Loading3Line className="h-5 w-5 animate-spin" />
             <span>Loading routing stats...</span>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Render an error state with Retry rather than falling through to the
+  // empty-data view — otherwise a 401 / 500 / network failure looks
+  // identical to "no traffic yet", which made the page silently broken.
+  if (error) {
+    return (
+      <div className="flex flex-col h-full">
+        <Header title="Routing" description="Observed routing strategy usage" />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <Card className="max-w-md w-full border-destructive/30 bg-destructive/5">
+            <CardContent className="p-6 space-y-3">
+              <div className="text-sm font-medium text-destructive">
+                Failed to load routing stats
+              </div>
+              <div className="text-sm text-muted-foreground">{error}</div>
+              <Button onClick={handleRefresh} disabled={isRefreshing} size="sm">
+                <Refresh1Line className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
