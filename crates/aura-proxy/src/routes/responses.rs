@@ -637,16 +637,23 @@ pub async fn create_response(
     // We force-degrade here so the rest of the dispatch routes through
     // the non-streaming path; the fanout call below stamps a warning
     // into ValidationMetadata.warning so the client can surface it.
+    //
+    // BUT: if the client originally asked for stream=true, we still want
+    // to give them an SSE response (so the playground / chat keep
+    // working) — we just synthesize the events ourselves from the
+    // completed fanout result. See `wanted_streaming` below.
     let mut request = request;
     let needs_fanout = matches!(
         request.validation.as_ref().map(|v| v.strategy),
         Some(aura_types::ValidationStrategy::BestOfN)
             | Some(aura_types::ValidationStrategy::SelfConsistency)
     );
+    let wanted_streaming = request.stream;
     if needs_fanout && request.stream {
         debug!(
             strategy = ?request.validation.as_ref().map(|v| v.strategy),
-            "Fanout requested with stream=true; degrading to non-streaming"
+            "Fanout requested with stream=true; routing through non-streaming \
+             provider call and synthesizing SSE events after"
         );
         request.stream = false;
     }
@@ -1306,8 +1313,87 @@ pub async fn create_response(
             }
         });
 
+        // If the original request asked for streaming but we routed
+        // through the non-streaming path (only happens for fanout
+        // today), synthesize an SSE response from the completed
+        // Response. Clients that opened an SSE reader keep working;
+        // they see the same sequence of events the streaming provider
+        // adapter would have emitted (created → in_progress →
+        // output_item.added → content_part.added → output_text.delta
+        // → output_text.done → completed). The delta is sent as a
+        // single chunk — fanout already collected the full text
+        // server-side, so streaming token-by-token would just add
+        // artificial latency without informing the user.
+        if wanted_streaming {
+            return Ok(synthesize_sse_response(response));
+        }
+
         Ok(Json(response).into_response())
     }
+}
+
+/// Build a single-chunk SSE stream from a completed Response.
+///
+/// Used when the client asked for `stream: true` but the gateway had
+/// to collect the response non-streaming first (fanout strategies).
+/// Emits the canonical event sequence so a client reader sees the
+/// exact same shape it would from a real streaming provider.
+fn synthesize_sse_response(response: aura_types::Response) -> AxumResponse {
+    use aura_types::{ContentPart, Item, StreamEvent};
+
+    // Pull the assistant text out of the first message item. Fanout
+    // always produces exactly one Item::Message with one Text part,
+    // but be defensive in case future selectors emit otherwise.
+    let assistant_text = response
+        .output
+        .iter()
+        .find_map(|item| match item {
+            Item::Message(msg) => msg.content.iter().find_map(|part| match part {
+                ContentPart::Text { text, .. } => Some(text.clone()),
+                _ => None,
+            }),
+            _ => None,
+        })
+        .unwrap_or_default();
+
+    let assistant_id = response
+        .output
+        .iter()
+        .find_map(|item| match item {
+            Item::Message(msg) => Some(msg.id.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| "msg_0".to_string());
+
+    let assistant_item = Item::Message(aura_types::MessageItem::assistant(
+        assistant_id,
+        assistant_text.clone(),
+    ));
+
+    let events: Vec<StreamEvent> = vec![
+        StreamEvent::response_created(response.clone()),
+        StreamEvent::response_in_progress(response.clone()),
+        StreamEvent::output_item_added(0, assistant_item),
+        StreamEvent::content_part_added(0, 0, "text"),
+        StreamEvent::output_text_delta(0, 0, assistant_text.clone()),
+        StreamEvent::output_text_done(0, 0, assistant_text),
+        StreamEvent::response_completed(response),
+    ];
+
+    let stream = futures_util::stream::iter(events.into_iter().map(|event| {
+        let event_type = event.event_type();
+        let data = serde_json::to_string(&event)
+            .unwrap_or_else(|e| format!(r#"{{"error":"Failed to serialize event: {e}"}}"#));
+        Ok::<_, Infallible>(
+            axum::response::sse::Event::default()
+                .event(event_type)
+                .data(data),
+        )
+    }));
+
+    Sse::new(stream)
+        .keep_alive(axum::response::sse::KeepAlive::default())
+        .into_response()
 }
 
 #[cfg(test)]
