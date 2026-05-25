@@ -29,7 +29,15 @@ type Tab = 'traces' | 'prompts' | 'tools' | 'guardrails'
 
 interface TraceStep {
   id: string
-  type: 'user' | 'reasoning' | 'tool_call' | 'tool_result' | 'assistant'
+  type:
+    | 'user'
+    | 'reasoning'
+    | 'compression'
+    | 'validation'
+    | 'consistency'
+    | 'tool_call'
+    | 'tool_result'
+    | 'assistant'
   content: string
   toolName?: string
   input?: object
@@ -37,6 +45,10 @@ interface TraceStep {
   latency?: number
   tokens?: number
   status?: 'success' | 'error'
+  // Free-form metadata bag for strategy events (compression /
+  // validation / consistency). Rendered as a small inline chip
+  // row in the timeline when present.
+  meta?: Record<string, string | number | boolean | undefined>
 }
 
 interface Trace {
@@ -67,6 +79,72 @@ function logToTrace(log: RecentLog): Trace {
     type: 'user',
     content: 'User request (content not stored)',
   })
+
+  // Strategy events: compression / validation / consistency. These run
+  // BEFORE the model sees the prompt (compression, consistency
+  // augmentation) and AFTER it returns (validation), but rendering all
+  // three in sequence here keeps the timeline readable without
+  // claiming finer-grained timing than we actually store.
+  if (log.compression_meta) {
+    const c = log.compression_meta
+    const strategy = c.strategies?.[0] ?? 'compression'
+    const savings =
+      typeof c.savings_percent === 'number' ? `${c.savings_percent.toFixed(1)}%` : undefined
+    steps.push({
+      id: `${log.id}-compression`,
+      type: 'compression',
+      content: `Compression: ${strategy}${savings ? ` (${savings} saved)` : ''}`,
+      latency: c.latency_ms,
+      meta: {
+        strategy,
+        savings_percent: c.savings_percent,
+        original_tokens: c.original_tokens,
+        compressed_tokens: c.compressed_tokens,
+      },
+    })
+  }
+  if (log.consistency_meta && log.consistency_meta.strategy && log.consistency_meta.strategy !== 'none') {
+    const c = log.consistency_meta
+    steps.push({
+      id: `${log.id}-consistency`,
+      type: 'consistency',
+      content: `Consistency: ${c.strategy}${c.principles_count ? ` · ${c.principles_count} principles` : ''}`,
+      meta: {
+        strategy: c.strategy,
+        principles_count: c.principles_count,
+        has_style_profile: c.has_style_profile,
+        examples_count: c.examples_count,
+      },
+    })
+  }
+  if (log.validation_meta && log.validation_meta.strategy && log.validation_meta.strategy !== 'none') {
+    const v = log.validation_meta
+    const score =
+      typeof v.confidence === 'number' ? ` · confidence ${v.confidence.toFixed(2)}` : ''
+    const fanout =
+      typeof v.candidates_generated === 'number' && v.candidates_generated > 1
+        ? ` · ${v.candidates_generated} candidates`
+        : ''
+    steps.push({
+      id: `${log.id}-validation`,
+      type: 'validation',
+      content: `Validation: ${v.strategy}${score}${fanout}`,
+      // Color the step red when confidence dropped below the gate.
+      status:
+        typeof v.confidence === 'number' &&
+        typeof v.min_confidence === 'number' &&
+        v.confidence < v.min_confidence
+          ? 'error'
+          : 'success',
+      meta: {
+        strategy: v.strategy,
+        confidence: v.confidence,
+        min_confidence: v.min_confidence,
+        candidates_generated: v.candidates_generated,
+        selected_index: v.selected_index,
+      },
+    })
+  }
 
   // If there's reasoning
   if (log.has_reasoning && log.reasoning_tokens && log.reasoning_tokens > 0) {
@@ -155,6 +233,17 @@ function StepIcon({ type }: { type: TraceStep['type'] }) {
       return <User2Line className="h-4 w-4 text-blue-400" />
     case 'reasoning':
       return <BrainLine className="h-4 w-4 text-purple-400" />
+    case 'compression':
+      // Reuse FileZip glyph isn't imported here — use AI line as a
+      // visually distinct icon. Color = same purple family as compression
+      // chip on Dashboard.
+      return <AiLine className="h-4 w-4 text-purple-300" />
+    case 'validation':
+      return <ShieldLine className="h-4 w-4 text-blue-300" />
+    case 'consistency':
+      // Sparkles2 is already used for the assistant; pick Information so
+      // the trace doesn't get confused with the final model response.
+      return <InformationLine className="h-4 w-4 text-amber-400" />
     case 'tool_call':
       return <ToolLine className="h-4 w-4 text-orange-400" />
     case 'tool_result':
@@ -171,6 +260,11 @@ export function HarnessPage() {
   const [filterToolCalls, setFilterToolCalls] = useState<'all' | 'with-tools' | 'no-tools'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'failed'>('all')
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
+  // Tool drill-down drawer (B8 in #175). Holds the tool name when a
+  // row in the Tools tab is clicked; null otherwise. Detail data is
+  // computed from the in-memory traces so no backend call is needed.
+  const [selectedTool, setSelectedTool] = useState<string | null>(null)
+  const [toolSearch, setToolSearch] = useState('')
 
   const toggleStep = (stepId: string) => {
     setExpandedSteps(prev => {
@@ -538,6 +632,9 @@ export function HarnessPage() {
                                 step.type === 'tool_call' ? 'bg-orange-500/20' :
                                 step.type === 'tool_result' ? 'bg-green-500/20' :
                                 step.type === 'reasoning' ? 'bg-purple-500/20' :
+                                step.type === 'compression' ? 'bg-purple-500/10' :
+                                step.type === 'validation' ? 'bg-blue-500/10' :
+                                step.type === 'consistency' ? 'bg-amber-500/20' :
                                 step.type === 'user' ? 'bg-blue-500/20' :
                                 'bg-primary/20'
                               )}>
@@ -563,7 +660,10 @@ export function HarnessPage() {
                                         'capitalize',
                                         step.type === 'tool_call' && 'bg-orange-500/20 text-orange-400',
                                         step.type === 'tool_result' && 'bg-green-500/20 text-green-400',
-                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-400'
+                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-400',
+                                        step.type === 'compression' && 'bg-purple-500/10 text-purple-300',
+                                        step.type === 'validation' && 'bg-blue-500/10 text-blue-300',
+                                        step.type === 'consistency' && 'bg-amber-500/20 text-amber-400',
                                       )}
                                     >
                                       {step.type.replace('_', ' ')}
@@ -602,6 +702,24 @@ export function HarnessPage() {
                                 </div>
 
                                 <p className="text-sm text-muted-foreground">{step.content}</p>
+
+                                {/* Meta chips for strategy steps. Filter out
+                                    undefined/null/empty values so we don't
+                                    render misleading "field: undefined" pills. */}
+                                {step.meta && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {Object.entries(step.meta)
+                                      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+                                      .map(([k, v]) => (
+                                        <span
+                                          key={k}
+                                          className="text-2xs font-mono px-2 py-0.5 rounded bg-muted/50 text-muted-foreground"
+                                        >
+                                          {k.replace(/_/g, ' ')}: {String(v)}
+                                        </span>
+                                      ))}
+                                  </div>
+                                )}
 
                                 {/* Expanded content for tool steps */}
                                 {isExpanded && isToolStep && (
@@ -700,7 +818,13 @@ export function HarnessPage() {
           {activeTab === 'tools' && (
             <div className="flex-1 p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <Input placeholder="Search tools..." className="max-w-sm" icon={<SearchLine className="h-4 w-4" />} />
+                <Input
+                  placeholder="Search tools..."
+                  className="max-w-sm"
+                  icon={<SearchLine className="h-4 w-4" />}
+                  value={toolSearch}
+                  onChange={(e) => setToolSearch(e.target.value)}
+                />
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
@@ -709,10 +833,6 @@ export function HarnessPage() {
                     disabled={isRefreshing}
                   >
                     <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
-                  </Button>
-                  <Button className="gap-2">
-                    <ToolLine className="h-4 w-4" />
-                    Add Tool
                   </Button>
                 </div>
               </div>
@@ -736,8 +856,16 @@ export function HarnessPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {tools.map((tool) => (
-                          <tr key={tool.tool_name} className="border-b border-border/50 hover:bg-muted/30">
+                        {tools
+                          .filter((t) =>
+                            t.tool_name.toLowerCase().includes(toolSearch.toLowerCase()),
+                          )
+                          .map((tool) => (
+                          <tr
+                            key={tool.tool_name}
+                            className="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
+                            onClick={() => setSelectedTool(tool.tool_name)}
+                          >
                             <td className="p-4">
                               <div className="flex items-center gap-2">
                                 <ToolLine className="h-4 w-4 text-muted-foreground" />
@@ -763,6 +891,123 @@ export function HarnessPage() {
               )}
             </div>
           )}
+
+          {/* Per-tool drill-down drawer. Aggregates invocations from
+              traces already in memory — recent calls, args + the parent
+              trace ID for jumping back to the timeline. */}
+          {selectedTool && (() => {
+            const invocations = traces.flatMap((t) =>
+              t.steps
+                .filter((s) => s.type === 'tool_call' && s.toolName === selectedTool)
+                .map((s) => ({
+                  traceId: t.id,
+                  sessionId: t.sessionId,
+                  provider: t.provider,
+                  model: t.model,
+                  args: s.input,
+                  createdAt: t.createdAt,
+                })),
+            )
+            const totalCalls = invocations.length
+            const tracesWithTool = traces.filter((t) =>
+              t.toolsUsed.includes(selectedTool),
+            )
+            const avgPerTrace =
+              tracesWithTool.length > 0 ? totalCalls / tracesWithTool.length : 0
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ToolLine className="h-5 w-5 text-orange-400" />
+                        <CardTitle className="font-mono">{selectedTool}()</CardTitle>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedTool(null)}
+                      >
+                        <CloseLine className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="overflow-y-auto space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold tabular-nums">{totalCalls}</p>
+                        <p className="text-xs text-muted-foreground">Total Calls</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold tabular-nums">
+                          {tracesWithTool.length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Traces Using</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-2xl font-bold tabular-nums">
+                          {avgPerTrace.toFixed(1)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Avg Calls / Trace</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground">
+                        Recent Invocations
+                      </h4>
+                      {invocations.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No invocations in the loaded traces.
+                        </p>
+                      ) : (
+                        invocations.slice(0, 20).map((inv, i) => (
+                          <div
+                            key={`${inv.traceId}-${i}`}
+                            className="border border-border/40 rounded-md p-3 space-y-2 cursor-pointer hover:border-primary/40"
+                            onClick={() => {
+                              // Jump to the trace this invocation came from.
+                              const t = traces.find((x) => x.id === inv.traceId)
+                              if (t) {
+                                setSelectedTrace(t)
+                                setSelectedTool(null)
+                                setActiveTab('traces')
+                              }
+                            }}
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-mono text-muted-foreground">
+                                {inv.sessionId.slice(0, 16)}…
+                              </span>
+                              <span className="text-muted-foreground">
+                                {inv.provider} · {inv.model}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {formatRelativeTime(inv.createdAt)}
+                              </span>
+                            </div>
+                            {inv.args ? (
+                              <pre className="text-2xs bg-muted/50 p-2 rounded font-mono overflow-x-auto">
+                                {JSON.stringify(inv.args, null, 2)}
+                              </pre>
+                            ) : (
+                              <p className="text-2xs text-muted-foreground italic">
+                                args not stored
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                      {invocations.length > 20 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          Showing 20 of {invocations.length} invocations.
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })()}
 
           {activeTab === 'guardrails' && (
             <div className="flex-1 p-6 space-y-6">

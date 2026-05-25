@@ -206,6 +206,16 @@ pub struct RecentLog {
     pub cache_hit: bool,
     pub has_reasoning: bool,
     pub compressed: Option<bool>,
+    // Strategy metadata extracted from request_logs.metadata->'aura'.
+    // The HarnessPage trace timeline renders one inline step per
+    // present field so users can see compression/validation/
+    // consistency events alongside tool calls (#175 / B7).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compression_meta: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validation_meta: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consistency_meta: Option<serde_json::Value>,
     // Tool call metadata
     pub has_tool_calls: bool,
     pub tool_calls_count: i32,
@@ -897,6 +907,28 @@ async fn get_recent_logs(
                 .and_then(|v| serde_json::from_value(v).ok())
                 .unwrap_or_default();
 
+            // Pull the strategy-feature objects directly off full_metadata.
+            // None when the object is absent or null; the JSON is small
+            // (a few keys each) so passing it through avoids a second
+            // round trip for the HarnessPage timeline.
+            let full_metadata: Option<serde_json::Value> = row
+                .try_get::<Option<serde_json::Value>, _>("full_metadata")
+                .ok()
+                .flatten();
+            let aura_block = full_metadata.as_ref().and_then(|m| m.get("aura"));
+            let compression_meta = aura_block
+                .and_then(|a| a.get("compression"))
+                .filter(|v| !v.is_null())
+                .cloned();
+            let validation_meta = aura_block
+                .and_then(|a| a.get("validation"))
+                .filter(|v| !v.is_null())
+                .cloned();
+            let consistency_meta = aura_block
+                .and_then(|a| a.get("consistency"))
+                .filter(|v| !v.is_null())
+                .cloned();
+
             RecentLog {
                 id: row.get("id"),
                 response_id: row.get("response_id"),
@@ -917,6 +949,9 @@ async fn get_recent_logs(
                 cache_hit: row.try_get("cache_hit").unwrap_or(false),
                 has_reasoning: row.try_get("has_reasoning").unwrap_or(false),
                 compressed: row.try_get("compressed").ok().flatten(),
+                compression_meta,
+                validation_meta,
+                consistency_meta,
                 has_tool_calls: row.try_get("has_tool_calls").unwrap_or(false),
                 tool_calls_count: row.try_get("tool_calls_count").unwrap_or(0),
                 tools_used,
