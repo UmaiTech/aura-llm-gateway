@@ -34,16 +34,29 @@ pr_draft = false
 # Version bumping: feat commits always bump minor (even in 0.x)
 features_always_increment_minor = true
 
-# Individual package configuration
-# publish = false prevents publishing to crates.io
-# All packages contribute to workspace version bumps
-# Only aura-proxy creates the actual GitHub release
+# Individual package configuration.
+#
+# All four packages share one CHANGELOG.md (via `changelog_path` at the
+# workspace level above) — but only `aura-proxy` is allowed to WRITE
+# that file. The other three crates have `changelog_update = false`
+# so release-plz doesn't append a duplicate `## [vX.Y.Z]` section
+# per crate. Without this, every release PR ends up with N copies of
+# the same version header (one per workspace crate). See #185.
+#
+# `aura-proxy` keeps `changelog_update = true` (inherited from
+# workspace) AND adds `changelog_include = ["aura-types", "aura-db",
+# "aura-core"]` so commits to those crates' files still get
+# attributed to the workspace changelog via aura-proxy's writer.
+#
+# publish = false prevents publishing to crates.io.
+# Only aura-proxy creates the actual GitHub release + tag.
 [[package]]
 name = "aura-types"
 publish = false
 release = true
 git_release_enable = false
 git_tag_enable = false
+changelog_update = false
 
 [[package]]
 name = "aura-db"
@@ -51,6 +64,7 @@ publish = false
 release = true
 git_release_enable = false
 git_tag_enable = false
+changelog_update = false
 
 [[package]]
 name = "aura-core"
@@ -58,26 +72,21 @@ publish = false
 release = true
 git_release_enable = false
 git_tag_enable = false
+changelog_update = false
 
 [[package]]
 name = "aura-proxy"
 publish = false
 release = true
-# Only this package creates the GitHub release and tag
 git_release_enable = true
 git_tag_enable = true
-# Aggregate commits from every other workspace crate into aura-proxy's
-# changelog. Without this, release-plz applies a per-crate include_paths
-# filter (commits attributed to the crate iff they touch its files), so
-# a commit that fixes aura-core only shows up under aura-core's changelog
-# — and since all four crates point at the same CHANGELOG.md via
-# changelog_path, aura-proxy (the one that creates the GitHub release)
-# gets only its own commits and the others end up missing.
+# Pull commits attributed to other Rust crates into aura-proxy's
+# changelog so the workspace CHANGELOG.md doesn't lose them.
 #
-# NOTE: this fixes attribution between Rust crates. Commits touching ONLY
-# apps/admin/, apps/landing/, .github/, etc., still won't be attributed
-# to any crate and will be dropped from the auto-generated changelog.
-# When a release PR's CHANGELOG looks short, edit it by hand to add the
-# frontend / CI commits before merging — that's the rule documented in
-# CLAUDE.md under "Updating the Public Roadmap".
+# NOTE: this only covers cross-crate Rust commit attribution. Commits
+# touching ONLY apps/admin/, apps/landing/, .github/, etc., still
+# aren't attributed to any crate and will be dropped from the
+# auto-generated entry. When a release PR's CHANGELOG looks short,
+# edit it by hand to add the frontend / CI commits before merging —
+# documented in CLAUDE.md under "Auto-generated CHANGELOG is incomplete".
 changelog_include = ["aura-types", "aura-db", "aura-core"]
