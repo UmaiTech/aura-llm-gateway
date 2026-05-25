@@ -37,6 +37,26 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Rust deps
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend deps
+        run: |
+          npm install
+          npm install --prefix apps/admin
+          npm install --prefix apps/chat
+          npm install --prefix apps/landing
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
