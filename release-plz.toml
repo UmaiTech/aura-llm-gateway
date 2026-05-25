@@ -66,3 +66,18 @@ release = true
 # Only this package creates the GitHub release and tag
 git_release_enable = true
 git_tag_enable = true
+# Aggregate commits from every other workspace crate into aura-proxy's
+# changelog. Without this, release-plz applies a per-crate include_paths
+# filter (commits attributed to the crate iff they touch its files), so
+# a commit that fixes aura-core only shows up under aura-core's changelog
+# — and since all four crates point at the same CHANGELOG.md via
+# changelog_path, aura-proxy (the one that creates the GitHub release)
+# gets only its own commits and the others end up missing.
+#
+# NOTE: this fixes attribution between Rust crates. Commits touching ONLY
+# apps/admin/, apps/landing/, .github/, etc., still won't be attributed
+# to any crate and will be dropped from the auto-generated changelog.
+# When a release PR's CHANGELOG looks short, edit it by hand to add the
+# frontend / CI commits before merging — that's the rule documented in
+# CLAUDE.md under "Updating the Public Roadmap".
+changelog_include = ["aura-types", "aura-db", "aura-core"]

@@ -27,8 +27,8 @@ interface Release {
  * here. The latest shipped row sets phase='shipped' with the date;
  * the next-up row sets phase='active'.
  *
- * Latest shipped: v0.9.2 (2026-05-20)
- * In progress: v0.10 (admin + playground polish, validation strategies)
+ * Latest shipped: v0.13.0 (2026-05-25)
+ * In progress: v0.14 (harness improvements, organization detail page)
  */
 const releases: Release[] = [
   {
@@ -159,18 +159,72 @@ const releases: Release[] = [
   },
   {
     version: 'v0.10',
-    when: 'next',
-    phase: 'active',
+    when: 'May 2026',
+    phase: 'shipped',
     title: 'Admin polish & content audit',
     subtitle: 'Editorial redesign, admin app, design-audit cleanup',
     items: [
       { label: 'Admin dashboard at app.aura-llm.dev' },
       { label: 'Editorial redesign across landing/docs/roadmap/admin/chat' },
-      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
-      { label: 'Validation strategies actually consume request.validation', note: '#155' },
-      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
+      { label: 'Validation strategies wired end-to-end', note: '#155' },
     ],
     issueRefs: ['#155'],
+  },
+  {
+    version: 'v0.11',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Validation fanout & playground polish',
+    subtitle: 'best_of_n / self_consistency / confidence_threshold + consistency UI',
+    items: [
+      { label: 'best_of_n + self_consistency validation fanout', note: '#155' },
+      { label: 'confidence_threshold validation gate' },
+      { label: 'Consistency parameters + strategy outcomes in chat', note: '#158, #161' },
+      { label: 'Provider param hotfixes (Gemini 3.x, OpenAI top_logprobs, Anthropic tool roundtrip race)' },
+    ],
+  },
+  {
+    version: 'v0.12',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Admin CRUD foundation',
+    subtitle: 'Backend endpoints for orgs / teams / end users / API keys',
+    items: [
+      { label: 'Admin CRUD backend endpoints for all 4 entities' },
+      { label: 'Teams CRUD modal wired end-to-end' },
+      { label: 'Gateway: api_key_usage now records for failed + incomplete responses' },
+      { label: 'Streaming request logs populate latency_ms' },
+      { label: 'Helm chart version syncs to release tag' },
+    ],
+  },
+  {
+    version: 'v0.13',
+    when: 'May 2026',
+    phase: 'shipped',
+    title: 'Admin polish & honesty',
+    subtitle: 'CRUD wiring for all 4 entities, dashboard expansion, removed mock surfaces',
+    items: [
+      { label: 'CRUD modals wired for Organizations, End Users, API Keys' },
+      { label: 'Dashboard: 24h hourly buckets, "All time" range, real x-axis labels' },
+      { label: 'Provider Health card shows requests / success% / avg + p95 latency' },
+      { label: 'New dashboard cards for compression, validation, consistency activity' },
+      { label: 'Insights tool_calls metric reads real data instead of hardcoded zero' },
+      { label: 'Removed mock /admin/routing/rules surface; Routing page is now read-only stats' },
+    ],
+  },
+  {
+    version: 'v0.14',
+    when: 'next',
+    phase: 'active',
+    title: 'Harness improvements & new surfaces',
+    subtitle: 'Trace timeline events, tool drill-down, organization detail page',
+    items: [
+      { label: 'Compression / validation / consistency events in harness timeline' },
+      { label: 'Per-tool drill-down drawer in harness' },
+      { label: 'Organization detail page with team + key + cost breakdown' },
+      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
+      { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
+    ],
   },
   {
     version: 'v1.0',

@@ -281,6 +281,16 @@ The public roadmap at `aura-llm.dev/roadmap` is the source of truth for what the
 
 **Tone**: write for a smart non-engineer evaluating the project. "Tool roundtrip context replay" is right; "PR #164 implementation" is wrong. The roadmap is marketing surface as much as engineering record.
 
+### Auto-generated CHANGELOG is incomplete — review it on every release PR
+
+`release-plz` generates each release PR's `CHANGELOG.md` section by attributing commits to Rust crates based on file paths. Two consequences you have to work around manually:
+
+1. **Frontend-only commits get dropped.** Anything that touches only `apps/admin/`, `apps/landing/`, `apps/chat/`, `sdks/`, `.github/`, `CLAUDE.md`, or any other non-`crates/` path is **not attributed to any crate** and never reaches the auto-generated entry. We hit this for v0.11.0–v0.13.0 where most work was frontend.
+
+2. **Per-crate filtering even between Rust crates.** `release-plz.toml` has `changelog_include = ["aura-types", "aura-db", "aura-core"]` on `aura-proxy` so all Rust crates' commits aggregate into the workspace `CHANGELOG.md`. Don't remove that — the workspace will silently de-attribute again.
+
+**Rule**: every release PR (`chore: release vX.Y.Z`) needs a manual changelog review before merge. If the section is short, look at the actual commits in the range with `git log vPREV..HEAD --oneline` and add bullets for the user-facing items the auto-generator missed. Match the existing tone (one line per change, link the PR).
+
 ### Vercel Serverless Functions (`/api/*.ts`)
 
 The playground (`playground.aura-llm.dev`) is served by Vercel and uses serverless functions in `/api/`. These functions run under `@vercel/node@5` and **must be emitted as ESM**, because the auth stack (`better-auth@1.6+`) is ESM-only and any `require()` of it throws `ERR_REQUIRE_ESM` at module load.
