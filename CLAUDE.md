@@ -231,6 +231,17 @@ VITE_TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
 
 **Note**: Restart the Vite dev server after changing `.env` files for changes to take effect.
 
+### Preview deploy OAuth limitation
+
+Vercel preview URLs currently **cannot complete GitHub OAuth** for the playground app.
+
+- `BETTER_AUTH_URL` stays pinned to `https://playground.aura-llm.dev`
+- the GitHub OAuth app only allows the production callback URL
+- the OAuth callback returns to production instead of the preview host
+- better-auth then rejects the preview state cookie with `error=state_mismatch`
+
+Use preview deploys for UI and non-auth checks only. To test the real GitHub sign-in flow, merge to `main` and use `https://playground.aura-llm.dev`. If preview OAuth testing becomes mandatory, the proper long-term fix is moving from a classic GitHub OAuth app to a GitHub App with multiple callback URLs.
+
 ## Common Tasks
 
 ### Adding a New Provider

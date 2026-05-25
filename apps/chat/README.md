@@ -149,6 +149,16 @@ const response = await fetch(`${API_BASE}/v1/responses`, {
 })
 ```
 
+## Preview Deploy OAuth Limitation
+
+GitHub sign-in does **not** work on Vercel preview URLs right now.
+
+- preview deploys share `BETTER_AUTH_URL=https://playground.aura-llm.dev`
+- the GitHub OAuth app only allows the production callback URL
+- the callback lands on production, so better-auth rejects the preview state cookie with `error=state_mismatch`
+
+Use preview deploys for UI and non-authenticated checks, then test the real sign-in flow after merging to `main` on `https://playground.aura-llm.dev`.
+
 ## Development
 
 ```bash
