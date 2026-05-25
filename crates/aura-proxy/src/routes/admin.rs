@@ -47,22 +47,22 @@ pub fn router() -> Router<AppState> {
             get(list_organizations).post(create_organization),
         )
         .route(
-            "/admin/organizations/:id",
+            "/admin/organizations/{id}",
             put(update_organization).delete(delete_organization),
         )
         // Teams
         .route("/admin/teams", get(list_teams).post(create_team))
-        .route("/admin/teams/:id", put(update_team).delete(delete_team))
+        .route("/admin/teams/{id}", put(update_team).delete(delete_team))
         // API Keys
         .route("/admin/api-keys", get(list_api_keys).post(create_api_key))
-        .route("/admin/api-keys/:id", delete(delete_api_key))
+        .route("/admin/api-keys/{id}", delete(delete_api_key))
         // End Users
         .route(
             "/admin/end-users",
             get(list_end_users).post(create_end_user),
         )
         .route(
-            "/admin/end-users/:id",
+            "/admin/end-users/{id}",
             put(update_end_user).delete(delete_end_user),
         )
         // Providers (full detail)
