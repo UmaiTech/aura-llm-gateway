@@ -122,6 +122,36 @@ export interface RecentLog {
   cache_hit: boolean
   has_reasoning: boolean
   compressed: boolean | null
+  // Strategy metadata extracted from request_logs.metadata->'aura'.
+  // The HarnessPage trace timeline renders one inline step per
+  // present field so users can see compression/validation/
+  // consistency events alongside tool calls.
+  compression_meta?: {
+    strategies?: string[]
+    original_tokens?: number
+    compressed_tokens?: number
+    savings_percent?: number
+    ratio?: number
+    latency_ms?: number
+  } | null
+  validation_meta?: {
+    strategy?: string
+    confidence?: number
+    min_confidence?: number
+    n?: number
+    candidates_generated?: number
+    selected_index?: number
+    include_logprobs?: boolean
+  } | null
+  consistency_meta?: {
+    strategy?: string
+    apply_calibration?: boolean
+    has_principles?: boolean
+    principles_count?: number
+    has_style_profile?: boolean
+    has_examples?: boolean
+    examples_count?: number
+  } | null
   // Tool call metadata
   has_tool_calls: boolean
   tool_calls_count: number
