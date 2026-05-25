@@ -157,6 +157,10 @@ export interface RecentLog {
   tool_calls_count: number
   tools_used: string[]
   tool_calls_data: ToolCallData[]
+  // Payload capture — present only when capture was on for this request.
+  // Both fields are omitted (not null) in the API response when capture is off.
+  request_body?: Record<string, unknown> | null
+  response_body?: Record<string, unknown> | null
   created_at: string
 }
 
@@ -288,6 +292,7 @@ export interface EndUserSummary {
   monthly_token_limit: number | null
   rate_limit_rpm: number | null
   is_blocked: boolean
+  metadata: Record<string, unknown> | null
   first_seen_at: string | null
   last_seen_at: string | null
   created_at: string

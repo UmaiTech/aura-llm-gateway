@@ -300,7 +300,12 @@ export async function createEndUser(payload: {
 
 export async function updateEndUser(
   id: string,
-  payload: { monthly_token_limit?: number; blocked?: boolean }
+  payload: {
+    monthly_token_limit?: number
+    blocked?: boolean
+    external_id?: string
+    metadata?: Record<string, unknown>
+  }
 ): Promise<void> {
   await fetchApi<void>(`/admin/end-users/${id}`, {
     method: 'PUT',

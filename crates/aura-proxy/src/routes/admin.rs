@@ -1887,13 +1887,16 @@ async fn create_end_user(
 
 #[derive(Debug, Deserialize)]
 struct UpdateEndUserPayload {
-    // EndUserRepo only exposes set_monthly_limit + block/unblock today;
-    // name/email/metadata updates would need a new repo method. Cover
-    // what's available now and defer the rest to a follow-up.
     #[serde(default)]
     monthly_token_limit: Option<i64>,
     #[serde(default)]
     blocked: Option<bool>,
+    /// New external_id value. Omit or set to null to leave unchanged.
+    #[serde(default)]
+    external_id: Option<String>,
+    /// Replacement metadata object. Omit or set to null to leave unchanged.
+    #[serde(default)]
+    metadata: Option<serde_json::Value>,
 }
 
 async fn update_end_user(
@@ -1917,6 +1920,18 @@ async fn update_end_user(
             aura_db::EndUserRepo::unblock(pool, id).await
         };
         if let Err(e) = result {
+            return Err(map_db_error(e, "end_user"));
+        }
+    }
+    if payload.external_id.is_some() || payload.metadata.is_some() {
+        if let Err(e) = aura_db::EndUserRepo::update(
+            pool,
+            id,
+            payload.external_id.as_deref(),
+            payload.metadata.as_ref(),
+        )
+        .await
+        {
             return Err(map_db_error(e, "end_user"));
         }
     }

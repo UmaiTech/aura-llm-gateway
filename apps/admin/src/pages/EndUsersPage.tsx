@@ -44,6 +44,13 @@ export function EndUsersPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // Edit-fields state for the detail modal (external_id + metadata)
+  const [editExternalId, setEditExternalId] = useState('')
+  const [editMetadata, setEditMetadata] = useState('')
+  const [metadataError, setMetadataError] = useState<string | null>(null)
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editSuccess, setEditSuccess] = useState(false)
+
   const openCreate = () => {
     setNewUser({
       organization_id: organizations[0]?.id || '',
@@ -99,6 +106,59 @@ export function EndUsersPage() {
       await fetchUsers()
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Delete failed')
+    }
+  }
+
+  const openDetail = (user: EndUserSummary) => {
+    setSelectedUser(user)
+    setEditExternalId(user.external_id)
+    setEditMetadata(user.metadata ? JSON.stringify(user.metadata, null, 2) : '')
+    setMetadataError(null)
+    setEditSuccess(false)
+  }
+
+  const handleEditSave = async () => {
+    if (!selectedUser) return
+    setMetadataError(null)
+
+    let parsedMetadata: Record<string, unknown> | undefined
+    if (editMetadata.trim() !== '') {
+      try {
+        const parsed: unknown = JSON.parse(editMetadata)
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          setMetadataError('Metadata must be a JSON object, e.g. {"key": "value"}.')
+          return
+        }
+        parsedMetadata = parsed as Record<string, unknown>
+      } catch {
+        setMetadataError('Invalid JSON. Fix the syntax or clear the field to leave metadata unchanged.')
+        return
+      }
+    }
+
+    const payload: { external_id?: string; metadata?: Record<string, unknown> } = {}
+    if (editExternalId.trim() !== '' && editExternalId !== selectedUser.external_id) {
+      payload.external_id = editExternalId.trim()
+    }
+    if (parsedMetadata !== undefined) {
+      payload.metadata = parsedMetadata
+    }
+
+    if (Object.keys(payload).length === 0) {
+      // Nothing to change
+      setEditSuccess(true)
+      return
+    }
+
+    setEditSubmitting(true)
+    try {
+      await updateEndUser(selectedUser.id, payload)
+      setEditSuccess(true)
+      await fetchUsers()
+    } catch (e) {
+      setMetadataError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setEditSubmitting(false)
     }
   }
 
@@ -335,7 +395,7 @@ export function EndUsersPage() {
                     <tr
                       key={user.id}
                       className="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
-                      onClick={() => setSelectedUser(user)}
+                      onClick={() => openDetail(user)}
                     >
                       <td className="py-3 px-4">
                         <div>
@@ -489,6 +549,43 @@ export function EndUsersPage() {
                   )}
                 </div>
               )}
+
+              {/* Editable fields — external_id and metadata */}
+              <div className="space-y-3 pt-4 border-t border-border">
+                <p className="text-sm font-medium">Edit Fields</p>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">External ID</label>
+                  <Input
+                    value={editExternalId}
+                    onChange={(e) => { setEditExternalId(e.target.value); setEditSuccess(false) }}
+                    placeholder={selectedUser.external_id}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">
+                    Metadata <span className="text-xs">(JSON object — leave empty to keep current)</span>
+                  </label>
+                  <textarea
+                    value={editMetadata}
+                    onChange={(e) => { setEditMetadata(e.target.value); setMetadataError(null); setEditSuccess(false) }}
+                    placeholder='{"plan": "pro", "tier": 2}'
+                    rows={4}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  {metadataError && (
+                    <p className="text-xs text-red-400 mt-1">{metadataError}</p>
+                  )}
+                  {editSuccess && (
+                    <p className="text-xs text-green-400 mt-1">Saved.</p>
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={handleEditSave} disabled={editSubmitting}>
+                    <CheckLine className="w-4 h-4 mr-2" />
+                    {editSubmitting ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-border">
                 <Button variant="outline" onClick={() => setSelectedUser(null)}>

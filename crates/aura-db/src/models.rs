@@ -622,6 +622,17 @@ pub struct NewEndUser {
     pub metadata: Option<serde_json::Value>,
 }
 
+/// Partial update for admin-editable end-user fields.
+///
+/// All fields are optional so callers can send only the fields they
+/// want to change. The repo layer maps `None` to SQL NULL and lets
+/// COALESCE preserve the existing value.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EndUserUpdate {
+    pub external_id: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
 /// End user usage update
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EndUserUsageUpdate {
