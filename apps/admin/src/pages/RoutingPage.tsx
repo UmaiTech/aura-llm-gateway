@@ -53,7 +53,7 @@ const mockRules: RoutingRule[] = [
     ],
     actions: [
       { provider: 'openai', model: 'gpt-4o-mini', weight: 70 },
-      { provider: 'anthropic', model: 'claude-3-haiku', weight: 30 },
+      { provider: 'anthropic', model: 'claude-3-haiku-20240307', weight: 30 },
     ],
     stats: {
       requestsRouted: 12500,
@@ -92,8 +92,8 @@ const mockRules: RoutingRule[] = [
     conditions: [],
     actions: [
       { provider: 'openai', model: 'gpt-4o', weight: 40 },
-      { provider: 'anthropic', model: 'claude-3-sonnet', weight: 40 },
-      { provider: 'google', model: 'gemini-pro', weight: 20 },
+      { provider: 'anthropic', model: 'claude-sonnet-4-6', weight: 40 },
+      { provider: 'google', model: 'gemini-2.5-flash', weight: 20 },
     ],
     stats: {
       requestsRouted: 8900,
@@ -111,8 +111,8 @@ const mockRules: RoutingRule[] = [
     conditions: [{ type: 'on_error', value: 'true' }],
     actions: [
       { provider: 'openai', model: 'gpt-4o' },
-      { provider: 'anthropic', model: 'claude-3-sonnet' },
-      { provider: 'google', model: 'gemini-pro' },
+      { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+      { provider: 'google', model: 'gemini-2.5-flash' },
     ],
     stats: {
       requestsRouted: 156,
