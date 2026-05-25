@@ -113,6 +113,18 @@ git commit -m "your message"
 git commit --no-verify -m "your message"
 ```
 
+**GitHub OAuth fails on Vercel preview URLs with `error=state_mismatch`?**
+
+That is a current known limitation. Preview deploys keep `BETTER_AUTH_URL` pinned to
+`https://playground.aura-llm.dev`, while the GitHub OAuth app only allows the production
+callback URL. The callback returns to production instead of the preview host, so the
+preview state cookie no longer matches.
+
+For now:
+
+- use preview deploys for non-authenticated checks
+- test the real GitHub sign-in flow on `https://playground.aura-llm.dev` after merging to `main`
+
 ### Configuration
 
 Configuration can be provided via environment variables, YAML files, or both. Environment variables always take precedence over file configuration.
