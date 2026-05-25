@@ -6,6 +6,325 @@ All notable changes to this project will be documented in this file.
 
 ## [0.13.0] - 2026-05-25
 
+### Bug Fixes
+
+- Migrations
+- Align model registry with Google's authoritative models.list
+- Batch parallel FunctionCall items into one assistant message
+- Suppress params newer models reject (gemini candidateCount, openai top_logprobs)
+- Some security fixes
+- Chat, docs and route
+- Db operations for proxy
+- Db operations for proxy
+- Some fixes
+- Add allow(dead_code) for auth code prepared for future use
+- Add provider and model count to startup log
+- Make orgs work
+- Chat build again
+- Bump rush version in docker step ([#53](https://github.com/UmaiTech/aura-llm-gateway/pull/53))
+- Fail open + log loudly when AURA_CORS_ALLOWED_ORIGINS is misconfigured
+- Move cors_tests module to end of main.rs
+- Make `migrate` subcommand robust to duplicate argv from Fly
+- Scope api key routes to auth user
+- Single source of truth at root, drop per-crate clones
+- Log when rate-limit middleware finds no AuthContext
+- Scope daily message cap to POST /v1/responses
+- Retry migrate with backoff to absorb Fly PG flaps
+- Stop /admin/stats/overview crashing the gateway on NUMERIC cost columns
+- Pre-merge hardening of admin-deploy PR
+- Wire empty widgets to real data, replace stubs
+- Persist response before emitting completed to unblock replay
+- Persist api_key_usage + populate latency_ms in streaming logs
+- Record api_key_usage for failed + incomplete streaming responses
+- Wire tool_calls count + drop mock routing rules (A3, A6)
+
+### Documentation
+
+- Update example snippets to current-generation models
+
+### Features
+
+- Add configuration system with environment loading
+- Add YAML configuration file support
+- Add Mistral AI provider with full parity
+- Add Ollama local inference provider
+- Add HuggingFace TGI provider for Inference Endpoints
+- Add AWS Bedrock provider with Claude on Bedrock
+- Register GPT-5.4/5.5 + Claude 4.6/4.7 models with pricing
+- Register claude-haiku-4-5-20251001
+- Wire FunctionCall + batching in Together provider; add docs
+- Add InputItem::FunctionCall + per-provider emitters
+- Project setups for mono
+- Add basic server
+- Implement OpenAI adapter, chat UI, and database models
+- Enrich responses with cost and Aura metadata
+- Add aura_request_id and automatic MD docs loading
+- Add model name and agentic metadata to Aura responses
+- Add database integration and 2026 model pricing
+- Add Claude adapter, API key auth, and credential encryption
+- Add hierarchical org model with teams, projects, and end-user tracking
+- Wire up authentication and usage tracking
+- Add Google Gemini provider implementation
+- Add MDX support and interactive documentation components ([#56](https://github.com/UmaiTech/aura-llm-gateway/pull/56))
+- Implement Milestone 5 production readiness features ([#58](https://github.com/UmaiTech/aura-llm-gateway/pull/58))
+- Implement smart routing with load balancing and failover ([#60](https://github.com/UmaiTech/aura-llm-gateway/pull/60))
+- Implement admin dashboard foundation with Stripe/Vercel-inspired UI ([#61](https://github.com/UmaiTech/aura-llm-gateway/pull/61))
+- Wire new providers into routing, config, and cost tracking
+- Fly.io config + CORS env var + migrate subcommand
+- Daily message cap so the free tier actually bites
+- Redesigned sign-in + agent tools dialog + pg timeout fixes
+- Per-org filter on api-keys + end-users, header dropdown
+- GitHub session auth, AURA_ADMIN_KEY as fallback
+- Add Together AI provider
+- Synthesize prior tool_calls from previous_response_id
+- Implement confidence_threshold validation gate ([#155](https://github.com/UmaiTech/aura-llm-gateway/pull/155))
+- Implement best_of_n + self_consistency validation fanout ([#155](https://github.com/UmaiTech/aura-llm-gateway/pull/155))
+- Backend CRUD endpoints for orgs / teams / end_users / api_keys
+- Dashboard polish (B1, B2, B3, B4, B5)
+
+### Miscellaneous Tasks
+
+- Fix release
+- Fix release
+- Release v0.1.4
+- Release v0.1.5
+- Release v0.1.6
+- Release v0.2.2
+- Release v0.1.1
+- Release v0.1.2
+- Release v0.1.3
+- Release v0.1.7
+- Release v0.2.0
+- Release v0.2.1
+- Release v0.2.3
+- Release v0.2.4 ([#51](https://github.com/UmaiTech/aura-llm-gateway/pull/51))
+- Release v0.2.5 ([#52](https://github.com/UmaiTech/aura-llm-gateway/pull/52))
+- Release v0.2.6 ([#54](https://github.com/UmaiTech/aura-llm-gateway/pull/54))
+- Release v0.2.7 ([#57](https://github.com/UmaiTech/aura-llm-gateway/pull/57))
+- Release v0.2.8 ([#59](https://github.com/UmaiTech/aura-llm-gateway/pull/59))
+- Release v0.3.0 ([#63](https://github.com/UmaiTech/aura-llm-gateway/pull/63))
+- Release v0.3.1 ([#65](https://github.com/UmaiTech/aura-llm-gateway/pull/65))
+- Release v0.3.2
+- Release v0.4.0
+- Release v0.4.1
+- Release v0.4.2
+- Release v0.5.1
+- Release v0.5.2
+- Release v0.5.3
+- Release v0.5.4
+- Release v0.6.0
+- Release v0.6.1
+- Release v0.7.0
+- Release v0.7.1
+- Release v0.7.2
+- Release v0.8.0
+- Release v0.8.1
+- Release v0.8.2
+- Info! diagnostics for api_key_usage recording
+
+### Styling
+
+- Fix import order after use uuid; edit
+- Cargo fmt
+
+<!-- generated by git-cliff -->
+
+## [0.13.0] - 2026-05-25
+
+### Bug Fixes
+
+- Chat, docs and route
+- Migrations
+- Make orgs work
+- Chat build again
+- Single source of truth at root, drop per-crate clones
+- Align model registry with Google's authoritative models.list
+- Batch parallel FunctionCall items into one assistant message
+- Suppress params newer models reject (gemini candidateCount, openai top_logprobs)
+
+### Features
+
+- Project setups for mono
+- Add configuration system with environment loading
+- Add YAML configuration file support
+- Add basic server
+- Implement OpenAI adapter, chat UI, and database models
+- Enrich responses with cost and Aura metadata
+- Add database integration and 2026 model pricing
+- Add Claude adapter, API key auth, and credential encryption
+- Add Google Gemini provider implementation
+- Implement Milestone 5 production readiness features ([#58](https://github.com/UmaiTech/aura-llm-gateway/pull/58))
+- Implement smart routing with load balancing and failover ([#60](https://github.com/UmaiTech/aura-llm-gateway/pull/60))
+- Add Mistral AI provider with full parity
+- Add Ollama local inference provider
+- Add HuggingFace TGI provider for Inference Endpoints
+- Add AWS Bedrock provider with Claude on Bedrock
+- Wire new providers into routing, config, and cost tracking
+- Register GPT-5.4/5.5 + Claude 4.6/4.7 models with pricing
+- Register claude-haiku-4-5-20251001
+- Daily message cap so the free tier actually bites
+- Add Together AI provider
+- Add InputItem::FunctionCall + per-provider emitters
+- Wire FunctionCall + batching in Together provider; add docs
+- Implement best_of_n + self_consistency validation fanout ([#155](https://github.com/UmaiTech/aura-llm-gateway/pull/155))
+
+### Miscellaneous Tasks
+
+- Release v0.1.1
+- Fix release
+- Release v0.1.2
+- Release v0.1.3
+- Release v0.1.7
+- Release v0.2.1
+- Release v0.2.3
+- Release v0.2.4 ([#51](https://github.com/UmaiTech/aura-llm-gateway/pull/51))
+- Release v0.2.5 ([#52](https://github.com/UmaiTech/aura-llm-gateway/pull/52))
+- Release v0.2.6 ([#54](https://github.com/UmaiTech/aura-llm-gateway/pull/54))
+- Release v0.2.7 ([#57](https://github.com/UmaiTech/aura-llm-gateway/pull/57))
+- Release v0.2.8 ([#59](https://github.com/UmaiTech/aura-llm-gateway/pull/59))
+- Release v0.3.0 ([#63](https://github.com/UmaiTech/aura-llm-gateway/pull/63))
+- Release v0.3.1 ([#65](https://github.com/UmaiTech/aura-llm-gateway/pull/65))
+- Release v0.3.2
+- Release v0.4.0
+- Release v0.4.1
+- Release v0.4.2
+- Release v0.5.1
+- Release v0.5.2
+- Release v0.5.3
+- Release v0.5.4
+- Release v0.6.0
+- Release v0.6.1
+- Release v0.7.0
+- Release v0.7.1
+- Release v0.7.2
+- Release v0.8.0
+- Release v0.8.1
+- Release v0.8.2
+
+### Styling
+
+- Fix import order after use uuid; edit
+
+<!-- generated by git-cliff -->
+
+## [0.13.0] - 2026-05-25
+
+### Bug Fixes
+
+- Db operations for proxy
+- Single source of truth at root, drop per-crate clones
+
+### Features
+
+- Project setups for mono
+- Implement OpenAI adapter, chat UI, and database models
+- Add database integration and 2026 model pricing
+- Add Claude adapter, API key auth, and credential encryption
+- Add hierarchical org model with teams, projects, and end-user tracking
+- Implement smart routing with load balancing and failover ([#60](https://github.com/UmaiTech/aura-llm-gateway/pull/60))
+- Implement admin dashboard foundation with Stripe/Vercel-inspired UI ([#61](https://github.com/UmaiTech/aura-llm-gateway/pull/61))
+- Fly.io config + CORS env var + migrate subcommand
+- Daily message cap so the free tier actually bites
+- Redesigned sign-in + agent tools dialog + pg timeout fixes
+- Synthesize prior tool_calls from previous_response_id
+
+### Miscellaneous Tasks
+
+- Release v0.1.1
+- Fix release
+- Release v0.1.2
+- Release v0.1.3
+- Release v0.1.4
+- Release v0.1.5
+- Release v0.1.6
+- Release v0.1.7
+- Release v0.2.1
+- Release v0.2.2
+- Release v0.2.3
+- Release v0.2.4 ([#51](https://github.com/UmaiTech/aura-llm-gateway/pull/51))
+- Release v0.2.5 ([#52](https://github.com/UmaiTech/aura-llm-gateway/pull/52))
+- Release v0.2.6 ([#54](https://github.com/UmaiTech/aura-llm-gateway/pull/54))
+- Release v0.2.7 ([#57](https://github.com/UmaiTech/aura-llm-gateway/pull/57))
+- Release v0.2.8 ([#59](https://github.com/UmaiTech/aura-llm-gateway/pull/59))
+- Release v0.3.0 ([#63](https://github.com/UmaiTech/aura-llm-gateway/pull/63))
+- Release v0.3.1 ([#65](https://github.com/UmaiTech/aura-llm-gateway/pull/65))
+- Release v0.3.2
+- Release v0.4.0
+- Release v0.4.1
+- Release v0.4.2
+- Release v0.5.1
+- Release v0.5.2
+- Release v0.5.3
+- Release v0.5.4
+- Release v0.6.0
+- Release v0.6.1
+- Release v0.7.0
+- Release v0.7.1
+- Release v0.7.2
+- Release v0.8.0
+- Release v0.8.1
+- Release v0.8.2
+
+<!-- generated by git-cliff -->
+
+## [0.13.0] - 2026-05-25
+
+### Bug Fixes
+
+- Some security fixes
+- Chat, docs and route
+- Single source of truth at root, drop per-crate clones
+
+### Features
+
+- Project setups for mono
+- Enrich responses with cost and Aura metadata
+- Add MDX support and interactive documentation components ([#56](https://github.com/UmaiTech/aura-llm-gateway/pull/56))
+- Implement smart routing with load balancing and failover ([#60](https://github.com/UmaiTech/aura-llm-gateway/pull/60))
+- Add InputItem::FunctionCall + per-provider emitters
+- Implement confidence_threshold validation gate ([#155](https://github.com/UmaiTech/aura-llm-gateway/pull/155))
+
+### Miscellaneous Tasks
+
+- Release v0.1.1
+- Fix release
+- Release v0.1.2
+- Release v0.1.3
+- Release v0.1.4
+- Release v0.1.5
+- Release v0.1.6
+- Release v0.1.7
+- Release v0.2.1
+- Release v0.2.2
+- Release v0.2.3
+- Release v0.2.4 ([#51](https://github.com/UmaiTech/aura-llm-gateway/pull/51))
+- Release v0.2.5 ([#52](https://github.com/UmaiTech/aura-llm-gateway/pull/52))
+- Release v0.2.6 ([#54](https://github.com/UmaiTech/aura-llm-gateway/pull/54))
+- Release v0.2.7 ([#57](https://github.com/UmaiTech/aura-llm-gateway/pull/57))
+- Release v0.2.8 ([#59](https://github.com/UmaiTech/aura-llm-gateway/pull/59))
+- Release v0.3.0 ([#63](https://github.com/UmaiTech/aura-llm-gateway/pull/63))
+- Release v0.3.1 ([#65](https://github.com/UmaiTech/aura-llm-gateway/pull/65))
+- Release v0.3.2
+- Release v0.4.0
+- Release v0.4.1
+- Release v0.4.2
+- Release v0.5.1
+- Release v0.5.2
+- Release v0.5.3
+- Release v0.5.4
+- Release v0.6.0
+- Release v0.6.1
+- Release v0.7.0
+- Release v0.7.1
+- Release v0.7.2
+- Release v0.8.0
+- Release v0.8.1
+- Release v0.8.2
+
+<!-- generated by git-cliff -->
+
+## [0.13.0] - 2026-05-25
+
 ### Features
 
 - Wire CRUD modals for Organizations / End Users / API Keys in admin app (#176)
