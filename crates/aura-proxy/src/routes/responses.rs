@@ -37,6 +37,30 @@ const CACHE_CONTROL_HEADER: &str = "x-cache-control";
 /// Header to specify routing strategy
 const ROUTING_STRATEGY_HEADER: &str = "x-routing-strategy";
 
+/// Maximum byte size for a stored payload JSON value.
+/// Payloads that serialise to more than this are replaced with a
+/// small sentinel object so we don't bloat `request_logs`.
+const PAYLOAD_MAX_BYTES: usize = 256 * 1024; // 256 KB
+
+/// Serialise `value` to a `serde_json::Value` suitable for storage.
+///
+/// If the resulting JSON exceeds `PAYLOAD_MAX_BYTES` the function
+/// returns a truncation sentinel rather than the full value, so hot-path
+/// callers never need to think about size constraints.
+fn cap_payload(value: serde_json::Value) -> serde_json::Value {
+    // Cheap estimate: re-use the already-allocated string from to_string().
+    let serialised = value.to_string();
+    if serialised.len() > PAYLOAD_MAX_BYTES {
+        serde_json::json!({
+            "truncated": true,
+            "reason": "size",
+            "original_bytes": serialised.len()
+        })
+    } else {
+        value
+    }
+}
+
 /// Creates the responses router
 pub fn router() -> Router<AppState> {
     Router::new().route("/v1/responses", post(create_response))
@@ -690,6 +714,20 @@ pub async fn create_response(
                 ApiError::from_provider_error(&e)
             })?;
 
+        // Snapshot org_id and the original (pre-compression) request JSON
+        // for payload capture. Both are evaluated once here — before the
+        // stream closure captures its clones — so we don't serialise the
+        // request inside the hot event loop.
+        let org_id_for_stream = auth_context.as_ref().and_then(|a| a.tenant.organization_id);
+        let captured_request_body: Option<serde_json::Value> = {
+            let env_on = state.payload_capture_enabled;
+            if env_on {
+                serde_json::to_value(&request).ok().map(cap_payload)
+            } else {
+                None
+            }
+        };
+
         // Clone state and request_id for the stream closure
         let state_for_stream = state.clone();
         let request_id_for_stream = request_id.clone();
@@ -702,6 +740,7 @@ pub async fn create_response(
         let compression_metadata_for_stream = compression_metadata.clone();
         let compression_log_for_stream = compression_log_metadata.clone();
         let routing_strategy_for_stream = routing_strategy.clone();
+        let captured_request_body_for_stream = captured_request_body.clone();
 
         // Convert to SSE stream, enriching terminal events
         let sse_stream = stream.then(move |result| {
@@ -715,6 +754,8 @@ pub async fn create_response(
             let compression_meta_clone = compression_metadata_for_stream.clone();
             let compression_log_clone = compression_log_for_stream.clone();
             let routing_strategy_clone = routing_strategy_for_stream.clone();
+            let captured_req_body_clone = captured_request_body_for_stream.clone();
+            let org_id_clone = org_id_for_stream;
 
             async move {
                 match result {
@@ -761,6 +802,20 @@ pub async fn create_response(
                                     (None, None) => None,
                                 };
 
+                                // Resolve per-org capture flag and build
+                                // payload bodies for this completed response.
+                                let (req_body_for_log, resp_body_for_log) = {
+                                    let capture =
+                                        state_clone.should_capture_payload(org_id_clone).await;
+                                    if capture {
+                                        let resp_val =
+                                            serde_json::to_value(&response).ok().map(cap_payload);
+                                        (captured_req_body_clone.clone(), resp_val)
+                                    } else {
+                                        (None, None)
+                                    }
+                                };
+
                                 let log = NewRequestLog {
                                     response_id: request_id_clone.clone(),
                                     conversation_id,
@@ -781,6 +836,8 @@ pub async fn create_response(
                                     error_code: None,
                                     error_message: None,
                                     metadata: log_metadata,
+                                    request_body: req_body_for_log,
+                                    response_body: resp_body_for_log,
                                 };
 
                                 // Save response and record API key usage.
@@ -890,6 +947,10 @@ pub async fn create_response(
                                         .as_ref()
                                         .map(|e| e.message.clone()),
                                     metadata: response.metadata.clone(),
+                                    // Payload capture: not needed on failed responses
+                                    // (no useful content to surface in the harness).
+                                    request_body: None,
+                                    response_body: None,
                                 };
 
                                 // Record api_key_usage even for failed responses so
@@ -946,6 +1007,9 @@ pub async fn create_response(
                                     error_code: None,
                                     error_message: None,
                                     metadata: response.metadata.clone(),
+                                    // No payload capture on incomplete responses.
+                                    request_body: None,
+                                    response_body: None,
                                 };
 
                                 // Record api_key_usage. Incomplete responses
@@ -1136,6 +1200,9 @@ pub async fn create_response(
                     error_code: Some(e.error_code().to_string()),
                     error_message: Some(e.to_string()),
                     metadata: None,
+                    // No payload capture on failed requests.
+                    request_body: None,
+                    response_body: None,
                 };
                 tokio::spawn({
                     let state = state.clone();
@@ -1245,6 +1312,16 @@ pub async fn create_response(
             (None, None) => None,
         };
 
+        // Resolve per-org capture flag for non-streaming success log.
+        let org_id_nonstream = auth_context.as_ref().and_then(|a| a.tenant.organization_id);
+        let (req_body_ns, resp_body_ns) = if state.should_capture_payload(org_id_nonstream).await {
+            let req_val = serde_json::to_value(&request).ok().map(cap_payload);
+            let resp_val = serde_json::to_value(&response).ok().map(cap_payload);
+            (req_val, resp_val)
+        } else {
+            (None, None)
+        };
+
         let log = NewRequestLog {
             response_id: request_id,
             conversation_id,
@@ -1268,6 +1345,8 @@ pub async fn create_response(
             error_code: None,
             error_message: None,
             metadata: log_metadata,
+            request_body: req_body_ns,
+            response_body: resp_body_ns,
         };
 
         // Persist the response synchronously before returning so the
