@@ -91,3 +91,82 @@ export function getStatusColor(status: string): string {
       return 'muted'
   }
 }
+
+/**
+ * Format a strategy id from the gateway into a human-readable label.
+ *
+ * The gateway emits strategy ids as lowercase, no-separator strings
+ * (e.g. `tokencleanup`, `selfconsistency`, `referenceanchoring`) — see
+ * the serde lowercase pass in `aura-types`. Keeping them that way in
+ * the UI makes the dashboard look like a config dump.
+ *
+ * Strategy:
+ *   1. Look up a known-alias map for the common cases the gateway
+ *      ships. Wins on both accuracy and consistency — "Best of N",
+ *      not "Best Of N".
+ *   2. Fall back to inserting spaces at snake_case + lowerCamelCase
+ *      boundaries, then title-casing each word. Covers strategies we
+ *      add in the future without needing this file edited.
+ *
+ * Examples:
+ *   tokencleanup       -> "Token Cleanup"
+ *   selfconsistency    -> "Self-Consistency"
+ *   referenceanchoring -> "Reference Anchoring"
+ *   best_of_n          -> "Best of N"
+ *   highest_confidence -> "Highest Confidence"
+ */
+const STRATEGY_LABELS: Record<string, string> = {
+  // Compression
+  tokencleanup: 'Token Cleanup',
+  jsonminify: 'JSON Minify',
+  toon: 'TOON',
+  aisp: 'AISP',
+  yaml: 'YAML',
+  // Validation
+  logprobs: 'Logprobs',
+  best_of_n: 'Best of N',
+  bestofn: 'Best of N',
+  self_consistency: 'Self-Consistency',
+  selfconsistency: 'Self-Consistency',
+  confidence_threshold: 'Confidence Threshold',
+  confidencethreshold: 'Confidence Threshold',
+  // Consistency
+  constitutional: 'Constitutional',
+  style_profile: 'Style Profile',
+  styleprofile: 'Style Profile',
+  reference_anchoring: 'Reference Anchoring',
+  referenceanchoring: 'Reference Anchoring',
+  few_shot_priming: 'Few-Shot Priming',
+  fewshotpriming: 'Few-Shot Priming',
+  model_calibration: 'Model Calibration',
+  modelcalibration: 'Model Calibration',
+  format_schema: 'Format Schema',
+  formatschema: 'Format Schema',
+  semantic_normalization: 'Semantic Normalization',
+  semanticnormalization: 'Semantic Normalization',
+  ensemble_voting: 'Ensemble Voting',
+  ensemblevoting: 'Ensemble Voting',
+  // Selection criteria (validation.selection)
+  highest_confidence: 'Highest Confidence',
+  highestconfidence: 'Highest Confidence',
+  lowest_perplexity: 'Lowest Perplexity',
+  lowestperplexity: 'Lowest Perplexity',
+  most_relevant: 'Most Relevant',
+  mostrelevant: 'Most Relevant',
+}
+
+export function formatStrategy(raw: string | null | undefined): string {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  const lookup = STRATEGY_LABELS[trimmed.toLowerCase()]
+  if (lookup) return lookup
+  // Fallback: insert spaces at snake_case + camelCase boundaries,
+  // then title-case each word.
+  return trimmed
+    .replace(/_+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}

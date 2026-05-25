@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui'
-import { cn, formatDuration, formatCurrency, formatNumber, formatRelativeTime } from '@/lib/utils'
+import { cn, formatDuration, formatCurrency, formatNumber, formatRelativeTime, formatStrategy } from '@/lib/utils'
 import {
   AiLine,
   Message1Line,
@@ -87,16 +87,17 @@ function logToTrace(log: RecentLog): Trace {
   // claiming finer-grained timing than we actually store.
   if (log.compression_meta) {
     const c = log.compression_meta
-    const strategy = c.strategies?.[0] ?? 'compression'
+    const strategyRaw = c.strategies?.[0] ?? 'compression'
+    const strategyLabel = formatStrategy(strategyRaw)
     const savings =
       typeof c.savings_percent === 'number' ? `${c.savings_percent.toFixed(1)}%` : undefined
     steps.push({
       id: `${log.id}-compression`,
       type: 'compression',
-      content: `Compression: ${strategy}${savings ? ` (${savings} saved)` : ''}`,
+      content: `Compression: ${strategyLabel}${savings ? ` (${savings} saved)` : ''}`,
       latency: c.latency_ms,
       meta: {
-        strategy,
+        strategy: strategyLabel,
         savings_percent: c.savings_percent,
         original_tokens: c.original_tokens,
         compressed_tokens: c.compressed_tokens,
@@ -105,12 +106,13 @@ function logToTrace(log: RecentLog): Trace {
   }
   if (log.consistency_meta && log.consistency_meta.strategy && log.consistency_meta.strategy !== 'none') {
     const c = log.consistency_meta
+    const label = formatStrategy(c.strategy)
     steps.push({
       id: `${log.id}-consistency`,
       type: 'consistency',
-      content: `Consistency: ${c.strategy}${c.principles_count ? ` · ${c.principles_count} principles` : ''}`,
+      content: `Consistency: ${label}${c.principles_count ? ` · ${c.principles_count} principles` : ''}`,
       meta: {
-        strategy: c.strategy,
+        strategy: label,
         principles_count: c.principles_count,
         has_style_profile: c.has_style_profile,
         examples_count: c.examples_count,
@@ -119,6 +121,7 @@ function logToTrace(log: RecentLog): Trace {
   }
   if (log.validation_meta && log.validation_meta.strategy && log.validation_meta.strategy !== 'none') {
     const v = log.validation_meta
+    const label = formatStrategy(v.strategy)
     const score =
       typeof v.confidence === 'number' ? ` · confidence ${v.confidence.toFixed(2)}` : ''
     const fanout =
@@ -128,7 +131,7 @@ function logToTrace(log: RecentLog): Trace {
     steps.push({
       id: `${log.id}-validation`,
       type: 'validation',
-      content: `Validation: ${v.strategy}${score}${fanout}`,
+      content: `Validation: ${label}${score}${fanout}`,
       // Color the step red when confidence dropped below the gate.
       status:
         typeof v.confidence === 'number' &&

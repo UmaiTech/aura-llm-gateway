@@ -312,10 +312,15 @@ export function InsightsPage() {
                   const dd = d.getDate().toString().padStart(2, '0')
                   return { primary: `${mm}-${dd}`, full: d.toLocaleDateString() }
                 }
+                // Cap displayed bars so the chart fits its half-width
+                // container at normal window sizes. 12 hourly bars × ~24px
+                // labels overflowed when the dashboard column got narrower
+                // than ~320px (#175 follow-up).
+                const maxBars = useHourLabels ? 8 : 12
                 return (
                 <>
-                  <div className="h-[200px] flex items-end gap-1 relative">
-                    {tokenTimeline.slice(-12).map((point, i) => {
+                  <div className="h-[200px] flex items-end gap-1 relative overflow-hidden">
+                    {tokenTimeline.slice(-maxBars).map((point, i) => {
                       const inputHeight = (point.input_tokens / maxTokens) * 100
                       const outputHeight = (point.output_tokens / maxTokens) * 100
                       const isHovered = hoveredBar === i
@@ -398,20 +403,33 @@ export function InsightsPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {modelCosts.length > 0 ? (
-                modelCosts.slice(0, 5).map((model) => (
-                  <div key={model.model_id} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">{model.model_name || model.model_id}</span>
-                      <span className="text-muted-foreground">{formatCurrency(model.total_cost)}</span>
+                // One model often dominates cost (e.g. 95%), making the
+                // rest invisible at literal `width: %`. Floor visible bars
+                // at 4% so non-zero spend remains legible while still
+                // letting the dominant model read as dominant.
+                modelCosts.slice(0, 5).map((model) => {
+                  const displayWidth =
+                    model.percentage > 0 ? Math.max(model.percentage, 4) : 0
+                  return (
+                    <div key={model.model_id} className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{model.model_name || model.model_id}</span>
+                        <span className="text-muted-foreground">
+                          {formatCurrency(model.total_cost)}
+                          <span className="ml-1 text-2xs opacity-70">
+                            ({model.percentage.toFixed(1)}%)
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-aura-400 rounded-full transition-all duration-1000"
+                          style={{ width: `${displayWidth}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary to-aura-400 rounded-full transition-all duration-1000"
-                        style={{ width: `${model.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="py-8 text-center text-muted-foreground">No cost data available</div>
               )}

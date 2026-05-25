@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
-import { cn, formatNumber, formatCurrency, formatDuration } from '@/lib/utils'
+import { cn, formatNumber, formatCurrency, formatDuration, formatStrategy } from '@/lib/utils'
 import { animateStaggered, animateNumber } from '@/lib/animations'
 import {
   FlashLine,
@@ -504,9 +504,7 @@ export function DashboardPage() {
                 routingWithPercentages.map((stat) => (
                   <div key={stat.routing_strategy} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="capitalize">
-                        {stat.routing_strategy.replace(/_/g, ' ')}
-                      </span>
+                      <span>{formatStrategy(stat.routing_strategy)}</span>
                       <span className="text-muted-foreground">{stat.percentage.toFixed(1)}%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -670,9 +668,7 @@ export function DashboardPage() {
                         key={s.strategy}
                         className="flex items-center justify-between text-sm"
                       >
-                        <span className="capitalize text-muted-foreground">
-                          {s.strategy.replace(/_/g, ' ')}
-                        </span>
+                        <span className="text-muted-foreground">{formatStrategy(s.strategy)}</span>
                         <span className="font-mono tabular-nums">{s.request_count}</span>
                       </div>
                     ))}
@@ -717,9 +713,7 @@ export function DashboardPage() {
                         key={s.strategy}
                         className="flex items-center justify-between text-sm"
                       >
-                        <span className="capitalize text-muted-foreground">
-                          {s.strategy.replace(/_/g, ' ')}
-                        </span>
+                        <span className="text-muted-foreground">{formatStrategy(s.strategy)}</span>
                         <span className="font-mono tabular-nums">{s.request_count}</span>
                       </div>
                     ))}
@@ -762,9 +756,7 @@ export function DashboardPage() {
                         key={s.strategy}
                         className="flex items-center justify-between text-sm"
                       >
-                        <span className="capitalize text-muted-foreground">
-                          {s.strategy.replace(/_/g, ' ')}
-                        </span>
+                        <span className="text-muted-foreground">{formatStrategy(s.strategy)}</span>
                         <span className="font-mono tabular-nums">{s.request_count}</span>
                       </div>
                     ))}
