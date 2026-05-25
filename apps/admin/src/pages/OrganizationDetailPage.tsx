@@ -70,6 +70,13 @@ export function OrganizationDetailPage() {
   }
 
   useEffect(() => {
+    // Reset to a loading skeleton when navigating between orgs so
+    // we don't briefly show the previous org's data under the new id.
+    setLoading(true)
+    setOrg(null)
+    setTeams([])
+    setApiKeys([])
+    setEndUsers([])
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])

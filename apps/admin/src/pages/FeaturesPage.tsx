@@ -64,6 +64,10 @@ export function FeaturesPage() {
   }
 
   useEffect(() => {
+    // Show the loading skeleton on every period switch, otherwise
+    // the previous range's stats stay visible while the new request
+    // is in flight and the user sees nothing change.
+    setLoading(true)
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange])
