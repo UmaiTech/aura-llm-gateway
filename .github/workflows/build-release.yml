@@ -34,7 +34,7 @@ jobs:
             asset_name: aura-proxy-macos-aarch64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -96,7 +96,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all artifacts
         uses: actions/download-artifact@v7
@@ -125,7 +125,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Pull the binaries built natively by the `build-release` matrix
       # (linux-x86_64, linux-aarch64) instead of cross-compiling under
