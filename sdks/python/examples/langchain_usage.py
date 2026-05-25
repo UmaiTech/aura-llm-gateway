@@ -65,9 +65,12 @@ def aura_v1_base_url() -> str:
 
 def build_model(**overrides: Any) -> ChatOpenAI:
     """Create a ChatOpenAI instance pointed at Aura's OpenAI-compatible API."""
+    api_key = os.getenv("AURA_API_KEY")
+    if not api_key:
+        raise ValueError("AURA_API_KEY environment variable is not set")
     return ChatOpenAI(
         model=os.getenv("AURA_MODEL", DEFAULT_MODEL),
-        api_key=os.environ["AURA_API_KEY"],
+        api_key=api_key,
         base_url=aura_v1_base_url(),
         temperature=0,
         **overrides,
