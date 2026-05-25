@@ -30,6 +30,7 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/providers", get(get_provider_health))
         .route("/admin/stats/cache", get(get_cache_stats))
         .route("/admin/stats/routing", get(get_routing_stats))
+        .route("/admin/stats/features", get(get_feature_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
         // Insights endpoints
@@ -40,12 +41,6 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/token-timeline", get(get_token_timeline))
         // Request logs for dev logs page
         .route("/admin/logs/recent", get(get_recent_logs))
-        // Routing configuration
-        .route("/admin/routing/rules", get(list_routing_rules))
-        .route(
-            "/admin/routing/rules",
-            axum::routing::post(create_routing_rule),
-        )
         // Organizations
         .route(
             "/admin/organizations",
@@ -323,40 +318,10 @@ pub struct ProviderSummary {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RoutingRule {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub strategy: String,
-    pub priority: i32,
-    pub enabled: bool,
-    pub conditions: Vec<RoutingCondition>,
-    pub actions: Vec<RoutingAction>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RoutingCondition {
-    pub condition_type: String,
-    pub value: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RoutingAction {
-    pub provider: String,
-    pub model: String,
-    pub weight: Option<i32>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateRoutingRuleRequest {
-    pub name: String,
-    pub description: String,
-    pub strategy: String,
-    pub priority: i32,
-    pub conditions: Vec<RoutingCondition>,
-    pub actions: Vec<RoutingAction>,
-}
+// RoutingRule / RoutingCondition / RoutingAction / CreateRoutingRuleRequest
+// types removed alongside the mock /admin/routing/rules handlers — those
+// returned hardcoded JSON and never persisted anything (#175 / A6). Add
+// them back when an actual routing_rules table + migration land.
 
 #[derive(Debug, Deserialize)]
 pub struct LogsQuery {
@@ -378,7 +343,11 @@ pub struct PeriodQuery {
 }
 
 impl PeriodQuery {
-    /// Convert period string to PostgreSQL interval
+    /// Convert period string to PostgreSQL interval.
+    ///
+    /// `"all"` returns `100 years` — effectively unbounded for the
+    /// gateway's lifetime, so existing `WHERE created_at >= NOW() - INTERVAL ...`
+    /// queries don't need a separate "no filter" branch.
     fn to_interval(&self) -> &'static str {
         match self.period.as_deref() {
             Some("24h") | Some("1d") => "24 hours",
@@ -388,6 +357,7 @@ impl PeriodQuery {
             Some("5d") => "5 days",
             Some("6d") => "6 days",
             Some("7d") => "7 days",
+            Some("all") => "100 years",
             _ => "24 hours", // default
         }
     }
@@ -1238,121 +1208,9 @@ async fn list_providers(
     Ok(Json(providers))
 }
 
-// ============================================================================
-// Routing Configuration Endpoints
-// ============================================================================
-
-async fn list_routing_rules(State(_state): State<AppState>) -> Json<Vec<RoutingRule>> {
-    // Return mock routing rules - real implementation would query database
-    // Note: Routing rules table doesn't exist yet, so keeping mock data
-    Json(mock_routing_rules())
-}
-
-fn mock_routing_rules() -> Vec<RoutingRule> {
-    vec![
-        RoutingRule {
-            id: "rule_1".to_string(),
-            name: "Cost Optimization".to_string(),
-            description: "Route simple queries to cheaper models".to_string(),
-            strategy: "cost_based".to_string(),
-            priority: 1,
-            enabled: true,
-            conditions: vec![RoutingCondition {
-                condition_type: "input_tokens".to_string(),
-                value: "< 500".to_string(),
-            }],
-            actions: vec![
-                RoutingAction {
-                    provider: "openai".to_string(),
-                    model: "gpt-5.4-nano".to_string(),
-                    weight: Some(70),
-                },
-                RoutingAction {
-                    provider: "anthropic".to_string(),
-                    model: "claude-3-haiku-20240307".to_string(),
-                    weight: Some(30),
-                },
-            ],
-        },
-        RoutingRule {
-            id: "rule_2".to_string(),
-            name: "Load Balancing".to_string(),
-            description: "Distribute load across providers".to_string(),
-            strategy: "round_robin".to_string(),
-            priority: 2,
-            enabled: true,
-            conditions: vec![],
-            actions: vec![
-                RoutingAction {
-                    provider: "openai".to_string(),
-                    model: "gpt-5.4-mini".to_string(),
-                    weight: Some(40),
-                },
-                RoutingAction {
-                    provider: "anthropic".to_string(),
-                    model: "claude-sonnet-4-6".to_string(),
-                    weight: Some(40),
-                },
-                RoutingAction {
-                    provider: "google".to_string(),
-                    model: "gemini-2.5-flash".to_string(),
-                    weight: Some(20),
-                },
-            ],
-        },
-        RoutingRule {
-            id: "rule_3".to_string(),
-            name: "Fallback Chain".to_string(),
-            description: "Automatic fallback on provider failures".to_string(),
-            strategy: "fallback".to_string(),
-            priority: 10,
-            enabled: true,
-            conditions: vec![RoutingCondition {
-                condition_type: "on_error".to_string(),
-                value: "true".to_string(),
-            }],
-            actions: vec![
-                RoutingAction {
-                    provider: "openai".to_string(),
-                    model: "gpt-5.4-mini".to_string(),
-                    weight: None,
-                },
-                RoutingAction {
-                    provider: "anthropic".to_string(),
-                    model: "claude-sonnet-4-6".to_string(),
-                    weight: None,
-                },
-                RoutingAction {
-                    provider: "google".to_string(),
-                    model: "gemini-2.5-flash".to_string(),
-                    weight: None,
-                },
-            ],
-        },
-    ]
-}
-
-async fn create_routing_rule(
-    State(_state): State<AppState>,
-    Json(req): Json<CreateRoutingRuleRequest>,
-) -> (StatusCode, Json<RoutingRule>) {
-    // Return mock created rule - real implementation would store in database
-    let rule = RoutingRule {
-        id: format!(
-            "rule_{}",
-            uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
-        ),
-        name: req.name,
-        description: req.description,
-        strategy: req.strategy,
-        priority: req.priority,
-        enabled: true,
-        conditions: req.conditions,
-        actions: req.actions,
-    };
-
-    (StatusCode::CREATED, Json(rule))
-}
+// Routing rules CRUD intentionally removed (#175 / A6). Strategies are
+// configured via aura.yaml on the gateway today; the admin Routing page
+// is read-only and reads from /admin/stats/routing.
 
 // ============================================================================
 // Dynamic Stats with Time Range
@@ -1422,6 +1280,17 @@ async fn get_insights_stats(
 
     let interval = params.to_interval();
 
+    // tool_calls sums the per-request count the gateway writes to
+    // metadata.aura.agentic.tool_calls_count. The JSONB cast is wrapped
+    // in COALESCE because requests without tool activity store no
+    // agentic block at all, and ::BIGINT would fail on NULL.
+    let tool_calls_sum = "COALESCE(SUM(\
+        COALESCE(\
+            (metadata->'aura'->'agentic'->>'tool_calls_count')::BIGINT, \
+            0\
+        )\
+    ), 0)::BIGINT as tool_calls";
+
     // Current period stats
     let current_query = format!(
         r#"
@@ -1430,11 +1299,10 @@ async fn get_insights_stats(
             COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
             COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
             COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
-            0::BIGINT as tool_calls
+            {tool_calls_sum}
         FROM request_logs
-        WHERE created_at >= NOW() - INTERVAL '{}'
+        WHERE created_at >= NOW() - INTERVAL '{interval}'
         "#,
-        interval
     );
 
     // Previous period stats (for comparison)
@@ -1445,12 +1313,11 @@ async fn get_insights_stats(
             COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
             COALESCE(SUM(cost_usd), 0)::FLOAT8 as total_cost,
             COALESCE(AVG(latency_ms), 0)::INT as avg_latency,
-            0::BIGINT as tool_calls
+            {tool_calls_sum}
         FROM request_logs
-        WHERE created_at >= NOW() - INTERVAL '{0}' - INTERVAL '{0}'
-          AND created_at < NOW() - INTERVAL '{0}'
+        WHERE created_at >= NOW() - INTERVAL '{interval}' - INTERVAL '{interval}'
+          AND created_at < NOW() - INTERVAL '{interval}'
         "#,
-        interval
     );
 
     let current = sqlx::query(&current_query)
@@ -1718,6 +1585,9 @@ async fn get_token_timeline(
     let group_interval = match params.period.as_deref() {
         Some("24h") | Some("1d") => "1 hour",
         Some("2d") | Some("3d") => "2 hours",
+        // "all" gets daily buckets — anything finer would balloon the
+        // response for projects with months of history.
+        Some("all") => "1 day",
         _ => "6 hours",
     };
 
@@ -2144,32 +2014,255 @@ fn map_db_error(err: aura_db::DbError, entity: &str) -> (StatusCode, Json<serde_
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::mock_routing_rules;
-    use aura_core::{AnthropicProvider, GeminiProvider, OpenAIProvider, Provider};
+// ============================================================================
+// Strategy Feature Stats (compression / validation / consistency)
+// ============================================================================
+//
+// Single endpoint that aggregates per-strategy usage over the requested
+// period. The dashboard renders a card per feature next to the existing
+// Routing Distribution / Cache Performance / Usage Summary row, and this
+// single endpoint avoids spinning three separate cards' worth of queries.
 
-    #[test]
-    fn mock_routing_rule_models_match_provider_catalogs() {
-        let openai = OpenAIProvider::new("test-key");
-        let anthropic = AnthropicProvider::new("test-key");
-        let gemini = GeminiProvider::new("test-key");
+#[derive(Debug, Serialize)]
+pub struct StrategyBreakdown {
+    /// The strategy id (e.g. "aisp", "best_of_n", "constitutional"),
+    /// or "none" when the request didn't pick one.
+    pub strategy: String,
+    pub request_count: i64,
+}
 
-        for rule in mock_routing_rules() {
-            for action in rule.actions {
-                let is_supported = match action.provider.as_str() {
-                    "openai" => openai.supports_model(&action.model),
-                    "anthropic" => anthropic.supports_model(&action.model),
-                    "google" => gemini.supports_model(&action.model),
-                    provider => panic!("unexpected provider in mock routing rules: {provider}"),
-                };
+#[derive(Debug, Serialize)]
+pub struct CompressionFeatureStats {
+    /// Number of requests where compression actually ran (regardless
+    /// of whether it saved tokens).
+    pub requests_compressed: i64,
+    /// Total tokens saved across the period.
+    pub total_tokens_saved: i64,
+    /// Aggregate savings percentage — weighted by `original_tokens` so
+    /// a single big compressed request doesn't dominate.
+    pub avg_savings_percent: f64,
+    pub by_strategy: Vec<StrategyBreakdown>,
+}
 
-                assert!(
-                    is_supported,
-                    "provider '{}' does not support demo model '{}' in routing rule '{}' ({})",
-                    action.provider, action.model, rule.id, rule.name,
-                );
-            }
-        }
-    }
+#[derive(Debug, Serialize)]
+pub struct ValidationFeatureStats {
+    /// Requests where validation.strategy != "none".
+    pub requests_validated: i64,
+    /// Mean confidence across all responses that actually produced a
+    /// confidence score (i.e. provider supplied logprobs). Null when
+    /// no validated request returned a score.
+    pub avg_confidence: Option<f64>,
+    pub by_strategy: Vec<StrategyBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConsistencyFeatureStats {
+    /// Requests where consistency.strategy != "none".
+    pub requests_applied: i64,
+    /// Count of requests that carried at least one principle, used as
+    /// a proxy for "did Constitutional actually do something".
+    pub requests_with_principles: i64,
+    pub by_strategy: Vec<StrategyBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FeatureStats {
+    pub compression: CompressionFeatureStats,
+    pub validation: ValidationFeatureStats,
+    pub consistency: ConsistencyFeatureStats,
+}
+
+async fn get_feature_stats(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<FeatureStats>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let interval = params.to_interval();
+
+    // Compression rollup — pull from metadata->'aura'->'compression'.
+    // request_count uses COUNT for the "actually ran" filter (savings_percent
+    // > 0 means the gateway selected a strategy that did something);
+    // by_strategy aggregates by the strategies[] array's first element.
+    let compression_query = format!(
+        r#"
+        SELECT
+            COALESCE(COUNT(*) FILTER (
+                WHERE metadata->'aura'->'compression'->>'savings_percent' IS NOT NULL
+            ), 0)::BIGINT AS requests_compressed,
+            COALESCE(SUM(
+                (metadata->'aura'->'compression'->>'original_tokens')::BIGINT
+                - (metadata->'aura'->'compression'->>'compressed_tokens')::BIGINT
+            ), 0)::BIGINT AS total_tokens_saved,
+            COALESCE(
+                SUM(
+                    (metadata->'aura'->'compression'->>'savings_percent')::FLOAT8
+                    * (metadata->'aura'->'compression'->>'original_tokens')::FLOAT8
+                ) / NULLIF(SUM((metadata->'aura'->'compression'->>'original_tokens')::FLOAT8), 0),
+                0.0
+            )::FLOAT8 AS avg_savings_percent
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+          AND status = 'completed'
+          AND metadata->'aura'->'compression' IS NOT NULL
+        "#,
+        interval
+    );
+
+    let compression_row = sqlx::query(&compression_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch compression stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let compression_strategies = fetch_strategy_breakdown(
+        pool,
+        interval,
+        // Strategies live in an array; pull the first element for the
+        // breakdown. Multi-strategy chains roll up under their primary.
+        "metadata->'aura'->'compression'->'strategies'->>0",
+    )
+    .await?;
+
+    let validation_query = format!(
+        r#"
+        SELECT
+            COALESCE(COUNT(*) FILTER (
+                WHERE metadata->'aura'->'validation'->>'strategy' IS NOT NULL
+                  AND metadata->'aura'->'validation'->>'strategy' != 'none'
+            ), 0)::BIGINT AS requests_validated,
+            AVG(NULLIF(
+                (metadata->'aura'->'validation'->>'confidence')::FLOAT8,
+                0.0
+            )) AS avg_confidence
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+          AND status = 'completed'
+        "#,
+        interval
+    );
+
+    let validation_row = sqlx::query(&validation_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch validation stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let validation_strategies = fetch_strategy_breakdown(
+        pool,
+        interval,
+        "metadata->'aura'->'validation'->>'strategy'",
+    )
+    .await?;
+
+    let consistency_query = format!(
+        r#"
+        SELECT
+            COALESCE(COUNT(*) FILTER (
+                WHERE metadata->'aura'->'consistency'->>'strategy' IS NOT NULL
+                  AND metadata->'aura'->'consistency'->>'strategy' != 'none'
+            ), 0)::BIGINT AS requests_applied,
+            COALESCE(COUNT(*) FILTER (
+                WHERE (metadata->'aura'->'consistency'->>'has_principles')::BOOLEAN = TRUE
+            ), 0)::BIGINT AS requests_with_principles
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{}'
+          AND status = 'completed'
+        "#,
+        interval
+    );
+
+    let consistency_row = sqlx::query(&consistency_query)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch consistency stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    let consistency_strategies = fetch_strategy_breakdown(
+        pool,
+        interval,
+        "metadata->'aura'->'consistency'->>'strategy'",
+    )
+    .await?;
+
+    Ok(Json(FeatureStats {
+        compression: CompressionFeatureStats {
+            requests_compressed: compression_row.try_get("requests_compressed").unwrap_or(0),
+            total_tokens_saved: compression_row.try_get("total_tokens_saved").unwrap_or(0),
+            avg_savings_percent: compression_row
+                .try_get("avg_savings_percent")
+                .unwrap_or(0.0),
+            by_strategy: compression_strategies,
+        },
+        validation: ValidationFeatureStats {
+            requests_validated: validation_row.try_get("requests_validated").unwrap_or(0),
+            avg_confidence: validation_row.try_get("avg_confidence").ok(),
+            by_strategy: validation_strategies,
+        },
+        consistency: ConsistencyFeatureStats {
+            requests_applied: consistency_row.try_get("requests_applied").unwrap_or(0),
+            requests_with_principles: consistency_row
+                .try_get("requests_with_principles")
+                .unwrap_or(0),
+            by_strategy: consistency_strategies,
+        },
+    }))
+}
+
+/// Helper: group request_logs rows by a JSONB string extracted by
+/// `path_expr` (e.g. `metadata->'aura'->'validation'->>'strategy'`)
+/// and return (strategy, count) tuples ordered by count desc.
+async fn fetch_strategy_breakdown(
+    pool: &aura_db::DbPool,
+    interval: &str,
+    path_expr: &str,
+) -> Result<Vec<StrategyBreakdown>, (StatusCode, Json<serde_json::Value>)> {
+    let query = format!(
+        r#"
+        SELECT
+            COALESCE({path}, 'none') AS strategy,
+            COUNT(*)::BIGINT AS request_count
+        FROM request_logs
+        WHERE created_at >= NOW() - INTERVAL '{interval}'
+          AND status = 'completed'
+        GROUP BY COALESCE({path}, 'none')
+        ORDER BY request_count DESC
+        LIMIT 8
+        "#,
+        path = path_expr,
+        interval = interval,
+    );
+    let rows = sqlx::query(&query).fetch_all(pool).await.map_err(|e| {
+        tracing::error!("Failed to fetch strategy breakdown for {path_expr}: {e}");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {e}")})),
+        )
+    })?;
+    Ok(rows
+        .iter()
+        .map(|row| StrategyBreakdown {
+            strategy: row
+                .try_get("strategy")
+                .unwrap_or_else(|_| "none".to_string()),
+            request_count: row.try_get("request_count").unwrap_or(0),
+        })
+        .collect())
 }

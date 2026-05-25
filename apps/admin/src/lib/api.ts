@@ -12,7 +12,6 @@ import type {
   OrganizationSummary,
   TeamSummary,
   ApiKeySummary,
-  RoutingRule,
   TimeRange,
   DynamicStats,
   InsightsStats,
@@ -163,19 +162,9 @@ export async function getProviders(): Promise<ProviderSummary[]> {
   return fetchApi<ProviderSummary[]>('/admin/providers')
 }
 
-// Routing Rules
-export async function getRoutingRules(): Promise<RoutingRule[]> {
-  return fetchApi<RoutingRule[]>('/admin/routing/rules')
-}
-
-export async function createRoutingRule(
-  rule: Omit<RoutingRule, 'id' | 'enabled'>
-): Promise<RoutingRule> {
-  return fetchApi<RoutingRule>('/admin/routing/rules', {
-    method: 'POST',
-    body: JSON.stringify(rule),
-  })
-}
+// Routing rule CRUD methods removed (#175 / A6) — the backend handlers
+// were mock-only and the RoutingPage now shows read-only stats from
+// /admin/stats/routing. Restore these when a routing_rules table exists.
 
 // Insights Stats
 export async function getInsightsStats(period: TimeRange = '7d'): Promise<InsightsStats> {
@@ -350,4 +339,42 @@ export async function createApiKey(payload: {
 
 export async function deleteApiKey(id: string): Promise<void> {
   await fetchApi<void>(`/admin/api-keys/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// Feature stats (compression / validation / consistency)
+// ---------------------------------------------------------------------------
+
+export interface StrategyBreakdown {
+  strategy: string
+  request_count: number
+}
+
+export interface CompressionFeatureStats {
+  requests_compressed: number
+  total_tokens_saved: number
+  avg_savings_percent: number
+  by_strategy: StrategyBreakdown[]
+}
+
+export interface ValidationFeatureStats {
+  requests_validated: number
+  avg_confidence: number | null
+  by_strategy: StrategyBreakdown[]
+}
+
+export interface ConsistencyFeatureStats {
+  requests_applied: number
+  requests_with_principles: number
+  by_strategy: StrategyBreakdown[]
+}
+
+export interface FeatureStats {
+  compression: CompressionFeatureStats
+  validation: ValidationFeatureStats
+  consistency: ConsistencyFeatureStats
+}
+
+export async function getFeatureStats(period: TimeRange = '24h'): Promise<FeatureStats> {
+  return fetchApi<FeatureStats>(`/admin/stats/features?period=${period}`)
 }
