@@ -1677,6 +1677,37 @@ impl EndUserRepo {
         Ok(())
     }
 
+    /// Update extended editable fields on an end user.
+    ///
+    /// Each parameter is optional; only the fields that are `Some` are
+    /// written. `None` values are passed as SQL NULL and COALESCE keeps
+    /// the existing column value, so callers can send a partial update
+    /// without clobbering untouched fields.
+    pub async fn update(
+        pool: &DbPool,
+        id: Uuid,
+        external_id: Option<&str>,
+        metadata: Option<&serde_json::Value>,
+    ) -> Result<EndUser, DbError> {
+        let row = sqlx::query(
+            r#"
+            UPDATE end_users
+            SET external_id = COALESCE($2, external_id),
+                metadata    = COALESCE($3, metadata),
+                updated_at  = NOW()
+            WHERE id = $1
+            RETURNING *
+            "#,
+        )
+        .bind(id)
+        .bind(external_id)
+        .bind(metadata)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(Self::row_to_end_user(row))
+    }
+
     /// Delete an end user
     pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), DbError> {
         sqlx::query("DELETE FROM end_users WHERE id = $1")
