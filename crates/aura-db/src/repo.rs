@@ -1050,6 +1050,11 @@ impl OrganizationRepo {
     }
 
     /// Update organization
+    ///
+    /// `settings` is shallow-merged via the JSONB `||` operator so a
+    /// partial patch (e.g. `{"capture_payloads": true}`) keeps untouched
+    /// top-level keys. A `None` patch leaves the column untouched.
+    /// COALESCE on the LHS guards against a legacy NULL settings column.
     pub async fn update(
         pool: &DbPool,
         id: Uuid,
@@ -1060,7 +1065,10 @@ impl OrganizationRepo {
             r#"
             UPDATE organizations
             SET name = COALESCE($2, name),
-                settings = COALESCE($3, settings),
+                settings = CASE
+                    WHEN $3::jsonb IS NULL THEN settings
+                    ELSE COALESCE(settings, '{}'::jsonb) || $3::jsonb
+                END,
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
@@ -1706,10 +1714,11 @@ impl EndUserRepo {
 
     /// Update extended editable fields on an end user.
     ///
-    /// Each parameter is optional; only the fields that are `Some` are
-    /// written. `None` values are passed as SQL NULL and COALESCE keeps
-    /// the existing column value, so callers can send a partial update
-    /// without clobbering untouched fields.
+    /// `external_id` is replaced when `Some`, left alone when `None`.
+    /// `metadata` is shallow-merged via the JSONB `||` operator when
+    /// `Some` so a partial patch keeps untouched top-level keys; `None`
+    /// leaves the column untouched. COALESCE on the LHS guards against
+    /// a legacy NULL metadata column.
     pub async fn update(
         pool: &DbPool,
         id: Uuid,
@@ -1720,8 +1729,11 @@ impl EndUserRepo {
             r#"
             UPDATE end_users
             SET external_id = COALESCE($2, external_id),
-                metadata    = COALESCE($3, metadata),
-                updated_at  = NOW()
+                metadata = CASE
+                    WHEN $3::jsonb IS NULL THEN metadata
+                    ELSE COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+                END,
+                updated_at = NOW()
             WHERE id = $1
             RETURNING *
             "#,
