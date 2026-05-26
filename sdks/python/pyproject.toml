@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aura-llm"
-version = "0.13.0"
+version = "0.15.0"
 description = "Python SDK for Aura LLM Gateway - Open Responses API"
 readme = "README.md"
 license = "MIT"
