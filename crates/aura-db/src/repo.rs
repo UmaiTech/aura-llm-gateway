@@ -312,9 +312,10 @@ impl RequestLogRepo {
             INSERT INTO request_logs (
                 response_id, conversation_id, provider_name, model_id, user_id,
                 input_tokens, output_tokens, cached_tokens, reasoning_tokens,
-                cost_usd, latency_ms, status, error_code, error_message, metadata
+                cost_usd, latency_ms, status, error_code, error_message, metadata,
+                request_body, response_body
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *
             "#,
         )
@@ -333,6 +334,8 @@ impl RequestLogRepo {
         .bind(&new.error_code)
         .bind(&new.error_message)
         .bind(&new.metadata)
+        .bind(&new.request_body)
+        .bind(&new.response_body)
         .fetch_one(pool)
         .await?;
 
@@ -353,6 +356,8 @@ impl RequestLogRepo {
             error_code: row.get("error_code"),
             error_message: row.get("error_message"),
             metadata: row.get("metadata"),
+            request_body: row.try_get("request_body").ok().flatten(),
+            response_body: row.try_get("response_body").ok().flatten(),
             created_at: row.get("created_at"),
         })
     }
@@ -395,6 +400,8 @@ impl RequestLogRepo {
                 error_code: row.get("error_code"),
                 error_message: row.get("error_message"),
                 metadata: row.get("metadata"),
+                request_body: row.try_get("request_body").ok().flatten(),
+                response_body: row.try_get("response_body").ok().flatten(),
                 created_at: row.get("created_at"),
             })
             .collect())
@@ -1043,6 +1050,11 @@ impl OrganizationRepo {
     }
 
     /// Update organization
+    ///
+    /// `settings` is shallow-merged via the JSONB `||` operator so a
+    /// partial patch (e.g. `{"capture_payloads": true}`) keeps untouched
+    /// top-level keys. A `None` patch leaves the column untouched.
+    /// COALESCE on the LHS guards against a legacy NULL settings column.
     pub async fn update(
         pool: &DbPool,
         id: Uuid,
@@ -1053,7 +1065,10 @@ impl OrganizationRepo {
             r#"
             UPDATE organizations
             SET name = COALESCE($2, name),
-                settings = COALESCE($3, settings),
+                settings = CASE
+                    WHEN $3::jsonb IS NULL THEN settings
+                    ELSE COALESCE(settings, '{}'::jsonb) || $3::jsonb
+                END,
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
@@ -1066,6 +1081,26 @@ impl OrganizationRepo {
         .await?;
 
         Ok(org)
+    }
+
+    /// Fetch only the settings JSONB column for an organization.
+    ///
+    /// Used by the payload-capture decision path in aura-proxy so the
+    /// caller does not need to decode the full Organization row.
+    pub async fn get_settings(
+        pool: &DbPool,
+        id: Uuid,
+    ) -> Result<Option<serde_json::Value>, DbError> {
+        let row = sqlx::query("SELECT settings FROM organizations WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.and_then(|r| {
+            r.try_get::<Option<serde_json::Value>, _>("settings")
+                .ok()
+                .flatten()
+        }))
     }
 
     /// Delete organization
@@ -1679,10 +1714,11 @@ impl EndUserRepo {
 
     /// Update extended editable fields on an end user.
     ///
-    /// Each parameter is optional; only the fields that are `Some` are
-    /// written. `None` values are passed as SQL NULL and COALESCE keeps
-    /// the existing column value, so callers can send a partial update
-    /// without clobbering untouched fields.
+    /// `external_id` is replaced when `Some`, left alone when `None`.
+    /// `metadata` is shallow-merged via the JSONB `||` operator when
+    /// `Some` so a partial patch keeps untouched top-level keys; `None`
+    /// leaves the column untouched. COALESCE on the LHS guards against
+    /// a legacy NULL metadata column.
     pub async fn update(
         pool: &DbPool,
         id: Uuid,
@@ -1693,8 +1729,11 @@ impl EndUserRepo {
             r#"
             UPDATE end_users
             SET external_id = COALESCE($2, external_id),
-                metadata    = COALESCE($3, metadata),
-                updated_at  = NOW()
+                metadata = CASE
+                    WHEN $3::jsonb IS NULL THEN metadata
+                    ELSE COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+                END,
+                updated_at = NOW()
             WHERE id = $1
             RETURNING *
             "#,

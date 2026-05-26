@@ -41,6 +41,9 @@ pub struct AppState {
     rate_limiter: Option<RateLimiter>,
     /// Response cache (optional, requires Redis)
     response_cache: Option<ResponseCache>,
+    /// Top-level env flag for payload capture (AURA_PAYLOAD_CAPTURE=on).
+    /// When false the per-org flag is never consulted.
+    pub payload_capture_enabled: bool,
 }
 
 impl AppState {
@@ -198,6 +201,11 @@ impl AppState {
             (None, None)
         };
 
+        let payload_capture_enabled = config.payload_capture_enabled();
+        if payload_capture_enabled {
+            info!("Payload capture enabled (AURA_PAYLOAD_CAPTURE=on)");
+        }
+
         Self {
             config: Arc::new(config),
             providers: Arc::new(providers),
@@ -207,6 +215,7 @@ impl AppState {
             redis_pool,
             rate_limiter,
             response_cache,
+            payload_capture_enabled,
         }
     }
 
@@ -228,6 +237,43 @@ impl AppState {
     /// Get response cache reference
     pub fn response_cache(&self) -> Option<&ResponseCache> {
         self.response_cache.as_ref()
+    }
+
+    /// Return true when payload capture should be active for a given request.
+    ///
+    /// Layer 1: env flag (`payload_capture_enabled`) must be `true`.
+    /// Layer 2: if an `org_id` is provided, the org's
+    ///   `settings->>'capture_payloads'` must be `"true"`.
+    ///   When `org_id` is `None` (unauthenticated / no org context),
+    ///   we fall back to the env flag alone — this matches dev/admin usage.
+    pub async fn should_capture_payload(&self, org_id: Option<uuid::Uuid>) -> bool {
+        if !self.payload_capture_enabled {
+            return false;
+        }
+        let Some(oid) = org_id else {
+            // No org context — honour the env flag alone.
+            return true;
+        };
+        let Some(pool) = &self.db_pool else {
+            // No DB — can't consult org settings; fall back to env flag.
+            return true;
+        };
+        match aura_db::OrganizationRepo::get_settings(pool, oid).await {
+            Ok(Some(settings)) => settings
+                .get("capture_payloads")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            Ok(None) => false,
+            Err(e) => {
+                // Log but don't let a DB hiccup crash capture entirely.
+                tracing::warn!(
+                    org_id = %oid,
+                    error = %e,
+                    "should_capture_payload: failed to fetch org settings; skipping capture"
+                );
+                false
+            }
+        }
     }
 
     /// Log a completed request to the database (if available)

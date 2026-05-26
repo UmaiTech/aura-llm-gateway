@@ -99,6 +99,10 @@ pub struct Config {
     /// Smart routing configuration
     #[serde(default)]
     pub routing: RoutingConfig,
+
+    /// Feature flags
+    #[serde(default)]
+    pub features: FeaturesConfig,
 }
 
 /// Server configuration
@@ -198,6 +202,18 @@ pub struct AdminConfig {
     pub key: Option<String>,
 }
 
+/// Feature-flag configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct FeaturesConfig {
+    /// Top-level kill switch for request/response payload capture.
+    ///
+    /// Controlled by `AURA_PAYLOAD_CAPTURE=on|off` (default `off`).
+    /// When `false` no payload is ever written to `request_logs`,
+    /// regardless of the per-org setting.
+    pub payload_capture: bool,
+}
+
 impl Default for Config {
     /// Returns sensible defaults for development
     fn default() -> Self {
@@ -209,6 +225,7 @@ impl Default for Config {
             redis: RedisConfig::default(),
             admin: AdminConfig::default(),
             routing: RoutingConfig::default(),
+            features: FeaturesConfig::default(),
         }
     }
 }
@@ -428,6 +445,12 @@ impl Config {
                 self.admin.key = Some(key);
             }
         }
+
+        // Feature flags
+        if let Ok(val) = env::var("AURA_PAYLOAD_CAPTURE") {
+            let v = val.trim().to_ascii_lowercase();
+            self.features.payload_capture = v == "on" || v == "true" || v == "1" || v == "yes";
+        }
     }
 
     /// Validates the log level string
@@ -625,6 +648,11 @@ impl Config {
         &self.routing
     }
 
+    /// Returns whether payload capture is enabled at the env level
+    pub fn payload_capture_enabled(&self) -> bool {
+        self.features.payload_capture
+    }
+
     /// Logs the current configuration (with sensitive values masked)
     pub fn log_config(&self) {
         info!(
@@ -642,6 +670,7 @@ impl Config {
             database = %self.database.url.is_some(),
             redis = %self.redis.url.is_some(),
             routing_strategy = %self.routing.strategy,
+            payload_capture = %self.features.payload_capture,
             "Configuration loaded"
         );
     }

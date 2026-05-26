@@ -123,6 +123,12 @@ pub struct RequestLog {
     pub error_code: Option<String>,
     pub error_message: Option<String>,
     pub metadata: Option<serde_json::Value>,
+    /// Full request JSON. Non-null only when payload capture is enabled
+    /// at both the env level (AURA_PAYLOAD_CAPTURE=on) and the org level
+    /// (organizations.settings.capture_payloads = true).
+    pub request_body: Option<serde_json::Value>,
+    /// Full response JSON. Same guard as request_body.
+    pub response_body: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -144,6 +150,10 @@ pub struct NewRequestLog {
     pub error_code: Option<String>,
     pub error_message: Option<String>,
     pub metadata: Option<serde_json::Value>,
+    /// Full request JSON when payload capture is on; None otherwise.
+    pub request_body: Option<serde_json::Value>,
+    /// Full response JSON when payload capture is on; None otherwise.
+    pub response_body: Option<serde_json::Value>,
 }
 
 /// New conversation for insertion

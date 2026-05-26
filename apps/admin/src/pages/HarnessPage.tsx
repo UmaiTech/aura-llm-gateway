@@ -67,6 +67,9 @@ interface Trace {
   hasToolCalls: boolean
   toolCallsCount: number
   toolsUsed: string[]
+  // Payload capture — undefined when capture was off for this request
+  requestBody?: Record<string, unknown> | null
+  responseBody?: Record<string, unknown> | null
 }
 
 // Convert RecentLog to Trace format
@@ -226,6 +229,8 @@ function logToTrace(log: RecentLog): Trace {
     hasToolCalls: log.has_tool_calls,
     toolCallsCount: log.tool_calls_count,
     toolsUsed: log.tools_used ?? [],
+    requestBody: log.request_body,
+    responseBody: log.response_body,
   }
 }
 
@@ -769,6 +774,55 @@ export function HarnessPage() {
                         )
                       })}
                     </div>
+
+                    {/* Payload Capture Panels */}
+                    {(selectedTrace.requestBody != null || selectedTrace.responseBody != null) ? (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-medium text-muted-foreground">Captured Payloads</h3>
+                        {selectedTrace.requestBody != null && (
+                          <Card>
+                            <CardContent className="p-0">
+                              <details className="group">
+                                <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none select-none hover:bg-muted/30 rounded-lg">
+                                  <span className="text-sm font-medium">Request body</span>
+                                  <ArrowDownLine className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                                </summary>
+                                <div className="px-4 pb-4">
+                                  <pre className="text-xs font-mono bg-muted/50 p-3 rounded-lg overflow-auto max-h-96 whitespace-pre-wrap break-words">
+                                    {JSON.stringify(selectedTrace.requestBody, null, 2)}
+                                  </pre>
+                                </div>
+                              </details>
+                            </CardContent>
+                          </Card>
+                        )}
+                        {selectedTrace.responseBody != null && (
+                          <Card>
+                            <CardContent className="p-0">
+                              <details className="group">
+                                <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none select-none hover:bg-muted/30 rounded-lg">
+                                  <span className="text-sm font-medium">Response body</span>
+                                  <ArrowDownLine className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                                </summary>
+                                <div className="px-4 pb-4">
+                                  <pre className="text-xs font-mono bg-muted/50 p-3 rounded-lg overflow-auto max-h-96 whitespace-pre-wrap break-words">
+                                    {JSON.stringify(selectedTrace.responseBody, null, 2)}
+                                  </pre>
+                                </div>
+                              </details>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 px-4 py-3 rounded-lg">
+                        <InformationLine className="h-4 w-4 shrink-0" />
+                        <span>
+                          Payload capture is off for this org. Enable in Organizations &rarr; Settings or set{' '}
+                          <code className="font-mono bg-muted px-1 py-0.5 rounded">AURA_PAYLOAD_CAPTURE=on</code>.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground">

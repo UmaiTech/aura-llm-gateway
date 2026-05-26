@@ -13,12 +13,14 @@ import {
   CoinLine,
   Loading3Line,
   Refresh1Line,
+  StorageLine,
 } from '@mingcute/react'
 import {
   getOrganizations,
   getTeams,
   getApiKeys,
   getEndUsers,
+  updateOrganization,
   type OrganizationSummary,
   type TeamSummary,
   type ApiKeySummary,
@@ -45,6 +47,13 @@ export function OrganizationDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  // Payload capture toggle — reads from the settings returned by the
+  // updateOrganization PUT response. Starts as false (unknown) until the
+  // user explicitly saves; there is no per-org GET endpoint today.
+  const [capturePayloads, setCapturePayloads] = useState(false)
+  const [captureToggledOnce, setCaptureToggledOnce] = useState(false)
+  const [isSavingCapture, setIsSavingCapture] = useState(false)
+  const [captureError, setCaptureError] = useState<string | null>(null)
 
   const fetchData = async () => {
     if (!id) return
@@ -84,6 +93,33 @@ export function OrganizationDetailPage() {
   const handleRefresh = () => {
     setIsRefreshing(true)
     fetchData()
+  }
+
+  const handleToggleCapture = async () => {
+    if (!id) return
+    const next = !capturePayloads
+    setCapturePayloads(next)
+    setCaptureToggledOnce(true)
+    setIsSavingCapture(true)
+    setCaptureError(null)
+    try {
+      const updated = await updateOrganization(id, {
+        settings: { capture_payloads: next },
+      })
+      // Read back what the server stored so we stay in sync.
+      const storedCapture =
+        updated.settings != null &&
+        typeof updated.settings === 'object' &&
+        !Array.isArray(updated.settings) &&
+        (updated.settings as Record<string, unknown>).capture_payloads === true
+      setCapturePayloads(storedCapture)
+    } catch (e) {
+      // Roll back optimistic update on failure.
+      setCapturePayloads(!next)
+      setCaptureError(e instanceof Error ? e.message : 'Failed to save setting')
+    } finally {
+      setIsSavingCapture(false)
+    }
   }
 
   if (loading) {
@@ -381,6 +417,61 @@ export function OrganizationDetailPage() {
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+        {/* Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-medium">Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Payload capture toggle */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-500/10 rounded mt-0.5">
+                  <StorageLine className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Capture request / response payloads</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Persist raw request and response bodies for this org. Surfaced inline on the
+                    Harness trace view. Requires{' '}
+                    <code className="font-mono bg-muted px-1 py-0.5 rounded text-2xs">
+                      AURA_PAYLOAD_CAPTURE=on
+                    </code>{' '}
+                    on the gateway.
+                  </p>
+                  {!captureToggledOnce && (
+                    <p className="text-2xs text-muted-foreground mt-1 italic">
+                      Current value unknown — no per-org GET endpoint yet. Toggle to set.
+                    </p>
+                  )}
+                  {captureError && (
+                    <p className="text-xs text-destructive mt-1">{captureError}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={capturePayloads}
+                disabled={isSavingCapture}
+                onClick={handleToggleCapture}
+                className={cn(
+                  'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent',
+                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                  capturePayloads ? 'bg-primary' : 'bg-muted',
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-transform',
+                    capturePayloads ? 'translate-x-5' : 'translate-x-0',
+                  )}
+                />
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>

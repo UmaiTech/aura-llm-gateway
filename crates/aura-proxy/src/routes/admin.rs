@@ -221,6 +221,12 @@ pub struct RecentLog {
     pub tool_calls_count: i32,
     pub tools_used: Vec<String>,
     pub tool_calls_data: Vec<ToolCallData>,
+    // Payload capture — null when capture was off for this request.
+    // Admin-only; the endpoint already requires admin auth.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_body: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_body: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -296,6 +302,7 @@ pub struct EndUserSummary {
     pub monthly_token_limit: Option<i64>,
     pub rate_limit_rpm: Option<i32>,
     pub is_blocked: bool,
+    pub metadata: Option<serde_json::Value>,
     pub first_seen_at: Option<DateTime<Utc>>,
     pub last_seen_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -956,6 +963,8 @@ async fn get_recent_logs(
                 tool_calls_count: row.try_get("tool_calls_count").unwrap_or(0),
                 tools_used,
                 tool_calls_data,
+                request_body: row.try_get("request_body").ok().flatten(),
+                response_body: row.try_get("response_body").ok().flatten(),
                 created_at: row.get("created_at"),
             }
         })
@@ -1177,6 +1186,7 @@ async fn list_end_users(
             monthly_token_limit: row.try_get("monthly_token_limit").ok().flatten(),
             rate_limit_rpm: row.try_get("rate_limit_rpm").ok().flatten(),
             is_blocked: row.try_get("is_blocked").unwrap_or(false),
+            metadata: row.try_get("metadata").ok().flatten(),
             first_seen_at: row.try_get("first_seen_at").ok().flatten(),
             last_seen_at: row.try_get("last_seen_at").ok().flatten(),
             created_at: row.get("created_at"),
