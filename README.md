@@ -49,7 +49,7 @@ across providers instead of being flattened into chat-completions and bolted bac
 **Reach for Aura when** you're building agentic workflows, want the latency budget of a
 single static Rust binary on every request, and need to self-host with real multi-tenancy
 (Organization → Team → Project → End-User). A deeper write-up of the landscape and the
-design decisions behind Aura is in [*Building Aura: An Agentic LLM Gateway in Rust*](https://aura-llm.dev/blog).
+design decisions behind Aura is in [*Building Aura: An Agentic LLM Gateway in Rust*](https://www.umai-tech.com/blog/building-aura-an-agentic-llm-gateway-in-rust).
 
 ### Key Features
 
