@@ -30,6 +30,27 @@ A high-performance, production-ready LLM proxy gateway built in Rust that implem
 
 Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace TGI, AWS Bedrock) with built-in load balancing, cost tracking, caching, and observability. It's designed for production deployments requiring high throughput, low latency, and enterprise-grade reliability.
 
+## Why Aura?
+
+The LLM-gateway shelf is full — and most of them are good. The difference is that Aura
+is **agentic-native**: every provider sits behind one [Open Responses API](https://www.openresponses.org/specification)
+contract, so tool calls, reasoning items, and the response lifecycle work the same way
+across providers instead of being flattened into chat-completions and bolted back on.
+
+| Gateway | Language | Open source | Strength | Gap for agents |
+|---------|----------|-------------|----------|----------------|
+| **Aura** | **Rust** | **MIT** | **Agentic-native (Open Responses API), multi-tenant by design, self-hostable** | **Earlier-stage; 7 providers** |
+| LiteLLM | Python | Yes | 100+ providers, simple router, easy self-host | Chat-completions-shaped; agentic metadata bolted on |
+| Portkey | Node / TS | Apache 2.0 | Guardrails, semantic cache, prompt management | Cloud-first; self-host is second-class |
+| Helicone | Rust | Yes | Observability-first, edge-friendly | Started as analytics; agentic primitives surface-level |
+| OpenRouter | Closed | No | 290+ models, passthrough pricing, one URL | Hosted only — they bill you, not the provider |
+| Bifrost | Go | Apache 2.0 | ~11 µs overhead at 5k RPS, 1000+ models | OpenAI-shaped wire format; agents on top, not native |
+
+**Reach for Aura when** you're building agentic workflows, want the latency budget of a
+single static Rust binary on every request, and need to self-host with real multi-tenancy
+(Organization → Team → Project → End-User). A deeper write-up of the landscape and the
+design decisions behind Aura is in [*Building Aura: An Agentic LLM Gateway in Rust*](https://aura-llm.dev/blog).
+
 ### Key Features
 
 - **7 LLM providers** behind one Open Responses API — OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Ollama, HuggingFace TGI, AWS Bedrock
