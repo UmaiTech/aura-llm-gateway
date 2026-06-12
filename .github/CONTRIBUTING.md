@@ -43,6 +43,17 @@ git commit --no-verify
 git push --no-verify
 ```
 
+## Your first PR in 5 minutes
+
+1. Fork the repository and create a branch such as `docs/issue-123-quickstart`.
+2. Run `cargo build` once; this also installs the local git hooks.
+3. Pick a scoped issue labeled `good first issue` or `help wanted`.
+4. Make the smallest useful change and commit it with a conventional message:
+   ```bash
+   git commit -m "docs: clarify provider setup"
+   ```
+5. Open a PR that links the issue and lists the checks you ran.
+
 ## Development Workflow
 
 ### Making Changes
