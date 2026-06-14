@@ -444,6 +444,13 @@ We welcome contributions! Please read these documents before getting started:
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards (Contributor Covenant 2.1)
 - [CLAUDE.md](CLAUDE.md) — project conventions and architecture notes
 
+### Good first contributions
+
+New here? Start with issues labeled
+[good first issue](https://github.com/UmaiTech/aura-llm-gateway/labels/good%20first%20issue)
+or [help wanted](https://github.com/UmaiTech/aura-llm-gateway/labels/help%20wanted).
+Pick one scoped issue, mention it in your PR, and include the checks you ran.
+
 We use [Conventional Commits](https://www.conventionalcommits.org/) for automated changelog generation and semantic versioning.
 
 Example commit messages:
