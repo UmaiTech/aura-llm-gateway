@@ -35,6 +35,25 @@ uv add 'aura-llm[langchain]'
 See [`examples/langchain_usage.py`](./examples/langchain_usage.py) for a complete
 example covering basic chat, tool calling, and an LCEL chain.
 
+### Drop-in with the Official OpenAI SDK
+
+You can also bypass the Aura SDK entirely and point the official
+[`openai`](https://pypi.org/project/openai/) Python package at Aura — just
+change the `base_url`:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8080/v1",
+    api_key="your-aura-api-key",
+)
+# use client.chat.completions.create(...) as usual
+```
+
+See [`examples/openai_sdk_compat.py`](./examples/openai_sdk_compat.py) for a
+complete runnable example with basic chat and streaming.
+
 ### From Source
 
 ```bash
