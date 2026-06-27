@@ -9,6 +9,12 @@
       "runtime": "@vercel/node@5.0.0"
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/scrape-pricing",
+      "schedule": "0 6 * * 1"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
