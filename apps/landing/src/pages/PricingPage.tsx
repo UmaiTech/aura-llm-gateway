@@ -8,9 +8,16 @@
  * theme of RoadmapPage.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, DollarSign, RefreshCw } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  DollarSign,
+  RefreshCw,
+  Search,
+} from 'lucide-react'
 
 interface Model {
   model_id: string
@@ -18,14 +25,20 @@ interface Model {
   input_per_million: number
   output_per_million: number
   cached_input_per_million: number | null
+  batch_input_per_million: number | null
+  batch_output_per_million: number | null
   context_window: number | null
   max_output_tokens: number | null
+  capabilities: string[] | null
+  good_at: string | null
   effective_from: string
 }
 
 interface ProviderBlock {
   name: string
   display_name: string
+  description: string | null
+  models_url: string | null
   models: Model[]
 }
 
@@ -76,6 +89,12 @@ export function PricingPage() {
   const [data, setData] = useState<PricingResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Filter state: a set of selected provider names (empty = all) and a
+  // free-text model search. Both applied client-side to the fetched data.
+  const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
+    new Set(),
+  )
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -106,6 +125,43 @@ export function PricingPage() {
 
   const totalModels =
     data?.providers.reduce((a, p) => a + p.models.length, 0) ?? 0
+
+  // Apply provider + model-name filters. A provider is shown when it's
+  // selected (or nothing is selected) and has at least one model matching
+  // the search query.
+  const filteredProviders = useMemo(() => {
+    if (!data) return []
+    const q = query.trim().toLowerCase()
+    return data.providers
+      .filter(
+        (p) => selectedProviders.size === 0 || selectedProviders.has(p.name),
+      )
+      .map((p) => ({
+        ...p,
+        models: q
+          ? p.models.filter(
+              (m) =>
+                m.model_name.toLowerCase().includes(q) ||
+                m.model_id.toLowerCase().includes(q),
+            )
+          : p.models,
+      }))
+      .filter((p) => p.models.length > 0)
+  }, [data, selectedProviders, query])
+
+  const shownModels = filteredProviders.reduce(
+    (a, p) => a + p.models.length,
+    0,
+  )
+
+  function toggleProvider(name: string) {
+    setSelectedProviders((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -163,10 +219,38 @@ export function PricingPage() {
             {data.last_run && (
               <ScrapeBanner lastRun={data.last_run} />
             )}
+
+            {data.providers.length > 0 && (
+              <FilterBar
+                providers={data.providers}
+                selected={selectedProviders}
+                onToggle={toggleProvider}
+                onClear={() => setSelectedProviders(new Set())}
+                query={query}
+                onQuery={setQuery}
+                shownModels={shownModels}
+                totalModels={totalModels}
+              />
+            )}
+
             <div className="space-y-12">
-              {data.providers.map((p) => (
+              {filteredProviders.map((p) => (
                 <ProviderTable key={p.name} provider={p} />
               ))}
+              {data.providers.length > 0 && filteredProviders.length === 0 && (
+                <p className="text-gray-500 text-sm">
+                  No models match your filters.{' '}
+                  <button
+                    onClick={() => {
+                      setSelectedProviders(new Set())
+                      setQuery('')
+                    }}
+                    className="text-green-400 hover:underline"
+                  >
+                    Clear filters
+                  </button>
+                </p>
+              )}
               {data.providers.length === 0 && (
                 <p className="text-gray-500 text-sm">
                   No pricing data yet. The first weekly scrape will populate
@@ -177,6 +261,72 @@ export function PricingPage() {
           </>
         )}
       </main>
+    </div>
+  )
+}
+
+function FilterBar({
+  providers,
+  selected,
+  onToggle,
+  onClear,
+  query,
+  onQuery,
+  shownModels,
+  totalModels,
+}: {
+  providers: ProviderBlock[]
+  selected: Set<string>
+  onToggle: (name: string) => void
+  onClear: () => void
+  query: string
+  onQuery: (q: string) => void
+  shownModels: number
+  totalModels: number
+}) {
+  return (
+    <div className="mb-10 space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Filter models by name…"
+          className="w-full bg-gray-900/60 border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-gray-600 transition-colors"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {providers.map((p) => {
+          const active = selected.has(p.name)
+          return (
+            <button
+              key={p.name}
+              onClick={() => onToggle(p.name)}
+              className={`font-mono text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                active
+                  ? 'border-green-500/60 bg-green-500/10 text-green-400'
+                  : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-gray-200'
+              }`}
+            >
+              {p.display_name}
+            </button>
+          )
+        })}
+        {(selected.size > 0 || query) && (
+          <button
+            onClick={onClear}
+            className="font-mono text-xs px-2.5 py-1 text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            clear
+          </button>
+        )}
+        <span className="font-mono text-xs text-gray-600 ml-auto">
+          {shownModels === totalModels
+            ? `${totalModels} models`
+            : `${shownModels} / ${totalModels} models`}
+        </span>
+      </div>
     </div>
   )
 }
@@ -221,12 +371,30 @@ function ScrapeBanner({
 function ProviderTable({ provider }: { provider: ProviderBlock }) {
   return (
     <section>
-      <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-gray-100 mb-4">
+      <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-gray-100 mb-1">
         {provider.display_name}
         <span className="font-mono text-xs text-gray-600 ml-2">
           {provider.models.length} models
         </span>
       </h2>
+      {(provider.description || provider.models_url) && (
+        <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+          {provider.description}
+          {provider.models_url && (
+            <>
+              {provider.description && ' '}
+              <a
+                href={provider.models_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-green-400 underline underline-offset-2 transition-colors"
+              >
+                View models →
+              </a>
+            </>
+          )}
+        </p>
+      )}
       <div className="overflow-x-auto border border-gray-800 rounded-lg">
         <table className="w-full text-sm">
           <thead>
@@ -235,40 +403,134 @@ function ProviderTable({ provider }: { provider: ProviderBlock }) {
               <th className="px-4 py-3 font-medium text-right">Input /1M</th>
               <th className="px-4 py-3 font-medium text-right">Output /1M</th>
               <th className="px-4 py-3 font-medium text-right">Cached /1M</th>
+              <th className="px-4 py-3 font-medium text-right">Batch /1M</th>
               <th className="px-4 py-3 font-medium text-right">Context</th>
             </tr>
           </thead>
           <tbody>
             {provider.models.map((m) => (
-              <tr
-                key={m.model_id}
-                className="border-b border-gray-900 last:border-0 hover:bg-gray-900/40"
-              >
-                <td className="px-4 py-3">
-                  <div className="text-gray-200">{m.model_name}</div>
-                  <div className="font-mono text-xs text-gray-600">
-                    {m.model_id}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-gray-300">
-                  {fmtUsd(m.input_per_million)}
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-gray-300">
-                  {fmtUsd(m.output_per_million)}
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-gray-500">
-                  {m.cached_input_per_million !== null
-                    ? fmtUsd(m.cached_input_per_million)
-                    : '—'}
-                </td>
-                <td className="px-4 py-3 text-right font-mono text-gray-500">
-                  {fmtTokens(m.context_window)}
-                </td>
-              </tr>
+              <ModelRow key={m.model_id} model={m} />
             ))}
           </tbody>
         </table>
       </div>
     </section>
+  )
+}
+
+function ModelRow({ model: m }: { model: Model }) {
+  const [open, setOpen] = useState(false)
+  const Chevron = open ? ChevronDown : ChevronRight
+  return (
+    <>
+      <tr
+        onClick={() => setOpen((o) => !o)}
+        className="border-b border-gray-900 last:border-0 hover:bg-gray-900/40 cursor-pointer"
+      >
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Chevron className="h-3.5 w-3.5 text-gray-600 shrink-0" />
+            <div>
+              <div className="text-gray-200">{m.model_name}</div>
+              <div className="font-mono text-xs text-gray-600">
+                {m.model_id}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td className="px-4 py-3 text-right font-mono text-gray-300">
+          {fmtUsd(m.input_per_million)}
+        </td>
+        <td className="px-4 py-3 text-right font-mono text-gray-300">
+          {fmtUsd(m.output_per_million)}
+        </td>
+        <td className="px-4 py-3 text-right font-mono text-gray-500">
+          {m.cached_input_per_million !== null
+            ? fmtUsd(m.cached_input_per_million)
+            : '—'}
+        </td>
+        <td className="px-4 py-3 text-right font-mono text-gray-500">
+          {m.batch_input_per_million !== null &&
+          m.batch_output_per_million !== null
+            ? `${fmtUsd(m.batch_input_per_million)} / ${fmtUsd(m.batch_output_per_million)}`
+            : '—'}
+        </td>
+        <td className="px-4 py-3 text-right font-mono text-gray-500">
+          {fmtTokens(m.context_window)}
+        </td>
+      </tr>
+      {open && (
+        <tr className="border-b border-gray-900 bg-gray-900/30">
+          <td colSpan={6} className="px-4 py-4 space-y-3">
+            {m.good_at && (
+              <p className="text-sm text-gray-300">
+                <span className="text-gray-500">Good at: </span>
+                {m.good_at}
+              </p>
+            )}
+            {m.capabilities && m.capabilities.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {m.capabilities.map((c) => (
+                  <span
+                    key={c}
+                    className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-gray-700 text-gray-400"
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-xs">
+              <Detail label="Context window" value={fmtTokens(m.context_window)} />
+              <Detail label="Max output" value={fmtTokens(m.max_output_tokens)} />
+              <Detail
+                label="Cached input /1M"
+                value={
+                  m.cached_input_per_million !== null
+                    ? fmtUsd(m.cached_input_per_million)
+                    : '—'
+                }
+              />
+              <Detail
+                label="Batch input /1M"
+                value={
+                  m.batch_input_per_million !== null
+                    ? fmtUsd(m.batch_input_per_million)
+                    : '—'
+                }
+              />
+              <Detail
+                label="Batch output /1M"
+                value={
+                  m.batch_output_per_million !== null
+                    ? fmtUsd(m.batch_output_per_million)
+                    : '—'
+                }
+              />
+              <Detail
+                label="Output / input ratio"
+                value={
+                  m.input_per_million > 0
+                    ? `${(m.output_per_million / m.input_per_million).toFixed(1)}×`
+                    : '—'
+                }
+              />
+              <Detail label="Tracked since" value={fmtDate(m.effective_from)} />
+            </dl>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-mono uppercase tracking-wider text-gray-600 mb-0.5">
+        {label}
+      </dt>
+      <dd className="text-gray-300">{value}</dd>
+    </div>
   )
 }

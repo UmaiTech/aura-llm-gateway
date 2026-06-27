@@ -15,6 +15,15 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pricingPool } from '../cron/_db.js'
+import { PROVIDERS } from '../cron/_providers.js'
+
+/** provider name → { description, models_url } from the scraper config. */
+const PROVIDER_META = new Map(
+  PROVIDERS.map((p) => [
+    p.provider as string,
+    { description: p.description, models_url: p.modelsUrl },
+  ]),
+)
 
 interface PriceRow {
   provider: string
@@ -24,8 +33,12 @@ interface PriceRow {
   input_per_million: number
   output_per_million: number
   cached_input_per_million: number | null
+  batch_input_per_million: number | null
+  batch_output_per_million: number | null
   context_window: number | null
   max_output_tokens: number | null
+  capabilities: string[] | null
+  good_at: string | null
   effective_from: Date
 }
 
@@ -37,7 +50,8 @@ export default async function handler(
   res.setHeader('access-control-allow-methods', 'GET, OPTIONS')
   if (req.method === 'OPTIONS') {
     res.statusCode = 204
-    return res.end()
+    res.end()
+    return
   }
   if (req.method !== 'GET') {
     return json(res, 405, { error: 'method_not_allowed' })
@@ -50,14 +64,23 @@ export default async function handler(
     // Group by provider, preserving a stable provider order.
     const byProvider = new Map<
       string,
-      { name: string; display_name: string; models: unknown[] }
+      {
+        name: string
+        display_name: string
+        description: string | null
+        models_url: string | null
+        models: unknown[]
+      }
     >()
     let newest: Date | null = null
     for (const r of rows) {
       if (!byProvider.has(r.provider)) {
+        const meta = PROVIDER_META.get(r.provider)
         byProvider.set(r.provider, {
           name: r.provider,
           display_name: r.display_name,
+          description: meta?.description ?? null,
+          models_url: meta?.models_url ?? null,
           models: [],
         })
       }
@@ -67,8 +90,12 @@ export default async function handler(
         input_per_million: r.input_per_million,
         output_per_million: r.output_per_million,
         cached_input_per_million: r.cached_input_per_million,
+        batch_input_per_million: r.batch_input_per_million,
+        batch_output_per_million: r.batch_output_per_million,
         context_window: r.context_window,
         max_output_tokens: r.max_output_tokens,
+        capabilities: r.capabilities,
+        good_at: r.good_at,
         effective_from: r.effective_from.toISOString(),
       })
       if (!newest || r.effective_from > newest) newest = r.effective_from
@@ -100,7 +127,10 @@ async function fetchCurrentPrices(): Promise<PriceRow[]> {
             mp.input_per_million::float8,
             mp.output_per_million::float8,
             mp.cached_input_per_million::float8,
+            mp.batch_input_per_million::float8,
+            mp.batch_output_per_million::float8,
             mp.context_window, mp.max_output_tokens,
+            mp.capabilities, mp.good_at,
             mp.effective_from
        FROM model_pricing mp
        JOIN providers p ON p.id = mp.provider_id

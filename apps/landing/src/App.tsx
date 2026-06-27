@@ -252,6 +252,12 @@ export default function App() {
                 Roadmap
               </a>
               <a
+                href="/pricing"
+                className="text-gray-400 hover:text-gray-100 transition-colors"
+              >
+                LLM Pricing
+              </a>
+              <a
                 href="https://playground.aura-llm.dev"
                 target="_blank"
                 rel="noopener noreferrer"
