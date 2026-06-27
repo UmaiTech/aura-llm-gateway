@@ -98,6 +98,8 @@ export async function persistProvider(
         model_id: row.model_id,
         kind: 'flagged',
         note: row.failure_reason ?? row.status,
+        source_url: row.source_url,
+        reasoning: row.reasoning,
       })
       continue
     }
@@ -119,7 +121,11 @@ export async function persistProvider(
         after: {
           input_per_million: row.input_per_million,
           output_per_million: row.output_per_million,
+          batch_input_per_million: row.batch_input_per_million,
+          batch_output_per_million: row.batch_output_per_million,
         },
+        source_url: row.source_url,
+        reasoning: row.reasoning,
       })
       upserted++
       if (!dryRun) await insertRow(pool, pid, row)
@@ -128,7 +134,12 @@ export async function persistProvider(
 
     if (!pricesDiffer(current, row)) {
       unchanged++
-      changes.push({ model_id: row.model_id, kind: 'unchanged' })
+      changes.push({
+        model_id: row.model_id,
+        kind: 'unchanged',
+        source_url: row.source_url,
+        reasoning: row.reasoning,
+      })
       continue
     }
 
@@ -143,7 +154,11 @@ export async function persistProvider(
       after: {
         input_per_million: row.input_per_million,
         output_per_million: row.output_per_million,
+        batch_input_per_million: row.batch_input_per_million,
+        batch_output_per_million: row.batch_output_per_million,
       },
+      source_url: row.source_url,
+      reasoning: row.reasoning,
     })
     upserted++
     if (!dryRun) await versionRow(pool, pid, current.id, row)
@@ -160,9 +175,11 @@ async function insertRow(
   await p.query(
     `INSERT INTO model_pricing
        (provider_id, model_id, model_name, input_per_million, output_per_million,
-        cached_input_per_million, reasoning_per_million, context_window,
-        max_output_tokens, effective_from, effective_until)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW(), NULL)`,
+        cached_input_per_million, reasoning_per_million,
+        batch_input_per_million, batch_output_per_million,
+        context_window, max_output_tokens, capabilities, good_at,
+        effective_from, effective_until)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW(), NULL)`,
     [
       providerUuid,
       row.model_id,
@@ -171,8 +188,12 @@ async function insertRow(
       row.output_per_million,
       row.cached_input_per_million ?? null,
       row.reasoning_per_million ?? null,
+      row.batch_input_per_million ?? null,
+      row.batch_output_per_million ?? null,
       row.context_window ?? null,
       row.max_output_tokens ?? null,
+      row.capabilities ?? null,
+      row.good_at ?? null,
     ],
   )
 }
@@ -194,9 +215,11 @@ async function versionRow(
     await client.query(
       `INSERT INTO model_pricing
          (provider_id, model_id, model_name, input_per_million, output_per_million,
-          cached_input_per_million, reasoning_per_million, context_window,
-          max_output_tokens, effective_from, effective_until)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW(), NULL)`,
+          cached_input_per_million, reasoning_per_million,
+          batch_input_per_million, batch_output_per_million,
+          context_window, max_output_tokens, capabilities, good_at,
+          effective_from, effective_until)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW(), NULL)`,
       [
         providerUuid,
         row.model_id,
@@ -205,8 +228,12 @@ async function versionRow(
         row.output_per_million,
         row.cached_input_per_million ?? null,
         row.reasoning_per_million ?? null,
+        row.batch_input_per_million ?? null,
+        row.batch_output_per_million ?? null,
         row.context_window ?? null,
         row.max_output_tokens ?? null,
+        row.capabilities ?? null,
+        row.good_at ?? null,
       ],
     )
     await client.query('COMMIT')

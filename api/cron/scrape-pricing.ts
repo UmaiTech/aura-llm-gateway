@@ -47,10 +47,24 @@ export default async function handler(
   const dryRun = url.searchParams.get('dry_run') === '1'
   const runId = globalThis.crypto.randomUUID()
 
+  const runStart = perfNow()
+  console.log(
+    `[scrape-pricing] run ${runId} started — ${PROVIDERS.length} providers` +
+      `${dryRun ? ' (dry run, no writes)' : ''}`,
+  )
+
   // Scrape every provider's own pricing page concurrently; isolate
   // failures so one broken page never aborts the others.
   const results = await Promise.all(
     PROVIDERS.map((cfg) => runProvider(cfg, dryRun, runId)),
+  )
+
+  console.log(
+    `[scrape-pricing] run ${runId} done in ` +
+      `${Math.round(perfNow() - runStart)}ms — ` +
+      `${results.reduce((a, r) => a + r.models_upserted, 0)} upserted, ` +
+      `${results.reduce((a, r) => a + r.models_flagged, 0)} flagged, ` +
+      `${results.filter((r) => r.status === 'failed').length} failed`,
   )
 
   const summary: ScrapeSummary = {
@@ -83,6 +97,8 @@ async function runProvider(
   let flagged = 0
   let changes: ProviderResult['changes'] = []
 
+  console.log(`[scrape-pricing]   → ${cfg.provider}: scraping ${cfg.url ?? cfg.source}…`)
+
   try {
     const rows = await scrapeProvider(cfg)
     found = rows.length
@@ -93,6 +109,17 @@ async function runProvider(
     changes = applied.changes
   } catch (err) {
     error = errMsg(err)
+  }
+
+  const elapsed = Math.round(perfNow() - startedAt)
+  if (error) {
+    console.error(`[scrape-pricing]   ✗ ${cfg.provider}: ${error} (${elapsed}ms)`)
+  } else {
+    const icon = flagged > 0 ? '⚠' : '✓'
+    console.log(
+      `[scrape-pricing]   ${icon} ${cfg.provider}: ${found} found, ` +
+        `${upserted} upserted, ${flagged} flagged (${elapsed}ms)`,
+    )
   }
 
   const result: ProviderResult = {
