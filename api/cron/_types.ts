@@ -15,23 +15,22 @@ export type ProviderId =
   | 'anthropic'
   | 'google'
   | 'mistral'
+  | 'together'
   | 'bedrock'
   | 'huggingface'
   | 'ollama'
 
 /**
- * How a provider's prices are obtained. See docs/internal/PRICING-SCRAPER.md
- * for the full "does this provider have a pricing API?" matrix — the short
- * version is that *no* first-party LLM provider exposes a pricing API, so:
+ * How a provider's prices are obtained. We scrape each provider's own
+ * pricing website directly (no third-party aggregator), because the page
+ * the provider publishes is the authoritative source of truth:
  *
- *  - 'litellm'   → pull the community-maintained structured JSON
- *                  (BerriAI/litellm model_prices_and_context_window.json).
- *                  Effectively a free, versioned pricing feed; the default.
- *  - 'firecrawl' → Firecrawl `extract` against the provider's HTML pricing
- *                  page with a schema. Fallback for when the JSON lags.
+ *  - 'firecrawl' → Firecrawl `extract` against the provider's own pricing
+ *                  page with a schema. The source for every cloud provider,
+ *                  including OSS-model hosts (Together AI).
  *  - 'static'    → fixed rows (Ollama is local inference: price is 0.0).
  */
-export type SourceKind = 'litellm' | 'firecrawl' | 'static'
+export type SourceKind = 'firecrawl' | 'static'
 
 /** Per-row trust level. Only `success` rows are ever written to the DB. */
 export type RowStatus = 'success' | 'needs_review' | 'failed'

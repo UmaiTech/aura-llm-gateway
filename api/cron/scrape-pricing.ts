@@ -18,7 +18,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { PROVIDERS } from './_providers.js'
-import { scrapeProvider, fetchLiteLLMFeed } from './_sources.js'
+import { scrapeProvider } from './_sources.js'
 import {
   persistProvider,
   writeScrapeLog,
@@ -47,23 +47,10 @@ export default async function handler(
   const dryRun = url.searchParams.get('dry_run') === '1'
   const runId = globalThis.crypto.randomUUID()
 
-  // Fetch the shared LiteLLM feed once if any provider needs it.
-  let feed: Record<string, unknown> | null = null
-  const needsFeed = PROVIDERS.some((p) => p.source === 'litellm')
-  let feedError: string | null = null
-  if (needsFeed) {
-    try {
-      feed = await fetchLiteLLMFeed()
-    } catch (err) {
-      feedError = errMsg(err)
-    }
-  }
-
-  // Scrape every provider concurrently; isolate failures per provider.
+  // Scrape every provider's own pricing page concurrently; isolate
+  // failures so one broken page never aborts the others.
   const results = await Promise.all(
-    PROVIDERS.map((cfg) =>
-      runProvider(cfg, feed, feedError, dryRun, runId),
-    ),
+    PROVIDERS.map((cfg) => runProvider(cfg, dryRun, runId)),
   )
 
   const summary: ScrapeSummary = {
@@ -85,8 +72,6 @@ export default async function handler(
 
 async function runProvider(
   cfg: (typeof PROVIDERS)[number],
-  feed: Record<string, unknown> | null,
-  feedError: string | null,
   dryRun: boolean,
   runId: string,
 ): Promise<ProviderResult> {
@@ -99,10 +84,7 @@ async function runProvider(
   let changes: ProviderResult['changes'] = []
 
   try {
-    if (cfg.source === 'litellm' && feedError) {
-      throw new Error(`shared feed failed: ${feedError}`)
-    }
-    const rows = await scrapeProvider(cfg, feed)
+    const rows = await scrapeProvider(cfg)
     found = rows.length
     const applied = await persistProvider(cfg.provider, rows, dryRun)
     upserted = applied.upserted

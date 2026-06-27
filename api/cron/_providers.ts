@@ -1,42 +1,33 @@
 /**
  * Per-provider scrape configuration for the weekly pricing cron.
  *
- * Each provider declares a `source` (see SourceKind in _types.ts) and the
- * inputs that source needs. Adding a provider = adding one entry here plus
- * a mapper in _normalize.ts.
+ * Each provider is scraped from *its own pricing website* via Firecrawl —
+ * no third-party aggregator. The provider's published page is the
+ * authoritative source. Ollama is local inference (no cloud price) and
+ * emits a static $0.00 row.
  *
- * Why the source split is what it is — the "which provider has a pricing
- * API?" question from the issue, answered concretely:
+ * The set mirrors the providers the gateway actually routes to
+ * (crates/aura-core/src/provider/*.rs): OpenAI, Anthropic, Google, Mistral,
+ * Together AI (OSS-model host), AWS Bedrock, Hugging Face, Ollama.
  *
- *   provider    first-party pricing API?   how we get prices
- *   ---------   ------------------------   ---------------------------------
- *   openai      NO  (/v1/models = ids)     litellm feed  (firecrawl fallback)
- *   anthropic   NO  (/v1/models = ids)     litellm feed  (firecrawl fallback)
- *   google      NO  (models.list = limits) litellm feed  (firecrawl fallback)
- *   mistral     NO  (/v1/models = ids)     litellm feed  (firecrawl fallback)
- *   bedrock     YES (AWS Price List API)   litellm feed  (AWS API documented)
- *   huggingface NO  (per-endpoint, varies) litellm feed  (firecrawl fallback)
- *   ollama      N/A (local inference)      static 0.0 rows
+ * On the "does this provider expose a pricing API?" question: none of them
+ * do — their `/models` endpoints return ids/limits, never prices. AWS
+ * Bedrock is the lone exception via the generic AWS Price List Query API
+ * (documented in docs/internal/pricing-scraper.md as a future swap). So we
+ * scrape the HTML pricing pages they each publish.
  *
- * The LiteLLM JSON (BerriAI/litellm) is a community-maintained structured
- * feed covering every provider above; treating it as the primary source
- * means we are reading JSON, not parsing HTML, for six of seven providers.
- * Firecrawl stays wired up per the issue as the HTML fallback. Full matrix
- * and the AWS Price List query live in docs/internal/PRICING-SCRAPER.md.
+ * Adding a provider = one entry here + (if its page shape is unusual) a
+ * tweak to the shared extract schema below.
  */
 
 import { z } from 'zod'
 import type { ProviderId, SourceKind } from './_types.js'
 
-/** Canonical LiteLLM pricing feed (raw GitHub, no auth, ~weekly fresh). */
-export const LITELLM_FEED_URL =
-  'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'
-
 /**
  * Zod schema for a Firecrawl `extract` result. Firecrawl returns one
- * object shaped like this per page when given the schema; the per-provider
- * normalizer maps it onto ScrapedPrice. Kept deliberately loose (strings
- * coerced to numbers downstream) because pricing pages are messy.
+ * object shaped like this per page when given the schema; the normalizer
+ * maps it onto ScrapedPrice. Kept deliberately loose — pricing pages are
+ * messy and we'd rather flag a row `needs_review` than reject the page.
  */
 export const ZFirecrawlModel = z.object({
   model_name: z.string(),
@@ -57,95 +48,86 @@ export interface ProviderConfig {
   /** Human-facing name, matches providers.display_name. */
   displayName: string
   source: SourceKind
-  /** Pricing page (firecrawl) or canonical reference (litellm/static). */
+  /** The provider's own pricing page (firecrawl) or null (static). */
   url: string | null
-  /**
-   * For source==='litellm': the prefix(es) used to select this provider's
-   * rows out of the flat LiteLLM map (keys look like 'gpt-5', 'claude-...',
-   * 'gemini/...', 'mistral/...', 'bedrock/...', 'huggingface/...').
-   */
-  litellmPrefixes?: string[]
   /** For source==='firecrawl': the natural-language extraction prompt. */
   firecrawlPrompt?: string
 }
 
+/** Shared instruction appended to every provider prompt for consistency. */
+const COMMON_PROMPT =
+  'Return a `models` array. For each chat/completion model give: model_name ' +
+  '(display name), model_id (the API identifier if shown), ' +
+  'input_price_per_million and output_price_per_million in USD per 1,000,000 ' +
+  'tokens, cached_input_price_per_million if listed, and context_window and ' +
+  'max_output_tokens if shown. Use numbers only — no "$" or "/1M". Skip ' +
+  'embedding, image, audio, and fine-tuning rows. Only include models whose ' +
+  'price is actually visible on the page; do not infer.'
+
 /**
- * The 7-provider registry. Order is the order they are scraped (concurrent,
- * but this is the display order in the summary).
+ * Provider registry. Each cloud provider scrapes its own pricing page;
+ * Ollama is static. Order here is the display order in the summary.
  */
 export const PROVIDERS: ProviderConfig[] = [
   {
     provider: 'openai',
     displayName: 'OpenAI',
-    source: 'litellm',
+    source: 'firecrawl',
     url: 'https://platform.openai.com/docs/pricing',
-    litellmPrefixes: ['gpt-', 'o1', 'o3', 'o4', 'chatgpt-'],
-    firecrawlPrompt:
-      'Extract every OpenAI model with its input, output and cached-input ' +
-      'price per 1M tokens (USD), context window and max output tokens.',
+    firecrawlPrompt: `Extract OpenAI API model pricing. ${COMMON_PROMPT}`,
   },
   {
     provider: 'anthropic',
     displayName: 'Anthropic',
-    source: 'litellm',
+    source: 'firecrawl',
     url: 'https://www.anthropic.com/pricing',
-    litellmPrefixes: ['claude-'],
-    firecrawlPrompt:
-      'Extract every Claude model with input, output and prompt-caching ' +
-      'price per 1M tokens (USD), context window and max output tokens.',
+    firecrawlPrompt: `Extract Claude API model pricing (input, output, and prompt-caching prices). ${COMMON_PROMPT}`,
   },
   {
     provider: 'google',
     displayName: 'Google AI',
-    source: 'litellm',
-    url: 'https://ai.google.dev/pricing',
-    litellmPrefixes: ['gemini/', 'gemini-'],
-    firecrawlPrompt:
-      'Extract every Gemini model with input and output price per 1M ' +
-      'tokens (USD), context window and max output tokens.',
+    source: 'firecrawl',
+    url: 'https://ai.google.dev/gemini-api/docs/pricing',
+    firecrawlPrompt: `Extract Gemini API model pricing (use the paid-tier prices, not the free tier). ${COMMON_PROMPT}`,
   },
   {
     provider: 'mistral',
     displayName: 'Mistral AI',
-    source: 'litellm',
-    url: 'https://mistral.ai/technology/#pricing',
-    litellmPrefixes: ['mistral/'],
-    firecrawlPrompt:
-      'Extract every Mistral model with input and output price per 1M ' +
-      'tokens (USD) and context window.',
+    source: 'firecrawl',
+    url: 'https://mistral.ai/pricing#api-pricing',
+    firecrawlPrompt: `Extract Mistral API model pricing. ${COMMON_PROMPT}`,
+  },
+  {
+    provider: 'together',
+    displayName: 'Together AI',
+    source: 'firecrawl',
+    // OSS-model host: serverless per-token pricing for Llama, Qwen,
+    // DeepSeek, Mixtral, etc.
+    url: 'https://www.together.ai/pricing',
+    firecrawlPrompt: `Extract Together AI serverless inference pricing for hosted open-source chat models (Llama, Qwen, DeepSeek, Mixtral, etc.). ${COMMON_PROMPT}`,
   },
   {
     provider: 'bedrock',
     displayName: 'AWS Bedrock',
-    source: 'litellm',
-    // Bedrock is the one provider with a real pricing API (AWS Price List
-    // Query API, service-code AmazonBedrock). We still prefer the LiteLLM
-    // feed for uniformity; the AWS query is documented in the runbook.
+    source: 'firecrawl',
+    // Bedrock also has a real pricing API (AWS Price List Query API,
+    // service-code AmazonBedrock) — documented in the runbook as a future
+    // swap. For now we scrape the same pricing page as everyone else.
     url: 'https://aws.amazon.com/bedrock/pricing/',
-    litellmPrefixes: ['bedrock/'],
-    firecrawlPrompt:
-      'Extract on-demand Bedrock model pricing: input and output price per ' +
-      '1M tokens (USD) for each foundation model.',
+    firecrawlPrompt: `Extract on-demand AWS Bedrock foundation-model pricing (input and output price per 1M tokens, on-demand throughput). ${COMMON_PROMPT}`,
   },
   {
     provider: 'huggingface',
     displayName: 'Hugging Face',
-    // HF has no unified pricing in the LiteLLM feed (pricing is per-
-    // Inference-Endpoint and instance-based), so HTML scraping is the only
-    // option. Requires FIRECRAWL_API_KEY; without it this provider reports
-    // a clean isolated error rather than silently emitting nothing.
     source: 'firecrawl',
-    url: 'https://huggingface.co/pricing',
-    litellmPrefixes: ['huggingface/'],
-    firecrawlPrompt:
-      'Extract Hugging Face inference pricing per 1M tokens (USD) for hosted models.',
+    url: 'https://huggingface.co/docs/inference-providers/pricing',
+    firecrawlPrompt: `Extract Hugging Face Inference pricing per 1M tokens for hosted chat models. ${COMMON_PROMPT}`,
   },
   {
     provider: 'ollama',
     displayName: 'Ollama',
     // Local inference — no cloud pricing page exists. Emit a fixed zero row
-    // so the model still appears in the table at $0.00 (issue: out of scope
-    // to price local providers).
+    // so the model still appears in the table at $0.00.
     source: 'static',
     url: null,
   },

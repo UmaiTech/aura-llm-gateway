@@ -9,14 +9,17 @@
 --      so "which providers broke last Monday" is a SQL query, not a
 --      Vercel log archaeology session.
 --
---   2. The four providers that were never seeded (mistral, bedrock,
---      huggingface, ollama). The scraper writes model_pricing rows
---      keyed by provider_id, so the provider row has to exist first.
+--   2. The five providers that were never seeded (mistral, together,
+--      bedrock, huggingface, ollama). The scraper writes model_pricing
+--      rows keyed by provider_id, so the provider row has to exist first.
 --      openai / anthropic / google were seeded in 001_initial_schema.
 
--- 1. Ensure every provider the scraper knows about has a row.
+-- 1. Ensure every provider the scraper knows about has a row. Mirrors the
+--    providers the gateway routes to (crates/aura-core/src/provider/*.rs),
+--    including the OSS-model host Together AI.
 INSERT INTO providers (name, display_name, api_base_url, is_enabled) VALUES
     ('mistral',     'Mistral AI',  'https://api.mistral.ai/v1',        true),
+    ('together',    'Together AI', 'https://api.together.xyz/v1',      true),
     ('bedrock',     'AWS Bedrock', NULL,                               true),
     ('huggingface', 'Hugging Face','https://api-inference.huggingface.co', true),
     ('ollama',      'Ollama',      'http://localhost:11434',           true)
