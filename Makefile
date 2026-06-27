@@ -3,7 +3,8 @@
 	docker-compose-logs docker-compose-ps docker-deps \
 	chat chat-build chat-install landing landing-build landing-install \
 	admin admin-build admin-install admin-preview \
-	apps apps-install apps-build dev-all
+	apps apps-install apps-build dev-all \
+	cron-dev scrape-pricing-dry scrape-pricing
 
 # Default target
 .DEFAULT_GOAL := help
@@ -211,6 +212,38 @@ pre-commit: fmt lint test ## Run pre-commit checks
 
 # Pre-push hook
 pre-push: check build-release ## Run pre-push checks
+
+# =============================================================================
+# Vercel Functions — Pricing Scraper (api/cron/scrape-pricing.ts, issue #123)
+# =============================================================================
+# These targets source .env so FIRECRAWL_API_KEY, DATABASE_URL, and
+# CRON_SECRET reach `vercel dev` and the curl calls. The scraper's Postgres
+# is the docker-compose one (postgres:postgres @ 127.0.0.1:5433) — start it
+# with `make docker-deps` first, not the stale :5432 default above.
+
+CRON_PORT ?= 3000
+CRON_URL  := http://localhost:$(CRON_PORT)/api/cron/scrape-pricing
+# firecrawl-js + root package.json require Node 22.x; pin it via nvm so the
+# recipe doesn't run under whatever the shell default happens to be.
+# Use 22.22.0 specifically — that's the version with the `vercel` CLI
+# installed (22.22.3 has none, so a bare `nvm use 22` breaks `vercel`).
+NODE_VERSION ?= 22.22.0
+NVM_SH := $${NVM_DIR:-$$HOME/.nvm}/nvm.sh
+
+cron-dev: ## Run Vercel functions locally (pricing scraper) on CRON_PORT
+	# Raise the fd limit: vercel dev file-watches this whole monorepo and
+	# crashes with EMFILE (too many open files) at the default macOS 256.
+	ulimit -n 10240; \
+	. $(NVM_SH); nvm use $(NODE_VERSION); \
+	set -a; . ./.env; set +a; vercel dev --listen $(CRON_PORT)
+
+scrape-pricing-dry: ## Trigger the pricing scraper in dry-run mode (no DB writes)
+	@set -a; . ./.env; set +a; \
+	curl -s "$(CRON_URL)?dry_run=1" -H "Authorization: Bearer $$CRON_SECRET" | jq .
+
+scrape-pricing: ## Trigger the pricing scraper for real (writes to model_pricing)
+	@set -a; . ./.env; set +a; \
+	curl -s "$(CRON_URL)" -H "Authorization: Bearer $$CRON_SECRET" | jq .
 
 # =============================================================================
 # Frontend Apps

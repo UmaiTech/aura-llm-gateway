@@ -119,3 +119,6 @@ venv/
 ENV/
 .vercel
 .env*.local
+
+# Firecrawl CLI scrape cache (local only)
+.firecrawl/
