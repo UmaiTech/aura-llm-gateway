@@ -8,10 +8,18 @@
  * theme of RoadmapPage.
  */
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft,
+  Check,
   ChevronDown,
   ChevronRight,
   DollarSign,
@@ -68,14 +76,17 @@ interface PricingResponse {
   exchange_rates?: ExchangeRate[]
 }
 
-/** Symbol + locale per supported currency for display formatting. */
-const CURRENCY_META: Record<string, { symbol: string; label: string }> = {
-  USD: { symbol: '$', label: 'USD' },
-  SEK: { symbol: 'kr', label: 'SEK' },
-  EUR: { symbol: '€', label: 'EUR' },
-  GBP: { symbol: '£', label: 'GBP' },
-  NOK: { symbol: 'kr', label: 'NOK' },
-  DKK: { symbol: 'kr', label: 'DKK' },
+/** Symbol, flag, and label per supported currency for display formatting. */
+const CURRENCY_META: Record<
+  string,
+  { symbol: string; label: string; flag: string }
+> = {
+  USD: { symbol: '$', label: 'USD', flag: '🇺🇸' },
+  SEK: { symbol: 'kr', label: 'SEK', flag: '🇸🇪' },
+  EUR: { symbol: '€', label: 'EUR', flag: '🇪🇺' },
+  GBP: { symbol: '£', label: 'GBP', flag: '🇬🇧' },
+  NOK: { symbol: 'kr', label: 'NOK', flag: '🇳🇴' },
+  DKK: { symbol: 'kr', label: 'DKK', flag: '🇩🇰' },
 }
 
 /**
@@ -357,9 +368,9 @@ function FilterBar({
   currencies: string[]
 }) {
   return (
-    <div className="mb-10 space-y-3">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+    <div className="mb-10 space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
           <input
             type="text"
@@ -369,6 +380,12 @@ function FilterBar({
             className="w-full bg-gray-900/60 border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-gray-600 transition-colors"
           />
         </div>
+        <ProviderDropdown
+          providers={providers}
+          selected={selected}
+          onToggle={onToggle}
+          onClearProviders={() => selected.forEach((n) => onToggle(n))}
+        />
         {currencies.length > 1 && (
           <select
             value={currency}
@@ -378,35 +395,19 @@ function FilterBar({
           >
             {currencies.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {(CURRENCY_META[c]?.flag ?? '')} {c}
               </option>
             ))}
           </select>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {providers.map((p) => {
-          const active = selected.has(p.name)
-          return (
-            <button
-              key={p.name}
-              onClick={() => onToggle(p.name)}
-              className={`font-mono text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                active
-                  ? 'border-green-500/60 bg-green-500/10 text-green-400'
-                  : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-gray-200'
-              }`}
-            >
-              {p.display_name}
-            </button>
-          )
-        })}
+      <div className="flex items-center gap-3 px-0.5">
         {(selected.size > 0 || query) && (
           <button
             onClick={onClear}
-            className="font-mono text-xs px-2.5 py-1 text-gray-500 hover:text-gray-300 transition-colors"
+            className="font-mono text-xs text-gray-500 hover:text-gray-300 transition-colors"
           >
-            clear
+            clear filters
           </button>
         )}
         <span className="font-mono text-xs text-gray-600 ml-auto">
@@ -415,6 +416,81 @@ function FilterBar({
             : `${shownModels} / ${totalModels} models`}
         </span>
       </div>
+    </div>
+  )
+}
+
+/** Multi-select dropdown of providers, closes on outside click / Escape. */
+function ProviderDropdown({
+  providers,
+  selected,
+  onToggle,
+  onClearProviders,
+}: {
+  providers: ProviderBlock[]
+  selected: Set<string>
+  onToggle: (name: string) => void
+  onClearProviders: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const count = selected.size
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-gray-200 hover:border-gray-600 transition-colors"
+      >
+        Providers
+        {count > 0 && (
+          <span className="font-mono text-xs text-green-400">{count}</span>
+        )}
+        <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-56 z-20 bg-gray-900 border border-gray-800 rounded-lg shadow-xl py-1 max-h-80 overflow-y-auto">
+          {providers.map((p) => {
+            const active = selected.has(p.name)
+            return (
+              <button
+                key={p.name}
+                onClick={() => onToggle(p.name)}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/60 transition-colors"
+              >
+                <span>{p.display_name}</span>
+                {active && <Check className="h-3.5 w-3.5 text-green-400" />}
+              </button>
+            )
+          })}
+          {count > 0 && (
+            <button
+              onClick={onClearProviders}
+              className="w-full text-left px-3 py-2 text-xs font-mono text-gray-500 hover:text-gray-300 border-t border-gray-800 mt-1"
+            >
+              clear providers
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
