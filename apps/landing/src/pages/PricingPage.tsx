@@ -8,7 +8,7 @@
  * theme of RoadmapPage.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -51,6 +51,12 @@ interface LastRunProvider {
   error: string | null
 }
 
+interface ExchangeRate {
+  currency: string
+  sek_per_unit: number
+  rate_date: string | null
+}
+
 interface PricingResponse {
   updated_at: string | null
   providers: ProviderBlock[]
@@ -59,13 +65,55 @@ interface PricingResponse {
     at: string
     providers: LastRunProvider[]
   } | null
+  exchange_rates?: ExchangeRate[]
 }
 
-function fmtUsd(n: number): string {
-  if (n === 0) return '$0.00'
-  if (n < 0.01) return `$${n.toFixed(4)}`
-  return `$${n.toFixed(2)}`
+/** Symbol + locale per supported currency for display formatting. */
+const CURRENCY_META: Record<string, { symbol: string; label: string }> = {
+  USD: { symbol: '$', label: 'USD' },
+  SEK: { symbol: 'kr', label: 'SEK' },
+  EUR: { symbol: '€', label: 'EUR' },
+  GBP: { symbol: '£', label: 'GBP' },
+  NOK: { symbol: 'kr', label: 'NOK' },
+  DKK: { symbol: 'kr', label: 'DKK' },
 }
+
+/**
+ * Build a money formatter for the selected currency. Prices are stored in
+ * USD; conversion uses Riksbank SEK-per-unit rates:
+ *   price_T = price_usd * sek_per_unit['USD'] / sek_per_unit[T]
+ * Falls back to USD when rates are missing or the currency is unsupported.
+ */
+function makeFmt(
+  currency: string,
+  rates: ExchangeRate[],
+): (usd: number) => string {
+  const sekPer = (c: string) =>
+    rates.find((r) => r.currency === c)?.sek_per_unit
+  const sekPerUsd = sekPer('USD')
+  const sekPerTarget = sekPer(currency)
+  const meta = CURRENCY_META[currency] ?? CURRENCY_META.USD
+
+  // Factor to multiply a USD price by. USD or any missing rate → 1 (USD).
+  const factor =
+    currency === 'USD' || !sekPerUsd || !sekPerTarget
+      ? 1
+      : sekPerUsd / sekPerTarget
+  const symbol = factor === 1 ? '$' : meta.symbol
+  const suffix = symbol === 'kr' ? ' kr' : ''
+  const prefix = symbol === 'kr' ? '' : symbol
+
+  return (usd: number) => {
+    const v = usd * factor
+    const digits = v === 0 ? 2 : v < 0.01 ? 4 : 2
+    return `${prefix}${v.toFixed(digits)}${suffix}`
+  }
+}
+
+const FmtContext = createContext<(usd: number) => string>(
+  (n) => `$${n.toFixed(2)}`,
+)
+const useFmt = () => useContext(FmtContext)
 
 function fmtTokens(n: number | null): string {
   if (n === null || n === undefined) return '—'
@@ -95,6 +143,7 @@ export function PricingPage() {
     new Set(),
   )
   const [query, setQuery] = useState('')
+  const [currency, setCurrency] = useState('USD')
 
   useEffect(() => {
     let cancelled = false
@@ -153,6 +202,18 @@ export function PricingPage() {
     (a, p) => a + p.models.length,
     0,
   )
+
+  const rates = data?.exchange_rates ?? []
+  // Offer USD plus any currency we have a rate for (and a USD base rate to
+  // convert from). Stable, known order.
+  const availableCurrencies = useMemo(() => {
+    const have = new Set(rates.map((r) => r.currency))
+    const hasUsdBase = have.has('USD')
+    return ['USD', 'SEK', 'EUR', 'GBP', 'NOK', 'DKK'].filter(
+      (c) => c === 'USD' || (hasUsdBase && have.has(c)),
+    )
+  }, [rates])
+  const fmt = useMemo(() => makeFmt(currency, rates), [currency, rates])
 
   function toggleProvider(name: string) {
     setSelectedProviders((prev) => {
@@ -230,9 +291,13 @@ export function PricingPage() {
                 onQuery={setQuery}
                 shownModels={shownModels}
                 totalModels={totalModels}
+                currency={currency}
+                onCurrency={setCurrency}
+                currencies={availableCurrencies}
               />
             )}
 
+            <FmtContext.Provider value={fmt}>
             <div className="space-y-12">
               {filteredProviders.map((p) => (
                 <ProviderTable key={p.name} provider={p} />
@@ -258,6 +323,7 @@ export function PricingPage() {
                 </p>
               )}
             </div>
+            </FmtContext.Provider>
           </>
         )}
       </main>
@@ -274,6 +340,9 @@ function FilterBar({
   onQuery,
   shownModels,
   totalModels,
+  currency,
+  onCurrency,
+  currencies,
 }: {
   providers: ProviderBlock[]
   selected: Set<string>
@@ -283,18 +352,37 @@ function FilterBar({
   onQuery: (q: string) => void
   shownModels: number
   totalModels: number
+  currency: string
+  onCurrency: (c: string) => void
+  currencies: string[]
 }) {
   return (
     <div className="mb-10 space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="Filter models by name…"
-          className="w-full bg-gray-900/60 border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-gray-600 transition-colors"
-        />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder="Filter models by name…"
+            className="w-full bg-gray-900/60 border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-gray-600 transition-colors"
+          />
+        </div>
+        {currencies.length > 1 && (
+          <select
+            value={currency}
+            onChange={(e) => onCurrency(e.target.value)}
+            aria-label="Display currency"
+            className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-gray-600 transition-colors cursor-pointer"
+          >
+            {currencies.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {providers.map((p) => {
@@ -420,6 +508,7 @@ function ProviderTable({ provider }: { provider: ProviderBlock }) {
 
 function ModelRow({ model: m }: { model: Model }) {
   const [open, setOpen] = useState(false)
+  const fmt = useFmt()
   const Chevron = open ? ChevronDown : ChevronRight
   return (
     <>
@@ -439,20 +528,20 @@ function ModelRow({ model: m }: { model: Model }) {
           </div>
         </td>
         <td className="px-4 py-3 text-right font-mono text-gray-300">
-          {fmtUsd(m.input_per_million)}
+          {fmt(m.input_per_million)}
         </td>
         <td className="px-4 py-3 text-right font-mono text-gray-300">
-          {fmtUsd(m.output_per_million)}
+          {fmt(m.output_per_million)}
         </td>
         <td className="px-4 py-3 text-right font-mono text-gray-500">
           {m.cached_input_per_million !== null
-            ? fmtUsd(m.cached_input_per_million)
+            ? fmt(m.cached_input_per_million)
             : '—'}
         </td>
         <td className="px-4 py-3 text-right font-mono text-gray-500">
           {m.batch_input_per_million !== null &&
           m.batch_output_per_million !== null
-            ? `${fmtUsd(m.batch_input_per_million)} / ${fmtUsd(m.batch_output_per_million)}`
+            ? `${fmt(m.batch_input_per_million)} / ${fmt(m.batch_output_per_million)}`
             : '—'}
         </td>
         <td className="px-4 py-3 text-right font-mono text-gray-500">
@@ -487,7 +576,7 @@ function ModelRow({ model: m }: { model: Model }) {
                 label="Cached input /1M"
                 value={
                   m.cached_input_per_million !== null
-                    ? fmtUsd(m.cached_input_per_million)
+                    ? fmt(m.cached_input_per_million)
                     : '—'
                 }
               />
@@ -495,7 +584,7 @@ function ModelRow({ model: m }: { model: Model }) {
                 label="Batch input /1M"
                 value={
                   m.batch_input_per_million !== null
-                    ? fmtUsd(m.batch_input_per_million)
+                    ? fmt(m.batch_input_per_million)
                     : '—'
                 }
               />
@@ -503,7 +592,7 @@ function ModelRow({ model: m }: { model: Model }) {
                 label="Batch output /1M"
                 value={
                   m.batch_output_per_million !== null
-                    ? fmtUsd(m.batch_output_per_million)
+                    ? fmt(m.batch_output_per_million)
                     : '—'
                 }
               />

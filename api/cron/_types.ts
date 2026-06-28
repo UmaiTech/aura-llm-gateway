@@ -125,4 +125,10 @@ export interface ScrapeSummary {
   models_flagged: number
   errors: { provider: ProviderId; error: string }[]
   providers: ProviderResult[]
+  /** FX refresh outcome (Riksbank). Undefined if the refresh threw. */
+  fx?: {
+    ok: boolean
+    updated: string[]
+    errors: { currency: string; error: string }[]
+  }
 }

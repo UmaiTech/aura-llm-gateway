@@ -60,6 +60,7 @@ export default async function handler(
   try {
     const rows = await fetchCurrentPrices()
     const lastRun = await fetchLastRun()
+    const rates = await fetchExchangeRates()
 
     // Group by provider, preserving a stable provider order.
     const byProvider = new Map<
@@ -110,6 +111,7 @@ export default async function handler(
       updated_at: lastRun?.at ?? newest?.toISOString() ?? null,
       providers: [...byProvider.values()],
       last_run: lastRun,
+      exchange_rates: rates,
     })
   } catch (err) {
     console.error('[pricing] handler crashed:', err)
@@ -179,6 +181,36 @@ async function fetchLastRun(): Promise<LastRun | null> {
     run_id: runId,
     at: latest.rows[0].created_at.toISOString(),
     providers: detail.rows as LastRun['providers'],
+  }
+}
+
+interface ExchangeRate {
+  currency: string
+  sek_per_unit: number
+  rate_date: string | null
+}
+
+/**
+ * Current FX rates (SEK per unit) for client-side local-currency display.
+ * Returns [] if the table is empty / unreachable so the page just shows USD.
+ */
+async function fetchExchangeRates(): Promise<ExchangeRate[]> {
+  try {
+    const r = await pricingPool.query<{
+      currency: string
+      sek_per_unit: number
+      rate_date: Date | null
+    }>(
+      `SELECT currency, sek_per_unit::float8, rate_date
+         FROM exchange_rates ORDER BY currency`,
+    )
+    return r.rows.map((row) => ({
+      currency: row.currency,
+      sek_per_unit: row.sek_per_unit,
+      rate_date: row.rate_date ? row.rate_date.toISOString().slice(0, 10) : null,
+    }))
+  } catch {
+    return []
   }
 }
 

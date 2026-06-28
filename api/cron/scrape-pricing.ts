@@ -24,6 +24,8 @@ import {
   writeScrapeLog,
   rollupStatus,
 } from './_db.js'
+import { refreshFxRates } from './_fx.js'
+import type { FxResult } from './_fx.js'
 import type {
   ProviderResult,
   ScrapeSummary,
@@ -59,6 +61,19 @@ export default async function handler(
     PROVIDERS.map((cfg) => runProvider(cfg, dryRun, runId)),
   )
 
+  // Refresh FX rates (Riksbank) so the page can show local currency. Best
+  // effort — a Riksbank outage must not fail the pricing run.
+  let fx: FxResult | undefined
+  try {
+    fx = await refreshFxRates(dryRun)
+    console.log(
+      `[scrape-pricing]   fx: ${fx.updated.join(', ')}` +
+        (fx.errors.length ? ` (errors: ${fx.errors.map((e) => e.currency).join(', ')})` : ''),
+    )
+  } catch (fxErr) {
+    console.error('[scrape-pricing] fx refresh failed:', errMsg(fxErr))
+  }
+
   console.log(
     `[scrape-pricing] run ${runId} done in ` +
       `${Math.round(perfNow() - runStart)}ms — ` +
@@ -79,6 +94,7 @@ export default async function handler(
       .filter((r) => r.error)
       .map((r) => ({ provider: r.provider, error: r.error as string })),
     providers: results,
+    fx,
   }
 
   return json(res, 200, summary)
