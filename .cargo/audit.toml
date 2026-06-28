@@ -2,7 +2,10 @@
 # https://github.com/rustsec/rustsec/tree/main/cargo-audit
 
 [advisories]
-# Ignore advisories for specific IDs
+# Ignore advisories for specific IDs. Each entry is a transitive dependency
+# we cannot bump ourselves (pinned by an upstream crate's version constraint).
+# Re-evaluate on every dependency bump — remove entries once the upstream
+# releases a fixed version. Verify with `cargo audit`.
 ignore = [
     # RUSTSEC-2023-0071: Marvin Attack in RSA crate
     # This vulnerability only affects RSA decryption operations.
@@ -11,4 +14,30 @@ ignore = [
     # of the sqlx crate itself, but we never actually use MySQL in our application.
     # The vulnerability is not exploitable in our use case.
     "RUSTSEC-2023-0071",
+
+    # aws-lc-sys 0.37.x — pinned by aws-lc-rs 1.15 (requires aws-lc-sys
+    # ^0.37.0) ← rustls 0.23 / AWS SDK (aws-sdk-bedrockruntime, aws-config).
+    # Fixes need aws-lc-sys >=0.38/0.39, unreachable until aws-lc-rs relaxes
+    # its constraint. Revisit when the AWS SDK bumps.
+    "RUSTSEC-2026-0044", # X.509 Name Constraints bypass
+    "RUSTSEC-2026-0045", # AES-CCM timing side-channel
+    "RUSTSEC-2026-0046", # PKCS7_verify cert-chain validation bypass
+    "RUSTSEC-2026-0047", # PKCS7_verify signature validation bypass
+    "RUSTSEC-2026-0048", # CRL distribution-point scope check
+
+    # rustls-webpki 0.101.7 — pulled ONLY by the legacy rustls 0.21 inside
+    # aws-smithy-http-client (AWS SDK). Our own TLS uses rustls-webpki
+    # 0.103.13 (patched). Pinned until the AWS SDK moves off rustls 0.21.
+    "RUSTSEC-2026-0098", # name constraints for URI names
+    "RUSTSEC-2026-0099", # name constraints wildcard acceptance
+    "RUSTSEC-2026-0104", # reachable panic in CRL parsing
+
+    # paste 1.0.15 — unmaintained (informational, no CVE). Pinned by
+    # utoipa-axum 0.2. Compile-time proc-macro only; low risk.
+    "RUSTSEC-2024-0436",
+
+    # rand 0.8.5 — "unsound with a custom logger" (informational). Pinned by
+    # sqlx-postgres 0.8 and used directly by aura-core; rand 0.9 is an API
+    # break. Not exploitable in our usage.
+    "RUSTSEC-2026-0097",
 ]

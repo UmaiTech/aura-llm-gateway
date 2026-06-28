@@ -7,11 +7,27 @@ db-path = "~/.cargo/advisory-db"
 # The url(s) of the advisory databases to use
 db-urls = ["https://github.com/rustsec/advisory-db"]
 
-# Ignore advisories for specific IDs
+# Ignore advisories for specific IDs. All transitive deps pinned by upstream
+# constraints we can't bump (mainly the AWS SDK's aws-lc-rs/rustls 0.21).
+# See .cargo/audit.toml for the full rationale per ID. Revisit on dep bumps.
 ignore = [
     # RSA timing attack - not applicable as we don't use MySQL
     # Only affects sqlx-mysql which we explicitly disable with default-features = false
     "RUSTSEC-2023-0071",
+    # aws-lc-sys 0.37.x — pinned by aws-lc-rs 1.15 (AWS SDK / rustls 0.23).
+    "RUSTSEC-2026-0044",
+    "RUSTSEC-2026-0045",
+    "RUSTSEC-2026-0046",
+    "RUSTSEC-2026-0047",
+    "RUSTSEC-2026-0048",
+    # rustls-webpki 0.101.7 — legacy rustls 0.21 inside the AWS SDK only.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+    # paste — unmaintained (informational), pinned by utoipa-axum.
+    "RUSTSEC-2024-0436",
+    # rand 0.8.5 — unsound informational, pinned by sqlx-postgres.
+    "RUSTSEC-2026-0097",
 ]
 
 [licenses]
