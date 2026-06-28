@@ -1,0 +1,55 @@
+name: TypeScript SDK
+
+on:
+  push:
+    branches: [main]
+    # Publish to npm on a tag like `sdk-ts-v0.1.0`.
+    tags: ['sdk-ts-v*']
+    paths:
+      - 'sdks/typescript/**'
+      - '.github/workflows/sdk-typescript.yml'
+  pull_request:
+    paths:
+      - 'sdks/typescript/**'
+      - '.github/workflows/sdk-typescript.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: sdks/typescript
+
+jobs:
+  test:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci || npm install
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Trusted publishing via OIDC — no NPM_TOKEN secret. Gated on sdk-ts-v* tags.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/sdk-ts-v')
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci || npm install
+      - run: npm run build
+      # --provenance emits a signed SLSA attestation (needs id-token: write).
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

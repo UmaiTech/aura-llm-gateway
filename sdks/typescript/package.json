@@ -1,0 +1,60 @@
+{
+  "name": "aura-llm",
+  "version": "0.1.0",
+  "description": "TypeScript/JavaScript SDK for the Aura LLM Gateway (Open Responses API) — universal fetch, AsyncIterable streaming, typed errors.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "aura",
+    "llm",
+    "gateway",
+    "open-responses",
+    "openai",
+    "anthropic",
+    "ai",
+    "sdk",
+    "streaming"
+  ],
+  "author": "UmaiTech",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UmaiTech/aura-llm-gateway.git",
+    "directory": "sdks/typescript"
+  },
+  "homepage": "https://aura-llm.dev",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.8",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
