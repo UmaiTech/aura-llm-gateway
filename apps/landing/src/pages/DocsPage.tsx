@@ -133,6 +133,7 @@ const docSections = [
     title: 'SDKs',
     items: [
       { title: 'Python', path: '/docs/sdks/python', icon: Package },
+      { title: 'TypeScript', path: '/docs/sdks/typescript', icon: Package },
     ],
   },
   {

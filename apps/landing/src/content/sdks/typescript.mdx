@@ -1,0 +1,130 @@
+---
+title: TypeScript SDK
+description: Official TypeScript/JavaScript SDK for Aura LLM Gateway
+---
+
+import { Callout, CodeBlock, CodeTabs, CodeTab, Steps, Step, Expandable } from '../../components/mdx'
+
+# TypeScript SDK
+
+The official TypeScript/JavaScript SDK for Aura LLM Gateway. Universal — runs on Node 20+, browsers, Deno, Bun, Vercel Edge, and Cloudflare Workers — built on the global `fetch` and Web Streams with no Node-only dependencies. Streaming is an `AsyncIterable`; errors are a typed hierarchy.
+
+<Callout type="info">
+Published on npm as `aura-llm`. There is one client (JS is async by default): every call returns a `Promise`, and streaming returns an `AsyncIterable`.
+</Callout>
+
+## Installation
+
+<CodeBlock language="bash">
+{`npm install aura-llm`}
+</CodeBlock>
+
+## Quick start
+
+<CodeBlock language="typescript">
+{`import { AuraClient, outputText } from 'aura-llm'
+
+const client = new AuraClient({ apiKey: process.env.AURA_API_KEY })
+
+const response = await client.responses.create({
+  model: 'gpt-5.4-mini',
+  input: 'What is the capital of France?',
+})
+
+console.log(outputText(response))`}
+</CodeBlock>
+
+## Streaming
+
+`create({ stream: true })` returns an `AsyncIterable<StreamEvent>` with back-pressure.
+
+<CodeBlock language="typescript">
+{`const stream = await client.responses.create({
+  model: 'gpt-5.4-mini',
+  input: 'Tell me a story',
+  stream: true,
+})
+
+for await (const event of stream) {
+  if (event.type === 'response.output_text.delta') {
+    process.stdout.write(event.delta)
+  }
+}`}
+</CodeBlock>
+
+<Callout type="warning">
+Streaming requests are not retried — re-issuing a partial stream would replay events. Errors before the first byte still surface as typed errors.
+</Callout>
+
+## Conversation threading
+
+<CodeBlock language="typescript">
+{`const r1 = await client.responses.create({ model: 'gpt-5.4-mini', input: 'My name is Alice.' })
+const r2 = await client.responses.create({
+  model: 'gpt-5.4-mini',
+  input: 'What is my name?',
+  previous_response_id: r1.id,
+})
+console.log(outputText(r2)) // → Your name is Alice.`}
+</CodeBlock>
+
+## Tools
+
+<CodeBlock language="typescript">
+{`import { functionTool, toolCalls } from 'aura-llm'
+
+const response = await client.responses.create({
+  model: 'gpt-5.4-mini',
+  input: "What's the weather in Tokyo?",
+  tools: [
+    functionTool('get_weather', 'Get current weather', {
+      type: 'object',
+      properties: { city: { type: 'string' } },
+      required: ['city'],
+    }),
+  ],
+})
+
+for (const call of toolCalls(response)) {
+  console.log(call.name, call.arguments)
+}`}
+</CodeBlock>
+
+## Error handling
+
+<CodeBlock language="typescript">
+{`import { AuraError, RateLimitError, AuthenticationError } from 'aura-llm'
+
+try {
+  await client.responses.create({ model: 'gpt-5.4-mini', input: 'Hi' })
+} catch (err) {
+  if (err instanceof RateLimitError) {
+    console.log(\`Retry after \${err.retryAfter}s\`)
+  } else if (err instanceof AuthenticationError) {
+    console.log('Check your API key')
+  } else if (err instanceof AuraError) {
+    console.log(err.status, err.code, err.message)
+  }
+}`}
+</CodeBlock>
+
+The hierarchy: `AuraError` → `APIError` → `AuthenticationError` (401) / `BadRequestError` (400) / `NotFoundError` (404) / `RateLimitError` (429); plus `APIConnectionError` and `APITimeoutError`.
+
+## Configuration
+
+| Option | Default | Description |
+|---|---|---|
+| `apiKey` | `AURA_API_KEY` env | Bearer token |
+| `baseUrl` | `AURA_BASE_URL` env / `http://localhost:8080` | Gateway URL |
+| `timeout` | `60000` | Per-request timeout (ms) |
+| `maxRetries` | `2` | Retries for 408/429/5xx + network errors; `0` disables |
+| `fetch` | global `fetch` | Custom fetch for edge runtimes |
+| `onRequest` / `onResponse` / `onError` | — | Lifecycle hooks |
+
+## Edge runtimes
+
+No Node-only APIs — works on Vercel Edge and Cloudflare Workers unchanged. See `sdks/typescript/examples/edge.ts` for a streaming Worker handler.
+
+<Callout type="info">
+The TypeScript SDK is versioned independently from the gateway and targets the Open Responses API served by aura-proxy v0.13+.
+</Callout>

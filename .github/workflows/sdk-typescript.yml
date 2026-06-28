@@ -1,0 +1,62 @@
+name: TypeScript SDK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sdks/typescript/**'
+      - '.github/workflows/sdk-typescript.yml'
+  pull_request:
+    paths:
+      - 'sdks/typescript/**'
+      - '.github/workflows/sdk-typescript.yml'
+  # Publish on a GitHub Release whose tag starts with `sdk-ts-v`
+  # (mirrors the Python SDK's release-triggered PyPI publish).
+  release:
+    types: [published]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: sdks/typescript
+
+jobs:
+  test:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Only on a published release tagged sdk-ts-v* (independent from gateway).
+    if: >-
+      github.event_name == 'release' &&
+      startsWith(github.event.release.tag_name, 'sdk-ts-v')
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/aura-llm
+    permissions:
+      id-token: write # OIDC trusted publishing + provenance
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install
+      - run: npm run build
+      # Trusted publishing (OIDC): npm 11.5+ authenticates via the id-token,
+      # no NPM_TOKEN secret. --provenance emits a signed SLSA attestation.
+      - run: npm install -g npm@latest
+      - run: npm publish --provenance --access public
