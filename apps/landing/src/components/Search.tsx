@@ -42,6 +42,7 @@ const searchIndex: SearchItem[] = [
 
   // SDKs
   { title: 'Python SDK', path: '/docs/sdks/python', section: 'SDKs', description: 'aura-llm Python package' },
+  { title: 'TypeScript SDK', path: '/docs/sdks/typescript', section: 'SDKs', description: 'aura-llm npm package — universal fetch, AsyncIterable streaming' },
 
   // Multi-Tenancy
   { title: 'Organizations', path: '/docs/organizations', section: 'Multi-Tenancy', description: 'Organizations, teams, and end-users' },

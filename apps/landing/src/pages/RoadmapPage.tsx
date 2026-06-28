@@ -222,7 +222,7 @@ const releases: Release[] = [
       { label: 'Compression / validation / consistency events in harness timeline' },
       { label: 'Per-tool drill-down drawer in harness' },
       { label: 'Organization detail page with team + key + cost breakdown' },
-      { label: 'TypeScript SDK', note: 'matching the Python feature set' },
+      { label: 'TypeScript SDK', note: 'aura-llm on npm — universal fetch, AsyncIterable streaming, typed errors; matches the Python feature set.' },
       { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
       { label: 'End-user extended fields', note: 'external_id and metadata are now editable from the admin app.' },
       { label: 'Harness payload capture', note: 'Optional per-org full request/response capture, surfaced inline on the harness trace.' },
