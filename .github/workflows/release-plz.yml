@@ -136,9 +136,11 @@ jobs:
           fi
 
       # release-plz manages the Rust workspace version but doesn't know about
-      # sdks/python/pyproject.toml. Sync it to match the new workspace version
-      # so PyPI publishes the right version on the next release tag.
-      - name: Sync Python SDK version with workspace
+      # the SDK manifests. Sync both the Python (pyproject.toml) and TypeScript
+      # (package.json) SDK versions to match the new workspace version, into the
+      # release PR, so PyPI and npm publish the right version on the next
+      # release tag. The SDKs are versioned in lockstep with the gateway.
+      - name: Sync SDK versions with workspace
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
@@ -157,21 +159,41 @@ jobs:
 
           # Read the new workspace version from Cargo.toml
           NEW_VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
-          CURRENT_PY=$(grep -m1 '^version' sdks/python/pyproject.toml | sed -E 's/version = "([^"]+)"/\1/')
-          echo "Workspace: ${NEW_VERSION}, Python SDK currently: ${CURRENT_PY}"
+          echo "Workspace version: ${NEW_VERSION}"
 
-          if [ "$NEW_VERSION" = "$CURRENT_PY" ]; then
-            echo "Python SDK version already in sync — no commit needed"
+          changed=false
+
+          # --- Python SDK (pyproject.toml) ---
+          CURRENT_PY=$(grep -m1 '^version' sdks/python/pyproject.toml | sed -E 's/version = "([^"]+)"/\1/')
+          if [ "$NEW_VERSION" != "$CURRENT_PY" ]; then
+            sed -i -E "s/^version = \"${CURRENT_PY}\"/version = \"${NEW_VERSION}\"/" sdks/python/pyproject.toml
+            git add sdks/python/pyproject.toml
+            changed=true
+            echo "Python SDK ${CURRENT_PY} -> ${NEW_VERSION}"
+          else
+            echo "Python SDK already in sync"
+          fi
+
+          # --- TypeScript SDK (package.json) ---
+          # Bump only the top-level "version" key (first occurrence).
+          CURRENT_TS=$(grep -m1 '"version"' sdks/typescript/package.json | sed -E 's/.*"version": "([^"]+)".*/\1/')
+          if [ "$NEW_VERSION" != "$CURRENT_TS" ]; then
+            sed -i -E "0,/\"version\": \"${CURRENT_TS}\"/s//\"version\": \"${NEW_VERSION}\"/" sdks/typescript/package.json
+            git add sdks/typescript/package.json
+            changed=true
+            echo "TypeScript SDK ${CURRENT_TS} -> ${NEW_VERSION}"
+          else
+            echo "TypeScript SDK already in sync"
+          fi
+
+          if [ "$changed" = false ]; then
+            echo "All SDK versions already in sync — no commit needed"
             exit 0
           fi
 
-          # Update pyproject.toml in-place
-          sed -i -E "s/^version = \"${CURRENT_PY}\"/version = \"${NEW_VERSION}\"/" sdks/python/pyproject.toml
-
           git config user.name "Marcus Elwin"
           git config user.email "marcus@elwin.com"
-          git add sdks/python/pyproject.toml
-          git commit -m "chore: sync Python SDK version to ${NEW_VERSION}"
+          git commit -m "chore: sync SDK versions to ${NEW_VERSION}"
           git push origin "$PR_BRANCH"
 
   # Release unpublished packages (creates GitHub releases, publishes to crates.io).
