@@ -266,6 +266,48 @@ Use preview deploys for UI and non-auth checks only. To test the real GitHub sig
 3. Update models in `aura-db`
 4. Run `sqlx migrate run`
 
+#### ⚠️ Migration version prefixes MUST be globally unique — or the Fly deploy fails
+
+`sqlx-migrate` derives a migration's **version** from the **leading integer up
+to the first non-digit** in the filename. Our files are named
+`YYYYMMDD_NNN_description.sql`, so the version is the **date prefix only** —
+the `NNN` ordinal is *not* part of the version. That means two files with the
+same date but different ordinals (e.g. `20260627_025_*` and `20260627_026_*`)
+**collide to the same version `20260627`**.
+
+When versions collide, sqlx records one checksum and then, on the next deploy,
+the `release_command = 'migrate'` in `fly.toml` aborts with:
+
+```
+Migration error: migration <VERSION> was previously applied but has been modified
+```
+
+This **fails the entire Fly deploy** (and therefore blocks every subsequent
+deploy, not just the one that introduced the collision — prod was stuck for a
+month on the `20260525` collision). It does NOT show up in local testing if
+you apply migrations by hand with `psql` instead of letting sqlx run them.
+
+**Rules:**
+- **One migration per date prefix.** If you add several migrations at once,
+  give each a *different* `YYYYMMDD` (sequential days are fine), even if that
+  date isn't "today". Keep the date order matching the `NNN` order so they
+  still sort/apply in sequence.
+- **Verify before pushing:**
+  `for f in migrations/*.sql; do basename "$f" | sed -E 's/^([0-9]+)_.*/\1/'; done | sort | uniq -d`
+  must print **nothing**.
+- **Test with sqlx, not psql.** Run `sqlx migrate run` (or `cargo run -p
+  aura-proxy -- migrate`) against a fresh DB — a manual `psql -f` bypasses
+  `_sqlx_migrations` and hides version collisions.
+- **Make every migration idempotent** (`IF NOT EXISTS`, `ON CONFLICT DO
+  NOTHING`, `CREATE OR REPLACE`). If a deploy half-applies and retries, or a
+  file is renamed to a fresh version after being partially applied, idempotent
+  SQL re-runs safely.
+- **Renaming to fix a collision is safe** as long as the new version prefix is
+  one prod has never recorded — the migration just applies fresh. Don't change
+  the *content* of a migration that has already applied to prod; rename it to a
+  new unique prefix instead. Precedent: commit `2096848` (renamed 022/023 for
+  the `20260521` collision) and the `20260525`/`20260627` fix.
+
 ### Updating the Public Roadmap
 
 The public roadmap at `aura-llm.dev/roadmap` is the source of truth for what the project has shipped and what's coming. It's read by users, prospects, and contributors evaluating the project — keeping it stale undermines trust.
