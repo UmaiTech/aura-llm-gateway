@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/react'
 import App from './App'
 import { DocsPage } from './pages/DocsPage'
 import { RoadmapPage } from './pages/RoadmapPage'
+import { PricingPage } from './pages/PricingPage'
 import './index.css'
 
 const hostname =
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={rootElement()} />
         <Route path="/roadmap" element={<RoadmapPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/docs/roadmap" element={<RoadmapPage />} />
         <Route path="/docs/*" element={<DocsPage />} />
       </Routes>

@@ -46,8 +46,8 @@ const SECTIONS: NumberedSection[] = [
     title: 'One API, every model.',
     body: (
       <>
-        OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace, and AWS
-        Bedrock — all behind the Open Responses API. Switch providers by
+        OpenAI, Anthropic, Google, Mistral, Together AI, Ollama, HuggingFace,
+        and AWS Bedrock — all behind the Open Responses API. Switch providers by
         changing one string.
       </>
     ),
@@ -107,7 +107,7 @@ routing:
       <>
         Per-request USD attached to every response, calculated by the
         gateway. Track input, output, cached, and reasoning tokens across
-        all seven providers without instrumenting your app.
+        all eight providers without instrumenting your app.
       </>
     ),
     code: `// Every response includes:
@@ -252,6 +252,12 @@ export default function App() {
                 Roadmap
               </a>
               <a
+                href="/pricing"
+                className="text-gray-400 hover:text-gray-100 transition-colors"
+              >
+                LLM Pricing
+              </a>
+              <a
                 href="https://playground.aura-llm.dev"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -278,14 +284,14 @@ export default function App() {
         {/* Hero — stat-led. Big serif headline, then the stat row. */}
         <section className="pt-32 pb-16 sm:pt-40 sm:pb-20">
           <div className="font-mono text-xs uppercase tracking-wider text-gray-500 mb-6">
-            Open Responses API · v0.4.1 · Rust
+            Open Responses API · v0.13 · Rust
           </div>
           <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight max-w-3xl text-gray-100 leading-[1.05]">
             A unified LLM gateway,{' '}
             <span className="text-gray-400">built for production.</span>
           </h1>
           <p className="mt-6 text-lg text-gray-400 leading-relaxed max-w-2xl">
-            Seven providers behind one API. Cost on every response.
+            Eight providers behind one API. Cost on every response.
             Compression that cuts tokens 40–60%. Self-hosted Rust binary,
             under 10ms overhead.
           </p>
@@ -309,10 +315,10 @@ export default function App() {
         {/* Stat row — the page's structural anchor */}
         <section className="border-t border-gray-800 py-12 grid grid-cols-2 sm:grid-cols-4 gap-8">
           {[
-            { value: '7', unit: 'providers' },
+            { value: '8', unit: 'providers' },
             { value: '40–60%', unit: 'token reduction' },
             { value: '<10ms', unit: 'overhead' },
-            { value: 'v0.4.1', unit: 'shipping' },
+            { value: 'v0.13', unit: 'shipping' },
           ].map((s) => (
             <div key={s.unit}>
               <div className="font-display text-3xl sm:text-4xl font-semibold text-gray-100 leading-none">

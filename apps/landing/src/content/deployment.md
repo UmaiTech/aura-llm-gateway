@@ -156,7 +156,7 @@ helm install aura oci://ghcr.io/umaitech/charts/aura-llm-gateway \
 | Deployment | Gateway pod with non-root securityContext, read-only rootfs |
 | Service | ClusterIP on port 8080 |
 | ConfigMap | Non-secret config (host, port, log level) |
-| Secret | Master key, admin key, all 7 provider credentials |
+| Secret | Master key, admin key, all 8 provider credentials |
 | Ingress *(optional, off)* | Standard k8s Ingress with TLS |
 | HPA *(optional, off)* | Horizontal pod autoscaling on CPU/memory |
 | ServiceAccount | Dedicated SA with dropped capabilities |

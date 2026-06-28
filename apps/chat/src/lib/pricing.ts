@@ -1,13 +1,20 @@
-// Model pricing per million tokens (USD)
-// Updated as of January 2025
+// Model pricing per million tokens (USD).
+//
+// Source of truth is the gateway's pricing DB, exposed at GET /api/pricing
+// (populated by the weekly scraper). `loadLivePricing()` fetches it once at
+// startup and overlays it on top of the hardcoded FALLBACK_PRICING below.
+// The fallback exists so the playground still costs conversations when the
+// API is unreachable (local `vite dev`) or before the fetch resolves —
+// `calculateCost` stays synchronous for its many call sites.
 
 export interface ModelPricing {
   inputPerMillion: number
   outputPerMillion: number
 }
 
-// Pricing data per model
-export const MODEL_PRICING: Record<string, ModelPricing> = {
+// Hardcoded reference prices — fallback only. Kept current-ish by hand; the
+// live values from /api/pricing take precedence once loaded.
+export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // OpenAI — 2026 lineup
   'gpt-5.5-pro': { inputPerMillion: 30.00, outputPerMillion: 180.00 },
   'gpt-5.5': { inputPerMillion: 5.00, outputPerMillion: 30.00 },
@@ -46,13 +53,71 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gemini-2.0-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
 }
 
-// Calculate cost for a given model and token counts
+// Live prices fetched from the gateway pricing DB. Overlaid on the fallback.
+const livePricing: Record<string, ModelPricing> = {}
+
+/**
+ * Back-compat export. Returns the merged live-over-fallback view at call
+ * time, so anything reading the whole table gets the freshest data.
+ */
+export function getModelPricing(): Record<string, ModelPricing> {
+  return { ...FALLBACK_PRICING, ...livePricing }
+}
+
+interface PricingApiResponse {
+  providers: {
+    models: {
+      model_id: string
+      input_per_million: number
+      output_per_million: number
+    }[]
+  }[]
+}
+
+let pricingLoaded: Promise<void> | null = null
+
+/**
+ * Fetch live prices from GET /api/pricing and overlay them on the fallback.
+ * Idempotent — safe to call from app startup; failures are swallowed so the
+ * playground falls back to the hardcoded table. Returns the same promise on
+ * repeat calls.
+ */
+export function loadLivePricing(): Promise<void> {
+  if (pricingLoaded) return pricingLoaded
+  pricingLoaded = fetch('/api/pricing', { headers: { accept: 'application/json' } })
+    .then((res) =>
+      res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)),
+    )
+    .then((json: PricingApiResponse) => {
+      for (const provider of json.providers) {
+        for (const m of provider.models) {
+          livePricing[m.model_id] = {
+            inputPerMillion: m.input_per_million,
+            outputPerMillion: m.output_per_million,
+          }
+        }
+      }
+    })
+    .catch(() => {
+      // Keep fallback prices; nothing to do.
+    })
+  return pricingLoaded
+}
+
+// Kick off the live-price fetch at module load (browser only). calculateCost
+// uses whatever is available now; values sharpen once this resolves.
+if (typeof window !== 'undefined') {
+  void loadLivePricing()
+}
+
+// Calculate cost for a given model and token counts. Prefers live prices,
+// then the hardcoded fallback, then 0 for unknown models.
 export function calculateCost(
   model: string,
   inputTokens: number,
   outputTokens: number
 ): number {
-  const pricing = MODEL_PRICING[model]
+  const pricing = livePricing[model] ?? FALLBACK_PRICING[model]
   if (!pricing) {
     return 0
   }

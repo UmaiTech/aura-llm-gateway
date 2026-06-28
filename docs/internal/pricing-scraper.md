@@ -1,201 +1,173 @@
-# Pricing Scraper Design
+# Pricing Scraper — Runbook
 
-## Overview
+> Implements issue #123. Supersedes the earlier Rust/tokio design sketch:
+> the scraper ships as a **Vercel Cron** function, not an in-process job,
+> because the pricing tables live behind the same Postgres the rest of
+> `api/` already talks to and Vercel Cron is already in the deploy surface.
 
-The pricing scraper is a scheduled job that automatically fetches and updates LLM model pricing from provider websites. This ensures the gateway always has accurate, up-to-date pricing information for cost calculations.
+## What it does
 
-## Architecture
+Every **Monday 06:00 UTC** (`vercel.json` → `crons`), `api/cron/scrape-pricing.ts`
+scrapes the **pricing page each provider publishes** for all 8 providers the
+gateway routes to, normalizes the result, and versions it into the existing
+`model_pricing` table using `effective_from` / `effective_until`. Existing
+Rust readers (`ModelPricingRepo::get_all_current`, which filters
+`effective_until IS NULL`) pick up the new rows with **no Rust changes**.
+
+The read side, `api/pricing/index.ts` (`GET /api/pricing`), serves the
+current rows publicly. It backs three surfaces:
+
+- the public pricing webapp at **`aura-llm.dev/pricing`**
+  (`apps/landing/src/pages/PricingPage.tsx`),
+- the docs **`ModelTable`** MDX component
+  (`apps/landing/src/components/mdx/ModelTable.tsx`), and
+- the **chat playground** cost calculator
+  (`apps/chat/src/lib/pricing.ts`).
+
+All three previously hardcoded their prices; they now read `/api/pricing`
+and keep their old hardcoded values only as an offline fallback.
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Cron Scheduler │───>│ Pricing Scraper │───>│    Database     │
-│    (tokio)      │    │    Service      │    │  model_pricing  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              v
-                    ┌─────────────────┐
-                    │ Provider APIs   │
-                    │ - OpenAI        │
-                    │ - Anthropic     │
-                    │ - Google        │
-                    └─────────────────┘
+Vercel Cron (Mon 06:00 UTC)
+   └─> POST /api/cron/scrape-pricing        (Bearer CRON_SECRET)
+         ├─ per provider (concurrent, isolated):
+         │     Firecrawl extract on the provider's own pricing page
+         │       → normalize → conservative gate → version into model_pricing
+         │     └─ append outcome to pricing_scrape_log
+         └─ JSON summary { providers_scraped, models_upserted, ... }
+
+GET /api/pricing  ──>  /pricing webapp · ModelTable docs · chat cost calc
 ```
 
-## Data Sources
+## Design stance: bad data is worse than stale data
 
-### OpenAI
-- **Primary**: `https://openai.com/api/pricing/` (HTML scraping)
-- **Fallback**: OpenAI API model list endpoint
-- **Frequency**: Daily
+Every scraped row carries a `status` (`success | needs_review | failed`).
+**Only `success` rows are ever written.** A row is downgraded the moment
+anything is ambiguous — missing input/output price, non-numeric price, no
+visible model id, or a provider page yielding zero models. The downgrade is
+recorded in `pricing_scrape_log` so a human can review, but it never touches
+`model_pricing`. This is the conservative writer contract raised on the issue.
 
-### Anthropic
-- **Primary**: `https://www.anthropic.com/pricing` (HTML scraping)
-- **Fallback**: Manual configuration
-- **Frequency**: Daily
+## Source: scrape each provider's own website
 
-### Google
-- **Primary**: `https://ai.google.dev/gemini-api/docs/pricing` (HTML scraping)
-- **Fallback**: Google Cloud pricing API
-- **Frequency**: Daily
+We scrape the **provider's own published pricing page** directly via
+Firecrawl `extract` (URL + prompt + Zod schema → structured JSON). No
+third-party aggregator. The page the provider publishes is the authoritative
+source of truth, and scraping it keeps us honest to exactly what they charge.
 
-## Database Schema
+On the "does this provider have a pricing API?" question — researched:
 
-Uses existing `model_pricing` table with `effective_from` / `effective_until` for price history:
+| Provider | First-party pricing API? | What their API *does* give | How we scrape |
+|---|---|---|---|
+| OpenAI | ❌ No | `GET /v1/models` → ids only | firecrawl: platform.openai.com/docs/pricing |
+| Anthropic | ❌ No | `GET /v1/models` → ids only | firecrawl: anthropic.com/pricing |
+| Google (Gemini) | ❌ No | `models.list` → token limits, no price | firecrawl: ai.google.dev/gemini-api/docs/pricing |
+| Mistral | ❌ No | `GET /v1/models` → ids only | firecrawl: mistral.ai/pricing |
+| Together AI (OSS host) | ❌ No | `GET /v1/models` → ids only | firecrawl: together.ai/pricing |
+| AWS Bedrock | ✅ **Yes** | AWS Price List Query API (`AmazonBedrock`) | firecrawl: aws.amazon.com/bedrock/pricing (API documented below) |
+| Hugging Face | ❌ No (per-endpoint, varies) | model metadata, no unified price | firecrawl: huggingface.co/docs/inference-providers/pricing |
+| Ollama | n/a (local inference) | — | `static` 0.0 row |
+
+**No first-party LLM provider exposes a pricing API** — their `/models`
+endpoints return ids and sometimes token limits, never prices. So scraping
+the HTML pricing page is the only universal option.
+
+### The one real API — AWS Bedrock (future swap)
+
+Bedrock pricing *is* queryable programmatically via the generic AWS Price
+List Query API. If we move Bedrock off HTML scraping onto the first-party API:
+
+```bash
+aws pricing get-products \
+  --region us-east-1 \
+  --service-code AmazonBedrock \
+  --filters 'Type=TERM_MATCH,Field=regionCode,Value=us-east-1' \
+  --query 'PriceList' --output text | jq .
+```
+
+Prices come back per-1K-tokens in nested `terms.OnDemand.*.priceDimensions`;
+multiply to per-1M and map `model` / `inferenceType`. Attribute names vary
+slightly by region/account, so it's not zero-cost — which is why we scrape
+the same page as everyone else for now.
+
+## Files
+
+| Path | Role |
+|---|---|
+| `api/cron/scrape-pricing.ts` | Cron entry point; auth, orchestration, summary |
+| `api/cron/_providers.ts` | 8-provider registry: pricing-page URLs + Firecrawl prompts/schema |
+| `api/cron/_sources.ts` | Firecrawl extract dispatch (+ static Ollama) |
+| `api/cron/_normalize.ts` | Raw → `ScrapedPrice` mappers + conservative trust gate |
+| `api/cron/_db.ts` | pg writer with `effective_until` versioning + scrape log |
+| `api/cron/_types.ts` | Shared types (`ScrapedPrice`, `ProviderResult`, status) |
+| `api/pricing/index.ts` | Public read endpoint backing the webapp + ModelTable + chat |
+| `apps/landing/src/pages/PricingPage.tsx` | Public pricing webapp (`/pricing`) |
+| `apps/landing/src/components/mdx/ModelTable.tsx` | Docs table — reads `/api/pricing`, hardcoded fallback |
+| `apps/chat/src/lib/pricing.ts` | Chat cost calc — `loadLivePricing()` overlays `/api/pricing` |
+| `migrations/20260627_025_pricing_scrape_log.sql` | Log table + seed missing providers (incl. Together) |
+
+## Environment variables
+
+| Var | Required | Purpose |
+|---|---|---|
+| `CRON_SECRET` | yes | Bearer guarding the cron endpoint (Vercel auto-sets on cron) |
+| `FIRECRAWL_API_KEY` | **yes** | Scrapes every cloud provider's pricing page |
+| `DATABASE_URL` | yes (already set) | Postgres connection (public schema) |
+| `PRICING_SCRAPE_ALERT_URL` | optional | Webhook on hard failure |
+
+Without `FIRECRAWL_API_KEY` every cloud provider fails cleanly and isolated
+(`status: failed`, error logged); Ollama's static row still writes.
+
+## Manual operation
+
+```bash
+# Dry run — scrape + diff, NO writes. Safe to run anytime.
+curl -s -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  "https://aura-llm.dev/api/cron/scrape-pricing?dry_run=1" | jq .
+
+# Live run — versions changed prices into model_pricing.
+curl -s -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  "https://aura-llm.dev/api/cron/scrape-pricing" | jq .
+```
+
+The response payload: `{ ok, run_id, dry_run, providers_scraped,
+models_upserted, models_unchanged, models_flagged, errors[], providers[] }`.
+Each `providers[]` entry carries the `changes[]` diff (insert / version /
+unchanged / flagged).
+
+## When a provider page changes shape
+
+1. Run the dry-run curl. The broken provider shows `status: "failed"` (zero
+   models / extract error) or `needs_review` (rows with missing prices),
+   captured in `pricing_scrape_log`.
+2. Open the provider's `url` in `api/cron/_providers.ts` in a browser. If the
+   page moved, update the URL. If the layout changed, tighten the
+   `firecrawlPrompt` (e.g. "use the paid tier, not the free tier") and/or the
+   shared `ZFirecrawlExtract` schema.
+3. Re-run dry-run until the diff is sane, then run live (or wait for Monday).
+4. Never hand-edit `model_pricing` to "fix" a scrape — seed a migration
+   instead, so the source of truth stays reproducible.
+
+## Querying the audit log
 
 ```sql
--- New pricing becomes effective immediately, old pricing gets end date
-UPDATE model_pricing
-SET effective_until = NOW()
-WHERE model_id = $1 AND effective_until IS NULL;
-
-INSERT INTO model_pricing (
-    provider_id, model_id, model_name,
-    input_per_million, output_per_million,
-    cached_input_per_million, reasoning_per_million,
-    context_window, max_output_tokens,
-    effective_from
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW());
+-- Providers that broke or needed review on the most recent run
+SELECT provider, status, models_upserted, models_flagged, error
+FROM pricing_scrape_log
+WHERE run_id = (
+  SELECT run_id FROM pricing_scrape_log
+  WHERE dry_run = false
+  GROUP BY run_id ORDER BY MAX(created_at) DESC LIMIT 1
+)
+ORDER BY provider;
 ```
 
-## Implementation Plan
+## Out of scope (follow-ups)
 
-### Phase 1: Core Infrastructure
-
-```rust
-// crates/aura-core/src/pricing/mod.rs
-pub mod scraper;
-pub mod scheduler;
-
-// Trait for provider-specific scrapers
-#[async_trait]
-pub trait PricingScraper: Send + Sync {
-    fn provider_name(&self) -> &str;
-    async fn fetch_pricing(&self) -> Result<Vec<ModelPricing>, ScraperError>;
-}
-
-// Scheduler configuration
-pub struct ScraperConfig {
-    pub enabled: bool,
-    pub schedule: String,  // cron expression, e.g., "0 0 * * *" (daily at midnight)
-    pub providers: Vec<String>,
-}
-```
-
-### Phase 2: Provider Scrapers
-
-```rust
-// OpenAI scraper
-pub struct OpenAIPricingScraper {
-    http_client: reqwest::Client,
-}
-
-impl PricingScraper for OpenAIPricingScraper {
-    async fn fetch_pricing(&self) -> Result<Vec<ModelPricing>, ScraperError> {
-        // 1. Fetch pricing page HTML
-        // 2. Parse pricing tables using scraper crate
-        // 3. Extract model names and prices
-        // 4. Return structured pricing data
-    }
-}
-```
-
-### Phase 3: Scheduler Integration
-
-```rust
-// Using tokio-cron-scheduler
-use tokio_cron_scheduler::{Job, JobScheduler};
-
-async fn start_pricing_scheduler(
-    config: ScraperConfig,
-    db_pool: DbPool,
-) -> Result<(), SchedulerError> {
-    let scheduler = JobScheduler::new().await?;
-
-    let job = Job::new_async(&config.schedule, move |_uuid, _lock| {
-        let pool = db_pool.clone();
-        Box::pin(async move {
-            run_all_scrapers(&pool).await;
-        })
-    })?;
-
-    scheduler.add(job).await?;
-    scheduler.start().await?;
-
-    Ok(())
-}
-```
-
-## Configuration
-
-```yaml
-# aura.yaml
-pricing:
-  scraper:
-    enabled: true
-    schedule: "0 0 * * *"  # Daily at midnight UTC
-    providers:
-      - openai
-      - anthropic
-      - google
-    retry:
-      max_attempts: 3
-      delay_seconds: 60
-```
-
-## Error Handling
-
-1. **Scraping Failures**: Log warning, keep existing pricing, retry next schedule
-2. **Parse Errors**: Log error with raw content for debugging
-3. **Network Timeouts**: Implement exponential backoff retries
-4. **Price Anomalies**: Detect >50% price changes, require manual approval
-
-## Monitoring
-
-```rust
-// Metrics to track
-- pricing_scraper_runs_total{provider, status}
-- pricing_scraper_duration_seconds{provider}
-- pricing_scraper_models_updated{provider}
-- pricing_scraper_errors_total{provider, error_type}
-```
-
-## Security Considerations
-
-1. **Rate Limiting**: Respect provider rate limits, use appropriate delays
-2. **User Agent**: Use identifiable user agent string
-3. **IP Rotation**: Consider proxy rotation for reliability
-4. **Validation**: Sanitize all scraped data before database insertion
-
-## Alternative Approaches
-
-### Manual API Integration
-
-Some providers offer pricing APIs:
-
-```rust
-// OpenAI models endpoint (partial pricing info)
-GET https://api.openai.com/v1/models
-
-// Google Cloud Pricing API
-GET https://cloudbilling.googleapis.com/v1/services/{serviceId}/skus
-```
-
-### Webhook Updates
-
-Register for provider pricing change notifications (when available).
-
-## Timeline
-
-1. **Week 1**: Core scraper infrastructure, OpenAI scraper
-2. **Week 2**: Anthropic and Google scrapers
-3. **Week 3**: Scheduler integration, monitoring
-4. **Week 4**: Testing, documentation, rollout
-
-## Dependencies
-
-```toml
-[dependencies]
-tokio-cron-scheduler = "0.10"
-scraper = "0.18"
-selectors = "0.25"
-```
+- Per-token Bedrock pricing via the first-party AWS Price List API (documented
+  above; HTML scrape used for now).
+- Capability flags (streaming / tools / vision) in `ModelTable` are still a
+  static lookup — pricing pages don't carry them.
+- Slack/Discord alerting wiring (env var reserved: `PRICING_SCRAPE_ALERT_URL`).

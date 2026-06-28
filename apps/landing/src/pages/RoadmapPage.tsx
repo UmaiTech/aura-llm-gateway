@@ -226,7 +226,10 @@ const releases: Release[] = [
       { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
       { label: 'End-user extended fields', note: 'external_id and metadata are now editable from the admin app.' },
       { label: 'Harness payload capture', note: 'Optional per-org full request/response capture, surfaced inline on the harness trace.' },
+      { label: 'Auto-updating pricing scraper', note: 'Weekly Vercel cron scrapes each provider’s own pricing page (9 providers incl. Together & Fireworks) into versioned price history, with batch-tier prices and conservative validation.' },
+      { label: 'Public pricing page', note: 'aura-llm.dev/pricing — live scraped prices across every provider, filterable, with expandable per-model detail and inferred capability tags.' },
     ],
+    issueRefs: ['#123'],
   },
   {
     version: 'v1.0',
@@ -236,7 +239,6 @@ const releases: Release[] = [
     subtitle: 'Enterprise security, HA deployment, uptime commitment',
     items: [
       { label: 'Webhook callbacks for async completion' },
-      { label: 'Auto-updating pricing scraper' },
       { label: 'API key rotation' },
       { label: 'IP allowlisting' },
       { label: 'Audit logs' },
