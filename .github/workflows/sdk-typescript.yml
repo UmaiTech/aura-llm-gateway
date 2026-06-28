@@ -3,8 +3,6 @@ name: TypeScript SDK
 on:
   push:
     branches: [main]
-    # Publish to npm on a tag like `sdk-ts-v0.1.0`.
-    tags: ['sdk-ts-v*']
     paths:
       - 'sdks/typescript/**'
       - '.github/workflows/sdk-typescript.yml'
@@ -12,6 +10,10 @@ on:
     paths:
       - 'sdks/typescript/**'
       - '.github/workflows/sdk-typescript.yml'
+  # Publish on a GitHub Release whose tag starts with `sdk-ts-v`
+  # (mirrors the Python SDK's release-triggered PyPI publish).
+  release:
+    types: [published]
   workflow_dispatch:
 
 defaults:
@@ -27,7 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci || npm install
+      - run: npm install
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
@@ -36,10 +38,15 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs: [test]
-    # Trusted publishing via OIDC — no NPM_TOKEN secret. Gated on sdk-ts-v* tags.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/sdk-ts-v')
+    # Only on a published release tagged sdk-ts-v* (independent from gateway).
+    if: >-
+      github.event_name == 'release' &&
+      startsWith(github.event.release.tag_name, 'sdk-ts-v')
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/aura-llm
     permissions:
-      id-token: write
+      id-token: write # OIDC trusted publishing + provenance
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -47,9 +54,9 @@ jobs:
         with:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
-      - run: npm ci || npm install
+      - run: npm install
       - run: npm run build
-      # --provenance emits a signed SLSA attestation (needs id-token: write).
+      # Trusted publishing (OIDC): npm 11.5+ authenticates via the id-token,
+      # no NPM_TOKEN secret. --provenance emits a signed SLSA attestation.
+      - run: npm install -g npm@latest
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
