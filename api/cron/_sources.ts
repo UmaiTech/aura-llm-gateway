@@ -28,9 +28,16 @@ interface FirecrawlClient {
       onlyMainContent?: boolean
       timeout?: number
       waitFor?: number
+      maxAge?: number
     },
   ) => Promise<{ json?: unknown }>
 }
+
+// Serve a Firecrawl-cached render up to 24h old instead of re-rendering the
+// page live. Prices change weekly at most, so a day-old cache is fine — and
+// it avoids the live-render timeouts that broke heavy pages (Fireworks, HF)
+// in prod, while being faster and cheaper for every provider.
+const SCRAPE_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 /** Lazily construct a Firecrawl v4 client (keeps the SDK off module load). */
 async function firecrawlClient(apiKey: string): Promise<FirecrawlClient> {
@@ -50,6 +57,7 @@ async function firecrawlExtract(
   const result = await client.scrape(url, {
     formats: [{ type: 'json', prompt, schema: ZFirecrawlExtract }],
     onlyMainContent: true,
+    maxAge: SCRAPE_MAX_AGE_MS,
     ...(cfg.firecrawlOptions?.timeout
       ? { timeout: cfg.firecrawlOptions.timeout }
       : {}),
