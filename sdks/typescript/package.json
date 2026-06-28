@@ -52,6 +52,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@types/node": "^20.19.0",
     "@vitest/coverage-v8": "^2.1.8",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",

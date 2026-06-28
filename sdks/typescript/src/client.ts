@@ -73,9 +73,11 @@ export interface ResponseCreateParams {
 }
 
 function readEnv(name: string): string | undefined {
-  // Guarded so the SDK still loads in browsers where `process` is undefined.
-  if (typeof process !== 'undefined' && process.env) return process.env[name]
-  return undefined
+  // Read process.env via globalThis so this compiles without @types/node and
+  // stays safe in browsers/edge runtimes where `process` is undefined.
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process
+  return proc?.env?.[name]
 }
 
 const sleep = (ms: number): Promise<void> =>
