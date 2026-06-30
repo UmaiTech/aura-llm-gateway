@@ -1,6 +1,6 @@
 {
   "name": "aura-llm",
-  "version": "0.1.0",
+  "version": "0.16.1",
   "description": "TypeScript/JavaScript SDK for the Aura LLM Gateway (Open Responses API) — universal fetch, AsyncIterable streaming, typed errors.",
   "type": "module",
   "main": "./dist/index.cjs",
