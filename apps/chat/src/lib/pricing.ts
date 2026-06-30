@@ -51,6 +51,16 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   'gemini-2.5-pro': { inputPerMillion: 1.25, outputPerMillion: 5.00 },
   'gemini-2.5-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
   'gemini-2.0-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
+
+  // Fireworks AI — serverless open-weight catalog (captured 2026-06-28).
+  // Model IDs are namespaced as accounts/fireworks/models/<slug>; kept in
+  // sync with cost.rs seed prices. Live values from /api/pricing win.
+  'accounts/fireworks/models/glm-5p2': { inputPerMillion: 1.40, outputPerMillion: 4.40 },
+  'accounts/fireworks/models/kimi-k2p6': { inputPerMillion: 1.20, outputPerMillion: 4.50 },
+  'accounts/fireworks/models/deepseek-v4-pro': { inputPerMillion: 2.10, outputPerMillion: 4.40 },
+  'accounts/fireworks/models/qwen3p6-plus': { inputPerMillion: 0.50, outputPerMillion: 3.00 },
+  'accounts/fireworks/models/gpt-oss-120b': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
+  'accounts/fireworks/models/gpt-oss-20b': { inputPerMillion: 0.05, outputPerMillion: 0.20 },
 }
 
 // Live prices fetched from the gateway pricing DB. Overlaid on the fallback.

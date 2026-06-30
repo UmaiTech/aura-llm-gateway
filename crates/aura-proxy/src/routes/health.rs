@@ -48,7 +48,7 @@ mod tests {
     async fn test_health_check() {
         // Create a test AppState without database or Redis
         let config = aura_core::Config::default();
-        let state = AppState::new(config, None, None);
+        let state = AppState::new(config, None, None).await;
 
         // Create the router with state
         let app = router().with_state(state);

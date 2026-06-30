@@ -25,6 +25,8 @@ Example usage:
             print(event.delta, end="", flush=True)
 """
 
+from importlib.metadata import PackageNotFoundError, version
+
 from aura._async_client import AsyncAuraClient
 from aura.client import AuraClient
 from aura.exceptions import (
@@ -37,6 +39,7 @@ from aura.exceptions import (
     NotFoundError,
     RateLimitError,
 )
+from aura.models import KnownModels
 from aura.types import (
     FunctionCallItem,
     FunctionCallOutputItem,
@@ -51,7 +54,14 @@ from aura.types import (
     Usage,
 )
 
-__version__ = "0.1.0"
+# Resolve the version from installed package metadata so it never drifts from
+# pyproject.toml (the release bot syncs pyproject, not this file). Falls back
+# to "0.0.0" only when running from an uninstalled source tree.
+try:
+    __version__ = version("aura-llm")
+except PackageNotFoundError:  # pragma: no cover - source checkout without install
+    __version__ = "0.0.0"
+
 __all__ = [
     "APIConnectionError",
     "APIError",
@@ -67,6 +77,8 @@ __all__ = [
     "FunctionCallOutputItem",
     "FunctionDefinition",
     "Item",
+    # Models
+    "KnownModels",
     "MessageItem",
     "NotFoundError",
     "RateLimitError",

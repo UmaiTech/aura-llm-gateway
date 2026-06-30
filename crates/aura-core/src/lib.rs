@@ -30,8 +30,9 @@ pub use config::{
 pub use cost::{CostCalculator, ModelPricing, UsageWithCost};
 pub use http::{HttpClient, HttpClientConfig, HttpError};
 pub use provider::{
-    AnthropicProvider, BedrockProvider, EventStream, GeminiProvider, HuggingFaceProvider,
-    MistralProvider, OllamaProvider, OpenAIProvider, Provider, ProviderError, TogetherProvider,
+    AnthropicProvider, BedrockProvider, EventStream, FireworksProvider, GeminiProvider,
+    HuggingFaceProvider, MistralProvider, OllamaProvider, OpenAIProvider, Provider, ProviderError,
+    TogetherProvider,
 };
 pub use rate_limit::{RateLimitError, RateLimitResult, RateLimiter};
 pub use redis::{RedisError, RedisPool};

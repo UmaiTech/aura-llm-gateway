@@ -6,6 +6,7 @@
 mod anthropic;
 mod bedrock;
 mod error;
+mod fireworks;
 mod gemini;
 mod huggingface;
 mod mistral;
@@ -16,6 +17,7 @@ mod together;
 pub use anthropic::AnthropicProvider;
 pub use bedrock::BedrockProvider;
 pub use error::ProviderError;
+pub use fireworks::FireworksProvider;
 pub use gemini::GeminiProvider;
 pub use huggingface::HuggingFaceProvider;
 pub use mistral::MistralProvider;

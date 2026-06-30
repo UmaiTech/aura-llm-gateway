@@ -7,11 +7,14 @@ mod routes;
 
 use anyhow::Context;
 use aura_core::{
-    AnthropicProvider, BedrockProvider, CostCalculator, GeminiProvider, HuggingFaceProvider,
-    MistralProvider, OllamaProvider, OpenAIProvider, Provider, RateLimiter, RedisPool,
-    ResponseCache, TogetherProvider,
+    cost::ScrapedPricing, AnthropicProvider, BedrockProvider, CostCalculator, FireworksProvider,
+    GeminiProvider, HuggingFaceProvider, MistralProvider, OllamaProvider, OpenAIProvider, Provider,
+    RateLimiter, RedisPool, ResponseCache, TogetherProvider,
 };
-use aura_db::{ApiKeyUsageRepo, DbPool, NewApiKeyUsage, NewRequestLog, PoolConfig, RequestLogRepo};
+use aura_db::{
+    ApiKeyUsageRepo, DbPool, ModelPricingRepo, NewApiKeyUsage, NewRequestLog, PoolConfig,
+    RequestLogRepo,
+};
 use axum::http::HeaderValue;
 use axum::{middleware, Router};
 use std::collections::HashMap;
@@ -48,7 +51,7 @@ pub struct AppState {
 
 impl AppState {
     /// Creates a new AppState with the given configuration
-    pub fn new(
+    pub async fn new(
         config: aura_core::Config,
         db_pool: Option<DbPool>,
         redis_pool: Option<RedisPool>,
@@ -129,6 +132,20 @@ impl AppState {
             warn!("TOGETHER_API_KEY not configured - Together provider disabled");
         }
 
+        // Register Fireworks provider if API key is configured
+        if let Some(api_key) = &config.providers.fireworks_api_key {
+            info!("Registering Fireworks provider");
+            let fireworks = Arc::new(FireworksProvider::new(api_key)) as Arc<dyn Provider>;
+
+            for model in fireworks.models() {
+                model_map.insert(model.to_string(), "fireworks".to_string());
+            }
+
+            providers.insert("fireworks".to_string(), fireworks);
+        } else {
+            warn!("FIREWORKS_API_KEY not configured - Fireworks provider disabled");
+        }
+
         // Register Ollama provider if base URL is configured
         // (Ollama requires no API key; the URL presence enables it)
         if let Some(base_url) = &config.providers.ollama_base_url {
@@ -206,11 +223,43 @@ impl AppState {
             info!("Payload capture enabled (AURA_PAYLOAD_CAPTURE=on)");
         }
 
+        // Seed the cost calculator with hardcoded defaults, then override any
+        // models we serve with fresher scraped prices from the DB. The scraped
+        // `model_pricing` rows are keyed by display slug; `apply_db_pricing`
+        // maps those to the gateway's API slugs and leaves unmatched models on
+        // their seed price.
+        let cost_calculator = Arc::new(CostCalculator::new());
+        if let Some(pool) = &db_pool {
+            match ModelPricingRepo::get_all_current(pool).await {
+                Ok(rows) => {
+                    let scraped: Vec<ScrapedPricing> = rows
+                        .into_iter()
+                        .map(|r| ScrapedPricing {
+                            provider: r.provider_name,
+                            scraped_model_id: r.model_id,
+                            input_per_million: r.input_per_million,
+                            output_per_million: r.output_per_million,
+                            cached_input_per_million: r.cached_input_per_million,
+                        })
+                        .collect();
+                    let updated = cost_calculator.apply_db_pricing(&scraped);
+                    info!(
+                        scraped = scraped.len(),
+                        applied = updated,
+                        "Refreshed cost calculator from scraped model_pricing"
+                    );
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to load scraped pricing; using hardcoded defaults");
+                }
+            }
+        }
+
         Self {
             config: Arc::new(config),
             providers: Arc::new(providers),
             model_map: Arc::new(model_map),
-            cost_calculator: Arc::new(CostCalculator::new()),
+            cost_calculator,
             db_pool,
             redis_pool,
             rate_limiter,
@@ -1088,7 +1137,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Create app state
-    let state = AppState::new(config.clone(), db_pool, redis_pool);
+    let state = AppState::new(config.clone(), db_pool, redis_pool).await;
 
     info!(
         providers = state.provider_names().len(),

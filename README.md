@@ -2,10 +2,14 @@
 
 [![CI](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
 [![Python SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml)
+[![TypeScript SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/sdk-typescript.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/sdk-typescript.yml)
 [![Helm Chart](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/helm-chart.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/helm-chart.yml)
 [![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway?include_prereleases&label=release)](https://github.com/UmaiTech/aura-llm-gateway/releases)
 [![PyPI](https://img.shields.io/pypi/v/aura-llm?label=pypi%3A%20aura-llm)](https://pypi.org/project/aura-llm/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/aura-llm?label=pypi%20downloads)](https://pypi.org/project/aura-llm/)
+[![npm](https://img.shields.io/npm/v/aura-llm?logo=npm&label=npm%3A%20aura-llm)](https://www.npmjs.com/package/aura-llm)
+[![npm downloads](https://img.shields.io/npm/dm/aura-llm?logo=npm&label=npm%20downloads)](https://www.npmjs.com/package/aura-llm)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fumaitech%2Faura--llm--gateway-2496ED?logo=docker&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/aura-llm-gateway)
 [![Helm](https://img.shields.io/badge/helm-ghcr.io%2Fumaitech%2Fcharts%2Faura--llm--gateway-0F1689?logo=helm&logoColor=white)](https://github.com/UmaiTech/aura-llm-gateway/pkgs/container/charts%2Faura-llm-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -28,7 +32,7 @@ A high-performance, production-ready LLM proxy gateway built in Rust that implem
 
 ## Overview
 
-Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI, Anthropic, Google, Mistral, Ollama, HuggingFace TGI, AWS Bedrock) with built-in load balancing, cost tracking, caching, and observability. It's designed for production deployments requiring high throughput, low latency, and enterprise-grade reliability.
+Aura LLM Gateway provides a unified interface to multiple LLM providers (OpenAI, Anthropic, Google, Mistral, Together AI, Fireworks AI, Ollama, HuggingFace TGI, AWS Bedrock) with built-in load balancing, cost tracking, caching, and observability. It's designed for production deployments requiring high throughput, low latency, and enterprise-grade reliability.
 
 ## Why Aura?
 
@@ -53,7 +57,7 @@ design decisions behind Aura is in [*Building Aura: An Agentic LLM Gateway in Ru
 
 ### Key Features
 
-- **7 LLM providers** behind one Open Responses API — OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Ollama, HuggingFace TGI, AWS Bedrock
+- **9 LLM providers** behind one Open Responses API — OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Together AI, Fireworks AI, Ollama, HuggingFace TGI, AWS Bedrock
 - **Prompt compression** — TOON, AISP, YAML, JSON strategies, 40–60% token savings on uniform arrays and nested objects
 - **Smart routing & failover** — 8 strategies (round-robin, weighted, region-aware, cost-optimized) + circuit breaker
 - **Cost tracking** — per-request USD on every response, with input/output/cached/reasoning token breakdown
@@ -346,8 +350,8 @@ The `docker-compose.yml` includes:
 
 Aura is pre-1.0 but actively used. Current line:
 
-- **Shipping** — 7 providers, smart routing, prompt compression, multi-tenancy, cost tracking, encrypted credentials, response caching, rate limiting, Prometheus metrics, Python SDK on PyPI, Helm chart for k8s deploys
-- **In progress** — TypeScript SDK, OpenTelemetry tracing, HF classic Inference API, additional Bedrock model families (Llama/Mistral/Titan), Mistral FIM completions
+- **Shipping** — 9 providers, smart routing, prompt compression, multi-tenancy, cost tracking, encrypted credentials, response caching, rate limiting, Prometheus metrics, Python SDK on PyPI, TypeScript SDK on npm, Helm chart for k8s deploys
+- **In progress** — OpenTelemetry tracing, HF classic Inference API, additional Bedrock model families (Llama/Mistral/Titan), Mistral FIM completions
 - **Considering** — webhook callbacks, semantic caching, A/B traffic splitting between models, hard budget caps
 
 For the live roadmap with version-anchored detail, see **[roadmap.aura-llm.dev](https://roadmap.aura-llm.dev)**.
@@ -380,6 +384,7 @@ Official client SDKs for the Aura LLM Gateway:
 ### Python SDK
 
 [![PyPI](https://img.shields.io/pypi/v/aura-llm)](https://pypi.org/project/aura-llm/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/aura-llm?label=downloads)](https://pypi.org/project/aura-llm/)
 [![Python](https://img.shields.io/pypi/pyversions/aura-llm)](https://pypi.org/project/aura-llm/)
 
 ```bash
@@ -421,9 +426,53 @@ Features:
 
 See [sdks/python/README.md](sdks/python/README.md) for full documentation.
 
-### TypeScript SDK (Coming Soon)
+### TypeScript SDK
 
-The TypeScript/JavaScript SDK is planned for a future release.
+[![npm](https://img.shields.io/npm/v/aura-llm?label=npm%3A%20aura-llm)](https://www.npmjs.com/package/aura-llm)
+[![npm downloads](https://img.shields.io/npm/dm/aura-llm?label=downloads)](https://www.npmjs.com/package/aura-llm)
+[![TypeScript SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/sdk-typescript.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/sdk-typescript.yml)
+
+Universal (Node 20+, browsers, Deno, Bun, Vercel Edge, Cloudflare Workers) —
+built on the global `fetch` and Web Streams, with no Node-only dependencies.
+
+```bash
+npm install aura-llm
+# or: pnpm add aura-llm / yarn add aura-llm / bun add aura-llm
+```
+
+```ts
+import { AuraClient, outputText } from 'aura-llm'
+
+const client = new AuraClient({ baseUrl: 'http://localhost:8080' })
+
+// Simple completion
+const response = await client.responses.create({
+  model: 'gpt-5.4-mini',
+  input: 'What is the capital of France?',
+})
+console.log(outputText(response))
+
+// Streaming
+const stream = await client.responses.create({
+  model: 'gpt-5.4-mini',
+  input: 'Tell me a story',
+  stream: true,
+})
+for await (const event of stream) {
+  if (event.type === 'response.output_text.delta') {
+    process.stdout.write(event.delta)
+  }
+}
+```
+
+Features:
+- Single async client — every call returns a `Promise`
+- Streaming as a back-pressured `AsyncIterable<StreamEvent>`
+- Conversation threading via `previous_response_id`
+- Tool/function calling support
+- Typed error hierarchy you can `instanceof`
+
+See [sdks/typescript/README.md](sdks/typescript/README.md) for full documentation.
 
 ## Tech Stack
 

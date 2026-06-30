@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 /// Pricing information for a model (per 1M tokens)
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -71,10 +72,15 @@ impl ModelPricing {
     }
 }
 
-/// Cost calculator with pricing data for all models
-#[derive(Debug, Clone)]
+/// Cost calculator with pricing data for all models.
+///
+/// The pricing map is seeded with hardcoded defaults and can be refreshed at
+/// runtime from the scraped `model_pricing` DB (see `apply_db_pricing`). The
+/// map is behind a `RwLock` so a background task can update it while the
+/// request hot path reads it concurrently — reads are uncontended and cheap.
+#[derive(Debug)]
 pub struct CostCalculator {
-    pricing: HashMap<String, ModelPricing>,
+    pricing: RwLock<HashMap<String, ModelPricing>>,
 }
 
 impl Default for CostCalculator {
@@ -550,6 +556,37 @@ impl CostCalculator {
         );
 
         // =================================================================
+        // Fireworks AI serverless chat pricing (captured 2026-06-28)
+        // Source: https://fireworks.ai/pricing (issue #209)
+        // Model IDs are namespaced as accounts/fireworks/models/<slug>.
+        // =================================================================
+
+        pricing.insert(
+            "accounts/fireworks/models/glm-5p2".to_string(),
+            ModelPricing::new(1.40, 4.40).with_cached(0.20),
+        );
+        pricing.insert(
+            "accounts/fireworks/models/kimi-k2p6".to_string(),
+            ModelPricing::new(1.20, 4.50).with_cached(0.20),
+        );
+        pricing.insert(
+            "accounts/fireworks/models/deepseek-v4-pro".to_string(),
+            ModelPricing::new(2.10, 4.40).with_cached(0.20),
+        );
+        pricing.insert(
+            "accounts/fireworks/models/qwen3p6-plus".to_string(),
+            ModelPricing::new(0.50, 3.00),
+        );
+        pricing.insert(
+            "accounts/fireworks/models/gpt-oss-120b".to_string(),
+            ModelPricing::new(0.15, 0.60),
+        );
+        pricing.insert(
+            "accounts/fireworks/models/gpt-oss-20b".to_string(),
+            ModelPricing::new(0.05, 0.20),
+        );
+
+        // =================================================================
         // Ollama (local inference — $0.00 for all models)
         // =================================================================
 
@@ -602,12 +639,19 @@ impl CostCalculator {
             ModelPricing::new(3.00, 15.00).with_cached(0.30),
         );
 
-        Self { pricing }
+        Self {
+            pricing: RwLock::new(pricing),
+        }
     }
 
-    /// Get pricing for a specific model
-    pub fn get_pricing(&self, model: &str) -> Option<&ModelPricing> {
-        self.pricing.get(model)
+    /// Get pricing for a specific model. Returns a copy (ModelPricing is Copy)
+    /// since the map is behind a lock.
+    pub fn get_pricing(&self, model: &str) -> Option<ModelPricing> {
+        self.pricing
+            .read()
+            .expect("cost pricing lock poisoned")
+            .get(model)
+            .copied()
     }
 
     /// Calculate cost for a request
@@ -624,14 +668,85 @@ impl CostCalculator {
         })
     }
 
-    /// Add or update pricing for a model
-    pub fn set_pricing(&mut self, model: impl Into<String>, pricing: ModelPricing) {
-        self.pricing.insert(model.into(), pricing);
+    /// Add or update pricing for a model. Uses interior mutability so it can
+    /// be called through a shared `Arc<CostCalculator>` (e.g. background
+    /// refresh) without `&mut`.
+    pub fn set_pricing(&self, model: impl Into<String>, pricing: ModelPricing) {
+        self.pricing
+            .write()
+            .expect("cost pricing lock poisoned")
+            .insert(model.into(), pricing);
     }
 
-    /// Get all available models with pricing
-    pub fn models(&self) -> impl Iterator<Item = &str> {
-        self.pricing.keys().map(|s| s.as_str())
+    /// Get all available models with pricing (owned, since the map is locked).
+    pub fn models(&self) -> Vec<String> {
+        self.pricing
+            .read()
+            .expect("cost pricing lock poisoned")
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Override pricing from scraped DB rows.
+    ///
+    /// Each row is keyed by the *scraped* slug (e.g. `glm-5-2`); we map it to
+    /// the gateway's *API* slug (e.g. `accounts/fireworks/models/glm-5p2`) via
+    /// [`api_slug_for_scraped`] and only override models the gateway serves.
+    /// Hardcoded seed prices remain the fallback for anything not matched.
+    /// Returns the number of models updated.
+    pub fn apply_db_pricing(&self, rows: &[ScrapedPricing]) -> usize {
+        let mut updated = 0;
+        for row in rows {
+            let Some(api_slug) = api_slug_for_scraped(&row.provider, &row.scraped_model_id) else {
+                continue;
+            };
+            let mut pricing = ModelPricing::new(row.input_per_million, row.output_per_million);
+            if let Some(cached) = row.cached_input_per_million {
+                pricing = pricing.with_cached(cached);
+            }
+            self.set_pricing(api_slug, pricing);
+            updated += 1;
+        }
+        updated
+    }
+}
+
+/// A scraped pricing row, decoupled from the aura-db model so aura-core has no
+/// DB dependency. The caller (aura-proxy) adapts `ModelPricingSimple` to this.
+#[derive(Debug, Clone)]
+pub struct ScrapedPricing {
+    pub provider: String,
+    /// The slug as stored by the scraper in model_pricing.model_id.
+    pub scraped_model_id: String,
+    pub input_per_million: f64,
+    pub output_per_million: f64,
+    pub cached_input_per_million: Option<f64>,
+}
+
+/// Map a (provider, scraped slug) to the gateway's API model slug.
+///
+/// The scraper stores normalized *display* slugs from each provider's pricing
+/// page (e.g. `glm-5-2`), which differ from the *API* model IDs the gateway
+/// routes with (e.g. `accounts/fireworks/models/glm-5p2`). This curated map is
+/// the bridge. Keep it in sync with each provider's `SUPPORTED_MODELS`.
+/// Returns `None` for rows we don't (yet) map — those keep their seed price.
+pub fn api_slug_for_scraped(provider: &str, scraped: &str) -> Option<&'static str> {
+    match (provider, scraped) {
+        // Fireworks — accounts/fireworks/models/<slug>
+        ("fireworks", "glm-5-2") => Some("accounts/fireworks/models/glm-5p2"),
+        ("fireworks", "kimi-k2-6") => Some("accounts/fireworks/models/kimi-k2p6"),
+        ("fireworks", "deepseek-v4-pro") => Some("accounts/fireworks/models/deepseek-v4-pro"),
+        ("fireworks", "qwen3-6-plus") => Some("accounts/fireworks/models/qwen3p6-plus"),
+        ("fireworks", "gpt-oss-120b") => Some("accounts/fireworks/models/gpt-oss-120b"),
+        ("fireworks", "gpt-oss-20b") => Some("accounts/fireworks/models/gpt-oss-20b"),
+        // Together — vendor/Model-Name slugs
+        ("together", "llama-3-3-70b") => Some("meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+        ("together", "deepseek-v4-pro") => Some("deepseek-ai/DeepSeek-V4-Pro"),
+        ("together", "qwen3-6-plus") => Some("Qwen/Qwen3.6-Plus"),
+        ("together", "gpt-oss-120b") => Some("openai/gpt-oss-120b"),
+        ("together", "gpt-oss-20b") => Some("openai/gpt-oss-20b"),
+        _ => None,
     }
 }
 
@@ -732,10 +847,57 @@ mod tests {
 
     #[test]
     fn test_custom_pricing() {
-        let mut calculator = CostCalculator::new();
+        let calculator = CostCalculator::new();
         calculator.set_pricing("custom-model", ModelPricing::new(1.00, 2.00));
         let cost = calculator.calculate_cost("custom-model", 1_000_000, 1_000_000, None, None);
         assert!(cost.is_some());
         assert!((cost.unwrap() - 3.00).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_apply_db_pricing_overrides_seed_for_mapped_slug() {
+        let calculator = CostCalculator::new();
+        // Seed price for glm-5p2 is 1.40/4.40 — scraped row should override it.
+        let rows = vec![
+            ScrapedPricing {
+                provider: "fireworks".to_string(),
+                scraped_model_id: "glm-5-2".to_string(),
+                input_per_million: 2.00,
+                output_per_million: 6.00,
+                cached_input_per_million: Some(0.50),
+            },
+            // Unmapped slug — must be ignored, not panic.
+            ScrapedPricing {
+                provider: "fireworks".to_string(),
+                scraped_model_id: "some-unknown-model".to_string(),
+                input_per_million: 99.0,
+                output_per_million: 99.0,
+                cached_input_per_million: None,
+            },
+        ];
+
+        let updated = calculator.apply_db_pricing(&rows);
+        assert_eq!(updated, 1, "only the mapped row should apply");
+
+        let pricing = calculator
+            .get_pricing("accounts/fireworks/models/glm-5p2")
+            .expect("glm-5p2 should be priced");
+        assert_eq!(pricing.input_per_million, 2.00);
+        assert_eq!(pricing.output_per_million, 6.00);
+        assert_eq!(pricing.cached_input_per_million, Some(0.50));
+    }
+
+    #[test]
+    fn test_api_slug_for_scraped_mapping() {
+        assert_eq!(
+            api_slug_for_scraped("fireworks", "glm-5-2"),
+            Some("accounts/fireworks/models/glm-5p2")
+        );
+        assert_eq!(
+            api_slug_for_scraped("together", "gpt-oss-120b"),
+            Some("openai/gpt-oss-120b")
+        );
+        assert_eq!(api_slug_for_scraped("fireworks", "nonexistent"), None);
+        assert_eq!(api_slug_for_scraped("unknown-provider", "glm-5-2"), None);
     }
 }
