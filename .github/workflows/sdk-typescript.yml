@@ -57,6 +57,17 @@ jobs:
         with:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
+      # Derive the version from the release tag (v1.2.3 -> 1.2.3) and force it
+      # into package.json before install/build. The release-PR "Sync SDK
+      # versions" step is best-effort and has shipped tags with a stale
+      # package.json (e.g. v0.16.0 tagged with 0.1.0); deriving here makes the
+      # published version always match the tag, independent of that step.
+      - name: Set version from release tag
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Release tag version: ${TAG_VERSION}"
+          npm version "${TAG_VERSION}" --no-git-tag-version --allow-same-version
       - run: npm install
       - run: npm run build
       # Trusted publishing (OIDC): npm 11.5+ authenticates via the id-token,

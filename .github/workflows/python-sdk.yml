@@ -167,6 +167,20 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
+      # Derive the version from the release tag (v1.2.3 -> 1.2.3) and force it
+      # into pyproject.toml before building. The release-PR "Sync SDK versions"
+      # step is best-effort and has shipped tags with a stale pyproject (e.g.
+      # v0.16.0 tagged with 0.15.0); deriving here makes the published version
+      # always match the tag, independent of that step.
+      - name: Set version from release tag
+        working-directory: sdks/python
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Release tag version: ${TAG_VERSION}"
+          sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"${TAG_VERSION}\"/" pyproject.toml
+          grep -m1 '^version' pyproject.toml
+
       - name: Build package
         run: uv build
 
