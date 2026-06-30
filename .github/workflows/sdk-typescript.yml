@@ -10,8 +10,9 @@ on:
     paths:
       - 'sdks/typescript/**'
       - '.github/workflows/sdk-typescript.yml'
-  # Publish on a GitHub Release whose tag starts with `sdk-ts-v`
-  # (mirrors the Python SDK's release-triggered PyPI publish).
+  # Publish on the workspace GitHub Release (tag `v*`) created by release-plz,
+  # so the TS SDK ships in lockstep with the gateway + Python SDK. The release
+  # PR's "Sync SDK versions" step keeps package.json's version aligned.
   release:
     types: [published]
   workflow_dispatch:
@@ -38,10 +39,12 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs: [test]
-    # Only on a published release tagged sdk-ts-v* (independent from gateway).
+    # Only on the workspace release (tag v*) created by release-plz. npm
+    # rejects re-publishing an existing version, so a release whose version
+    # already exists on npm is simply a no-op failure — guarded below.
     if: >-
       github.event_name == 'release' &&
-      startsWith(github.event.release.tag_name, 'sdk-ts-v')
+      startsWith(github.event.release.tag_name, 'v')
     environment:
       name: npm
       url: https://www.npmjs.com/package/aura-llm
@@ -59,4 +62,14 @@ jobs:
       # Trusted publishing (OIDC): npm 11.5+ authenticates via the id-token,
       # no NPM_TOKEN secret. --provenance emits a signed SLSA attestation.
       - run: npm install -g npm@latest
-      - run: npm publish --provenance --access public
+      # Skip (don't fail) if this version is already on npm — mirrors PyPI's
+      # skip-existing, so a re-run or an SDK-unchanged release is a no-op.
+      - name: Publish to npm (skip if version exists)
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "aura-llm@${VERSION}" version >/dev/null 2>&1; then
+            echo "aura-llm@${VERSION} already published — skipping."
+            exit 0
+          fi
+          npm publish --provenance --access public

@@ -144,6 +144,9 @@ pub struct ProviderConfig {
     /// Together AI API key (optional)
     pub together_api_key: Option<String>,
 
+    /// Fireworks AI API key (optional)
+    pub fireworks_api_key: Option<String>,
+
     /// HuggingFace user access token (`hf_...`) for TGI endpoints (optional)
     pub huggingface_api_key: Option<String>,
 
@@ -399,6 +402,11 @@ impl Config {
                 self.providers.together_api_key = Some(key);
             }
         }
+        if let Ok(key) = env::var("FIREWORKS_API_KEY") {
+            if !key.is_empty() {
+                self.providers.fireworks_api_key = Some(key);
+            }
+        }
         if let Ok(key) = env::var("HUGGINGFACE_API_KEY") {
             if !key.is_empty() {
                 self.providers.huggingface_api_key = Some(key);
@@ -497,6 +505,7 @@ impl Config {
             && self.providers.google_api_key.is_none()
             && self.providers.mistral_api_key.is_none()
             && self.providers.together_api_key.is_none()
+            && self.providers.fireworks_api_key.is_none()
             && self.providers.huggingface_api_key.is_none()
             && self.providers.ollama_base_url.is_none()
             && self.providers.aws_region.is_none()
@@ -531,6 +540,11 @@ impl Config {
         self.providers.together_api_key.is_some()
     }
 
+    /// Returns true if Fireworks is configured
+    pub fn has_fireworks(&self) -> bool {
+        self.providers.fireworks_api_key.is_some()
+    }
+
     /// Returns true if HuggingFace TGI is configured (both key and endpoint required)
     pub fn has_huggingface(&self) -> bool {
         self.providers.huggingface_api_key.is_some()
@@ -556,6 +570,7 @@ impl Config {
             || self.has_google()
             || self.has_mistral()
             || self.has_together()
+            || self.has_fireworks()
             || self.has_huggingface()
             || self.has_ollama()
             || self.has_bedrock()
@@ -606,6 +621,11 @@ impl Config {
     /// Returns the Together API key if configured
     pub fn together_api_key(&self) -> Option<&str> {
         self.providers.together_api_key.as_deref()
+    }
+
+    /// Returns the Fireworks API key if configured
+    pub fn fireworks_api_key(&self) -> Option<&str> {
+        self.providers.fireworks_api_key.as_deref()
     }
 
     /// Returns the HuggingFace API key if configured
@@ -664,6 +684,7 @@ impl Config {
             google = %self.has_google(),
             mistral = %self.has_mistral(),
             together = %self.has_together(),
+            fireworks = %self.has_fireworks(),
             huggingface = %self.has_huggingface(),
             ollama = %self.has_ollama(),
             bedrock = %self.has_bedrock(),
@@ -702,6 +723,9 @@ impl Config {
         }
         if masked.providers.together_api_key.is_some() {
             masked.providers.together_api_key = Some("***".to_string());
+        }
+        if masked.providers.fireworks_api_key.is_some() {
+            masked.providers.fireworks_api_key = Some("***".to_string());
         }
         if masked.providers.huggingface_api_key.is_some() {
             masked.providers.huggingface_api_key = Some("***".to_string());
@@ -776,6 +800,12 @@ impl ConfigBuilder {
     /// Sets the Together API key
     pub fn together_api_key(mut self, key: impl Into<String>) -> Self {
         self.config.providers.together_api_key = Some(key.into());
+        self
+    }
+
+    /// Sets the Fireworks API key
+    pub fn fireworks_api_key(mut self, key: impl Into<String>) -> Self {
+        self.config.providers.fireworks_api_key = Some(key.into());
         self
     }
 

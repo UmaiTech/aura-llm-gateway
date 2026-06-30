@@ -34,6 +34,8 @@ export {
 
 export { parseSSE, parseSSEChunk } from './streaming.js'
 
+export { KnownModels, type KnownModel } from './models.js'
+
 export {
   // helpers
   functionTool,
