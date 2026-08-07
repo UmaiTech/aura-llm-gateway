@@ -16,48 +16,69 @@ export interface ModelPricing {
 // live values from /api/pricing take precedence once loaded.
 export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // OpenAI — 2026 lineup
+  'gpt-5.6-sol': { inputPerMillion: 5.00, outputPerMillion: 30.00 },
+  'gpt-5.6-terra': { inputPerMillion: 2.00, outputPerMillion: 12.00 },
+  'gpt-5.6-luna': { inputPerMillion: 0.20, outputPerMillion: 1.20 },
   'gpt-5.5-pro': { inputPerMillion: 30.00, outputPerMillion: 180.00 },
   'gpt-5.5': { inputPerMillion: 5.00, outputPerMillion: 30.00 },
   'gpt-5.4': { inputPerMillion: 2.50, outputPerMillion: 15.00 },
   'gpt-5.4-mini': { inputPerMillion: 0.75, outputPerMillion: 4.50 },
   'gpt-5.4-nano': { inputPerMillion: 0.20, outputPerMillion: 1.25 },
-  'gpt-5.2': { inputPerMillion: 6.00, outputPerMillion: 24.00 },
+  'gpt-5.2': { inputPerMillion: 5.00, outputPerMillion: 20.00 },
   'gpt-5': { inputPerMillion: 5.00, outputPerMillion: 20.00 },
-  'gpt-5-mini': { inputPerMillion: 0.30, outputPerMillion: 1.20 },
+  'gpt-5-mini': { inputPerMillion: 0.50, outputPerMillion: 2.00 },
+  'gpt-5.3-codex': { inputPerMillion: 1.75, outputPerMillion: 14.00 },
+  'codex-mini-latest': { inputPerMillion: 1.50, outputPerMillion: 6.00 },
+  'o4-mini': { inputPerMillion: 1.10, outputPerMillion: 4.40 },
+  'o3': { inputPerMillion: 2.00, outputPerMillion: 8.00 },
   'gpt-4o': { inputPerMillion: 2.50, outputPerMillion: 10.00 },
   'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
   'gpt-4-turbo': { inputPerMillion: 10.00, outputPerMillion: 30.00 },
   'gpt-3.5-turbo': { inputPerMillion: 0.50, outputPerMillion: 1.50 },
 
   // Anthropic — 2026 lineup
+  'claude-opus-5': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
+  'claude-opus-4-8': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
+  'claude-fable-5': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
+  'claude-sonnet-5': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'claude-opus-4-7': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
   'claude-opus-4-6': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
   'claude-sonnet-4-6': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
-  'claude-opus-4-5-20251101': { inputPerMillion: 15.00, outputPerMillion: 75.00 },
-  'claude-sonnet-4-20250514': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
-  'claude-haiku-4-5-20251001': { inputPerMillion: 0.80, outputPerMillion: 4.00 },
+  'claude-opus-4-5-20251101': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
+  'claude-sonnet-4-5-20251022': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
+  'claude-haiku-4-5-20251001': { inputPerMillion: 1.00, outputPerMillion: 5.00 },
   // Legacy id, kept so older conversations don't show $NaN. Anthropic
   // no longer serves this model; the playground default switched to
   // claude-haiku-4-5-20251001.
   'claude-3-5-haiku-20241022': { inputPerMillion: 0.80, outputPerMillion: 4.00 },
 
-  // Google — ids match Google's models.list (verified 2026-05-22).
-  // Approximate $/MTok numbers from the public pricing page; refresh
-  // when Google publishes 3.x GA pricing.
-  'gemini-3.5-flash': { inputPerMillion: 0.20, outputPerMillion: 0.80 },
-  'gemini-3.1-flash-lite': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
-  'gemini-3-pro-preview': { inputPerMillion: 1.50, outputPerMillion: 6.00 },
-  'gemini-3-flash-preview': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
-  'gemini-2.5-pro': { inputPerMillion: 1.25, outputPerMillion: 5.00 },
-  'gemini-2.5-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
-  'gemini-2.0-flash': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
+  // Google — ids match Google's models.list (verified 2026-08-07).
+  'gemini-3.5-flash': { inputPerMillion: 1.50, outputPerMillion: 9.00 },
+  'gemini-3.1-pro-preview': { inputPerMillion: 2.00, outputPerMillion: 12.00 },
+  'gemini-3.1-flash-lite': { inputPerMillion: 0.25, outputPerMillion: 1.50 },
+  'gemini-3-flash-preview': { inputPerMillion: 0.50, outputPerMillion: 3.00 },
+  'gemini-3-pro-preview': { inputPerMillion: 2.50, outputPerMillion: 10.00 },
+  'gemini-2.5-pro': { inputPerMillion: 1.25, outputPerMillion: 10.00 },
+  'gemini-2.5-flash': { inputPerMillion: 0.30, outputPerMillion: 2.50 },
+  'gemini-2.5-flash-lite': { inputPerMillion: 0.10, outputPerMillion: 0.40 },
+  'gemini-2.0-flash': { inputPerMillion: 0.10, outputPerMillion: 0.40 },
+
+  // Together AI — serverless open-weight catalog (captured 2026-08-07).
+  'deepseek-ai/DeepSeek-V4-Pro': { inputPerMillion: 1.74, outputPerMillion: 3.48 },
+  'deepseek-ai/DeepSeek-V4-Flash-0731': { inputPerMillion: 0.14, outputPerMillion: 0.28 },
+  'Qwen/Qwen3.6-Plus': { inputPerMillion: 0.50, outputPerMillion: 3.00 },
+  'moonshotai/Kimi-K2.6': { inputPerMillion: 1.20, outputPerMillion: 4.50 },
+  'zai-org/GLM-5.1': { inputPerMillion: 1.40, outputPerMillion: 4.40 },
+  'openai/gpt-oss-120b': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
+  'openai/gpt-oss-20b': { inputPerMillion: 0.05, outputPerMillion: 0.20 },
+  'LiquidAI/LFM2-24B-A2B': { inputPerMillion: 0.03, outputPerMillion: 0.12 },
 
   // Fireworks AI — serverless open-weight catalog (captured 2026-06-28).
   // Model IDs are namespaced as accounts/fireworks/models/<slug>; kept in
   // sync with cost.rs seed prices. Live values from /api/pricing win.
   'accounts/fireworks/models/glm-5p2': { inputPerMillion: 1.40, outputPerMillion: 4.40 },
   'accounts/fireworks/models/kimi-k2p6': { inputPerMillion: 1.20, outputPerMillion: 4.50 },
-  'accounts/fireworks/models/deepseek-v4-pro': { inputPerMillion: 2.10, outputPerMillion: 4.40 },
+  'accounts/fireworks/models/deepseek-v4-pro': { inputPerMillion: 1.74, outputPerMillion: 3.48 },
   'accounts/fireworks/models/qwen3p6-plus': { inputPerMillion: 0.50, outputPerMillion: 3.00 },
   'accounts/fireworks/models/gpt-oss-120b': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
   'accounts/fireworks/models/gpt-oss-20b': { inputPerMillion: 0.05, outputPerMillion: 0.20 },
