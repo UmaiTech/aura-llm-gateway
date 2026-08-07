@@ -41,6 +41,7 @@ from aura.exceptions import (
 )
 from aura.models import KnownModels
 from aura.types import (
+    FeedbackSignal,
     FunctionCallItem,
     FunctionCallOutputItem,
     FunctionDefinition,
@@ -52,6 +53,8 @@ from aura.types import (
     StreamEvent,
     Tool,
     Usage,
+    ValidationMetadata,
+    ValidationStrategy,
 )
 
 # Resolve the version from installed package metadata so it never drifts from
@@ -73,6 +76,7 @@ __all__ = [
     "AuraError",
     "AuthenticationError",
     "BadRequestError",
+    "FeedbackSignal",
     "FunctionCallItem",
     "FunctionCallOutputItem",
     "FunctionDefinition",
@@ -89,4 +93,6 @@ __all__ = [
     "StreamEvent",
     "Tool",
     "Usage",
+    "ValidationMetadata",
+    "ValidationStrategy",
 ]

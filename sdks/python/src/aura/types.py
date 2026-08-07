@@ -231,6 +231,38 @@ class ResponseMetadata(BaseModel):
     aura: AuraMetadata | None = None
 
 
+class ValidationStrategy(str, Enum):
+    """Validation strategy applied to a response."""
+
+    NONE = "none"
+    LOGPROBS = "logprobs"
+    BEST_OF_N = "best_of_n"
+    SELF_CONSISTENCY = "self_consistency"
+    CONFIDENCE_THRESHOLD = "confidence_threshold"
+
+
+class FeedbackSignal(str, Enum):
+    """Feedback signal for the feedback API (gateway ``FeedbackSignal``)."""
+
+    THUMBS_UP = "ThumbsUp"
+    THUMBS_DOWN = "ThumbsDown"
+
+
+class ValidationMetadata(BaseModel):
+    """Validation metadata attached to a response.
+
+    Mirrors the gateway's ``ValidationMetadata`` (aura-types). All fields are
+    optional because different strategies populate different subsets.
+    """
+
+    strategy: ValidationStrategy | None = None
+    confidence: float | None = None
+    perplexity: float | None = None
+    candidates_generated: int | None = None
+    selected_index: int | None = None
+    min_confidence: float | None = None
+
+
 class Response(BaseModel):
     """A response from the Aura API."""
 
@@ -245,6 +277,7 @@ class Response(BaseModel):
     metadata: ResponseMetadata | None = None
     previous_response_id: str | None = None
     conversation_id: str | None = None
+    validation: ValidationMetadata | None = None
 
     @property
     def output_text(self) -> str:

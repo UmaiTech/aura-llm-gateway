@@ -5,6 +5,10 @@ Proves the exact code in examples/notebooks/*.ipynb runs end-to-end:
 - 01_quickstart: non-streaming response + usage/cost
 - 02_streaming_chat: SSE streaming + previous_response_id threading
 - 03_tool_calling: full function_call / function_call_output loop
+- 04_compression: input token savings when compression is enabled
+- 05_validation: best_of_n / self_consistency metadata on the response
+- 06_feedback_few_shot: submit/list/stats on /v1/feedback
+- 07_routing_and_costs: per-model provider + cost attribution
 
 No real gateway needed. Run: python3 scripts/verify_notebooks.py
 """
@@ -46,6 +50,7 @@ TOOL_RESPONSE = {
         "total_tokens": 54,
         "cost_usd": 0.000123,
     },
+    "metadata": {"aura": {"provider": "openai"}},
 }
 
 FINAL_RESPONSE = {
@@ -69,6 +74,7 @@ FINAL_RESPONSE = {
         "total_tokens": 100,
         "cost_usd": 0.000456,
     },
+    "metadata": {"aura": {"provider": "openai"}},
 }
 
 STREAM_EVENTS = [
@@ -105,6 +111,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if self.path == "/v1/feedback":
+            self._respond_json({"id": "fb_1", "recorded": True, "message": "feedback recorded"})
+            return
         if self.path != "/v1/responses":
             self._respond_json({"error": {"message": f"unexpected path {self.path}"}}, 404)
             return
@@ -122,6 +131,63 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
             return
 
+        model = payload.get("model", "")
+        provider_by_model = {
+            "gpt-5.4-mini": "openai",
+            "claude-sonnet-4-6": "anthropic",
+            "gemini-2.5-flash": "google",
+        }
+        cost_by_model = {
+            "gpt-5.4-mini": 0.000456,
+            "claude-sonnet-4-6": 0.001234,
+            "gemini-2.5-flash": 0.000089,
+        }
+        out_by_model = {"gpt-5.4-mini": 20, "claude-sonnet-4-6": 40, "gemini-2.5-flash": 15}
+
+        # Token accounting (notebook 04): compression shrinks input, long
+        # structured prompts cost more at baseline, otherwise per-model default.
+        if payload.get("compression"):
+            in_tokens = 72
+        elif len(json.dumps(payload.get("input", ""))) > 400:
+            in_tokens = 180
+        else:
+            in_tokens = {"gpt-5.4-mini": 80, "claude-sonnet-4-6": 95, "gemini-2.5-flash": 60}.get(
+                model, 80
+            )
+
+        # Validation metadata (notebook 05)
+        validation = payload.get("validation")
+        if validation:
+            if validation.get("strategy") == "self_consistency":
+                vmeta = {
+                    "strategy": "self_consistency",
+                    "confidence": 0.85,
+                    "candidates_generated": 3,
+                    "min_confidence": 0.7,
+                }
+            else:
+                vmeta = {
+                    "strategy": "best_of_n",
+                    "confidence": 0.92,
+                    "candidates_generated": 3,
+                    "selected_index": 1,
+                }
+        else:
+            vmeta = None
+
+        def _body():
+            out_tokens = out_by_model.get(model, 20)
+            return dict(
+                FINAL_RESPONSE,
+                usage={
+                    "input_tokens": in_tokens,
+                    "output_tokens": out_tokens,
+                    "total_tokens": in_tokens + out_tokens,
+                    "cost_usd": cost_by_model.get(model, 0.000456),
+                },
+                metadata={"aura": {"provider": provider_by_model.get(model, "openai")}},
+            )
+
         # Detect tool-calling loop: input list contains function_call items
         inp = payload.get("input", [])
         has_function_call = (
@@ -135,12 +201,33 @@ class Handler(BaseHTTPRequestHandler):
             # Tool results fed back: model synthesizes the final answer.
             self._respond_json(FINAL_RESPONSE)
         else:
-            # Single-turn. The SDK converts string input to a list of message
-            # dicts, so check the payload flag (not input type) for threading.
-            body = FINAL_RESPONSE
+            body = _body()
+            if vmeta:
+                body = dict(body, validation=vmeta)
             if "previous_response_id" in payload:
-                body = dict(FINAL_RESPONSE, id="resp_threaded")
+                body = dict(body, id="resp_threaded")
             self._respond_json(body)
+
+    def do_GET(self):
+        if self.path.startswith("/v1/feedback/stats"):
+            self._respond_json({"total": 1, "approved": 1, "rejected": 0})
+        elif self.path.startswith("/v1/feedback"):
+            self._respond_json(
+                {
+                    "samples": [
+                        {
+                            "id": "fb_1",
+                            "response_id": "resp_final",
+                            "signal": "ThumbsUp",
+                            "reason": "concise and accurate",
+                            "tags": ["summarization"],
+                        }
+                    ],
+                    "total": 1,
+                }
+            )
+        else:
+            self._respond_json({"error": {"message": f"unexpected path {self.path}"}}, 404)
 
 
 def main():
@@ -154,7 +241,7 @@ def main():
     # point at the local SDK source
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-    from aura import AuraClient, Tool
+    from aura import AuraClient, FeedbackSignal, Tool, ValidationStrategy
 
     failures = []
 
@@ -269,6 +356,128 @@ def main():
     except Exception as e:
         failures.append(f"03_tool_calling: {e}")
         print(f"03_tool_calling: FAIL {e}")
+
+    # ---- 04_compression: token savings ----
+    try:
+        order_prompt = (
+            "You are an order validator. Check the following order and report any "
+            "discrepancies between the line items and the totals.\n\n"
+            "ORDER:\n"
+            "{\n"
+            "  \"order_id\": \"ORD-78412\",\n"
+            "  \"customer\": {\"name\": \"Aarav Mehta\", \"tier\": \"gold\"},\n"
+            "  \"items\": [\n"
+            "    {\"sku\": \"A-101\", \"name\": \"Wireless Mouse\", \"qty\": 2, \"unit_price\": 24.99},\n"
+            "    {\"sku\": \"B-220\", \"name\": \"Mechanical Keyboard\", \"qty\": 1, \"unit_price\": 89.50},\n"
+            "    {\"sku\": \"C-330\", \"name\": \"USB-C Hub 7-in-1\", \"qty\": 3, \"unit_price\": 39.00},\n"
+            "    {\"sku\": \"D-441\", \"name\": \"Laptop Stand\", \"qty\": 1, \"unit_price\": 54.25}\n"
+            "  ],\n"
+            "  \"subtotal\": 319.23,\n"
+            "  \"tax_rate\": 0.18,\n"
+            "  \"shipping\": 0.00,\n"
+            "  \"discount\": 15.00\n"
+            "}\n\n"
+            "List each discrepancy and the corrected totals."
+        )
+        client = AuraClient()
+        baseline = client.responses.create(model="gpt-5.4-mini", input=order_prompt)
+        b_in = baseline.usage.input_tokens if baseline.usage else 0
+        compressed = client.responses.create(
+            model="gpt-5.4-mini",
+            input=order_prompt,
+            compression={"enabled": True, "auto_select": True, "target_ratio": 0.4},
+        )
+        c_in = compressed.usage.input_tokens if compressed.usage else 0
+        assert b_in == 180, f"expected baseline 180, got {b_in}"
+        assert c_in == 72, f"expected compressed 72, got {c_in}"
+        pct = 100.0 * (b_in - c_in) / b_in
+        assert pct >= 50, f"expected >=50% savings, got {pct:.0f}%"
+        print(f"04_compression: OK (baseline {b_in} -> compressed {c_in}, {pct:.0f}% saved)")
+    except Exception as e:
+        failures.append(f"04_compression: {e}")
+        print(f"04_compression: FAIL {e}")
+
+    # ---- 05_validation: best_of_n / self_consistency metadata ----
+    try:
+        ambiguous = (
+            "A farmer has 17 sheep. All but 9 run away. "
+            "How many are left? Answer with just the number."
+        )
+        client = AuraClient()
+        response = client.responses.create(
+            model="gpt-5.4-mini",
+            input=ambiguous,
+            validation={"strategy": "best_of_n", "n": 3, "selection": "HighestConfidence"},
+        )
+        v = response.validation
+        assert v is not None, "response.validation missing"
+        assert v.strategy == ValidationStrategy.BEST_OF_N
+        assert v.candidates_generated == 3
+        assert v.selected_index == 1
+        assert v.confidence == 0.92
+
+        response2 = client.responses.create(
+            model="gpt-5.4-mini",
+            input=ambiguous,
+            validation={"strategy": "self_consistency", "n": 3, "min_confidence": 0.7},
+        )
+        v2 = response2.validation
+        assert v2 is not None, "response2.validation missing"
+        assert v2.strategy == ValidationStrategy.SELF_CONSISTENCY
+        assert v2.min_confidence == 0.7
+        assert v2.confidence == 0.85
+        print("05_validation: OK (best_of_n + self_consistency metadata parsed)")
+    except Exception as e:
+        failures.append(f"05_validation: {e}")
+        print(f"05_validation: FAIL {e}")
+
+    # ---- 06_feedback_few_shot: submit / list / stats ----
+    try:
+        client = AuraClient()
+        response = client.responses.create(
+            model="gpt-5.4-mini",
+            input="Summarize the waterfall model in one sentence.",
+        )
+        result = client.feedback.submit(
+            response_id=response.id,
+            signal=FeedbackSignal.THUMBS_UP,
+            reason="concise and accurate",
+            tags=["summarization"],
+        )
+        assert result["recorded"] is True
+        samples = client.feedback.list()
+        assert samples["total"] == 1
+        assert samples["samples"][0]["signal"] == "ThumbsUp"
+        stats = client.feedback.stats()
+        assert stats["total"] == 1
+        print("06_feedback_few_shot: OK (submit/list/stats)")
+    except Exception as e:
+        failures.append(f"06_feedback_few_shot: {e}")
+        print(f"06_feedback_few_shot: FAIL {e}")
+
+    # ---- 07_routing_and_costs: per-model provider + cost ----
+    try:
+        client = AuraClient()
+        observed = {}
+        for model in ["gpt-5.4-mini", "claude-sonnet-4-6", "gemini-2.5-flash"]:
+            response = client.responses.create(
+                model=model,
+                input="Explain what an LLM gateway does in one sentence.",
+            )
+            provider = None
+            if response.metadata and response.metadata.aura:
+                provider = response.metadata.aura.provider
+            assert response.usage is not None and response.usage.cost_usd is not None
+            observed[model] = (provider, response.usage.cost_usd)
+        assert observed["gpt-5.4-mini"][0] == "openai"
+        assert observed["claude-sonnet-4-6"][0] == "anthropic"
+        assert observed["gemini-2.5-flash"][0] == "google"
+        costs = {c for _, c in observed.values()}
+        assert len(costs) == 3, "expected 3 distinct per-model costs"
+        print("07_routing_and_costs: OK (3 providers, distinct costs)")
+    except Exception as e:
+        failures.append(f"07_routing_and_costs: {e}")
+        print(f"07_routing_and_costs: FAIL {e}")
 
     server.shutdown()
     if failures:

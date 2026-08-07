@@ -23,6 +23,7 @@ from aura.exceptions import (
 )
 from aura.types import (
     ErrorEvent,
+    FeedbackSignal,
     FunctionCallDeltaEvent,
     FunctionCallDoneEvent,
     InputMessage,
@@ -200,6 +201,71 @@ class Responses:
         return self._client._stream("POST", "/v1/responses", json=payload)
 
 
+class Feedback:
+    """
+    Feedback API resource (adaptive few-shot learning).
+
+    Gateway routes: POST/GET ``/v1/feedback``, GET ``/v1/feedback/stats``.
+    """
+
+    def __init__(self, client: AuraClient) -> None:
+        self._client = client
+
+    def submit(
+        self,
+        *,
+        response_id: str,
+        signal: FeedbackSignal | str,
+        reason: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Submit feedback for a previous response.
+
+        Args:
+            response_id: ID of the response being rated
+            signal: ``FeedbackSignal.THUMBS_UP`` / ``FeedbackSignal.THUMBS_DOWN``
+            reason: Optional reason for the feedback
+            tags: Optional tags to categorize the sample
+
+        Returns:
+            The gateway's ``FeedbackResponse`` dict (id, recorded, message).
+        """
+        payload: dict[str, Any] = {
+            "response_id": response_id,
+            "signal": signal.value if isinstance(signal, FeedbackSignal) else signal,
+        }
+        if reason is not None:
+            payload["reason"] = reason
+        if tags is not None:
+            payload["tags"] = tags
+        return self._client._request("POST", "/v1/feedback", json=payload)
+
+    def list(self, limit: int | None = None) -> dict[str, Any]:
+        """
+        List feedback samples (useful for few-shot injection).
+
+        Args:
+            limit: Optional max number of samples to return.
+
+        Returns:
+            The gateway's ``ListFeedbackResponse`` dict (samples, total).
+        """
+        params: dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        return self._client._request("GET", "/v1/feedback", params=params)
+
+    def stats(self) -> dict[str, Any]:
+        """
+        Get feedback statistics.
+
+        Returns:
+            The gateway's ``FeedbackStats`` dict.
+        """
+        return self._client._request("GET", "/v1/feedback/stats")
+
+
 class AuraClient:
     """
     Client for the Aura LLM Gateway.
@@ -256,6 +322,7 @@ class AuraClient:
 
         # Initialize resources
         self.responses = Responses(self)
+        self.feedback = Feedback(self)
 
     def close(self) -> None:
         """Close the HTTP client."""

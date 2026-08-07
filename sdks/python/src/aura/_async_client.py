@@ -23,6 +23,7 @@ from aura.exceptions import (
 )
 from aura.types import (
     ErrorEvent,
+    FeedbackSignal,
     FunctionCallDeltaEvent,
     FunctionCallDoneEvent,
     InputMessage,
@@ -191,6 +192,47 @@ class AsyncResponses:
             yield event
 
 
+class AsyncFeedback:
+    """
+    Async feedback API resource (adaptive few-shot learning).
+
+    Gateway routes: POST/GET ``/v1/feedback``, GET ``/v1/feedback/stats``.
+    """
+
+    def __init__(self, client: AsyncAuraClient) -> None:
+        self._client = client
+
+    async def submit(
+        self,
+        *,
+        response_id: str,
+        signal: FeedbackSignal | str,
+        reason: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Submit feedback for a previous response (async)."""
+        payload: dict[str, Any] = {
+            "response_id": response_id,
+            "signal": signal.value if isinstance(signal, FeedbackSignal) else signal,
+        }
+        if reason is not None:
+            payload["reason"] = reason
+        if tags is not None:
+            payload["tags"] = tags
+        return await self._client._request("POST", "/v1/feedback", json=payload)
+
+    async def list(self, limit: int | None = None) -> dict[str, Any]:
+        """List feedback samples (async)."""
+        params: dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        return await self._client._request("GET", "/v1/feedback", params=params)
+
+    async def stats(self) -> dict[str, Any]:
+        """Get feedback statistics (async)."""
+        return await self._client._request("GET", "/v1/feedback/stats")
+
+
 class AsyncAuraClient:
     """
     Async client for the Aura LLM Gateway.
@@ -246,6 +288,7 @@ class AsyncAuraClient:
 
         # Initialize resources
         self.responses = AsyncResponses(self)
+        self.feedback = AsyncFeedback(self)
 
     async def close(self) -> None:
         """Close the HTTP client."""

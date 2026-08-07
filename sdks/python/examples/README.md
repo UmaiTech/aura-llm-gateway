@@ -11,6 +11,10 @@ patterns in plain `.py` form for pasting into your own project.
 | [`01_quickstart.ipynb`](./notebooks/01_quickstart.ipynb) | 5-minute hello world: create a client, send a completion, read usage + cost attribution |
 | [`02_streaming_chat.ipynb`](./notebooks/02_streaming_chat.ipynb) | Consume SSE token-by-token and keep context across turns with `previous_response_id` |
 | [`03_tool_calling.ipynb`](./notebooks/03_tool_calling.ipynb) | The full agentic loop: model proposes → you execute → model synthesizes |
+| [`04_compression.ipynb`](./notebooks/04_compression.ipynb) | Cut input tokens on structured prompts with `compression` (TOON/YAML/AISP/JSON) and read the savings |
+| [`05_validation.ipynb`](./notebooks/05_validation.ipynb) | best-of-N and self-consistency on an ambiguous question; read `response.validation` metadata |
+| [`06_feedback_few_shot.ipynb`](./notebooks/06_feedback_few_shot.ipynb) | Thumbs-up/down → adaptive few-shot via the feedback API (`client.feedback`) |
+| [`07_routing_and_costs.ipynb`](./notebooks/07_routing_and_costs.ipynb) | Hit multiple providers through one endpoint; see `metadata.aura.provider` + per-request cost |
 
 To run a notebook in Colab: open the file, hit the Colab badge / *Upload to
 Colab*, and run cells top to bottom. Requires a running gateway
