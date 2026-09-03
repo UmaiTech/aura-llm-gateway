@@ -1,0 +1,394 @@
+//! Tier catalog and within-tier candidate selection.
+//!
+//! The catalog knows which models belong to which tier. Selection takes a
+//! tier and an `Eligibility` oracle (health, capabilities, allow/deny lists
+//! are all the caller's business) and returns the model to dispatch to,
+//! escalating to a neighbouring tier when the requested one has no
+//! eligible candidate.
+
+use super::config::{TierModels, WithinTierStrategy};
+use aura_types::Tier;
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Answers questions about a candidate model on behalf of the caller.
+pub trait Eligibility {
+    /// Can this model be dispatched to right now?
+    fn is_eligible(&self, model: &str) -> bool;
+    /// Blended price per million tokens (used by `Cheapest`). `None` when
+    /// unknown.
+    fn blended_cost_per_million(&self, model: &str) -> Option<f64>;
+    /// Provider that serves the model, for the decision record.
+    fn provider_of(&self, model: &str) -> Option<String>;
+}
+
+/// A candidate that was considered for a decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CandidateInfo {
+    /// Model id.
+    pub model: String,
+    /// Provider, if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Tier the candidate was drawn from.
+    pub tier: Tier,
+    /// Blended price per million tokens, if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_per_million: Option<f64>,
+    /// Whether the eligibility oracle accepted it.
+    pub eligible: bool,
+}
+
+/// Outcome of tier selection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TierSelection {
+    /// Tier the model was drawn from (may differ from the requested tier
+    /// when escalation happened).
+    pub tier: Tier,
+    /// Selected model.
+    pub model: String,
+    /// Provider, if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Every candidate looked at, in the order they were considered.
+    pub candidates: Vec<CandidateInfo>,
+    /// Why this model won.
+    pub reason: String,
+}
+
+/// Tier catalog with a selection strategy.
+#[derive(Debug)]
+pub struct TierCatalog {
+    tiers: TierModels,
+    strategy: WithinTierStrategy,
+    rr_counter: AtomicUsize,
+}
+
+impl TierCatalog {
+    /// Build a catalog.
+    pub fn new(tiers: TierModels, strategy: WithinTierStrategy) -> Self {
+        Self {
+            tiers,
+            strategy,
+            rr_counter: AtomicUsize::new(0),
+        }
+    }
+
+    /// The configured tier lists.
+    pub fn tiers(&self) -> &TierModels {
+        &self.tiers
+    }
+
+    /// Highest tier a model is listed in.
+    pub fn tier_of(&self, model: &str) -> Option<Tier> {
+        self.tiers.tier_of(model)
+    }
+
+    /// Every distinct model in the catalog.
+    pub fn all_models(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for t in Tier::ALL {
+            for m in self.tiers.get(t) {
+                if !out.iter().any(|x| x == m) {
+                    out.push(m.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// Pick a model for `tier`, escalating outward when needed.
+    ///
+    /// Search order: the requested tier, then each tier above it (a stronger
+    /// model is always acceptable), then each tier below it (better than
+    /// failing). `max_tier` caps the upward search; `min_tier` caps the
+    /// downward one.
+    pub fn select(
+        &self,
+        tier: Tier,
+        min_tier: Tier,
+        max_tier: Tier,
+        oracle: &dyn Eligibility,
+    ) -> Option<TierSelection> {
+        let mut candidates = Vec::new();
+
+        let mut order = vec![tier];
+        let mut up = tier.up();
+        while let Some(t) = up {
+            if t <= max_tier {
+                order.push(t);
+            }
+            up = t.up();
+        }
+        let mut down = tier.down();
+        while let Some(t) = down {
+            if t >= min_tier {
+                order.push(t);
+            }
+            down = t.down();
+        }
+
+        for t in order {
+            if let Some(sel) = self.select_within(t, oracle, &mut candidates) {
+                let reason = if t == tier {
+                    sel.1
+                } else if t > tier {
+                    format!("escalated from {} (no eligible candidate); {}", tier, sel.1)
+                } else {
+                    format!(
+                        "fell back to {} (no eligible candidate at or above {}); {}",
+                        t, tier, sel.1
+                    )
+                };
+                return Some(TierSelection {
+                    tier: t,
+                    provider: oracle.provider_of(&sel.0),
+                    model: sel.0,
+                    candidates,
+                    reason,
+                });
+            }
+        }
+        None
+    }
+
+    fn select_within(
+        &self,
+        tier: Tier,
+        oracle: &dyn Eligibility,
+        candidates: &mut Vec<CandidateInfo>,
+    ) -> Option<(String, String)> {
+        let list = self.tiers.get(tier);
+        let mut eligible: Vec<(usize, &String, Option<f64>)> = Vec::new();
+        for (idx, model) in list.iter().enumerate() {
+            let ok = oracle.is_eligible(model);
+            let cost = oracle.blended_cost_per_million(model);
+            candidates.push(CandidateInfo {
+                model: model.clone(),
+                provider: oracle.provider_of(model),
+                tier,
+                cost_per_million: cost,
+                eligible: ok,
+            });
+            if ok {
+                eligible.push((idx, model, cost));
+            }
+        }
+        if eligible.is_empty() {
+            return None;
+        }
+
+        match self.strategy {
+            WithinTierStrategy::ConfigOrder => {
+                let (_, m, _) = eligible[0];
+                Some((m.clone(), format!("first eligible candidate in {}", tier)))
+            }
+            WithinTierStrategy::RoundRobin => {
+                let n = self.rr_counter.fetch_add(1, Ordering::Relaxed);
+                let (_, m, _) = eligible[n % eligible.len()];
+                Some((
+                    m.clone(),
+                    format!("round-robin over {} eligible in {}", eligible.len(), tier),
+                ))
+            }
+            WithinTierStrategy::Cheapest => {
+                // Known prices first (ascending), then unknown in config order.
+                let best = eligible
+                    .iter()
+                    .filter(|(_, _, c)| c.is_some())
+                    .min_by(|a, b| {
+                        a.2.partial_cmp(&b.2)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    })
+                    .or_else(|| eligible.first());
+                let (_, m, c) = best?;
+                let reason = match c {
+                    Some(c) => format!("cheapest eligible in {} (${:.2}/1M blended)", tier, c),
+                    None => format!("first eligible in {} (no price known)", tier),
+                };
+                Some((m.to_string(), reason))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    struct Oracle {
+        blocked: Vec<&'static str>,
+        costs: HashMap<&'static str, f64>,
+    }
+
+    impl Eligibility for Oracle {
+        fn is_eligible(&self, model: &str) -> bool {
+            !self.blocked.contains(&model)
+        }
+        fn blended_cost_per_million(&self, model: &str) -> Option<f64> {
+            self.costs.get(model).copied()
+        }
+        fn provider_of(&self, model: &str) -> Option<String> {
+            Some(if model.starts_with("gpt") {
+                "openai".into()
+            } else if model.starts_with("claude") {
+                "anthropic".into()
+            } else {
+                "google".into()
+            })
+        }
+    }
+
+    fn oracle(blocked: &[&'static str]) -> Oracle {
+        let mut costs = HashMap::new();
+        costs.insert("gemini-3.1-flash-lite", 0.3);
+        costs.insert("gpt-5.4-nano", 0.4);
+        costs.insert("claude-haiku-4-5", 2.0);
+        costs.insert("gemini-3.5-flash", 1.5);
+        costs.insert("gpt-5.4-mini", 1.0);
+        costs.insert("claude-sonnet-4-6", 9.0);
+        costs.insert("gpt-5.5", 8.0);
+        costs.insert("claude-opus-4-7", 30.0);
+        Oracle {
+            blocked: blocked.to_vec(),
+            costs,
+        }
+    }
+
+    #[test]
+    fn cheapest_picks_lowest_known_price() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        let sel = cat
+            .select(Tier::Medium, Tier::Simple, Tier::Reasoning, &oracle(&[]))
+            .unwrap();
+        assert_eq!(sel.model, "gpt-5.4-mini");
+        assert_eq!(sel.tier, Tier::Medium);
+        assert_eq!(sel.provider.as_deref(), Some("openai"));
+        assert_eq!(sel.candidates.len(), 3);
+        assert!(sel.reason.contains("cheapest"));
+    }
+
+    #[test]
+    fn unknown_price_comes_last_but_is_still_usable() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        // Only the unpriced gemini-3.1-pro-preview is eligible in complex.
+        let sel = cat
+            .select(
+                Tier::Complex,
+                Tier::Complex,
+                Tier::Complex,
+                &oracle(&["claude-sonnet-4-6", "gpt-5.5"]),
+            )
+            .unwrap();
+        assert_eq!(sel.model, "gemini-3.1-pro-preview");
+        assert!(sel.reason.contains("no price known"));
+    }
+
+    #[test]
+    fn escalates_up_before_falling_down() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        let blocked = ["gemini-3.5-flash", "gpt-5.4-mini", "claude-sonnet-4-6"];
+        let sel = cat
+            .select(
+                Tier::Medium,
+                Tier::Simple,
+                Tier::Reasoning,
+                &oracle(&blocked),
+            )
+            .unwrap();
+        assert_eq!(sel.tier, Tier::Complex);
+        assert_eq!(sel.model, "gpt-5.5");
+        assert!(sel.reason.starts_with("escalated from medium"));
+        // All three medium candidates were recorded as ineligible.
+        assert_eq!(
+            sel.candidates
+                .iter()
+                .filter(|c| c.tier == Tier::Medium && !c.eligible)
+                .count(),
+            3
+        );
+    }
+
+    #[test]
+    fn max_tier_caps_escalation_and_falls_back_down() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        let blocked = ["gemini-3.5-flash", "gpt-5.4-mini", "claude-sonnet-4-6"];
+        let sel = cat
+            .select(Tier::Medium, Tier::Simple, Tier::Medium, &oracle(&blocked))
+            .unwrap();
+        assert_eq!(sel.tier, Tier::Simple);
+        assert_eq!(sel.model, "gemini-3.1-flash-lite");
+        assert!(sel.reason.starts_with("fell back to simple"));
+    }
+
+    #[test]
+    fn returns_none_when_nothing_is_eligible() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        let all: Vec<&'static str> = vec![
+            "gemini-3.1-flash-lite",
+            "gpt-5.4-nano",
+            "claude-haiku-4-5",
+            "gemini-3.5-flash",
+            "gpt-5.4-mini",
+            "claude-sonnet-4-6",
+            "gpt-5.5",
+            "gemini-3.1-pro-preview",
+            "claude-opus-4-7",
+            "gpt-5.5-pro",
+            "o3-mini",
+        ];
+        assert!(cat
+            .select(Tier::Simple, Tier::Simple, Tier::Reasoning, &oracle(&all))
+            .is_none());
+    }
+
+    #[test]
+    fn round_robin_rotates() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::RoundRobin);
+        let o = oracle(&[]);
+        let a = cat
+            .select(Tier::Simple, Tier::Simple, Tier::Simple, &o)
+            .unwrap();
+        let b = cat
+            .select(Tier::Simple, Tier::Simple, Tier::Simple, &o)
+            .unwrap();
+        let c = cat
+            .select(Tier::Simple, Tier::Simple, Tier::Simple, &o)
+            .unwrap();
+        let d = cat
+            .select(Tier::Simple, Tier::Simple, Tier::Simple, &o)
+            .unwrap();
+        assert_ne!(a.model, b.model);
+        assert_ne!(b.model, c.model);
+        assert_eq!(a.model, d.model);
+    }
+
+    #[test]
+    fn config_order_takes_first_eligible() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::ConfigOrder);
+        let sel = cat
+            .select(
+                Tier::Simple,
+                Tier::Simple,
+                Tier::Simple,
+                &oracle(&["gemini-3.1-flash-lite"]),
+            )
+            .unwrap();
+        assert_eq!(sel.model, "gpt-5.4-nano");
+    }
+
+    #[test]
+    fn all_models_is_deduplicated() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        let all = cat.all_models();
+        assert_eq!(
+            all.iter()
+                .filter(|m| m.as_str() == "claude-sonnet-4-6")
+                .count(),
+            1
+        );
+        assert_eq!(all.len(), 11);
+    }
+}
