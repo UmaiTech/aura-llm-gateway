@@ -21,6 +21,7 @@ pub mod capabilities;
 pub mod catalog;
 pub mod config;
 pub mod features;
+pub mod llm;
 pub mod outcomes;
 pub mod scorer;
 pub mod tiers;
@@ -34,12 +35,18 @@ pub use config::{
 pub use features::{
     estimate_tokens, extract_features, IntentHint, KeywordMatcher, RequestFeatures,
 };
+pub use llm::{
+    classifier_prompt, judge_prompt, parse_classifier_output, parse_judge_output, ClassifierAnswer,
+    JudgeAnswer, JudgeVerdict, CLASSIFIER_EXCERPT_CHARS,
+};
 pub use outcomes::{
     classify_next_turn, evaluate, is_correction, reward_for, sample_beta, word_jaccard, ArmStats,
     NextTurn, NextTurnInputs, Outcome, OutcomeInputs,
 };
 pub use scorer::{HeuristicScorer, ScoreResult, HEURISTIC_VERSION};
 pub use tiers::{CandidateInfo, Eligibility, TierCatalog, TierSelection};
+
+pub use self::ClassifierOverride as TierOverride;
 
 use aura_types::{ClassifierKind, CreateResponseRequest, RoutingMode, RoutingOptions, Tier};
 use serde::{Deserialize, Serialize};
@@ -61,6 +68,17 @@ pub struct DecisionContext<'a> {
     pub previous_model: Option<&'a str>,
     /// When `true`, the decision is recorded but not applied.
     pub shadow: bool,
+}
+
+/// A tier chosen by a non-heuristic classifier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassifierOverride {
+    /// Tier to use instead of the heuristic one.
+    pub tier: Tier,
+    /// Classifier label recorded with the decision (e.g. `llm@claude-haiku-4-5`).
+    pub classifier: String,
+    /// Confidence in `[0, 1]`.
+    pub confidence: f64,
 }
 
 /// A recorded routing decision. Serialised into `metadata.aura.routing`
@@ -187,7 +205,7 @@ impl AutoRouter {
             .unwrap_or(self.config.default_classifier)
     }
 
-    /// Make a decision.
+    /// Make a decision with the heuristic classifier.
     ///
     /// `oracle` answers eligibility for each candidate. The router itself
     /// applies the request's allow / deny lists on top of the oracle so the
@@ -198,6 +216,20 @@ impl AutoRouter {
         ctx: &DecisionContext<'_>,
         oracle: &dyn Eligibility,
     ) -> Result<AutoDecision, AutoRouteError> {
+        self.decide_with_override(request, ctx, oracle, None)
+    }
+
+    /// Make a decision, optionally replacing the heuristic tier with one
+    /// produced by another classifier (LLM or learned). The heuristic
+    /// still runs so its score, signals and features are recorded next to
+    /// the override.
+    pub fn decide_with_override(
+        &self,
+        request: &CreateResponseRequest,
+        ctx: &DecisionContext<'_>,
+        oracle: &dyn Eligibility,
+        override_tier: Option<ClassifierOverride>,
+    ) -> Result<AutoDecision, AutoRouteError> {
         if !self.config.enabled && !ctx.shadow {
             return Err(AutoRouteError::Disabled);
         }
@@ -205,7 +237,19 @@ impl AutoRouter {
 
         let mode = self.effective_mode(ctx);
         let features = self.features(request);
-        let scored = self.scorer.score(&features, mode);
+        let mut scored = self.scorer.score(&features, mode);
+        let mut classifier = HEURISTIC_VERSION.to_string();
+        if let Some(ov) = override_tier {
+            scored.notes.push(format!(
+                "{} chose {} (confidence {:.2}); heuristic said {}",
+                ov.classifier, ov.tier, ov.confidence, scored.tier
+            ));
+            scored
+                .signals
+                .insert("classifier_confidence".to_string(), ov.confidence);
+            scored.tier = ov.tier;
+            classifier = ov.classifier;
+        }
 
         let mut hard_filters = Vec::new();
         let mut tier = scored.tier;
@@ -276,7 +320,7 @@ impl AutoRouter {
                     return Ok(AutoDecision {
                         requested_model: ctx.requested_model.to_string(),
                         mode,
-                        classifier: HEURISTIC_VERSION.to_string(),
+                        classifier: classifier.clone(),
                         score: scored.score,
                         raw_score: scored.raw_score,
                         classified_tier: scored.tier,
@@ -318,7 +362,7 @@ impl AutoRouter {
         Ok(AutoDecision {
             requested_model: ctx.requested_model.to_string(),
             mode,
-            classifier: HEURISTIC_VERSION.to_string(),
+            classifier: classifier.clone(),
             score: scored.score,
             raw_score: scored.raw_score,
             classified_tier: scored.tier,
@@ -641,6 +685,31 @@ mod tests {
         c.previous_model = Some("gpt-5.5");
         let d = r.decide(&req, &c, &oracle()).unwrap();
         assert_eq!(d.selected, "gpt-5.4-mini");
+    }
+
+    #[test]
+    fn classifier_override_replaces_tier_and_is_recorded() {
+        let r = router();
+        let req = CreateResponseRequest::text("auto", "hi");
+        let d = r
+            .decide_with_override(
+                &req,
+                &ctx("auto", None),
+                &oracle(),
+                Some(ClassifierOverride {
+                    tier: Tier::Complex,
+                    classifier: "llm@test".into(),
+                    confidence: 0.9,
+                }),
+            )
+            .unwrap();
+        assert_eq!(d.classified_tier, Tier::Complex);
+        assert_eq!(d.tier, Tier::Complex);
+        assert_eq!(d.classifier, "llm@test");
+        assert_eq!(d.signals.get("classifier_confidence"), Some(&0.9));
+        assert!(d.reason.contains("heuristic said simple"));
+        // The heuristic score is still there for comparison.
+        assert!(d.raw_score < 0.0);
     }
 
     #[test]

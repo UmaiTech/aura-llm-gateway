@@ -53,6 +53,15 @@ pub struct AutoRoutingConfig {
     pub outcome_grace_secs: u64,
     /// Outcome rollup: how far back arm statistics look.
     pub arm_stats_window_days: u32,
+    /// Gold labels: fraction of eligible requests (0.0–1.0) whose prompt
+    /// is also answered by the cheap and strong tiers in the background
+    /// and graded by the judge model. `0` disables collection. Every
+    /// sampled request costs two extra completions plus one judge call.
+    pub gold_sample_rate: f64,
+    /// Gold labels: model that grades the pair.
+    pub gold_judge_model: String,
+    /// Gold labels: characters of each text stored and sent to the judge.
+    pub gold_max_text_chars: usize,
 }
 
 impl Default for AutoRoutingConfig {
@@ -76,6 +85,9 @@ impl Default for AutoRoutingConfig {
             outcome_rollup_interval_secs: 900,
             outcome_grace_secs: 1800,
             arm_stats_window_days: 30,
+            gold_sample_rate: 0.0,
+            gold_judge_model: "claude-sonnet-4-6".to_string(),
+            gold_max_text_chars: 4000,
         }
     }
 }

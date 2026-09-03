@@ -64,7 +64,7 @@ Fine-tune a single request with a top-level `routing` object (an Aura extension,
 | `allow` | string[] | all | Only consider models matching one of these patterns. Patterns match the model id or `provider/model`; a trailing `*` is a prefix wildcard. |
 | `deny` | string[] | none | Never consider models matching one of these patterns. |
 | `sticky` | boolean | `true` | Keep the previous turn's model when this request continues a tool loop (has `function_call_output` items and `previous_response_id`). |
-| `classifier` | `heuristic` | `heuristic` | Which classifier scores the request. `llm` and `learned` are reserved for upcoming releases. |
+| `classifier` | `heuristic` \| `llm` | gateway default | Which classifier scores the request. `llm` asks the configured classifier model for the tier (heuristic fallback on any failure); `learned` is reserved for the next release. |
 
 ## Response
 
@@ -209,6 +209,10 @@ routing:
     outcome_rollup_interval_secs: 900
     outcome_grace_secs: 1800
     arm_stats_window_days: 30
+    llm_classifier: { model: claude-haiku-4-5, timeout_ms: 800 }
+    gold_sample_rate: 0.0            # e.g. 0.01 = 1% of eligible requests
+    gold_judge_model: claude-sonnet-4-6
+    gold_max_text_chars: 4000
 ```
 
 Feature `weights`, `token_thresholds` and every `keywords` list are configurable too; see `config.example.yaml` for the full block. Tier models the gateway cannot serve are dropped at startup with a warning.
@@ -225,6 +229,8 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`). |
 | `POST /admin/routing/rollup` | Score pending decisions now and refresh arm statistics; returns counts per signal. |
 | `GET /admin/routing/arms` | Learned Beta(α, β) per (tier, model) used by `within_tier: thompson`. |
+| `GET /admin/routing/gold?limit=` | Gold-label summary (cheap sufficed / strong better / ties / failed) and recent pairs. |
+| `POST /admin/routing/score` | Dry-run the router on a request body; returns the decision, dispatches nothing. |
 
 The admin app's Routing page renders the same data as an "Auto router" section.
 
@@ -243,6 +249,18 @@ A background job (every `routing.auto.outcome_rollup_interval_secs`, default 15 
 | no follow-up, response completed | | +0.5 |
 
 Tool-loop continuation turns (function outputs without a new user message) are not counted as a verdict. Results land in `routing_outcomes` and are visible per tier on the admin page (mean reward and the move-on / retry / correction / escalation counts) and in `v_routing_outcomes`.
+
+### LLM classifier
+
+`classifier: llm` (per request, or `routing.auto.default_classifier: llm`) sends a numeric summary of the request plus an excerpt of the latest user text (at most 1,500 characters) to `routing.auto.llm_classifier.model` (default `claude-haiku-4-5`) and asks for `{"tier": ..., "confidence": ...}`. The call has a hard timeout (`timeout_ms`, default 800) and falls back to the heuristic tier on timeout, provider error or an unparseable reply. The decision records `classifier: "llm@<model>"`, a `classifier_confidence` signal and, in `reason`, what the heuristic would have said. Shadow decisions always use the heuristic. Expect roughly half a second of added latency and a fraction of a cent per request.
+
+### Gold labels
+
+With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self-contained text requests (no tools, images or continuations) is answered in the background by the cheapest eligible model of the lowest tier (A) and of the highest tier (B); `gold_judge_model` (default `claude-sonnet-4-6`) grades the pair and the result lands in `routing_gold_pairs` with the request's feature vector. A verdict of `a` or `tie` means the cheap tier would have sufficed. This is the augmentation RouteLLM used to train its routers, run on live traffic; it costs two extra completions and a judge call per sampled request, so keep the rate small (1% or less). `GET /admin/routing/gold?limit=` returns the summary and recent pairs.
+
+### Replaying captured traffic
+
+`POST /admin/routing/score` dry-runs the router on a request body and returns the decision without dispatching or recording anything. `scripts/router/replay.py` uses it to re-score captured `request_logs` (or a JSONL file), print the tier distribution and selected models, project the cost auto would have incurred against the actual cost, and optionally write per-request feature rows for training.
 
 ### Adaptive within-tier selection
 

@@ -10,9 +10,14 @@
 //! but the request is left untouched.
 
 use aura_core::router::auto::{
-    estimate_tokens, model_supports_tools, model_supports_vision, ArmStats,
+    classifier_prompt, estimate_tokens, model_supports_tools, model_supports_vision,
+    parse_classifier_output, ArmStats, LlmClassifierConfig, RequestFeatures,
+    CLASSIFIER_EXCERPT_CHARS,
 };
-use aura_core::{metrics, AutoDecision, AutoRouteError, DecisionContext, Eligibility};
+use aura_core::{
+    metrics, AutoDecision, AutoRouteError, ClassifierOverride, DecisionContext, Eligibility,
+};
+use aura_types::ClassifierKind;
 use aura_types::{parse_auto_model, CreateResponseRequest, RoutingOptions, Tier};
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::Json;
@@ -133,6 +138,83 @@ async fn previous_turn_model(state: &AppState, request: &CreateResponseRequest) 
     }
 }
 
+/// Latest user text, for the LLM classifier excerpt.
+fn last_user_excerpt(request: &CreateResponseRequest) -> String {
+    request
+        .input
+        .iter()
+        .rev()
+        .find_map(|item| match item {
+            aura_types::InputItem::Message { role, content } if *role == aura_types::Role::User => {
+                Some(match content {
+                    aura_types::InputContent::Text(t) => t.clone(),
+                    aura_types::InputContent::Parts(parts) => parts
+                        .iter()
+                        .filter_map(|p| match p {
+                            aura_types::ContentPart::Text { text } => Some(text.as_str()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                })
+            }
+            _ => None,
+        })
+        .map(|t| t.chars().take(CLASSIFIER_EXCERPT_CHARS).collect())
+        .unwrap_or_default()
+}
+
+/// Ask the configured classifier model for a tier. Any failure (model not
+/// servable, provider error, timeout, unparseable reply) returns `None`
+/// so the caller falls back to the heuristic.
+pub async fn llm_classify(
+    state: &AppState,
+    cfg: &LlmClassifierConfig,
+    features: &RequestFeatures,
+    excerpt: &str,
+) -> Option<ClassifierOverride> {
+    let provider = state.get_provider(&cfg.model)?;
+    let mut req =
+        CreateResponseRequest::text(cfg.model.clone(), classifier_prompt(features, excerpt));
+    req.temperature = Some(0.0);
+    req.max_output_tokens = Some(40);
+    let started = std::time::Instant::now();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_millis(cfg.timeout_ms.max(50)),
+        provider.complete(req),
+    )
+    .await;
+    let elapsed = started.elapsed();
+    match result {
+        Ok(Ok(resp)) => match parse_classifier_output(&resp.text()) {
+            Some(answer) => {
+                debug!(model = %cfg.model, tier = %answer.tier, confidence = answer.confidence,
+                       elapsed_ms = elapsed.as_millis() as u64, "llm classifier answered");
+                Some(ClassifierOverride {
+                    tier: answer.tier,
+                    classifier: format!("llm@{}", cfg.model),
+                    confidence: answer.confidence,
+                })
+            }
+            None => {
+                warn!(model = %cfg.model, "llm classifier: unparseable reply; using heuristic");
+                metrics::record_routing_failure("llm_unparseable");
+                None
+            }
+        },
+        Ok(Err(e)) => {
+            warn!(model = %cfg.model, error = %e, "llm classifier failed; using heuristic");
+            metrics::record_routing_failure("llm_error");
+            None
+        }
+        Err(_) => {
+            warn!(model = %cfg.model, timeout_ms = cfg.timeout_ms, "llm classifier timed out; using heuristic");
+            metrics::record_routing_failure("llm_timeout");
+            None
+        }
+    }
+}
+
 /// Resolve `model: "auto"` (or compute a shadow decision for a pinned
 /// model). Rewrites `request.model` when a real decision is applied.
 ///
@@ -141,6 +223,7 @@ pub async fn resolve_auto_model(
     state: &AppState,
     request: &mut CreateResponseRequest,
     organization_id: Option<uuid::Uuid>,
+    request_id: &str,
 ) -> Result<Option<AutoDecision>, (StatusCode, Json<ApiError>)> {
     let alias = parse_auto_model(&request.model);
     let Some(router) = state.auto_router() else {
@@ -201,9 +284,31 @@ pub async fn resolve_auto_model(
     };
     let oracle = GatewayEligibility::for_request(state, request);
 
-    match router.decide(request, &ctx, &oracle) {
+    // Optional LLM classifier for real `auto` requests (shadow decisions
+    // stay on the free heuristic).
+    let override_tier = if !shadow && router.effective_classifier(&ctx) == ClassifierKind::Llm {
+        let features = router.features(request);
+        llm_classify(
+            state,
+            &router.config().llm_classifier,
+            &features,
+            &last_user_excerpt(request),
+        )
+        .await
+    } else {
+        None
+    };
+
+    match router.decide_with_override(request, &ctx, &oracle, override_tier) {
         Ok(mut decision) => {
             decision.shadow = shadow;
+            crate::routes::routing_gold::maybe_collect(
+                state,
+                request,
+                &decision,
+                request_id,
+                organization_id,
+            );
             metrics::record_routing_decision(
                 decision.mode.as_str(),
                 decision.tier.as_str(),
@@ -463,6 +568,108 @@ mod tests {
         assert_eq!(routing["requested_model"], "llama3.3");
         assert_eq!(routing["selected"], "llama3.2");
         assert!(json["metadata"]["aura"].get("routing_strategy").is_none());
+    }
+
+    async fn state_with_llm_classifier(base_url: &str) -> AppState {
+        let mut config = Config::default();
+        config.providers.ollama_base_url = Some(base_url.to_string());
+        config.routing.auto = AutoRoutingConfig {
+            enabled: true,
+            tiers: ollama_tiers(),
+            default_classifier: aura_types::ClassifierKind::Llm,
+            llm_classifier: aura_core::router::auto::LlmClassifierConfig {
+                model: "phi3".into(),
+                timeout_ms: 2000,
+            },
+            ..Default::default()
+        };
+        AppState::new(config, None, None).await
+    }
+
+    #[tokio::test]
+    async fn llm_classifier_overrides_the_heuristic_tier() {
+        let server = MockServer::start().await;
+        // The classifier call goes to phi3 and answers "complex" for "hi".
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "phi3"})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(chat_completion(
+                "phi3",
+                "{\"tier\":\"complex\",\"confidence\":0.9}",
+            )))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "llama3.3"})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(chat_completion("llama3.3", "hello")),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = state_with_llm_classifier(&server.uri()).await;
+        let app = crate::routes::responses::router().with_state(state);
+        let (status, _headers, json) = post_responses(
+            app,
+            serde_json::json!({
+                "model": "auto",
+                "input": [{"type": "message", "role": "user", "content": "hi"}]
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["model"], "llama3.3");
+        let routing = &json["metadata"]["aura"]["routing"];
+        assert_eq!(routing["classifier"], "llm@phi3");
+        assert_eq!(routing["classified_tier"], "complex");
+        assert_eq!(routing["signals"]["classifier_confidence"], 0.9);
+        assert!(routing["reason"]
+            .as_str()
+            .unwrap()
+            .contains("heuristic said simple"));
+    }
+
+    #[tokio::test]
+    async fn llm_classifier_garbage_falls_back_to_heuristic() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "phi3"})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(chat_completion("phi3", "¯\\_(ツ)_/¯")),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "llama3.2"})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(chat_completion("llama3.2", "hello")),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = state_with_llm_classifier(&server.uri()).await;
+        let app = crate::routes::responses::router().with_state(state);
+        let (status, _headers, json) = post_responses(
+            app,
+            serde_json::json!({
+                "model": "auto",
+                "input": [{"type": "message", "role": "user", "content": "hi"}]
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["model"], "llama3.2");
+        assert_eq!(
+            json["metadata"]["aura"]["routing"]["classifier"],
+            "heuristic@v1"
+        );
     }
 
     #[tokio::test]

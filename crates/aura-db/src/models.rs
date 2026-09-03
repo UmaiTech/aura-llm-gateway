@@ -1004,3 +1004,70 @@ pub struct RoutingArmStat {
     pub observations: i32,
     pub updated_at: DateTime<Utc>,
 }
+
+/// Gold-label pair: one prompt answered by the cheap and strong tiers and
+/// graded by a judge model
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingGoldPair {
+    pub id: Uuid,
+    pub response_id: String,
+    pub organization_id: Option<Uuid>,
+    pub decided_tier: String,
+    pub heuristic_score: f64,
+    pub features: serde_json::Value,
+    pub prompt_hash: String,
+    pub user_text: Option<String>,
+    pub tier_a: String,
+    pub model_a: String,
+    pub text_a: Option<String>,
+    pub cost_a: Option<f64>,
+    pub latency_a_ms: Option<i32>,
+    pub tier_b: String,
+    pub model_b: String,
+    pub text_b: Option<String>,
+    pub cost_b: Option<f64>,
+    pub latency_b_ms: Option<i32>,
+    pub judge_model: String,
+    pub verdict: Option<String>,
+    pub judge_confidence: Option<f64>,
+    pub judge_rationale: Option<String>,
+    pub error: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// New gold-label pair for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewRoutingGoldPair {
+    pub response_id: String,
+    pub organization_id: Option<Uuid>,
+    pub decided_tier: String,
+    pub heuristic_score: f64,
+    pub features: serde_json::Value,
+    pub prompt_hash: String,
+    pub user_text: Option<String>,
+    pub tier_a: String,
+    pub model_a: String,
+    pub text_a: Option<String>,
+    pub cost_a: Option<f64>,
+    pub latency_a_ms: Option<i32>,
+    pub tier_b: String,
+    pub model_b: String,
+    pub text_b: Option<String>,
+    pub cost_b: Option<f64>,
+    pub latency_b_ms: Option<i32>,
+    pub judge_model: String,
+    pub verdict: Option<String>,
+    pub judge_confidence: Option<f64>,
+    pub judge_rationale: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Gold-label summary counts
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingGoldSummary {
+    pub total: i64,
+    pub cheap_sufficed: i64,
+    pub strong_better: i64,
+    pub ties: i64,
+    pub failed: i64,
+}

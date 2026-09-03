@@ -37,6 +37,8 @@ pub fn router() -> Router<AppState> {
         )
         .route("/admin/routing/rollup", post(run_routing_rollup))
         .route("/admin/routing/arms", get(get_routing_arms))
+        .route("/admin/routing/gold", get(get_routing_gold))
+        .route("/admin/routing/score", post(score_routing_request))
         .route("/admin/stats/features", get(get_feature_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
@@ -983,6 +985,76 @@ async fn run_routing_rollup(
                 Json(serde_json::json!({"error": e})),
             )
         })
+}
+
+#[derive(Debug, Deserialize)]
+struct LimitQuery {
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RoutingGoldResponse {
+    pub summary: aura_db::RoutingGoldSummary,
+    pub recent: Vec<aura_db::RoutingGoldPair>,
+}
+
+/// Gold-label pairs: summary counts and the most recent pairs.
+async fn get_routing_gold(
+    State(state): State<AppState>,
+    Query(q): Query<LimitQuery>,
+) -> Result<Json<RoutingGoldResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let db_err = |e: aura_db::DbError| {
+        tracing::error!("Failed to fetch routing gold pairs: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    };
+    let summary = aura_db::RoutingGoldPairRepo::summary(pool)
+        .await
+        .map_err(db_err)?;
+    let recent = aura_db::RoutingGoldPairRepo::recent(pool, q.limit.unwrap_or(25).clamp(1, 500))
+        .await
+        .map_err(db_err)?;
+    Ok(Json(RoutingGoldResponse { summary, recent }))
+}
+
+/// Dry-run the auto router on a request body: returns the decision
+/// without dispatching anything or recording it. Used by
+/// scripts/router/replay.py to re-score captured traffic.
+async fn score_routing_request(
+    State(state): State<AppState>,
+    Json(request): Json<aura_types::CreateResponseRequest>,
+) -> Result<Json<aura_core::AutoDecision>, (StatusCode, Json<serde_json::Value>)> {
+    let Some(router) = state.auto_router() else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "auto routing is not configured"})),
+        ));
+    };
+    let alias = aura_types::parse_auto_model(&request.model);
+    let ctx = aura_core::DecisionContext {
+        requested_model: &request.model,
+        alias_mode: alias.and_then(|a| a.mode),
+        options: request.routing.as_ref(),
+        previous_model: None,
+        shadow: true,
+    };
+    let oracle = crate::routes::auto_routing::GatewayEligibility::for_request(&state, &request);
+    match router.decide(&request, &ctx, &oracle) {
+        Ok(mut decision) => {
+            decision.shadow = alias.is_none();
+            Ok(Json(decision))
+        }
+        Err(e) => Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )),
+    }
 }
 
 /// Learned (tier, model) arm statistics used by Thompson sampling.
