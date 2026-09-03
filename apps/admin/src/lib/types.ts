@@ -93,6 +93,79 @@ export interface RoutingStats {
   failed_requests: number
 }
 
+// Auto-router (model: "auto") activity from /admin/stats/routing/auto
+export interface AutoRoutingTierStats {
+  shadow: boolean
+  tier: string
+  decisions: number
+  avg_score: number
+  completed: number
+  failed: number
+  actual_cost: number
+  estimated_savings: number
+  avg_latency_ms: number
+  avg_decision_us: number
+  top_model: string | null
+  approved: number
+  rejected: number
+}
+
+export interface AutoRoutingModelStats {
+  shadow: boolean
+  tier: string
+  selected_model: string
+  decisions: number
+  completed: number
+  actual_cost: number
+  estimated_savings: number
+  avg_latency_ms: number
+}
+
+export interface AutoRoutingSummary {
+  period: string
+  applied_decisions: number
+  shadow_decisions: number
+  applied_cost: number
+  estimated_savings: number
+  avg_decision_us: number
+  applied_success_rate: number
+}
+
+export interface RoutingOutcome {
+  response_id: string
+  provider_response_id: string | null
+  organization_id: string | null
+  conversation_id: string | null
+  requested_model: string
+  mode: string
+  classifier: string
+  score: number
+  classified_tier: string
+  tier: string
+  selected_model: string
+  selected_provider: string | null
+  reason: string
+  shadow: boolean
+  hard_filters: string[]
+  decision_latency_us: number
+  created_at: string
+  status: string | null
+  actual_model: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  cost_usd: number | null
+  latency_ms: number | null
+  feedback: string | null
+  estimated_savings_usd: number | null
+}
+
+export interface AutoRoutingStats {
+  summary: AutoRoutingSummary
+  by_tier: AutoRoutingTierStats[]
+  by_model: AutoRoutingModelStats[]
+  recent: RoutingOutcome[]
+}
+
 export interface TimelinePoint {
   timestamp: string
   request_count: number

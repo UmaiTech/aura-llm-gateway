@@ -170,6 +170,19 @@ routing:
 
 Feature `weights`, `token_thresholds` and every `keywords` list are configurable too; see `config.example.yaml` for the full block. Tier models the gateway cannot serve are dropped at startup with a warning.
 
+## Decision log
+
+Every decision, applied or shadow, is stored in the `routing_decisions` table (numeric features only, never prompt text) and joined with what actually happened in the `v_routing_outcomes` view: request status, tokens, cost, latency, explicit feedback, and for shadow rows an `estimated_savings_usd` computed from the pinned model's and the auto-selected model's blended prices at this request's token counts.
+
+Admin endpoints (bearer `AURA_ADMIN_KEY`):
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /admin/stats/routing/auto?period=24h\|7d\|all` | Summary (applied / shadow decisions, applied cost, estimated savings, decision latency, success rate), per-tier and per-model breakdowns, and the 25 most recent decisions with outcomes. |
+| `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`). |
+
+The admin app's Routing page renders the same data as an "Auto router" section.
+
 ## Metrics
 
 | Metric | Labels | Description |

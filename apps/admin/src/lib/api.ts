@@ -7,6 +7,7 @@ import type {
   ProviderHealth,
   CacheStats,
   RoutingStats,
+  AutoRoutingStats,
   TimelinePoint,
   RecentLog,
   OrganizationSummary,
@@ -104,6 +105,10 @@ export async function getCacheStats(): Promise<CacheStats> {
 
 export async function getRoutingStats(): Promise<RoutingStats[]> {
   return fetchApi<RoutingStats[]>('/admin/stats/routing')
+}
+
+export async function getAutoRoutingStats(period: TimeRange = '24h'): Promise<AutoRoutingStats> {
+  return fetchApi<AutoRoutingStats>(`/admin/stats/routing/auto?period=${period}`)
 }
 
 // Timelines

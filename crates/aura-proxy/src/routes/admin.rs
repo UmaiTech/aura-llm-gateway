@@ -30,6 +30,11 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/providers", get(get_provider_health))
         .route("/admin/stats/cache", get(get_cache_stats))
         .route("/admin/stats/routing", get(get_routing_stats))
+        .route("/admin/stats/routing/auto", get(get_auto_routing_stats))
+        .route(
+            "/admin/routing/decisions/{response_id}",
+            get(get_routing_decision),
+        )
         .route("/admin/stats/features", get(get_feature_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
@@ -173,6 +178,56 @@ pub struct RoutingStats {
     pub avg_latency_ms: i32,
     pub successful_requests: i64,
     pub failed_requests: i64,
+}
+
+/// Auto-router stats: one row per (shadow, tier).
+#[derive(Debug, Serialize)]
+pub struct AutoRoutingTierStats {
+    pub shadow: bool,
+    pub tier: String,
+    pub decisions: i64,
+    pub avg_score: f64,
+    pub completed: i64,
+    pub failed: i64,
+    pub actual_cost: f64,
+    pub estimated_savings: f64,
+    pub avg_latency_ms: i32,
+    pub avg_decision_us: i32,
+    pub top_model: Option<String>,
+    pub approved: i64,
+    pub rejected: i64,
+}
+
+/// Auto-router stats: one row per selected model.
+#[derive(Debug, Serialize)]
+pub struct AutoRoutingModelStats {
+    pub shadow: bool,
+    pub tier: String,
+    pub selected_model: String,
+    pub decisions: i64,
+    pub completed: i64,
+    pub actual_cost: f64,
+    pub estimated_savings: f64,
+    pub avg_latency_ms: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AutoRoutingSummary {
+    pub period: String,
+    pub applied_decisions: i64,
+    pub shadow_decisions: i64,
+    pub applied_cost: f64,
+    pub estimated_savings: f64,
+    pub avg_decision_us: i32,
+    pub applied_success_rate: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AutoRoutingStats {
+    pub summary: AutoRoutingSummary,
+    pub by_tier: Vec<AutoRoutingTierStats>,
+    pub by_model: Vec<AutoRoutingModelStats>,
+    pub recent: Vec<aura_db::RoutingOutcome>,
 }
 
 #[derive(Debug, Serialize)]
@@ -735,6 +790,185 @@ async fn get_cache_stats(
         total_cached_tokens: row.try_get("total_cached_tokens").unwrap_or(0),
         estimated_savings: row.try_get::<f64, _>("estimated_savings").unwrap_or(0.0),
     }))
+}
+
+/// Auto-router activity: summary, per-tier and per-model breakdowns, and
+/// the most recent decisions with their outcomes.
+async fn get_auto_routing_stats(
+    State(state): State<AppState>,
+    Query(params): Query<PeriodQuery>,
+) -> Result<Json<AutoRoutingStats>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let interval = params.to_interval();
+    let db_err = |e: sqlx::Error| {
+        tracing::error!("Failed to fetch auto routing stats: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    };
+
+    let summary_row = sqlx::query(&format!(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE NOT shadow) AS applied_decisions,
+            COUNT(*) FILTER (WHERE shadow) AS shadow_decisions,
+            COALESCE(SUM(cost_usd) FILTER (WHERE NOT shadow), 0)::FLOAT8 AS applied_cost,
+            COALESCE(SUM(estimated_savings_usd) FILTER (WHERE shadow), 0)::FLOAT8 AS estimated_savings,
+            COALESCE(AVG(decision_latency_us), 0)::INT AS avg_decision_us,
+            CASE WHEN COUNT(*) FILTER (WHERE NOT shadow AND status IS NOT NULL) > 0
+                THEN (COUNT(*) FILTER (WHERE NOT shadow AND status = 'completed')::FLOAT8
+                      / COUNT(*) FILTER (WHERE NOT shadow AND status IS NOT NULL) * 100)
+                ELSE 100.0
+            END AS applied_success_rate
+        FROM v_routing_outcomes
+        WHERE created_at >= NOW() - INTERVAL '{}'
+        "#,
+        interval
+    ))
+    .fetch_one(pool)
+    .await
+    .map_err(db_err)?;
+
+    let summary = AutoRoutingSummary {
+        period: params.period_str().to_string(),
+        applied_decisions: summary_row.try_get("applied_decisions").unwrap_or(0),
+        shadow_decisions: summary_row.try_get("shadow_decisions").unwrap_or(0),
+        applied_cost: summary_row.try_get("applied_cost").unwrap_or(0.0),
+        estimated_savings: summary_row.try_get("estimated_savings").unwrap_or(0.0),
+        avg_decision_us: summary_row.try_get("avg_decision_us").unwrap_or(0),
+        applied_success_rate: summary_row.try_get("applied_success_rate").unwrap_or(100.0),
+    };
+
+    let tier_rows = sqlx::query(&format!(
+        r#"
+        SELECT
+            shadow,
+            tier,
+            COUNT(*) AS decisions,
+            COALESCE(AVG(score), 0)::FLOAT8 AS avg_score,
+            COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+            COUNT(*) FILTER (WHERE status IS NOT NULL AND status != 'completed') AS failed,
+            COALESCE(SUM(cost_usd), 0)::FLOAT8 AS actual_cost,
+            COALESCE(SUM(estimated_savings_usd), 0)::FLOAT8 AS estimated_savings,
+            COALESCE(AVG(latency_ms), 0)::INT AS avg_latency_ms,
+            COALESCE(AVG(decision_latency_us), 0)::INT AS avg_decision_us,
+            MODE() WITHIN GROUP (ORDER BY selected_model) AS top_model,
+            COUNT(*) FILTER (WHERE feedback = 'approved') AS approved,
+            COUNT(*) FILTER (WHERE feedback = 'rejected') AS rejected
+        FROM v_routing_outcomes
+        WHERE created_at >= NOW() - INTERVAL '{}'
+        GROUP BY shadow, tier
+        ORDER BY shadow, CASE tier
+            WHEN 'simple' THEN 0 WHEN 'medium' THEN 1 WHEN 'complex' THEN 2 ELSE 3 END
+        "#,
+        interval
+    ))
+    .fetch_all(pool)
+    .await
+    .map_err(db_err)?;
+
+    let by_tier = tier_rows
+        .iter()
+        .map(|r| AutoRoutingTierStats {
+            shadow: r.try_get("shadow").unwrap_or(false),
+            tier: r.try_get("tier").unwrap_or_default(),
+            decisions: r.try_get("decisions").unwrap_or(0),
+            avg_score: r.try_get("avg_score").unwrap_or(0.0),
+            completed: r.try_get("completed").unwrap_or(0),
+            failed: r.try_get("failed").unwrap_or(0),
+            actual_cost: r.try_get("actual_cost").unwrap_or(0.0),
+            estimated_savings: r.try_get("estimated_savings").unwrap_or(0.0),
+            avg_latency_ms: r.try_get("avg_latency_ms").unwrap_or(0),
+            avg_decision_us: r.try_get("avg_decision_us").unwrap_or(0),
+            top_model: r.try_get("top_model").ok(),
+            approved: r.try_get("approved").unwrap_or(0),
+            rejected: r.try_get("rejected").unwrap_or(0),
+        })
+        .collect();
+
+    let model_rows = sqlx::query(&format!(
+        r#"
+        SELECT
+            shadow,
+            tier,
+            selected_model,
+            COUNT(*) AS decisions,
+            COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+            COALESCE(SUM(cost_usd), 0)::FLOAT8 AS actual_cost,
+            COALESCE(SUM(estimated_savings_usd), 0)::FLOAT8 AS estimated_savings,
+            COALESCE(AVG(latency_ms), 0)::INT AS avg_latency_ms
+        FROM v_routing_outcomes
+        WHERE created_at >= NOW() - INTERVAL '{}'
+        GROUP BY shadow, tier, selected_model
+        ORDER BY decisions DESC
+        LIMIT 50
+        "#,
+        interval
+    ))
+    .fetch_all(pool)
+    .await
+    .map_err(db_err)?;
+
+    let by_model = model_rows
+        .iter()
+        .map(|r| AutoRoutingModelStats {
+            shadow: r.try_get("shadow").unwrap_or(false),
+            tier: r.try_get("tier").unwrap_or_default(),
+            selected_model: r.try_get("selected_model").unwrap_or_default(),
+            decisions: r.try_get("decisions").unwrap_or(0),
+            completed: r.try_get("completed").unwrap_or(0),
+            actual_cost: r.try_get("actual_cost").unwrap_or(0.0),
+            estimated_savings: r.try_get("estimated_savings").unwrap_or(0.0),
+            avg_latency_ms: r.try_get("avg_latency_ms").unwrap_or(0),
+        })
+        .collect();
+
+    let recent = aura_db::RoutingDecisionRepo::recent_outcomes(pool, 25, None)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch recent routing decisions: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+
+    Ok(Json(AutoRoutingStats {
+        summary,
+        by_tier,
+        by_model,
+        recent,
+    }))
+}
+
+/// One auto-router decision, by gateway request id (`aura_...`) or
+/// provider response id (`resp_...`).
+async fn get_routing_decision(
+    State(state): State<AppState>,
+    Path(response_id): Path<String>,
+) -> Result<Json<aura_db::RoutingDecision>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    match aura_db::RoutingDecisionRepo::find_by_response_id(pool, &response_id).await {
+        Ok(Some(d)) => Ok(Json(d)),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "No routing decision for this response"})),
+        )),
+        Err(e) => {
+            tracing::error!("Failed to fetch routing decision: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            ))
+        }
+    }
 }
 
 async fn get_routing_stats(

@@ -875,6 +875,8 @@ pub async fn create_response(
                                     let response_bg = response.clone();
                                     let request_bg = request_clone.clone();
                                     let auth_bg = auth_clone.clone();
+                                    let auto_decision_bg = auto_decision_clone.clone();
+                                    let request_id_bg = request_id_clone.clone();
                                     let response_id_for_diag = response.id.clone();
                                     tokio::spawn(async move {
                                         info!(
@@ -898,6 +900,15 @@ pub async fn create_response(
                                         }
                                         state_bg.log_request(log).await;
                                         state_bg
+                                            .record_routing_decision(
+                                                auto_decision_bg.as_ref(),
+                                                &request_id_bg,
+                                                Some(&response_bg.id),
+                                                auth_bg.as_ref(),
+                                                Some(conv_id),
+                                            )
+                                            .await;
+                                        state_bg
                                             .save_messages_from_items(
                                                 conv_id,
                                                 &response_bg.id,
@@ -909,6 +920,8 @@ pub async fn create_response(
                                     let auth_bg = auth_clone.clone();
                                     let response_bg = response.clone();
                                     let request_bg = request_clone.clone();
+                                    let auto_decision_bg = auto_decision_clone.clone();
+                                    let request_id_bg = request_id_clone.clone();
                                     let response_id_for_diag = response.id.clone();
                                     tokio::spawn({
                                         let state = state_clone.clone();
@@ -930,6 +943,15 @@ pub async fn create_response(
                                                     .await;
                                             }
                                             state.log_request(log).await;
+                                            state
+                                                .record_routing_decision(
+                                                    auto_decision_bg.as_ref(),
+                                                    &request_id_bg,
+                                                    Some(&response_bg.id),
+                                                    auth_bg.as_ref(),
+                                                    None,
+                                                )
+                                                .await;
                                         }
                                     });
                                 }
@@ -977,6 +999,8 @@ pub async fn create_response(
                                 let request_bg = request_clone.clone();
                                 let auth_bg = auth_clone.clone();
                                 let conv_id_opt = conversation_id;
+                                let auto_decision_bg = auto_decision_clone.clone();
+                                let request_id_bg = request_id_clone.clone();
                                 tokio::spawn(async move {
                                     if let Some(auth) = &auth_bg {
                                         state_bg
@@ -984,6 +1008,15 @@ pub async fn create_response(
                                             .await;
                                     }
                                     state_bg.log_request(log).await;
+                                    state_bg
+                                        .record_routing_decision(
+                                            auto_decision_bg.as_ref(),
+                                            &request_id_bg,
+                                            Some(&response_bg.id),
+                                            auth_bg.as_ref(),
+                                            conv_id_opt,
+                                        )
+                                        .await;
                                     if let Some(conv_id) = conv_id_opt {
                                         state_bg
                                             .save_response(conv_id, &request_bg, &response_bg)
@@ -1035,6 +1068,8 @@ pub async fn create_response(
                                 let request_bg = request_clone.clone();
                                 let auth_bg = auth_clone.clone();
                                 let conv_id_opt = conversation_id;
+                                let auto_decision_bg = auto_decision_clone.clone();
+                                let request_id_bg = request_id_clone.clone();
                                 tokio::spawn(async move {
                                     if let Some(auth) = &auth_bg {
                                         state_bg
@@ -1042,6 +1077,15 @@ pub async fn create_response(
                                             .await;
                                     }
                                     state_bg.log_request(log).await;
+                                    state_bg
+                                        .record_routing_decision(
+                                            auto_decision_bg.as_ref(),
+                                            &request_id_bg,
+                                            Some(&response_bg.id),
+                                            auth_bg.as_ref(),
+                                            conv_id_opt,
+                                        )
+                                        .await;
                                     if let Some(conv_id) = conv_id_opt {
                                         state_bg
                                             .save_response(conv_id, &request_bg, &response_bg)
@@ -1225,7 +1269,21 @@ pub async fn create_response(
                 };
                 tokio::spawn({
                     let state = state.clone();
-                    async move { state.log_request(log).await }
+                    let auto_decision_bg = auto_decision.clone();
+                    let request_id_bg = request_id.clone();
+                    let auth_bg = auth_context.clone();
+                    async move {
+                        state.log_request(log).await;
+                        state
+                            .record_routing_decision(
+                                auto_decision_bg.as_ref(),
+                                &request_id_bg,
+                                None,
+                                auth_bg.as_ref(),
+                                conversation_id,
+                            )
+                            .await;
+                    }
                 });
 
                 ApiError::from_provider_error(&e)
@@ -1382,6 +1440,8 @@ pub async fn create_response(
         let response_for_bg = response.clone();
         let request_for_bg = request.clone();
         let auth_for_bg = auth_context.clone();
+        let auto_decision_for_bg = auto_decision.clone();
+        let request_id_for_bg = log.response_id.clone();
         let response_id_for_diag = response.id.clone();
 
         // Spawn background tasks for persistence (non-blocking)
@@ -1403,6 +1463,17 @@ pub async fn create_response(
             }
             // Log to request_logs
             state_for_bg.log_request(log).await;
+
+            // Record the auto-routing decision with the provider response id
+            state_for_bg
+                .record_routing_decision(
+                    auto_decision_for_bg.as_ref(),
+                    &request_id_for_bg,
+                    Some(&response_for_bg.id),
+                    auth_for_bg.as_ref(),
+                    conversation_id,
+                )
+                .await;
 
             // Save per-message rows for the conversation view
             if let Some(conv_id) = conversation_id {

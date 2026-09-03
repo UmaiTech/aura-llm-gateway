@@ -861,3 +861,91 @@ impl NewFeedbackSample {
         self
     }
 }
+
+/// Auto-router decision record
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingDecision {
+    pub id: Uuid,
+    pub response_id: String,
+    pub provider_response_id: Option<String>,
+    pub organization_id: Option<Uuid>,
+    pub api_key_id: Option<Uuid>,
+    pub conversation_id: Option<Uuid>,
+    pub requested_model: String,
+    pub mode: String,
+    pub classifier: String,
+    pub score: f64,
+    pub raw_score: f64,
+    pub classified_tier: String,
+    pub tier: String,
+    pub selected_model: String,
+    pub selected_provider: Option<String>,
+    pub reason: String,
+    pub shadow: bool,
+    pub features: serde_json::Value,
+    pub signals: serde_json::Value,
+    pub hard_filters: Vec<String>,
+    pub candidates: serde_json::Value,
+    pub requested_blended_per_million: Option<f64>,
+    pub selected_blended_per_million: Option<f64>,
+    pub decision_latency_us: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+/// New auto-router decision for insertion (upserted on `response_id`)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewRoutingDecision {
+    pub response_id: String,
+    pub provider_response_id: Option<String>,
+    pub organization_id: Option<Uuid>,
+    pub api_key_id: Option<Uuid>,
+    pub conversation_id: Option<Uuid>,
+    pub requested_model: String,
+    pub mode: String,
+    pub classifier: String,
+    pub score: f64,
+    pub raw_score: f64,
+    pub classified_tier: String,
+    pub tier: String,
+    pub selected_model: String,
+    pub selected_provider: Option<String>,
+    pub reason: String,
+    pub shadow: bool,
+    pub features: serde_json::Value,
+    pub signals: serde_json::Value,
+    pub hard_filters: Vec<String>,
+    pub candidates: serde_json::Value,
+    pub requested_blended_per_million: Option<f64>,
+    pub selected_blended_per_million: Option<f64>,
+    pub decision_latency_us: i32,
+}
+
+/// One decision joined with its outcome (`v_routing_outcomes`)
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingOutcome {
+    pub response_id: String,
+    pub provider_response_id: Option<String>,
+    pub organization_id: Option<Uuid>,
+    pub conversation_id: Option<Uuid>,
+    pub requested_model: String,
+    pub mode: String,
+    pub classifier: String,
+    pub score: f64,
+    pub classified_tier: String,
+    pub tier: String,
+    pub selected_model: String,
+    pub selected_provider: Option<String>,
+    pub reason: String,
+    pub shadow: bool,
+    pub hard_filters: Vec<String>,
+    pub decision_latency_us: i32,
+    pub created_at: DateTime<Utc>,
+    pub status: Option<String>,
+    pub actual_model: Option<String>,
+    pub input_tokens: Option<i32>,
+    pub output_tokens: Option<i32>,
+    pub cost_usd: Option<f64>,
+    pub latency_ms: Option<i32>,
+    pub feedback: Option<String>,
+    pub estimated_savings_usd: Option<f64>,
+}
