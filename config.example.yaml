@@ -155,6 +155,16 @@ routing:
     gold_sample_rate: 0.0
     gold_judge_model: claude-sonnet-4-6
     gold_max_text_chars: 4000
+    # Escalation after provider failures on auto-routed requests, and the
+    # per-model circuit breaker that keeps a struggling model out of the
+    # candidate set for a while.
+    escalation:
+      enabled: true
+      max_attempts: 1
+      on_errors: [rate_limit_exceeded, service_unavailable, timeout, network_error, model_not_found, internal_error]
+      breaker_failures: 3
+      breaker_window_secs: 60
+      breaker_cooldown_secs: 30
     # Learned classifier weights (scripts/router/train.py) for gateways
     # without a database; the active router_models row wins when present.
     # learned_weights_file: /etc/aura/router-weights.json

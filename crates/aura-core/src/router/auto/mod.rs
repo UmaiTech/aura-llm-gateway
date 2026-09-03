@@ -48,8 +48,6 @@ pub use outcomes::{
 pub use scorer::{HeuristicScorer, ScoreResult, HEURISTIC_VERSION};
 pub use tiers::{CandidateInfo, Eligibility, TierCatalog, TierSelection};
 
-pub use self::ClassifierOverride as TierOverride;
-
 use aura_types::{ClassifierKind, CreateResponseRequest, RoutingMode, RoutingOptions, Tier};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -81,6 +79,21 @@ pub struct ClassifierOverride {
     pub classifier: String,
     /// Confidence in `[0, 1]`.
     pub confidence: f64,
+}
+
+/// One escalation step taken after a provider failure.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Escalation {
+    /// Model that failed.
+    pub from_model: String,
+    /// Tier it was in.
+    pub from_tier: Tier,
+    /// Model tried next.
+    pub to_model: String,
+    /// Tier it is in.
+    pub to_tier: Tier,
+    /// Provider error code that triggered the step.
+    pub error_code: String,
 }
 
 /// A recorded routing decision. Serialised into `metadata.aura.routing`
@@ -120,6 +133,9 @@ pub struct AutoDecision {
     pub shadow: bool,
     /// Wall time spent deciding.
     pub latency_us: u64,
+    /// Escalations taken after provider failures, oldest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub escalations: Vec<Escalation>,
 }
 
 /// Why no model could be selected.
@@ -342,6 +358,7 @@ impl AutoRouter {
                         reason: "kept previous turn's model inside tool loop".into(),
                         shadow: ctx.shadow,
                         latency_us: started.elapsed().as_micros() as u64,
+                        escalations: Vec::new(),
                     });
                 }
             }
@@ -378,7 +395,60 @@ impl AutoRouter {
             reason,
             shadow: ctx.shadow,
             latency_us: started.elapsed().as_micros() as u64,
+            escalations: Vec::new(),
         })
+    }
+}
+
+impl AutoRouter {
+    /// After a provider failure, pick the next model to try: another
+    /// eligible candidate in the decision's tier first, then tiers above it
+    /// up to the request's `max_tier`. Models in `exclude` (those that
+    /// already failed) are skipped. Returns `None` when nothing is left.
+    pub fn next_candidate(
+        &self,
+        decision: &AutoDecision,
+        options: Option<&RoutingOptions>,
+        oracle: &dyn Eligibility,
+        exclude: &[String],
+    ) -> Option<TierSelection> {
+        let max_tier = options.and_then(|o| o.max_tier).unwrap_or(Tier::Reasoning);
+        let max_tier = max_tier.max(decision.tier);
+        let filtered = FilteredOracle {
+            inner: oracle,
+            options,
+        };
+        let excluding = ExcludingOracle {
+            inner: &filtered,
+            exclude,
+        };
+        self.catalog
+            .select(decision.tier, decision.tier, max_tier, &excluding)
+    }
+
+    /// Apply an escalation to a decision in place: the selected model,
+    /// tier and provider move to the new candidate and the step is
+    /// recorded.
+    pub fn apply_escalation(
+        decision: &mut AutoDecision,
+        selection: TierSelection,
+        error_code: &str,
+    ) {
+        decision.escalations.push(Escalation {
+            from_model: decision.selected.clone(),
+            from_tier: decision.tier,
+            to_model: selection.model.clone(),
+            to_tier: selection.tier,
+            error_code: error_code.to_string(),
+        });
+        decision.reason = format!(
+            "{}; escalated from {} after {}: {}",
+            decision.reason, decision.selected, error_code, selection.reason
+        );
+        decision.tier = selection.tier;
+        decision.selected = selection.model;
+        decision.selected_provider = selection.provider;
+        decision.candidates.extend(selection.candidates);
     }
 }
 
@@ -405,6 +475,34 @@ impl Eligibility for FilteredOracle<'_> {
 
     fn provider_of(&self, model: &str) -> Option<String> {
         self.inner.provider_of(model)
+    }
+
+    fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
+        self.inner.arm_stats(tier, model)
+    }
+}
+
+/// Wraps an oracle to reject models that already failed this request.
+struct ExcludingOracle<'a> {
+    inner: &'a dyn Eligibility,
+    exclude: &'a [String],
+}
+
+impl Eligibility for ExcludingOracle<'_> {
+    fn is_eligible(&self, model: &str) -> bool {
+        !self.exclude.iter().any(|m| m == model) && self.inner.is_eligible(model)
+    }
+
+    fn blended_cost_per_million(&self, model: &str) -> Option<f64> {
+        self.inner.blended_cost_per_million(model)
+    }
+
+    fn provider_of(&self, model: &str) -> Option<String> {
+        self.inner.provider_of(model)
+    }
+
+    fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
+        self.inner.arm_stats(tier, model)
     }
 }
 
@@ -712,6 +810,45 @@ mod tests {
         assert!(d.reason.contains("heuristic said simple"));
         // The heuristic score is still there for comparison.
         assert!(d.raw_score < 0.0);
+    }
+
+    #[test]
+    fn next_candidate_stays_in_tier_then_escalates() {
+        let r = router();
+        let req = CreateResponseRequest::text("auto", "What is the capital of France?");
+        let mut d = r.decide(&req, &ctx("auto", None), &oracle()).unwrap();
+        assert_eq!(d.selected, "gemini-3.1-flash-lite");
+
+        // Same tier first: the next cheapest simple model.
+        let failed = vec![d.selected.clone()];
+        let sel = r.next_candidate(&d, None, &oracle(), &failed).unwrap();
+        assert_eq!(sel.tier, Tier::Simple);
+        assert_eq!(sel.model, "gpt-5.4-nano");
+        AutoRouter::apply_escalation(&mut d, sel, "service_unavailable");
+        assert_eq!(d.selected, "gpt-5.4-nano");
+        assert_eq!(d.escalations.len(), 1);
+        assert_eq!(d.escalations[0].from_model, "gemini-3.1-flash-lite");
+        assert!(d
+            .reason
+            .contains("escalated from gemini-3.1-flash-lite after service_unavailable"));
+
+        // Exhaust the tier: moves up to medium.
+        let failed = vec![
+            "gemini-3.1-flash-lite".to_string(),
+            "gpt-5.4-nano".to_string(),
+            "claude-haiku-4-5".to_string(),
+        ];
+        let sel = r.next_candidate(&d, None, &oracle(), &failed).unwrap();
+        assert_eq!(sel.tier, Tier::Medium);
+
+        // max_tier caps it.
+        let opts = RoutingOptions {
+            max_tier: Some(Tier::Simple),
+            ..Default::default()
+        };
+        assert!(r
+            .next_candidate(&d, Some(&opts), &oracle(), &failed)
+            .is_none());
     }
 
     #[test]

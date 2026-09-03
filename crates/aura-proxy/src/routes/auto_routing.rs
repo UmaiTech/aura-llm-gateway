@@ -86,6 +86,9 @@ impl Eligibility for GatewayEligibility<'_> {
         if self.state.provider_name_for_catalog_model(model).is_none() {
             return false;
         }
+        if self.state.is_model_breaker_open(model) {
+            return false;
+        }
         let entry = self.state.model_catalog().get(model);
         let vision_ok = entry
             .map(|e| e.supports_vision())
@@ -398,6 +401,47 @@ pub async fn resolve_auto_model(
     }
 }
 
+/// After a provider failure on an auto-routed request, pick the next model
+/// and rewrite the request. Returns the provider to retry with, or `None`
+/// when escalation doesn't apply (not auto-routed, disabled, wrong error,
+/// attempts exhausted, nothing eligible). Always feeds the breaker.
+pub fn escalate_after_failure(
+    state: &AppState,
+    request: &mut CreateResponseRequest,
+    decision: &mut Option<AutoDecision>,
+    error: &aura_core::ProviderError,
+    attempt: u32,
+) -> Option<std::sync::Arc<dyn aura_core::Provider>> {
+    let failed_model = request.model.clone();
+    state.record_model_failure(&failed_model);
+
+    let d = decision.as_mut().filter(|d| !d.shadow)?;
+    let router = state.auto_router()?;
+    let cfg = &router.config().escalation;
+    let code = error.error_code();
+    if !cfg.triggers_on(code) || attempt >= cfg.max_attempts {
+        return None;
+    }
+    let mut exclude: Vec<String> = d.escalations.iter().map(|e| e.from_model.clone()).collect();
+    exclude.push(failed_model.clone());
+    let oracle = GatewayEligibility::for_request(state, request);
+    let selection = router.next_candidate(d, request.routing.as_ref(), &oracle, &exclude)?;
+    let provider = state.get_provider(&selection.model)?;
+    warn!(
+        from = %failed_model,
+        to = %selection.model,
+        tier = %selection.tier,
+        error_code = code,
+        attempt,
+        "auto routing: escalating after provider failure"
+    );
+    metrics::record_routing_escalation(d.tier.as_str(), selection.tier.as_str(), code);
+    let to_model = selection.model.clone();
+    aura_core::AutoRouter::apply_escalation(d, selection, code);
+    request.model = to_model;
+    Some(provider)
+}
+
 /// Header pair announcing the selected model, when a decision was applied.
 pub fn selected_model_header(decision: Option<&AutoDecision>) -> Option<(HeaderName, HeaderValue)> {
     let d = decision?;
@@ -697,6 +741,109 @@ mod tests {
             json["metadata"]["aura"]["routing"]["classifier"],
             "heuristic@v1"
         );
+    }
+
+    #[tokio::test]
+    async fn provider_failure_escalates_to_next_candidate() {
+        let server = MockServer::start().await;
+        // Cheapest simple candidate (config order, no prices) fails hard.
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "llama3.2"})))
+            .respond_with(ResponseTemplate::new(503).set_body_json(serde_json::json!({
+                "error": {"message": "overloaded", "type": "server_error"}
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+        // The other simple candidate answers.
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "phi3"})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(chat_completion("phi3", "Paris")),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = state_with_router(&server.uri(), true).await;
+        let app = crate::routes::responses::router().with_state(state.clone());
+        let (status, headers, json) = post_responses(
+            app,
+            serde_json::json!({
+                "model": "auto",
+                "input": [{"type": "message", "role": "user", "content": "What is the capital of France?"}]
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["model"], "phi3");
+        assert_eq!(
+            headers
+                .get(SELECTED_MODEL_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("phi3")
+        );
+        let routing = &json["metadata"]["aura"]["routing"];
+        assert_eq!(routing["selected"], "phi3");
+        assert_eq!(routing["tier"], "simple");
+        let esc = routing["escalations"].as_array().unwrap();
+        assert_eq!(esc.len(), 1);
+        assert_eq!(esc[0]["from_model"], "llama3.2");
+        assert_eq!(esc[0]["to_model"], "phi3");
+        assert_eq!(esc[0]["error_code"], "service_unavailable");
+        assert!(routing["reason"]
+            .as_str()
+            .unwrap()
+            .contains("escalated from llama3.2"));
+        assert_eq!(json["metadata"]["aura"]["routing_strategy"], "auto:simple");
+        // One failure does not open the breaker (default threshold 3).
+        assert!(!state.is_model_breaker_open("llama3.2"));
+    }
+
+    #[tokio::test]
+    async fn escalation_respects_max_attempts() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(503).set_body_json(serde_json::json!({
+                "error": {"message": "overloaded", "type": "server_error"}
+            })))
+            .expect(2)
+            .mount(&server)
+            .await;
+        let state = state_with_router(&server.uri(), true).await;
+        let app = crate::routes::responses::router().with_state(state);
+        let (status, _headers, json) = post_responses(
+            app,
+            serde_json::json!({
+                "model": "auto",
+                "input": [{"type": "message", "role": "user", "content": "hi"}]
+            }),
+        )
+        .await;
+        // First choice + one escalation, then the error surfaces.
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{json}");
+    }
+
+    #[tokio::test]
+    async fn breaker_opens_after_repeated_failures_and_excludes_the_model() {
+        let server = MockServer::start().await;
+        let state = state_with_router(&server.uri(), true).await;
+        assert!(!state.record_model_failure("llama3.2"));
+        assert!(!state.record_model_failure("llama3.2"));
+        assert!(state.record_model_failure("llama3.2"));
+        assert!(state.is_model_breaker_open("llama3.2"));
+
+        let req = CreateResponseRequest::text("auto", "hi");
+        let oracle = GatewayEligibility::for_request(&state, &req);
+        assert!(!oracle.is_eligible("llama3.2"));
+        assert!(oracle.is_eligible("phi3"));
+
+        state.record_model_success("llama3.2");
+        assert!(!state.is_model_breaker_open("llama3.2"));
+        assert!(oracle.is_eligible("llama3.2"));
     }
 
     #[tokio::test]

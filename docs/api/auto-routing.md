@@ -132,6 +132,12 @@ Capabilities and context windows come from the gateway's model catalog: the `mod
 
 If no candidate in the chosen tier is eligible, the router escalates to the next tier up, then falls back to lower tiers, within `min_tier` / `max_tier`. If nothing is eligible at all the request fails with `503 no_eligible_model`.
 
+### Escalation after provider failures
+
+When an auto-routed request fails before any output is produced (the error code is one of `routing.auto.escalation.on_errors`, by default rate limits, 5xx, timeouts, network errors, model-not-found and internal errors), the gateway retries on the next candidate: another eligible model in the same tier first, then tiers above it up to the request's `max_tier`, at most `max_attempts` times (default 1). The decision then carries an `escalations` list (`from_model`, `from_tier`, `to_model`, `to_tier`, `error_code`), `selected` / `tier` reflect the model that answered, and `aura_routing_escalations_total{from_tier,to_tier,error_type}` increments. Streaming requests escalate only on failures before the first event.
+
+Every auto-routing provider failure also feeds a per-model circuit breaker: `breaker_failures` failures (default 3) within `breaker_window_secs` (60) make the model ineligible for `breaker_cooldown_secs` (30), so a struggling model stops being selected before every request has to escalate off it. A successful call after an escalation clears the target model's failure history.
+
 ### Tool loops
 
 Switching models mid tool loop breaks agent runs, so continuation turns (a request carrying `function_call_output` items and `previous_response_id`) keep the previous turn's model as long as it is eligible and at least as strong as the tier the new turn scored. Set `routing.sticky: false` to opt out.
@@ -215,6 +221,13 @@ routing:
     gold_judge_model: claude-sonnet-4-6
     gold_max_text_chars: 4000
     learned_weights_file: null       # or /etc/aura/router-weights.json
+    escalation:
+      enabled: true
+      max_attempts: 1
+      on_errors: [rate_limit_exceeded, service_unavailable, timeout, network_error, model_not_found, internal_error]
+      breaker_failures: 3
+      breaker_window_secs: 60
+      breaker_cooldown_secs: 30
 ```
 
 Feature `weights`, `token_thresholds` and every `keywords` list are configurable too; see `config.example.yaml` for the full block. Tier models the gateway cannot serve are dropped at startup with a warning.
@@ -284,6 +297,7 @@ With `within_tier: thompson`, the gateway keeps Beta(α, β) statistics per (tie
 | `aura_routing_decisions_total` | `mode`, `tier`, `classifier`, `model`, `shadow` | Decisions made, applied and shadow. |
 | `aura_routing_classifier_seconds` | `classifier` | Time spent classifying. |
 | `aura_routing_failures_total` | `reason` | Requests that could not be routed. |
+| `aura_routing_escalations_total` | `from_tier`, `to_tier`, `error_type` | Escalations after provider failures. |
 
 `routing_strategy` is stamped as `auto:<tier>` for applied decisions, so the existing `/admin/stats/routing` view and the admin Routing page group auto traffic per tier.
 

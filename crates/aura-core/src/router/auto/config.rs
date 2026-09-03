@@ -62,6 +62,8 @@ pub struct AutoRoutingConfig {
     pub gold_judge_model: String,
     /// Gold labels: characters of each text stored and sent to the judge.
     pub gold_max_text_chars: usize,
+    /// Escalation after provider failures and the per-model circuit breaker.
+    pub escalation: EscalationConfig,
     /// Learned classifier: path to a weights JSON file produced by
     /// `scripts/router/train.py`, for gateways without a database or to
     /// pin a model. The active row in `router_models` takes precedence.
@@ -92,8 +94,59 @@ impl Default for AutoRoutingConfig {
             gold_sample_rate: 0.0,
             gold_judge_model: "claude-sonnet-4-6".to_string(),
             gold_max_text_chars: 4000,
+            escalation: EscalationConfig::default(),
             learned_weights_file: None,
         }
+    }
+}
+
+/// Escalation after provider failures.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct EscalationConfig {
+    /// Retry an auto-routed request on another model when the provider
+    /// fails before any output was produced.
+    pub enabled: bool,
+    /// Maximum escalation steps per request.
+    pub max_attempts: u32,
+    /// Provider error codes that trigger an escalation.
+    pub on_errors: Vec<String>,
+    /// Circuit breaker: failures within `breaker_window_secs` that open
+    /// the breaker for a model.
+    pub breaker_failures: u32,
+    /// Circuit breaker: window for counting failures.
+    pub breaker_window_secs: u64,
+    /// Circuit breaker: how long a model stays ineligible once open.
+    pub breaker_cooldown_secs: u64,
+}
+
+impl Default for EscalationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_attempts: 1,
+            on_errors: [
+                "rate_limit_exceeded",
+                "service_unavailable",
+                "timeout",
+                "network_error",
+                "model_not_found",
+                "internal_error",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+            breaker_failures: 3,
+            breaker_window_secs: 60,
+            breaker_cooldown_secs: 30,
+        }
+    }
+}
+
+impl EscalationConfig {
+    /// Whether an error code should trigger escalation.
+    pub fn triggers_on(&self, error_code: &str) -> bool {
+        self.enabled && self.on_errors.iter().any(|c| c == error_code)
     }
 }
 

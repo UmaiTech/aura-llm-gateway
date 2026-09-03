@@ -64,6 +64,17 @@ pub struct AppState {
     arm_stats: Arc<std::sync::RwLock<HashMap<(String, String), ArmStats>>>,
     /// Active learned classifier (`classifier: learned`), if any.
     learned_model: Arc<std::sync::RwLock<Option<Arc<LearnedModel>>>>,
+    /// Per-model circuit breaker fed by auto-routing provider failures.
+    model_breaker: Arc<std::sync::Mutex<HashMap<String, BreakerState>>>,
+}
+
+/// Circuit-breaker state for one model.
+#[derive(Debug, Default, Clone)]
+struct BreakerState {
+    /// Recent failure timestamps within the window.
+    failures: Vec<std::time::Instant>,
+    /// When set, the model is ineligible until this instant.
+    open_until: Option<std::time::Instant>,
 }
 
 /// How long organization settings are cached before being re-read.
@@ -382,7 +393,49 @@ impl AppState {
             org_settings_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             arm_stats: Arc::new(std::sync::RwLock::new(HashMap::new())),
             learned_model: Arc::new(std::sync::RwLock::new(None)),
+            model_breaker: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Record a provider failure for a model. Opens the breaker once
+    /// `breaker_failures` failures land within `breaker_window_secs`.
+    /// Returns true when the breaker is (now) open.
+    pub fn record_model_failure(&self, model: &str) -> bool {
+        let cfg = &self.config.routing.auto.escalation;
+        let now = std::time::Instant::now();
+        let window = std::time::Duration::from_secs(cfg.breaker_window_secs.max(1));
+        let Ok(mut map) = self.model_breaker.lock() else {
+            return false;
+        };
+        let st = map.entry(model.to_string()).or_default();
+        st.failures.retain(|t| now.duration_since(*t) < window);
+        st.failures.push(now);
+        if st.failures.len() as u32 >= cfg.breaker_failures.max(1) {
+            st.open_until =
+                Some(now + std::time::Duration::from_secs(cfg.breaker_cooldown_secs.max(1)));
+            st.failures.clear();
+            warn!(model = %model, cooldown_secs = cfg.breaker_cooldown_secs, "auto routing: circuit breaker opened");
+            return true;
+        }
+        st.open_until.map(|u| u > now).unwrap_or(false)
+    }
+
+    /// Record a success for a model: clears its failure history.
+    pub fn record_model_success(&self, model: &str) {
+        if let Ok(mut map) = self.model_breaker.lock() {
+            map.remove(model);
+        }
+    }
+
+    /// True while a model's breaker is open.
+    pub fn is_model_breaker_open(&self, model: &str) -> bool {
+        let Ok(map) = self.model_breaker.lock() else {
+            return false;
+        };
+        map.get(model)
+            .and_then(|st| st.open_until)
+            .map(|u| u > std::time::Instant::now())
+            .unwrap_or(false)
     }
 
     /// The active learned classifier, if one is loaded.
@@ -642,6 +695,7 @@ impl AppState {
                 .cost_calculator
                 .blended_cost_per_million(&d.selected),
             decision_latency_us: d.latency_us.min(i32::MAX as u64) as i32,
+            escalations: serde_json::to_value(&d.escalations).unwrap_or(serde_json::json!([])),
         };
         if let Err(e) = RoutingDecisionRepo::upsert(pool, new).await {
             error!(error = %e, request_id = %request_id, "Failed to record routing decision");

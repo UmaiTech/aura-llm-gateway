@@ -39,7 +39,7 @@ mod strategy;
 
 pub use auto::{
     AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, CatalogEntry, CatalogSource,
-    ClassifierOverride, DecisionContext, Eligibility, LearnedModel, ModelCatalog,
+    ClassifierOverride, DecisionContext, Eligibility, Escalation, LearnedModel, ModelCatalog,
     OrgAutoRoutingOverride, RequestFeatures,
 };
 pub use config::{EndpointConfig, FallbackConfig, RoutingConfig, RoutingWeights};
