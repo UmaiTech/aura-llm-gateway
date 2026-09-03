@@ -142,8 +142,8 @@ export function ChatInput({
     return acc
   }, {} as Record<string, Model[]>)
 
-  const providerOrder: Array<'openai' | 'anthropic' | 'google'> = ['openai', 'anthropic', 'google']
-  const providerLabels = { openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google' }
+  const providerOrder: Array<'aura' | 'openai' | 'anthropic' | 'google'> = ['aura', 'openai', 'anthropic', 'google']
+  const providerLabels = { aura: 'Auto routing', openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google' }
 
   const currentRouting = ROUTING_STRATEGIES.find(s => s.id === routingStrategy) || ROUTING_STRATEGIES[0]
   const currentValidation = VALIDATION_STRATEGIES.find(s => s.id === validationStrategy) || VALIDATION_STRATEGIES[0]

@@ -13,7 +13,7 @@ Send `model: "auto"` and Aura scores the request's complexity, maps it to a tier
 | `complex` | Multi-step engineering work, debugging, long context | `claude-sonnet-4-6`, `gpt-5.5`, `gemini-3.1-pro-preview` |
 | `reasoning` | Proofs, derivations, deep analysis, explicit "think hard" | `claude-opus-4-7`, `gpt-5.5-pro`, `o3-mini` |
 
-Only models the gateway can actually serve (a provider key is configured) are ever considered. Tier lists are configurable per gateway.
+Only models the gateway can actually serve (a provider key is configured) are ever considered. Tier lists are configurable per gateway; when none are configured the gateway derives them from its model catalog (price thirds, `reasoning` tag) at startup.
 
 ## Request
 
@@ -124,8 +124,11 @@ Before any scoring, the router excludes models that can't serve the request:
 
 - requests with image input only go to vision-capable models
 - requests with `tools` only go to tool-capable models, and never below the `medium` tier
+- estimated input plus `max_output_tokens` must fit the model's context window, when known
 - models this gateway has no provider for
-- anything excluded by `allow` / `deny`
+- anything excluded by `allow` / `deny` on the request or the organization
+
+Capabilities and context windows come from the gateway's model catalog: the `model_pricing` table (scraped `capabilities` tags, `context_window`) where a row matches, and conservative name-based hints otherwise. `GET /v1/models` shows what the catalog knows about each model.
 
 If no candidate in the chosen tier is eligible, the router escalates to the next tier up, then falls back to lower tiers, within `min_tier` / `max_tier`. If nothing is eligible at all the request fails with `503 no_eligible_model`.
 
@@ -137,11 +140,48 @@ Switching models mid tool loop breaks agent runs, so continuation turns (a reque
 
 When `routing.auto.shadow_for_pinned_models` is on (the default), requests that pin a concrete model still get scored. The decision `auto` would have made is returned in `metadata.aura.routing` with `"shadow": true`, the request is dispatched to the model you asked for, and no `x-aura-selected-model` header is set. This is what powers the "what would auto have saved" reporting without changing any traffic.
 
+## Listing models
+
+`GET /v1/models` returns every model this gateway can serve, OpenAI-list style, with an `aura` object per entry (tier, capabilities, `good_at`, prices, context window, vision / tool support) and, when the router is configured, a top-level `auto` object with the accepted aliases and the tier lists. The `auto*` aliases are listed first with `owned_by: "aura"` when auto routing is enabled.
+
+```json
+{
+  "object": "list",
+  "data": [
+    {"id": "auto", "object": "model", "owned_by": "aura", "aura": {"capabilities": ["auto-routing", "mode:balanced"], "supports_vision": true, "supports_tools": true}},
+    {"id": "gpt-5.4-nano", "object": "model", "owned_by": "openai", "aura": {"tier": "simple", "capabilities": ["fast", "cost-efficient"], "input_per_million": 0.1, "output_per_million": 0.4, "context_window": 400000, "supports_vision": true, "supports_tools": true}}
+  ],
+  "auto": {"enabled": true, "shadow_for_pinned_models": true, "default_mode": "balanced", "aliases": ["auto", "auto:cost", "auto:balanced", "auto:quality"], "tiers": {"simple": ["gpt-5.4-nano"], "medium": ["..."], "complex": ["..."], "reasoning": ["..."]}}
+}
+```
+
+## Per-organization overrides
+
+An organization can override the gateway defaults through `organizations.settings.routing.auto` (edited on the admin app's organization page):
+
+```json
+{
+  "routing": {
+    "auto": {
+      "enabled": true,
+      "shadow_for_pinned_models": false,
+      "default_mode": "cost",
+      "min_tier": "medium",
+      "max_tier": "complex",
+      "allow": ["anthropic/*"],
+      "deny": ["*-preview"]
+    }
+  }
+}
+```
+
+Precedence is request `routing` options, then the organization override, then the gateway config. `enabled` can switch `auto` on for one organization while the gateway default stays off, or off for one organization while it is on. Deny lists from the organization and the request are both applied. Settings are cached for 60 seconds on the gateway.
+
 ## Errors
 
 | Status | Code | When |
 |--------|------|------|
-| 404 | `model_not_found` | `model: "auto"` on a gateway where `routing.auto.enabled` is `false`. |
+| 404 | `model_not_found` | `model: "auto"` on a gateway where `routing.auto.enabled` is `false`, or for an organization whose override sets `enabled: false`. |
 | 503 | `no_eligible_model` | Every candidate was excluded by capability, provider availability or `allow` / `deny`. |
 
 `auto:<unknown-mode>` is treated as an ordinary unknown model name and returns `404 model_not_found`.

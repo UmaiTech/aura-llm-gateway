@@ -92,7 +92,9 @@ impl ModelPricingRepo {
                 mp.model_id, mp.model_name, p.name as provider_name,
                 mp.input_per_million::float8, mp.output_per_million::float8,
                 mp.cached_input_per_million::float8,
-                mp.context_window, mp.max_output_tokens
+                mp.context_window, mp.max_output_tokens,
+                mp.capabilities, mp.good_at,
+                mp.batch_input_per_million::float8, mp.batch_output_per_million::float8
             FROM model_pricing mp
             JOIN providers p ON mp.provider_id = p.id
             WHERE mp.is_enabled = true
@@ -116,6 +118,14 @@ impl ModelPricingRepo {
                 cached_input_per_million: r.get("cached_input_per_million"),
                 context_window: r.get("context_window"),
                 max_output_tokens: r.get("max_output_tokens"),
+                capabilities: r
+                    .try_get::<Option<Vec<String>>, _>("capabilities")
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default(),
+                good_at: r.try_get("good_at").ok().flatten(),
+                batch_input_per_million: r.try_get("batch_input_per_million").ok().flatten(),
+                batch_output_per_million: r.try_get("batch_output_per_million").ok().flatten(),
             })
             .collect())
     }
@@ -157,6 +167,14 @@ impl ModelPricingRepo {
                 cached_input_per_million: r.get("cached_input_per_million"),
                 context_window: r.get("context_window"),
                 max_output_tokens: r.get("max_output_tokens"),
+                capabilities: r
+                    .try_get::<Option<Vec<String>>, _>("capabilities")
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default(),
+                good_at: r.try_get("good_at").ok().flatten(),
+                batch_input_per_million: r.try_get("batch_input_per_million").ok().flatten(),
+                batch_output_per_million: r.try_get("batch_output_per_million").ok().flatten(),
             })
             .collect())
     }

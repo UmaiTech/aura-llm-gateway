@@ -54,6 +54,19 @@ export function OrganizationDetailPage() {
   const [captureToggledOnce, setCaptureToggledOnce] = useState(false)
   const [isSavingCapture, setIsSavingCapture] = useState(false)
   const [captureError, setCaptureError] = useState<string | null>(null)
+  // Auto-routing override — stored at settings.routing.auto. Same
+  // caveat as payload capture: no per-org GET, so the form starts empty
+  // (= inherit gateway defaults) and reflects what the PUT returned.
+  const [routingEnabled, setRoutingEnabled] = useState<'inherit' | 'on' | 'off'>('inherit')
+  const [routingShadow, setRoutingShadow] = useState<'inherit' | 'on' | 'off'>('inherit')
+  const [routingMode, setRoutingMode] = useState<'inherit' | 'cost' | 'balanced' | 'quality'>('inherit')
+  const [routingMinTier, setRoutingMinTier] = useState<string>('inherit')
+  const [routingMaxTier, setRoutingMaxTier] = useState<string>('inherit')
+  const [routingAllow, setRoutingAllow] = useState('')
+  const [routingDeny, setRoutingDeny] = useState('')
+  const [isSavingRouting, setIsSavingRouting] = useState(false)
+  const [routingError, setRoutingError] = useState<string | null>(null)
+  const [routingSavedAt, setRoutingSavedAt] = useState<number | null>(null)
 
   const fetchData = async () => {
     if (!id) return
@@ -119,6 +132,37 @@ export function OrganizationDetailPage() {
       setCaptureError(e instanceof Error ? e.message : 'Failed to save setting')
     } finally {
       setIsSavingCapture(false)
+    }
+  }
+
+  const handleSaveRouting = async () => {
+    if (!id) return
+    setIsSavingRouting(true)
+    setRoutingError(null)
+    const list = (raw: string) =>
+      raw
+        .split(/[\n,]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    const auto: Record<string, unknown> = {}
+    if (routingEnabled !== 'inherit') auto.enabled = routingEnabled === 'on'
+    if (routingShadow !== 'inherit') auto.shadow_for_pinned_models = routingShadow === 'on'
+    if (routingMode !== 'inherit') auto.default_mode = routingMode
+    if (routingMinTier !== 'inherit') auto.min_tier = routingMinTier
+    if (routingMaxTier !== 'inherit') auto.max_tier = routingMaxTier
+    const allow = list(routingAllow)
+    const deny = list(routingDeny)
+    if (allow.length) auto.allow = allow
+    if (deny.length) auto.deny = deny
+    try {
+      // `settings` merges shallowly server-side, so send the whole
+      // routing object; an empty object clears the override.
+      await updateOrganization(id, { settings: { routing: { auto } } })
+      setRoutingSavedAt(Date.now())
+    } catch (e) {
+      setRoutingError(e instanceof Error ? e.message : 'Failed to save routing override')
+    } finally {
+      setIsSavingRouting(false)
     }
   }
 
@@ -471,6 +515,114 @@ export function OrganizationDetailPage() {
                   )}
                 />
               </button>
+            </div>
+
+            {/* Auto-routing override */}
+            <div className="border-t border-border/40 pt-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Auto routing override</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Per-organization settings for <code className="font-mono bg-muted px-1 py-0.5 rounded text-2xs">model: "auto"</code>.
+                  "Inherit" keeps the gateway default. Request-level <code className="font-mono">routing</code> options still win.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Enabled</span>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingEnabled}
+                    onChange={(e) => setRoutingEnabled(e.target.value as 'inherit' | 'on' | 'off')}
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Shadow-score pinned models</span>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingShadow}
+                    onChange={(e) => setRoutingShadow(e.target.value as 'inherit' | 'on' | 'off')}
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Default mode</span>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingMode}
+                    onChange={(e) =>
+                      setRoutingMode(e.target.value as 'inherit' | 'cost' | 'balanced' | 'quality')
+                    }
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="cost">Cost</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="quality">Quality</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Minimum tier</span>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingMinTier}
+                    onChange={(e) => setRoutingMinTier(e.target.value)}
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="simple">Simple</option>
+                    <option value="medium">Medium</option>
+                    <option value="complex">Complex</option>
+                    <option value="reasoning">Reasoning</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Maximum tier</span>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingMaxTier}
+                    onChange={(e) => setRoutingMaxTier(e.target.value)}
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="simple">Simple</option>
+                    <option value="medium">Medium</option>
+                    <option value="complex">Complex</option>
+                    <option value="reasoning">Reasoning</option>
+                  </select>
+                </label>
+                <div className="hidden md:block" />
+                <label className="space-y-1 md:col-span-3 lg:col-span-1">
+                  <span className="text-xs text-muted-foreground">Allow (one pattern per line)</span>
+                  <textarea
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm font-mono min-h-16"
+                    placeholder={'anthropic/*\ngpt-5.4-mini'}
+                    value={routingAllow}
+                    onChange={(e) => setRoutingAllow(e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1 md:col-span-3 lg:col-span-1">
+                  <span className="text-xs text-muted-foreground">Deny (one pattern per line)</span>
+                  <textarea
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm font-mono min-h-16"
+                    placeholder="*-preview"
+                    value={routingDeny}
+                    onChange={(e) => setRoutingDeny(e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button size="sm" onClick={handleSaveRouting} disabled={isSavingRouting}>
+                  {isSavingRouting ? 'Saving…' : 'Save routing override'}
+                </Button>
+                {routingSavedAt && !routingError && (
+                  <span className="text-xs text-muted-foreground">Saved</span>
+                )}
+                {routingError && <span className="text-xs text-destructive">{routingError}</span>}
+              </div>
             </div>
           </CardContent>
         </Card>

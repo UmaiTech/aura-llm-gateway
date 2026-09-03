@@ -1984,7 +1984,12 @@ async fn update_organization(
     )
     .await
     {
-        Ok(org) => Ok(Json(org)),
+        Ok(org) => {
+            // Settings are cached per org in AppState (payload capture,
+            // auto-routing override); drop the stale copy.
+            state.invalidate_org_settings(id).await;
+            Ok(Json(org))
+        }
         Err(e) => Err(map_db_error(e, "organization")),
     }
 }

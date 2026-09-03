@@ -4,7 +4,7 @@
 //! default so an empty `auto: {}` block (or none at all) is valid; the
 //! router is off unless `enabled: true`.
 
-use aura_types::{ClassifierKind, RoutingMode, Tier};
+use aura_types::{ClassifierKind, RoutingMode, RoutingOptions, Tier};
 use serde::{Deserialize, Serialize};
 
 /// Top-level auto-routing configuration.
@@ -92,6 +92,79 @@ impl AutoRoutingConfig {
     /// True when at least one tier has a candidate.
     pub fn has_candidates(&self) -> bool {
         Tier::ALL.iter().any(|t| !self.tiers.get(*t).is_empty())
+    }
+}
+
+/// Per-organization override, stored at `organizations.settings.routing.auto`.
+///
+/// Every field is optional; unset fields inherit the gateway config. The
+/// admin app edits this object, and the proxy merges it under the
+/// request's own `routing` options (request beats org beats gateway).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct OrgAutoRoutingOverride {
+    /// Turn `model: "auto"` on or off for this organization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// Score pinned-model requests for this organization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shadow_for_pinned_models: Option<bool>,
+    /// Default mode for this organization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_mode: Option<RoutingMode>,
+    /// Never route below this tier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_tier: Option<Tier>,
+    /// Never route above this tier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tier: Option<Tier>,
+    /// Only consider models matching these patterns.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub allow: Vec<String>,
+    /// Never consider models matching these patterns.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub deny: Vec<String>,
+}
+
+impl OrgAutoRoutingOverride {
+    /// Parse from an organization's `settings` JSON (`settings.routing.auto`).
+    /// Missing or malformed sections yield the empty override.
+    pub fn from_org_settings(settings: &serde_json::Value) -> Self {
+        settings
+            .get("routing")
+            .and_then(|r| r.get("auto"))
+            .cloned()
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default()
+    }
+
+    /// True when nothing is overridden.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Merge the organization override under the request's own options.
+    ///
+    /// Request fields win when set. Allow lists intersect in effect
+    /// (both must permit) by concatenating deny lists and keeping the
+    /// request's allow list when it has one, else the org's.
+    pub fn merged_with(&self, request: Option<&RoutingOptions>) -> RoutingOptions {
+        let req = request.cloned().unwrap_or_default();
+        let mut deny = self.deny.clone();
+        deny.extend(req.deny.iter().cloned());
+        RoutingOptions {
+            mode: req.mode.or(self.default_mode),
+            min_tier: req.min_tier.or(self.min_tier),
+            max_tier: req.max_tier.or(self.max_tier),
+            allow: if req.allow.is_empty() {
+                self.allow.clone()
+            } else {
+                req.allow.clone()
+            },
+            deny,
+            sticky: req.sticky,
+            classifier: req.classifier,
+        }
     }
 }
 
@@ -634,6 +707,37 @@ mod tests {
         let mut none = AutoRoutingConfig::default();
         none.prune_unknown_models(|_| false);
         assert!(!none.has_candidates());
+    }
+
+    #[test]
+    fn org_override_parses_and_merges() {
+        let settings = serde_json::json!({
+            "capture_payloads": true,
+            "routing": {"auto": {"enabled": true, "default_mode": "cost", "max_tier": "complex",
+                                  "deny": ["*-preview"]}}
+        });
+        let o = OrgAutoRoutingOverride::from_org_settings(&settings);
+        assert_eq!(o.enabled, Some(true));
+        assert_eq!(o.default_mode, Some(RoutingMode::Cost));
+        assert_eq!(o.max_tier, Some(Tier::Complex));
+        assert!(!o.is_empty());
+
+        let req = RoutingOptions {
+            mode: Some(RoutingMode::Quality),
+            deny: vec!["google/*".into()],
+            ..Default::default()
+        };
+        let merged = o.merged_with(Some(&req));
+        assert_eq!(merged.mode, Some(RoutingMode::Quality), "request wins");
+        assert_eq!(merged.max_tier, Some(Tier::Complex), "org fills the gap");
+        assert_eq!(
+            merged.deny,
+            vec!["*-preview".to_string(), "google/*".to_string()]
+        );
+
+        let none = OrgAutoRoutingOverride::from_org_settings(&serde_json::json!({"x": 1}));
+        assert!(none.is_empty());
+        assert_eq!(none.merged_with(None), RoutingOptions::default());
     }
 
     #[test]

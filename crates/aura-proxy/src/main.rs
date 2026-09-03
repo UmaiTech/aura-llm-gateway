@@ -6,11 +6,12 @@
 mod routes;
 
 use anyhow::Context;
+use aura_core::router::auto::{CatalogSource, TierModels};
 use aura_core::{
     cost::ScrapedPricing, AnthropicProvider, AutoDecision, AutoRouter, BedrockProvider,
     CostCalculator, FireworksProvider, GeminiProvider, HuggingFaceProvider, MistralProvider,
-    OllamaProvider, OpenAIProvider, Provider, RateLimiter, RedisPool, ResponseCache,
-    TogetherProvider,
+    ModelCatalog, OllamaProvider, OpenAIProvider, OrgAutoRoutingOverride, Provider, RateLimiter,
+    RedisPool, ResponseCache, TogetherProvider,
 };
 use aura_db::{
     ApiKeyUsageRepo, DbPool, ModelPricingRepo, NewApiKeyUsage, NewRequestLog, NewRoutingDecision,
@@ -52,7 +53,16 @@ pub struct AppState {
     /// routing or shadow scoring is configured and at least one tier has
     /// a model this gateway can serve.
     auto_router: Option<Arc<AutoRouter>>,
+    /// What the gateway knows about each servable model (prices,
+    /// capabilities, context window), built from providers + model_pricing.
+    model_catalog: Arc<ModelCatalog>,
+    /// Short-lived cache of organization settings JSON, keyed by org id.
+    org_settings_cache:
+        Arc<tokio::sync::RwLock<HashMap<uuid::Uuid, (std::time::Instant, serde_json::Value)>>>,
 }
+
+/// How long organization settings are cached before being re-read.
+const ORG_SETTINGS_TTL: std::time::Duration = std::time::Duration::from_secs(60);
 
 impl AppState {
     /// Creates a new AppState with the given configuration
@@ -234,9 +244,25 @@ impl AppState {
         // maps those to the gateway's API slugs and leaves unmatched models on
         // their seed price.
         let cost_calculator = Arc::new(CostCalculator::new());
+        let mut catalog_sources: Vec<CatalogSource> = Vec::new();
         if let Some(pool) = &db_pool {
             match ModelPricingRepo::get_all_current(pool).await {
                 Ok(rows) => {
+                    catalog_sources = rows
+                        .iter()
+                        .map(|r| CatalogSource {
+                            model_id: r.model_id.clone(),
+                            provider: r.provider_name.clone(),
+                            capabilities: r.capabilities.clone(),
+                            good_at: r.good_at.clone(),
+                            context_window: r.context_window.and_then(|c| u32::try_from(c).ok()),
+                            max_output_tokens: r
+                                .max_output_tokens
+                                .and_then(|c| u32::try_from(c).ok()),
+                            input_per_million: Some(r.input_per_million),
+                            output_per_million: Some(r.output_per_million),
+                        })
+                        .collect();
                     let scraped: Vec<ScrapedPricing> = rows
                         .into_iter()
                         .map(|r| ScrapedPricing {
@@ -260,10 +286,52 @@ impl AppState {
             }
         }
 
+        // Model catalog: every model a provider explicitly lists (Ollama's
+        // catch-all is excluded by construction), enriched from the
+        // pricing table and the seeded price list.
+        let servable: Vec<(String, String)> = model_map
+            .iter()
+            .map(|(m, p)| (m.clone(), p.clone()))
+            .collect();
+        let mut model_catalog = ModelCatalog::build(
+            &servable,
+            &catalog_sources,
+            aura_core::cost::api_slug_for_scraped,
+        );
+        model_catalog.fill_prices(|m| {
+            cost_calculator
+                .get_pricing(m)
+                .map(|p| (p.input_per_million, p.output_per_million))
+        });
+        info!(
+            models = model_catalog.len(),
+            enriched = model_catalog
+                .entries()
+                .iter()
+                .filter(|e| e.from_database)
+                .count(),
+            "Model catalog built"
+        );
+
         // Auto router: keep only tier models this gateway can actually
         // serve, then decide whether there is anything to route to.
         let auto_router = {
             let mut auto_cfg = config.routing.auto.clone();
+            if !auto_cfg.has_candidates() {
+                // No tiers configured at all: derive them from the catalog
+                // (price thirds, `reasoning` tag) so `auto` works out of
+                // the box on any gateway with a pricing table.
+                auto_cfg.tiers = TierModels::from_catalog(&model_catalog, 3);
+                if auto_cfg.has_candidates() {
+                    info!(
+                        simple = ?auto_cfg.tiers.simple,
+                        medium = ?auto_cfg.tiers.medium,
+                        complex = ?auto_cfg.tiers.complex,
+                        reasoning = ?auto_cfg.tiers.reasoning,
+                        "Auto routing: derived tiers from the model catalog"
+                    );
+                }
+            }
             let dropped = auto_cfg.prune_unknown_models(|m| {
                 provider_name_for_catalog_model(&providers, &model_map, m).is_some()
             });
@@ -305,6 +373,66 @@ impl AppState {
             response_cache,
             payload_capture_enabled,
             auto_router,
+            model_catalog: Arc::new(model_catalog),
+            org_settings_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// The model catalog.
+    pub fn model_catalog(&self) -> &ModelCatalog {
+        &self.model_catalog
+    }
+
+    /// Organization settings JSON, cached for `ORG_SETTINGS_TTL`.
+    ///
+    /// Returns `None` without a database, for an unknown organization, or
+    /// on a database error (which is logged).
+    pub async fn org_settings(&self, org_id: uuid::Uuid) -> Option<serde_json::Value> {
+        let pool = self.db_pool.as_ref()?;
+        {
+            let cache = self.org_settings_cache.read().await;
+            if let Some((at, value)) = cache.get(&org_id) {
+                if at.elapsed() < ORG_SETTINGS_TTL {
+                    return Some(value.clone());
+                }
+            }
+        }
+        match aura_db::OrganizationRepo::get_settings(pool, org_id).await {
+            Ok(settings) => {
+                let value = settings.unwrap_or(serde_json::Value::Null);
+                self.org_settings_cache
+                    .write()
+                    .await
+                    .insert(org_id, (std::time::Instant::now(), value.clone()));
+                if value.is_null() {
+                    None
+                } else {
+                    Some(value)
+                }
+            }
+            Err(e) => {
+                warn!(org_id = %org_id, error = %e, "Failed to fetch organization settings");
+                None
+            }
+        }
+    }
+
+    /// Forget cached settings for an organization (call after an update).
+    pub async fn invalidate_org_settings(&self, org_id: uuid::Uuid) {
+        self.org_settings_cache.write().await.remove(&org_id);
+    }
+
+    /// Auto-routing override for an organization, if it has one.
+    pub async fn org_auto_routing_override(
+        &self,
+        org_id: Option<uuid::Uuid>,
+    ) -> OrgAutoRoutingOverride {
+        let Some(org_id) = org_id else {
+            return OrgAutoRoutingOverride::default();
+        };
+        match self.org_settings(org_id).await {
+            Some(settings) => OrgAutoRoutingOverride::from_org_settings(&settings),
+            None => OrgAutoRoutingOverride::default(),
         }
     }
 
@@ -365,21 +493,13 @@ impl AppState {
             // No DB — can't consult org settings; fall back to env flag.
             return true;
         };
-        match aura_db::OrganizationRepo::get_settings(pool, oid).await {
-            Ok(Some(settings)) => settings
+        let _ = pool;
+        match self.org_settings(oid).await {
+            Some(settings) => settings
                 .get("capture_payloads")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
-            Ok(None) => false,
-            Err(e) => {
-                // Log but don't let a DB hiccup crash capture entirely.
-                tracing::warn!(
-                    org_id = %oid,
-                    error = %e,
-                    "should_capture_payload: failed to fetch org settings; skipping capture"
-                );
-                false
-            }
+            None => false,
         }
     }
 

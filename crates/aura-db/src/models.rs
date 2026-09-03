@@ -79,6 +79,13 @@ pub struct ModelPricingSimple {
     pub cached_input_per_million: Option<f64>,
     pub context_window: Option<i32>,
     pub max_output_tokens: Option<i32>,
+    /// Scraped capability tags (`vision`, `tool-calling`, `reasoning`, …).
+    pub capabilities: Vec<String>,
+    /// Scraped one-line summary of what the model is good at.
+    pub good_at: Option<String>,
+    /// Batch-tier prices, when the provider publishes them.
+    pub batch_input_per_million: Option<f64>,
+    pub batch_output_per_million: Option<f64>,
 }
 
 /// Conversation record
