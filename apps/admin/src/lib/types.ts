@@ -108,6 +108,12 @@ export interface AutoRoutingTierStats {
   top_model: string | null
   approved: number
   rejected: number
+  avg_reward: number | null
+  scored: number
+  move_on: number
+  retry: number
+  correction: number
+  escalation: number
 }
 
 export interface AutoRoutingModelStats {
@@ -157,6 +163,8 @@ export interface RoutingOutcome {
   latency_ms: number | null
   feedback: string | null
   estimated_savings_usd: number | null
+  next_turn?: string | null
+  reward?: number | null
 }
 
 export interface AutoRoutingStats {

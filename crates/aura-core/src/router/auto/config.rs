@@ -44,6 +44,15 @@ pub struct AutoRoutingConfig {
     /// Number of distinct reasoning-marker hits that force the
     /// `reasoning` tier regardless of the weighted score.
     pub reasoning_override_matches: u32,
+    /// Outcome rollup: how often the gateway scores past decisions from
+    /// the conversation graph and refreshes arm statistics. `0` disables
+    /// the background job (the admin endpoint can still trigger it).
+    pub outcome_rollup_interval_secs: u64,
+    /// Outcome rollup: decisions younger than this are skipped so the
+    /// user's next turn has had time to arrive.
+    pub outcome_grace_secs: u64,
+    /// Outcome rollup: how far back arm statistics look.
+    pub arm_stats_window_days: u32,
 }
 
 impl Default for AutoRoutingConfig {
@@ -64,6 +73,9 @@ impl Default for AutoRoutingConfig {
             sticky_tool_loops: true,
             tools_min_tier: Some(Tier::Medium),
             reasoning_override_matches: 3,
+            outcome_rollup_interval_secs: 900,
+            outcome_grace_secs: 1800,
+            arm_stats_window_days: 30,
         }
     }
 }
@@ -667,6 +679,9 @@ pub enum WithinTierStrategy {
     ConfigOrder,
     /// Rotate through eligible candidates.
     RoundRobin,
+    /// Thompson sampling over per-(tier, model) outcome statistics learned
+    /// from the routing decision log; unknown models use a uniform prior.
+    Thompson,
 }
 
 #[cfg(test)]

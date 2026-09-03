@@ -2221,3 +2221,140 @@ impl RoutingDecisionRepo {
         Ok(rows)
     }
 }
+
+/// Repository for auto-router outcome scoring and arm statistics
+pub struct RoutingOutcomeRepo;
+
+impl RoutingOutcomeRepo {
+    /// Decisions older than `grace_secs` that have no outcome row yet,
+    /// with the inputs needed to score them. Oldest first.
+    pub async fn pending(
+        pool: &DbPool,
+        grace_secs: i64,
+        limit: i64,
+    ) -> Result<Vec<PendingRoutingOutcome>, DbError> {
+        let rows = sqlx::query_as::<_, PendingRoutingOutcome>(
+            r#"
+            SELECT
+                d.response_id,
+                d.provider_response_id,
+                d.conversation_id,
+                d.tier,
+                d.selected_model,
+                d.shadow,
+                d.created_at,
+                rl.status,
+                fb.feedback,
+                COALESCE((rl.metadata->'aura'->'agentic'->>'tool_calls_count')::INT, 0) AS tool_calls_count,
+                cur.input_items,
+                nxt.input_items AS next_input_items,
+                nxt.model_id AS next_model
+            FROM routing_decisions d
+            LEFT JOIN routing_outcomes o ON o.response_id = d.response_id
+            LEFT JOIN request_logs rl ON rl.response_id = d.response_id
+            LEFT JOIN responses cur ON cur.id = d.provider_response_id
+            LEFT JOIN LATERAL (
+                SELECT r.input_items, r.model_id
+                FROM responses r
+                WHERE d.provider_response_id IS NOT NULL
+                  AND r.previous_response_id = d.provider_response_id
+                ORDER BY r.created_at ASC
+                LIMIT 1
+            ) nxt ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT f.feedback
+                FROM feedback_samples f
+                WHERE d.provider_response_id IS NOT NULL
+                  AND f.response_id = d.provider_response_id
+                ORDER BY f.created_at DESC
+                LIMIT 1
+            ) fb ON TRUE
+            WHERE o.response_id IS NULL
+              AND d.created_at < NOW() - ($1::BIGINT * INTERVAL '1 second')
+            ORDER BY d.created_at ASC
+            LIMIT $2
+            "#,
+        )
+        .bind(grace_secs)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Insert or replace an outcome row.
+    pub async fn upsert(pool: &DbPool, new: NewRoutingOutcome) -> Result<(), DbError> {
+        sqlx::query(
+            r#"
+            INSERT INTO routing_outcomes (
+                response_id, tier, selected_model, shadow, status, feedback,
+                next_turn, next_model, reward, decided_at, computed_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            ON CONFLICT (response_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                feedback = EXCLUDED.feedback,
+                next_turn = EXCLUDED.next_turn,
+                next_model = EXCLUDED.next_model,
+                reward = EXCLUDED.reward,
+                computed_at = NOW()
+            "#,
+        )
+        .bind(&new.response_id)
+        .bind(&new.tier)
+        .bind(&new.selected_model)
+        .bind(new.shadow)
+        .bind(&new.status)
+        .bind(&new.feedback)
+        .bind(&new.next_turn)
+        .bind(&new.next_model)
+        .bind(new.reward)
+        .bind(new.decided_at)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Recompute arm statistics from applied (non-shadow) outcomes in the
+    /// trailing window and return the fresh rows.
+    pub async fn recompute_arm_stats(
+        pool: &DbPool,
+        window_days: i32,
+    ) -> Result<Vec<RoutingArmStat>, DbError> {
+        sqlx::query(
+            r#"
+            INSERT INTO routing_arm_stats (tier, model, alpha, beta, observations, updated_at)
+            SELECT
+                tier,
+                selected_model,
+                1 + COALESCE(SUM(reward) FILTER (WHERE reward > 0), 0),
+                1 + COALESCE(SUM(-reward) FILTER (WHERE reward < 0), 0),
+                COUNT(*),
+                NOW()
+            FROM routing_outcomes
+            WHERE NOT shadow
+              AND decided_at >= NOW() - ($1::INT * INTERVAL '1 day')
+            GROUP BY tier, selected_model
+            ON CONFLICT (tier, model) DO UPDATE SET
+                alpha = EXCLUDED.alpha,
+                beta = EXCLUDED.beta,
+                observations = EXCLUDED.observations,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(window_days)
+        .execute(pool)
+        .await?;
+        Self::load_arm_stats(pool).await
+    }
+
+    /// All arm statistics.
+    pub async fn load_arm_stats(pool: &DbPool) -> Result<Vec<RoutingArmStat>, DbError> {
+        let rows = sqlx::query_as::<_, RoutingArmStat>(
+            "SELECT tier, model, alpha, beta, observations, updated_at FROM routing_arm_stats",
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(rows)
+    }
+}

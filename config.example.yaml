@@ -129,12 +129,18 @@ routing:
       long: 400        # at or above: strong "complex" signal
       long_output: 2000
     # How to pick among the eligible candidates of the chosen tier.
-    within_tier: cheapest           # cheapest | config_order | round_robin
+    within_tier: cheapest           # cheapest | config_order | round_robin | thompson
     # Keep the previous turn's model on tool-loop continuation turns.
     sticky_tool_loops: true
     # Requests that carry tools never go below this tier.
     tools_min_tier: medium
     # Distinct reasoning markers that force the reasoning tier.
     reasoning_override_matches: 3
+    # Outcome rollup: score past decisions from the conversation graph
+    # (move on / retry / correction / escalation) and refresh the Thompson
+    # arm statistics. 0 disables the background job.
+    outcome_rollup_interval_secs: 900
+    outcome_grace_secs: 1800
+    arm_stats_window_days: 30
     # keywords: { code: [...], reasoning: [...], technical: [...], simple: [...],
     #             intent_quick: [...], intent_deep: [...] }  — override the built-in lists

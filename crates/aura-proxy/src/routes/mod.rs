@@ -12,6 +12,7 @@ pub mod openapi;
 pub mod organizations;
 pub mod rate_limit;
 pub mod responses;
+pub mod routing_rollup;
 
 use axum::Router;
 

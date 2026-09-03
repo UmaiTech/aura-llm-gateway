@@ -349,6 +349,12 @@ export function RoutingPage() {
                         <th className="text-right py-2 pr-3 font-medium">Cost</th>
                         <th className="text-right py-2 pr-3 font-medium">Est. savings</th>
                         <th className="text-right py-2 pr-3 font-medium">Feedback</th>
+                        <th className="text-right py-2 pr-3 font-medium" title="Mean reward from outcome signals (move on / retry / correction / escalation), −1 to +1">
+                          Reward
+                        </th>
+                        <th className="text-right py-2 pr-3 font-medium" title="move on / retry / correction / escalation">
+                          Signals
+                        </th>
                         <th className="text-left py-2 font-medium">Top model</th>
                       </tr>
                     </thead>
@@ -400,6 +406,20 @@ export function RoutingPage() {
                             <td className="py-2 pr-3 text-right tabular-nums">
                               {t.approved + t.rejected > 0
                                 ? `${t.approved} / ${t.rejected}`
+                                : '—'}
+                            </td>
+                            <td
+                              className={cn(
+                                'py-2 pr-3 text-right tabular-nums',
+                                t.avg_reward != null && t.avg_reward < 0 && 'text-destructive/80',
+                                t.avg_reward != null && t.avg_reward > 0.5 && 'text-emerald-400',
+                              )}
+                            >
+                              {t.avg_reward != null ? `${t.avg_reward >= 0 ? '+' : ''}${t.avg_reward.toFixed(2)}` : '—'}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums text-xs">
+                              {t.scored > 0
+                                ? `${t.move_on} / ${t.retry} / ${t.correction} / ${t.escalation}`
                                 : '—'}
                             </td>
                             <td className="py-2 font-mono text-xs">{t.top_model ?? '—'}</td>

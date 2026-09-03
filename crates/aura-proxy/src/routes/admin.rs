@@ -10,7 +10,7 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{delete, get, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use chrono::{DateTime, NaiveDate, Utc};
@@ -35,6 +35,8 @@ pub fn router() -> Router<AppState> {
             "/admin/routing/decisions/{response_id}",
             get(get_routing_decision),
         )
+        .route("/admin/routing/rollup", post(run_routing_rollup))
+        .route("/admin/routing/arms", get(get_routing_arms))
         .route("/admin/stats/features", get(get_feature_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
@@ -196,6 +198,13 @@ pub struct AutoRoutingTierStats {
     pub top_model: Option<String>,
     pub approved: i64,
     pub rejected: i64,
+    /// Mean reward over scored decisions (None until the rollup ran).
+    pub avg_reward: Option<f64>,
+    pub scored: i64,
+    pub move_on: i64,
+    pub retry: i64,
+    pub correction: i64,
+    pub escalation: i64,
 }
 
 /// Auto-router stats: one row per selected model.
@@ -858,7 +867,13 @@ async fn get_auto_routing_stats(
             COALESCE(AVG(decision_latency_us), 0)::INT AS avg_decision_us,
             MODE() WITHIN GROUP (ORDER BY selected_model) AS top_model,
             COUNT(*) FILTER (WHERE feedback = 'approved') AS approved,
-            COUNT(*) FILTER (WHERE feedback = 'rejected') AS rejected
+            COUNT(*) FILTER (WHERE feedback = 'rejected') AS rejected,
+            AVG(reward)::FLOAT8 AS avg_reward,
+            COUNT(reward) AS scored,
+            COUNT(*) FILTER (WHERE next_turn = 'move_on') AS move_on,
+            COUNT(*) FILTER (WHERE next_turn = 'retry') AS retry,
+            COUNT(*) FILTER (WHERE next_turn = 'correction') AS correction,
+            COUNT(*) FILTER (WHERE next_turn = 'escalation') AS escalation
         FROM v_routing_outcomes
         WHERE created_at >= NOW() - INTERVAL '{}'
         GROUP BY shadow, tier
@@ -887,6 +902,12 @@ async fn get_auto_routing_stats(
             top_model: r.try_get("top_model").ok(),
             approved: r.try_get("approved").unwrap_or(0),
             rejected: r.try_get("rejected").unwrap_or(0),
+            avg_reward: r.try_get::<Option<f64>, _>("avg_reward").ok().flatten(),
+            scored: r.try_get("scored").unwrap_or(0),
+            move_on: r.try_get("move_on").unwrap_or(0),
+            retry: r.try_get("retry").unwrap_or(0),
+            correction: r.try_get("correction").unwrap_or(0),
+            escalation: r.try_get("escalation").unwrap_or(0),
         })
         .collect();
 
@@ -943,6 +964,45 @@ async fn get_auto_routing_stats(
         by_model,
         recent,
     }))
+}
+
+/// Score pending auto-router decisions now and refresh arm statistics.
+async fn run_routing_rollup(
+    State(state): State<AppState>,
+) -> Result<Json<crate::routes::routing_rollup::RollupReport>, (StatusCode, Json<serde_json::Value>)>
+{
+    if state.db_pool().is_none() {
+        return Err(db_unavailable());
+    }
+    crate::routes::routing_rollup::run_rollup(&state)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e})),
+            )
+        })
+}
+
+/// Learned (tier, model) arm statistics used by Thompson sampling.
+async fn get_routing_arms(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<aura_db::RoutingArmStat>>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    aura_db::RoutingOutcomeRepo::load_arm_stats(pool)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            tracing::error!("Failed to fetch routing arm stats: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })
 }
 
 /// One auto-router decision, by gateway request id (`aura_...`) or
