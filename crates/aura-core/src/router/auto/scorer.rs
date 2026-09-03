@@ -17,7 +17,9 @@ pub const HEURISTIC_VERSION: &str = "heuristic@v1";
 /// Output of the scorer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoreResult {
-    /// Weighted sum before the mode offset, clamped to `[0, 1]`.
+    /// Weighted sum before the mode offset, clamped to `[-1, 1]`. Negative
+    /// values carry "this is trivial" evidence that a mode offset has to
+    /// overcome before the tier moves up.
     pub raw_score: f64,
     /// Score after the mode offset, clamped to `[0, 1]`. This is what the
     /// tier boundaries are applied to.
@@ -127,7 +129,7 @@ impl HeuristicScorer {
             if long_output { 0.5 } else { 0.0 },
         );
 
-        let raw_score = clamp01(raw);
+        let raw_score = raw.clamp(-1.0, 1.0);
         let offset = self.offsets.for_mode(mode);
         let score = clamp01(raw_score + offset);
         if offset.abs() > f64::EPSILON {
@@ -255,6 +257,15 @@ mod tests {
         );
         assert_eq!(r.tier, Tier::Reasoning);
         assert!(r.notes.iter().any(|n| n.contains("reasoning override")));
+    }
+
+    #[test]
+    fn negative_evidence_resists_quality_offset() {
+        let r = score_text("hi", RoutingMode::Quality);
+        assert!(r.raw_score < 0.0, "raw={}", r.raw_score);
+        assert_eq!(r.tier, Tier::Simple);
+        let r = score_text("What is the capital of France?", RoutingMode::Quality);
+        assert_eq!(r.tier, Tier::Simple);
     }
 
     #[test]
