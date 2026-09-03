@@ -229,6 +229,7 @@ const releases: Release[] = [
       { label: 'Harness payload capture', note: 'Optional per-org full request/response capture, surfaced inline on the harness trace.' },
       { label: 'Auto-updating pricing scraper', note: 'Weekly Vercel cron scrapes each provider’s own pricing page (9 providers incl. Together & Fireworks) into versioned price history, with batch-tier prices and conservative validation.' },
       { label: 'Public pricing page', note: 'aura-llm.dev/pricing — live scraped prices across every provider, filterable, with expandable per-model detail and inferred capability tags.' },
+      { label: 'Auto model routing', note: 'model: "auto" scores each request\'s complexity and dispatches to the cheapest capable model in a tier; auto:cost / auto:quality shift the dial, every response explains the decision, and pinned-model traffic is shadow-scored for savings reporting.' },
     ],
     issueRefs: ['#123', '#209'],
   },

@@ -646,6 +646,15 @@ impl CostCalculator {
 
     /// Get pricing for a specific model. Returns a copy (ModelPricing is Copy)
     /// since the map is behind a lock.
+    /// Blended price per million tokens for ranking models against each
+    /// other: 70% input, 30% output, which matches typical chat traffic.
+    ///
+    /// Returns `None` when the model has no known price.
+    pub fn blended_cost_per_million(&self, model: &str) -> Option<f64> {
+        self.get_pricing(model)
+            .map(|p| 0.7 * p.input_per_million + 0.3 * p.output_per_million)
+    }
+
     pub fn get_pricing(&self, model: &str) -> Option<ModelPricing> {
         self.pricing
             .read()

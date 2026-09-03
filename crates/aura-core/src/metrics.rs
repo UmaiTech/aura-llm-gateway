@@ -39,6 +39,12 @@ pub mod names {
     pub const STREAM_CHUNKS_TOTAL: &str = "aura_stream_chunks_total";
     /// Tool calls made
     pub const TOOL_CALLS_TOTAL: &str = "aura_tool_calls_total";
+    /// Auto-routing decisions made (applied or shadow)
+    pub const ROUTING_DECISIONS_TOTAL: &str = "aura_routing_decisions_total";
+    /// Time spent classifying a request for auto routing
+    pub const ROUTING_CLASSIFIER_SECONDS: &str = "aura_routing_classifier_seconds";
+    /// Auto-routing requests that could not be routed
+    pub const ROUTING_FAILURES_TOTAL: &str = "aura_routing_failures_total";
 }
 
 /// Labels commonly used with metrics
@@ -50,6 +56,11 @@ pub mod labels {
     pub const CACHE_STATUS: &str = "cache_status";
     pub const STREAM: &str = "stream";
     pub const TOOL: &str = "tool";
+    pub const MODE: &str = "mode";
+    pub const TIER: &str = "tier";
+    pub const CLASSIFIER: &str = "classifier";
+    pub const SHADOW: &str = "shadow";
+    pub const REASON: &str = "reason";
 }
 
 /// Record a request received
@@ -201,6 +212,40 @@ pub fn record_tool_call(tool_name: &str, provider: &str, model: &str) {
     .increment(1);
 }
 
+/// Record an auto-routing decision.
+pub fn record_routing_decision(
+    mode: &str,
+    tier: &str,
+    classifier: &str,
+    model: &str,
+    shadow: bool,
+    classifier_secs: f64,
+) {
+    counter!(
+        names::ROUTING_DECISIONS_TOTAL,
+        labels::MODE => mode.to_string(),
+        labels::TIER => tier.to_string(),
+        labels::CLASSIFIER => classifier.to_string(),
+        labels::MODEL => model.to_string(),
+        labels::SHADOW => shadow.to_string()
+    )
+    .increment(1);
+    histogram!(
+        names::ROUTING_CLASSIFIER_SECONDS,
+        labels::CLASSIFIER => classifier.to_string()
+    )
+    .record(classifier_secs);
+}
+
+/// Record an auto-routing request that could not be routed.
+pub fn record_routing_failure(reason: &str) {
+    counter!(
+        names::ROUTING_FAILURES_TOTAL,
+        labels::REASON => reason.to_string()
+    )
+    .increment(1);
+}
+
 /// Describe all metrics (for documentation purposes)
 pub fn describe_metrics() {
     metrics::describe_counter!(
@@ -256,6 +301,19 @@ pub fn describe_metrics() {
         "Total number of streaming chunks sent"
     );
     metrics::describe_counter!(names::TOOL_CALLS_TOTAL, "Total number of tool calls made");
+    metrics::describe_counter!(
+        names::ROUTING_DECISIONS_TOTAL,
+        "Total number of auto-routing decisions (applied and shadow)"
+    );
+    metrics::describe_histogram!(
+        names::ROUTING_CLASSIFIER_SECONDS,
+        metrics::Unit::Seconds,
+        "Time spent classifying a request for auto routing"
+    );
+    metrics::describe_counter!(
+        names::ROUTING_FAILURES_TOTAL,
+        "Total number of auto-routing requests that could not be routed"
+    );
 }
 
 #[cfg(test)]

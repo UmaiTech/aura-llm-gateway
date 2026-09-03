@@ -38,3 +38,5 @@ utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
 
 [dev-dependencies]
+http-body-util = "0.1"
+wiremock = "0.6"

@@ -28,6 +28,7 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
+use crate::routes::auto_routing::{resolve_auto_model, selected_model_header};
 use crate::routes::AuthContext;
 use crate::AppState;
 
@@ -81,7 +82,7 @@ struct ApiErrorInner {
 }
 
 impl ApiError {
-    fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+    pub(crate) fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             error: ApiErrorInner {
                 code: code.into(),
@@ -91,7 +92,7 @@ impl ApiError {
         }
     }
 
-    fn with_param(
+    pub(crate) fn with_param(
         code: impl Into<String>,
         message: impl Into<String>,
         param: impl Into<String>,
@@ -648,6 +649,16 @@ pub async fn create_response(
         obj
     });
 
+    // Auto routing: rewrite `model: "auto"` to a concrete model (or record
+    // a shadow decision for a pinned model). Must run before the cache
+    // lookup so cache keys are built from the resolved model.
+    let mut request = request;
+    let auto_decision = resolve_auto_model(&state, &mut request).await?;
+    let routing_strategy = match auto_decision.as_ref().filter(|d| !d.shadow) {
+        Some(decision) => Some(format!("auto:{}", decision.tier)),
+        None => routing_strategy,
+    };
+
     // Get the provider for this request
     let provider = state.get_provider(&request.model).ok_or_else(|| {
         let err = ProviderError::model_not_found(&request.model);
@@ -666,7 +677,6 @@ pub async fn create_response(
     // to give them an SSE response (so the playground / chat keep
     // working) — we just synthesize the events ourselves from the
     // completed fanout result. See `wanted_streaming` below.
-    let mut request = request;
     let needs_fanout = matches!(
         request.validation.as_ref().map(|v| v.strategy),
         Some(aura_types::ValidationStrategy::BestOfN)
@@ -740,6 +750,7 @@ pub async fn create_response(
         let compression_metadata_for_stream = compression_metadata.clone();
         let compression_log_for_stream = compression_log_metadata.clone();
         let routing_strategy_for_stream = routing_strategy.clone();
+        let auto_decision_for_stream = auto_decision.clone();
         let captured_request_body_for_stream = captured_request_body.clone();
 
         // Convert to SSE stream, enriching terminal events
@@ -754,6 +765,7 @@ pub async fn create_response(
             let compression_meta_clone = compression_metadata_for_stream.clone();
             let compression_log_clone = compression_log_for_stream.clone();
             let routing_strategy_clone = routing_strategy_for_stream.clone();
+            let auto_decision_clone = auto_decision_for_stream.clone();
             let captured_req_body_clone = captured_request_body_for_stream.clone();
             let org_id_clone = org_id_for_stream;
 
@@ -774,6 +786,7 @@ pub async fn create_response(
                                         Some(&request_clone),
                                         compression_meta_clone.as_ref(),
                                         routing_strategy_clone.as_deref(),
+                                        auto_decision_clone.as_ref(),
                                     )
                                     .await;
 
@@ -1067,7 +1080,10 @@ pub async fn create_response(
         let sse = Sse::new(sse_stream)
             .keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15)));
 
-        Ok(sse.into_response())
+        Ok(with_selected_model_header(
+            sse.into_response(),
+            auto_decision.as_ref(),
+        ))
     } else {
         // Non-streaming response - track latency
         let start = Instant::now();
@@ -1109,7 +1125,10 @@ pub async fn create_response(
                             "Response served from cache"
                         );
 
-                        return Ok(Json(response).into_response());
+                        return Ok(with_selected_model_header(
+                            Json(response).into_response(),
+                            auto_decision.as_ref(),
+                        ));
                     }
                     Ok(None) => {
                         debug!("Cache miss");
@@ -1228,6 +1247,7 @@ pub async fn create_response(
                 Some(&request),
                 compression_metadata.as_ref(),
                 routing_strategy.as_deref(),
+                auto_decision.as_ref(),
             )
             .await;
 
@@ -1404,11 +1424,29 @@ pub async fn create_response(
         // server-side, so streaming token-by-token would just add
         // artificial latency without informing the user.
         if wanted_streaming {
-            return Ok(synthesize_sse_response(response));
+            return Ok(with_selected_model_header(
+                synthesize_sse_response(response),
+                auto_decision.as_ref(),
+            ));
         }
 
-        Ok(Json(response).into_response())
+        Ok(with_selected_model_header(
+            Json(response).into_response(),
+            auto_decision.as_ref(),
+        ))
     }
+}
+
+/// Attach the `x-aura-selected-model` header when an auto-routing
+/// decision was applied to this request.
+fn with_selected_model_header(
+    mut response: AxumResponse,
+    decision: Option<&aura_core::AutoDecision>,
+) -> AxumResponse {
+    if let Some((name, value)) = selected_model_header(decision) {
+        response.headers_mut().insert(name, value);
+    }
+    response
 }
 
 /// Build a single-chunk SSE stream from a completed Response.
