@@ -284,19 +284,46 @@ pub async fn resolve_auto_model(
     };
     let oracle = GatewayEligibility::for_request(state, request);
 
-    // Optional LLM classifier for real `auto` requests (shadow decisions
-    // stay on the free heuristic).
-    let override_tier = if !shadow && router.effective_classifier(&ctx) == ClassifierKind::Llm {
-        let features = router.features(request);
-        llm_classify(
-            state,
-            &router.config().llm_classifier,
-            &features,
-            &last_user_excerpt(request),
-        )
-        .await
-    } else {
+    // Optional non-heuristic classifiers for real `auto` requests
+    // (shadow decisions stay on the free heuristic).
+    let override_tier = if shadow {
         None
+    } else {
+        match router.effective_classifier(&ctx) {
+            ClassifierKind::Llm => {
+                let features = router.features(request);
+                llm_classify(
+                    state,
+                    &router.config().llm_classifier,
+                    &features,
+                    &last_user_excerpt(request),
+                )
+                .await
+            }
+            ClassifierKind::Learned => match state.learned_model() {
+                Some(model) => {
+                    let features = router.features(request);
+                    let mode = router.effective_mode(&ctx);
+                    let (tier, _score, confidence) = model.classify(
+                        &features,
+                        mode,
+                        &router.config().boundaries,
+                        &router.config().mode_offsets,
+                    );
+                    Some(ClassifierOverride {
+                        tier,
+                        classifier: model.classifier_label(),
+                        confidence,
+                    })
+                }
+                None => {
+                    debug!("classifier: learned requested but no model is loaded; using heuristic");
+                    metrics::record_routing_failure("learned_unavailable");
+                    None
+                }
+            },
+            ClassifierKind::Heuristic => None,
+        }
     };
 
     match router.decide_with_override(request, &ctx, &oracle, override_tier) {

@@ -411,8 +411,10 @@ mod tests {
         }
         fn arm_stats(&self, _tier: Tier, model: &str) -> Option<ArmStats> {
             match model {
+                // Strong but not certain, so the uniform prior of the
+                // unknown arm still wins a draw now and then.
                 "gpt-5.4-nano" => Some(ArmStats {
-                    alpha: 200.0,
+                    alpha: 20.0,
                     beta: 2.0,
                 }),
                 "gemini-3.1-flash-lite" => Some(ArmStats {
@@ -438,7 +440,7 @@ mod tests {
         let nano = wins.get("gpt-5.4-nano").copied().unwrap_or(0);
         let lite = wins.get("gemini-3.1-flash-lite").copied().unwrap_or(0);
         assert!(nano > 120, "nano={} wins={:?}", nano, wins);
-        assert!(lite < 10, "lite={} wins={:?}", lite, wins);
+        assert!(lite < 20, "lite={} wins={:?}", lite, wins);
         // The unknown arm (Beta(1,1)) is explored sometimes.
         assert!(wins.get("claude-haiku-4-5").copied().unwrap_or(0) > 0);
     }

@@ -64,7 +64,7 @@ Fine-tune a single request with a top-level `routing` object (an Aura extension,
 | `allow` | string[] | all | Only consider models matching one of these patterns. Patterns match the model id or `provider/model`; a trailing `*` is a prefix wildcard. |
 | `deny` | string[] | none | Never consider models matching one of these patterns. |
 | `sticky` | boolean | `true` | Keep the previous turn's model when this request continues a tool loop (has `function_call_output` items and `previous_response_id`). |
-| `classifier` | `heuristic` \| `llm` | gateway default | Which classifier scores the request. `llm` asks the configured classifier model for the tier (heuristic fallback on any failure); `learned` is reserved for the next release. |
+| `classifier` | `heuristic` \| `llm` \| `learned` | gateway default | Which classifier scores the request. `llm` asks the configured classifier model for the tier; `learned` uses the active trained model. Both fall back to the heuristic when unavailable. |
 
 ## Response
 
@@ -166,6 +166,7 @@ An organization can override the gateway defaults through `organizations.setting
       "enabled": true,
       "shadow_for_pinned_models": false,
       "default_mode": "cost",
+      "default_classifier": "learned",
       "min_tier": "medium",
       "max_tier": "complex",
       "allow": ["anthropic/*"],
@@ -213,6 +214,7 @@ routing:
     gold_sample_rate: 0.0            # e.g. 0.01 = 1% of eligible requests
     gold_judge_model: claude-sonnet-4-6
     gold_max_text_chars: 4000
+    learned_weights_file: null       # or /etc/aura/router-weights.json
 ```
 
 Feature `weights`, `token_thresholds` and every `keywords` list are configurable too; see `config.example.yaml` for the full block. Tier models the gateway cannot serve are dropped at startup with a warning.
@@ -230,6 +232,11 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | `POST /admin/routing/rollup` | Score pending decisions now and refresh arm statistics; returns counts per signal. |
 | `GET /admin/routing/arms` | Learned Beta(α, β) per (tier, model) used by `within_tier: thompson`. |
 | `GET /admin/routing/gold?limit=` | Gold-label summary (cheap sufficed / strong better / ties / failed) and recent pairs. |
+| `GET /admin/routing/models` | Stored classifiers and the one loaded in memory. |
+| `POST /admin/routing/models` | Store a weights JSON (`{"weights": ..., "activate": bool}`), validated against the gateway's feature vector. |
+| `POST /admin/routing/models/{id}/activate` | Activate a stored classifier and load it. |
+| `POST /admin/routing/models/reload` | Re-read the active classifier from the database or weights file. |
+| `POST /admin/routing/models/deactivate` | Unload and deactivate every classifier (back to the heuristic). |
 | `POST /admin/routing/score` | Dry-run the router on a request body; returns the decision, dispatches nothing. |
 
 The admin app's Routing page renders the same data as an "Auto router" section.
@@ -257,6 +264,10 @@ Tool-loop continuation turns (function outputs without a new user message) are n
 ### Gold labels
 
 With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self-contained text requests (no tools, images or continuations) is answered in the background by the cheapest eligible model of the lowest tier (A) and of the highest tier (B); `gold_judge_model` (default `claude-sonnet-4-6`) grades the pair and the result lands in `routing_gold_pairs` with the request's feature vector. A verdict of `a` or `tie` means the cheap tier would have sufficed. This is the augmentation RouteLLM used to train its routers, run on live traffic; it costs two extra completions and a judge call per sampled request, so keep the rate small (1% or less). `GET /admin/routing/gold?limit=` returns the summary and recent pairs.
+
+### Learned classifier
+
+`classifier: learned` (per request, per organization via `default_classifier`, or gateway-wide) scores the request with a multinomial logistic regression over the same 24-number feature vector the heuristic records. The model is trained offline by `scripts/router/train.py` from gold pairs and scored outcomes, exported as JSON with standardisation stats, weights and tier boundaries calibrated to a target strong-model share, and stored in `router_models` (`POST /admin/routing/models`, `.../{id}/activate`, `.../reload`, `.../deactivate`; `GET /admin/routing/models`). The gateway validates the feature list against its own before accepting a model. The expected tier position `Σ pᵢ·i/3` is the score, so `cost` / `balanced` / `quality` offsets keep working; decisions record `classifier: "learned@<version>"` and the probability of the chosen tier as `classifier_confidence`. Without an active model (or on a gateway without a database, `routing.auto.learned_weights_file` can point at the JSON) the heuristic is used and `aura_routing_failures_total{reason="learned_unavailable"}` increments.
 
 ### Replaying captured traffic
 

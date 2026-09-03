@@ -155,5 +155,8 @@ routing:
     gold_sample_rate: 0.0
     gold_judge_model: claude-sonnet-4-6
     gold_max_text_chars: 4000
+    # Learned classifier weights (scripts/router/train.py) for gateways
+    # without a database; the active router_models row wins when present.
+    # learned_weights_file: /etc/aura/router-weights.json
     # keywords: { code: [...], reasoning: [...], technical: [...], simple: [...],
     #             intent_quick: [...], intent_deep: [...] }  — override the built-in lists

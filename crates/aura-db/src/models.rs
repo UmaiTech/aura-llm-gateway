@@ -1071,3 +1071,38 @@ pub struct RoutingGoldSummary {
     pub ties: i64,
     pub failed: i64,
 }
+
+/// Trained auto-router classifier
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RouterModel {
+    pub id: Uuid,
+    pub name: String,
+    pub version: String,
+    pub kind: String,
+    pub weights: serde_json::Value,
+    pub metrics: serde_json::Value,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Trained auto-router classifier without its weights (for listings)
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RouterModelSummary {
+    pub id: Uuid,
+    pub name: String,
+    pub version: String,
+    pub kind: String,
+    pub metrics: serde_json::Value,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// New trained classifier for insertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewRouterModel {
+    pub name: String,
+    pub version: String,
+    pub kind: String,
+    pub weights: serde_json::Value,
+    pub metrics: serde_json::Value,
+}

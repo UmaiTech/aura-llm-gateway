@@ -6,7 +6,7 @@
 mod routes;
 
 use anyhow::Context;
-use aura_core::router::auto::{ArmStats, CatalogSource, TierModels};
+use aura_core::router::auto::{ArmStats, CatalogSource, LearnedModel, TierModels};
 use aura_core::{
     cost::ScrapedPricing, AnthropicProvider, AutoDecision, AutoRouter, BedrockProvider,
     CostCalculator, FireworksProvider, GeminiProvider, HuggingFaceProvider, MistralProvider,
@@ -62,6 +62,8 @@ pub struct AppState {
     /// Learned (tier, model) arm statistics for Thompson sampling,
     /// refreshed by the outcome rollup.
     arm_stats: Arc<std::sync::RwLock<HashMap<(String, String), ArmStats>>>,
+    /// Active learned classifier (`classifier: learned`), if any.
+    learned_model: Arc<std::sync::RwLock<Option<Arc<LearnedModel>>>>,
 }
 
 /// How long organization settings are cached before being re-read.
@@ -379,7 +381,57 @@ impl AppState {
             model_catalog: Arc::new(model_catalog),
             org_settings_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             arm_stats: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            learned_model: Arc::new(std::sync::RwLock::new(None)),
         }
+    }
+
+    /// The active learned classifier, if one is loaded.
+    pub fn learned_model(&self) -> Option<Arc<LearnedModel>> {
+        self.learned_model.read().ok().and_then(|g| g.clone())
+    }
+
+    /// Install (or clear) the learned classifier.
+    pub fn set_learned_model(&self, model: Option<LearnedModel>) {
+        if let Ok(mut guard) = self.learned_model.write() {
+            *guard = model.map(Arc::new);
+        }
+    }
+
+    /// Load the learned classifier: the active `router_models` row when a
+    /// database is present, else `routing.auto.learned_weights_file`.
+    /// Returns a description of what was loaded.
+    pub async fn reload_learned_model(&self) -> Result<Option<String>, String> {
+        if let Some(pool) = &self.db_pool {
+            match aura_db::RouterModelRepo::active(pool).await {
+                Ok(Some(row)) => {
+                    let model = LearnedModel::from_json(&row.weights)?;
+                    let label = model.classifier_label();
+                    self.set_learned_model(Some(model));
+                    return Ok(Some(label));
+                }
+                Ok(None) => {}
+                Err(e) => return Err(format!("failed to read router_models: {e}")),
+            }
+        }
+        let path = self
+            .config
+            .routing
+            .auto
+            .learned_weights_file
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty());
+        if let Some(path) = path {
+            let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+            let json: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?;
+            let model = LearnedModel::from_json(&json)?;
+            let label = model.classifier_label();
+            self.set_learned_model(Some(model));
+            return Ok(Some(label));
+        }
+        self.set_learned_model(None);
+        Ok(None)
     }
 
     /// Arm statistics for a (tier, model), if the rollup has produced any.
@@ -1424,6 +1476,13 @@ async fn main() -> anyhow::Result<()> {
     // Score past auto-routing decisions on a schedule (no-op without a
     // database or a configured router).
     routes::routing_rollup::spawn_rollup_loop(state.clone());
+
+    // Learned classifier, if one is active in the database or on disk.
+    match state.reload_learned_model().await {
+        Ok(Some(label)) => info!(classifier = %label, "Learned router classifier loaded"),
+        Ok(None) => debug!("No learned router classifier configured"),
+        Err(e) => warn!(error = %e, "Failed to load learned router classifier"),
+    }
 
     info!(
         providers = state.provider_names().len(),

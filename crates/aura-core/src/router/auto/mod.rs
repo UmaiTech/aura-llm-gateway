@@ -21,6 +21,7 @@ pub mod capabilities;
 pub mod catalog;
 pub mod config;
 pub mod features;
+pub mod learned;
 pub mod llm;
 pub mod outcomes;
 pub mod scorer;
@@ -35,6 +36,7 @@ pub use config::{
 pub use features::{
     estimate_tokens, extract_features, IntentHint, KeywordMatcher, RequestFeatures,
 };
+pub use learned::{featurize, LearnedModel, LearnedModelError, LearnedPrediction, FEATURE_NAMES};
 pub use llm::{
     classifier_prompt, judge_prompt, parse_classifier_output, parse_judge_output, ClassifierAnswer,
     JudgeAnswer, JudgeVerdict, CLASSIFIER_EXCERPT_CHARS,

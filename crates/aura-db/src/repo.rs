@@ -2435,3 +2435,73 @@ impl RoutingGoldPairRepo {
         Ok(row)
     }
 }
+
+/// Repository for trained auto-router classifiers
+pub struct RouterModelRepo;
+
+impl RouterModelRepo {
+    /// Insert (or replace the weights of) a model version.
+    pub async fn upsert(pool: &DbPool, new: NewRouterModel) -> Result<RouterModelSummary, DbError> {
+        let row = sqlx::query_as::<_, RouterModelSummary>(
+            r#"
+            INSERT INTO router_models (name, version, kind, weights, metrics)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (name, version) DO UPDATE SET
+                kind = EXCLUDED.kind,
+                weights = EXCLUDED.weights,
+                metrics = EXCLUDED.metrics
+            RETURNING id, name, version, kind, metrics, is_active, created_at
+            "#,
+        )
+        .bind(&new.name)
+        .bind(&new.version)
+        .bind(&new.kind)
+        .bind(&new.weights)
+        .bind(&new.metrics)
+        .fetch_one(pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// All models, newest first, without weights.
+    pub async fn list(pool: &DbPool) -> Result<Vec<RouterModelSummary>, DbError> {
+        let rows = sqlx::query_as::<_, RouterModelSummary>(
+            "SELECT id, name, version, kind, metrics, is_active, created_at FROM router_models ORDER BY created_at DESC",
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// The active model with weights, if any.
+    pub async fn active(pool: &DbPool) -> Result<Option<RouterModel>, DbError> {
+        let row =
+            sqlx::query_as::<_, RouterModel>("SELECT * FROM router_models WHERE is_active LIMIT 1")
+                .fetch_optional(pool)
+                .await?;
+        Ok(row)
+    }
+
+    /// Make one model active (and every other inactive). Returns false
+    /// when the id does not exist.
+    pub async fn activate(pool: &DbPool, id: Uuid) -> Result<bool, DbError> {
+        let mut tx = pool.begin().await?;
+        sqlx::query("UPDATE router_models SET is_active = FALSE WHERE is_active")
+            .execute(&mut *tx)
+            .await?;
+        let result = sqlx::query("UPDATE router_models SET is_active = TRUE WHERE id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Deactivate every model.
+    pub async fn deactivate_all(pool: &DbPool) -> Result<(), DbError> {
+        sqlx::query("UPDATE router_models SET is_active = FALSE WHERE is_active")
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+}

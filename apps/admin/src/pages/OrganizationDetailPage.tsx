@@ -60,6 +60,7 @@ export function OrganizationDetailPage() {
   const [routingEnabled, setRoutingEnabled] = useState<'inherit' | 'on' | 'off'>('inherit')
   const [routingShadow, setRoutingShadow] = useState<'inherit' | 'on' | 'off'>('inherit')
   const [routingMode, setRoutingMode] = useState<'inherit' | 'cost' | 'balanced' | 'quality'>('inherit')
+  const [routingClassifier, setRoutingClassifier] = useState<'inherit' | 'heuristic' | 'llm' | 'learned'>('inherit')
   const [routingMinTier, setRoutingMinTier] = useState<string>('inherit')
   const [routingMaxTier, setRoutingMaxTier] = useState<string>('inherit')
   const [routingAllow, setRoutingAllow] = useState('')
@@ -148,6 +149,7 @@ export function OrganizationDetailPage() {
     if (routingEnabled !== 'inherit') auto.enabled = routingEnabled === 'on'
     if (routingShadow !== 'inherit') auto.shadow_for_pinned_models = routingShadow === 'on'
     if (routingMode !== 'inherit') auto.default_mode = routingMode
+    if (routingClassifier !== 'inherit') auto.default_classifier = routingClassifier
     if (routingMinTier !== 'inherit') auto.min_tier = routingMinTier
     if (routingMaxTier !== 'inherit') auto.max_tier = routingMaxTier
     const allow = list(routingAllow)
@@ -567,6 +569,21 @@ export function OrganizationDetailPage() {
                   </select>
                 </label>
                 <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Classifier</span>
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingClassifier}
+                    onChange={(e) =>
+                      setRoutingClassifier(e.target.value as 'inherit' | 'heuristic' | 'llm' | 'learned')
+                    }
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="heuristic">Heuristic</option>
+                    <option value="llm">LLM</option>
+                    <option value="learned">Learned model</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Minimum tier</span>
                   <select
                     className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
@@ -594,7 +611,6 @@ export function OrganizationDetailPage() {
                     <option value="reasoning">Reasoning</option>
                   </select>
                 </label>
-                <div className="hidden md:block" />
                 <label className="space-y-1 md:col-span-3 lg:col-span-1">
                   <span className="text-xs text-muted-foreground">Allow (one pattern per line)</span>
                   <textarea
