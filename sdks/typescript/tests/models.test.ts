@@ -11,6 +11,7 @@ describe('KnownModels', () => {
     expect(KnownModels.CLAUDE_OPUS_5).toBe('claude-opus-5')
     expect(KnownModels.CLAUDE_SONNET_5).toBe('claude-sonnet-5')
     expect(KnownModels.GEMINI_3_7_FLASH).toBe('gemini-3.7-flash')
+    expect(KnownModels.GEMINI_3_8_FLASH).toBe('gemini-3.8-flash')
     expect(KnownModels.FIREWORKS_GPT_OSS_20B).toBe('accounts/fireworks/models/gpt-oss-20b')
   })
 

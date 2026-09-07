@@ -12,6 +12,7 @@ def test_fireworks_catalog_exposed() -> None:
     assert KnownModels.CLAUDE_OPUS_5 == "claude-opus-5"
     assert KnownModels.CLAUDE_SONNET_5 == "claude-sonnet-5"
     assert KnownModels.GEMINI_3_7_FLASH == "gemini-3.7-flash"
+    assert KnownModels.GEMINI_3_8_FLASH == "gemini-3.8-flash"
     assert KnownModels.FIREWORKS_GPT_OSS_20B == "accounts/fireworks/models/gpt-oss-20b"
 
 

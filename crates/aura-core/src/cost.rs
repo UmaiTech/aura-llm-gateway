@@ -417,10 +417,14 @@ impl CostCalculator {
         // and updating $/MTok from https://ai.google.dev/pricing.
         // =================================================================
 
-        // Gemini 3.6 / 3.7 Flash (GA 2026-07-21 / 2026-08-13) and
+        // Gemini 3.6 / 3.7 / 3.8 Flash (GA 2026-07-21 / 08-13 / 09-02) and
         // 3.5 Flash-Lite (GA 2026-07-21). The Flash rows are Google's
         // introductory price through 2026-12-31; the standard rate from
         // 2027-01-01 is $1.50 / $7.50.
+        pricing.insert(
+            "gemini-3.8-flash".to_string(),
+            ModelPricing::new(0.75, 3.75).with_cached(0.075),
+        );
         pricing.insert(
             "gemini-3.7-flash".to_string(),
             ModelPricing::new(0.75, 3.75).with_cached(0.075),
@@ -923,6 +927,7 @@ mod tests {
             "claude-opus-5",
             "claude-sonnet-5",
             "claude-opus-4-8",
+            "gemini-3.8-flash",
             "gemini-3.7-flash",
             "gemini-3.6-flash",
             "gemini-3.5-flash-lite",

@@ -305,8 +305,9 @@ export const AVAILABLE_MODELS: Model[] = [
   //    version v1beta"
   // when sending requests. See /v1/models against the gateway for
   // the canonical list at any time.
-  // 3.7 / 3.6 Flash and 3.5 Flash-Lite added 2026-09-07 from Google's
-  // model docs (GA 2026-08-13 / 2026-07-21).
+  // 3.8 / 3.7 / 3.6 Flash and 3.5 Flash-Lite added 2026-09-07 from Google's
+  // model docs (GA 2026-09-02 / 08-13 / 07-21).
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'google', tier: 'beta' },

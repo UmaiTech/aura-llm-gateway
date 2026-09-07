@@ -55,8 +55,9 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // Google — ids match Google's models.list (verified 2026-05-22).
   // Approximate $/MTok numbers from the public pricing page; refresh
   // when Google publishes 3.x GA pricing.
-  // 3.6/3.7 Flash are Google's introductory price through 2026-12-31
+  // 3.6/3.7/3.8 Flash are Google's introductory price through 2026-12-31
   // ($1.50 / $7.50 standard from 2027-01-01).
+  'gemini-3.8-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.7-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.6-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.5-flash': { inputPerMillion: 0.20, outputPerMillion: 0.80 },

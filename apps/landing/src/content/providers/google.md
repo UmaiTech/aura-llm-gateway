@@ -10,7 +10,8 @@ Aura provides full support for Google's Gemini models, offering industry-leading
 ## Supported Models
 
 ### Gemini 3.x Flash (Latest)
-- **gemini-3.7-flash** - Google's most intelligent workhorse model for coding and agents (GA 2026-08-13)
+- **gemini-3.8-flash** - Newest Flash, tuned for long-horizon coding and autonomous agents (GA 2026-09-02); spends more thinking tokens than 3.7
+- **gemini-3.7-flash** - Efficiency-first workhorse for coding and agents (GA 2026-08-13)
 - **gemini-3.6-flash** - Previous Flash generation (GA 2026-07-21)
 - **gemini-3.5-flash** - Earlier Flash generation
 - **gemini-3.5-flash-lite** - Lowest-cost 3.x option (GA 2026-07-21)
@@ -33,24 +34,25 @@ Gemini 1.5 models have been retired by Google and are no longer routable.
 
 ## Model Capabilities
 
-| Feature | 3.7 Flash | 3.6 Flash | 3.5 Flash-Lite | 3.1 Pro (preview) | 2.5 Pro | 2.0 Flash |
-|---------|-----------|-----------|----------------|-------------------|---------|-----------|
-| **Text Generation** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Tool/Function Calling** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Vision/Multimodal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Audio Input** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **Video Input** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **JSON Mode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Context Window** | 1M | 1M | 1M | 1M | 1M | 1M |
-| **Max Output** | 64K | 64K | 64K | 64K | 64K | 8K |
+| Feature | 3.8 Flash | 3.7 Flash | 3.6 Flash | 3.5 Flash-Lite | 3.1 Pro (preview) | 2.5 Pro | 2.0 Flash |
+|---------|-----------|-----------|-----------|----------------|-------------------|---------|-----------|
+| **Text Generation** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Tool/Function Calling** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Vision/Multimodal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Audio Input** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Video Input** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **JSON Mode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Context Window** | 1M | 1M | 1M | 1M | 1M | 1M | 1M |
+| **Max Output** | 64K | 64K | 64K | 64K | 64K | 64K | 8K |
 
 ## Pricing
 
-*Prices per 1M tokens (USD), as published 2026-09-07. Gemini 3.6 / 3.7 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
+*Prices per 1M tokens (USD), as published 2026-09-07. Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| **gemini-3.8-flash** | $0.75 | $3.75 | $0.075 |
 | **gemini-3.7-flash** | $0.75 | $3.75 | $0.075 |
 | **gemini-3.6-flash** | $0.75 | $3.75 | $0.075 |
 | **gemini-3.5-flash** | $0.20 | $0.80 | $0.05 |

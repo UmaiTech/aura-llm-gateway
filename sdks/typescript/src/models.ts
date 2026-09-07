@@ -38,6 +38,7 @@ export const KnownModels = {
   CLAUDE_HAIKU_4_5: 'claude-haiku-4-5-20251001',
 
   // Google
+  GEMINI_3_8_FLASH: 'gemini-3.8-flash',
   GEMINI_3_7_FLASH: 'gemini-3.7-flash',
   GEMINI_3_6_FLASH: 'gemini-3.6-flash',
   GEMINI_3_5_FLASH: 'gemini-3.5-flash',

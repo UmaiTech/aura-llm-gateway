@@ -82,7 +82,7 @@ export function SettingsPage() {
                         <option value="claude-sonnet-5">claude-sonnet-5</option>
                         <option value="claude-opus-5">claude-opus-5</option>
                         <option value="claude-fable-5-1">claude-fable-5-1</option>
-                        <option value="gemini-3.7-flash">gemini-3.7-flash</option>
+                        <option value="gemini-3.8-flash">gemini-3.8-flash</option>
                         <option value="gpt-4o">gpt-4o (legacy)</option>
                       </select>
                     </div>

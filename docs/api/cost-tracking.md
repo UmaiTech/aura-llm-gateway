@@ -140,10 +140,11 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 
 ### Google Models
 
-Gemini 3.6 / 3.7 Flash are Google's introductory rate through 2026-12-31 ($1.50 / $7.50 standard from 2027-01-01).
+Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31 ($1.50 / $7.50 standard from 2027-01-01).
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| gemini-3.8-flash | $0.75 | $3.75 | $0.075 |
 | gemini-3.7-flash | $0.75 | $3.75 | $0.075 |
 | gemini-3.6-flash | $0.75 | $3.75 | $0.075 |
 | gemini-3.5-flash | $0.20 | $0.80 | $0.05 |

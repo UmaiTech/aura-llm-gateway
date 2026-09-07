@@ -51,6 +51,7 @@ const FALLBACK_MODELS: Model[] = [
   { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', inputPrice: 1.0, outputPrice: 5.0, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
   // Google — ids match the gateway's SUPPORTED_MODELS (the old bare
   // 'gemini-3-pro' / 'gemini-3-flash' ids do not exist upstream).
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', provider: 'google', inputPrice: 0.3, outputPrice: 2.5, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
