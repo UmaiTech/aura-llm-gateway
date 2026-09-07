@@ -15,6 +15,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pricingPool } from '../cron/_db.js'
+import { dedupeCurrentRows } from '../cron/_normalize.js'
 import { PROVIDERS } from '../cron/_providers.js'
 
 /** provider name → { description, models_url } from the scraper config. */
@@ -58,7 +59,9 @@ export default async function handler(
   }
 
   try {
-    const rows = await fetchCurrentPrices()
+    // One row per (provider, model): seed rows and scraper rows for the
+    // same model used to both be "current" and rendered twice on /pricing.
+    const rows = dedupeCurrentRows(await fetchCurrentPrices())
     const lastRun = await fetchLastRun()
     const rates = await fetchExchangeRates()
 

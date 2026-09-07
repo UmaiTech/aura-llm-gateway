@@ -30,21 +30,34 @@ class KnownModels(str, Enum):
     can be passed anywhere a model string is expected.
     """
 
-    # OpenAI
+    # OpenAI (September 2026 line first)
+    GPT_6_ASTRA = "gpt-6-astra"
+    GPT_5_6_SOL = "gpt-5.6-sol"
+    GPT_5_6_TERRA = "gpt-5.6-terra"
+    GPT_5_6_LUNA = "gpt-5.6-luna"
+    GPT_5_5 = "gpt-5.5"
     GPT_5_4 = "gpt-5.4"
     GPT_5_4_MINI = "gpt-5.4-mini"
     GPT_5_4_NANO = "gpt-5.4-nano"
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
 
-    # Anthropic
+    # Anthropic (Claude 5-generation ids carry no date suffix)
+    CLAUDE_FABLE_5_1 = "claude-fable-5-1"
+    CLAUDE_OPUS_5 = "claude-opus-5"
+    CLAUDE_SONNET_5 = "claude-sonnet-5"
+    CLAUDE_OPUS_4_8 = "claude-opus-4-8"
     CLAUDE_OPUS_4_7 = "claude-opus-4-7"
     CLAUDE_SONNET_4_6 = "claude-sonnet-4-6"
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
 
     # Google
-    GEMINI_3_PRO = "gemini-3-pro-preview"
+    GEMINI_3_8_FLASH = "gemini-3.8-flash"
+    GEMINI_3_7_FLASH = "gemini-3.7-flash"
+    GEMINI_3_6_FLASH = "gemini-3.6-flash"
     GEMINI_3_5_FLASH = "gemini-3.5-flash"
+    GEMINI_3_5_FLASH_LITE = "gemini-3.5-flash-lite"
+    GEMINI_3_PRO = "gemini-3-pro-preview"
 
     # Fireworks AI — serverless open-weight catalog (see gateway issue #209).
     # IDs are namespaced as accounts/fireworks/models/<slug>.
