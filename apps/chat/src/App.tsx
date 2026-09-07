@@ -9,7 +9,7 @@ import { generateId } from './lib/utils'
 import { AuraAPI } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, CompressionMetadata, ConsistencyMetadataResponse, ValidationMetadataResponse } from './lib/types'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, CompressionMetadata, ConsistencyMetadataResponse, ValidationMetadataResponse, RoutingDecisionMetadata } from './lib/types'
 
 // In production the chat hits same-origin /api/proxy (a serverless
 // function that holds the per-user gateway API key).
@@ -215,6 +215,8 @@ export default function App() {
               compression?: CompressionMetadata
               consistency?: ConsistencyMetadataResponse
               validation?: ValidationMetadataResponse
+              routing_strategy?: string
+              routing?: RoutingDecisionMetadata
             } }
           }
 
@@ -251,6 +253,8 @@ export default function App() {
             compression: auraMetadata.compression,
             consistency: auraMetadata.consistency,
             validation: auraMetadata.validation,
+            routingStrategy: auraMetadata.routing_strategy,
+            routing: auraMetadata.routing,
           } : undefined
 
           console.log('[Standard Chat] Response completed:', {
@@ -490,6 +494,8 @@ export default function App() {
                         compression?: CompressionMetadata
                         consistency?: ConsistencyMetadataResponse
                         validation?: ValidationMetadataResponse
+                        routing_strategy?: string
+                        routing?: RoutingDecisionMetadata
                       }
                     } | undefined
                     if (metadata?.aura) {
@@ -501,6 +507,8 @@ export default function App() {
                         compression: metadata.aura.compression,
                         consistency: metadata.aura.consistency,
                         validation: metadata.aura.validation,
+                        routingStrategy: metadata.aura.routing_strategy,
+                        routing: metadata.aura.routing,
                       }
                     }
 

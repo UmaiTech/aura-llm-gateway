@@ -61,6 +61,48 @@ export interface CompressionConfigResponse {
   auto_select?: boolean
 }
 
+// One model the auto router considered for a request.
+export interface RoutingCandidate {
+  model: string
+  provider?: string | null
+  tier: 'simple' | 'medium' | 'complex' | 'reasoning'
+  cost_per_million?: number | null
+  eligible: boolean
+  predicted_cost_usd?: number | null
+}
+
+// A provider failure the auto router escalated past.
+export interface RoutingEscalation {
+  from_model: string
+  from_tier: string
+  to_model: string
+  to_tier: string
+  error_code: string
+}
+
+// The auto router's decision, as returned in metadata.aura.routing.
+// Mirrors AutoDecision in crates/aura-core/src/router/auto/mod.rs.
+export interface RoutingDecisionMetadata {
+  requested_model: string
+  mode: 'cost' | 'balanced' | 'quality' | string
+  classifier: string
+  score: number
+  raw_score: number
+  classified_tier: string
+  tier: string
+  signals?: Record<string, number>
+  features?: Record<string, unknown>
+  hard_filters?: string[]
+  candidates?: RoutingCandidate[]
+  selected: string
+  selected_provider?: string | null
+  reason: string
+  shadow: boolean
+  latency_us?: number
+  escalations?: RoutingEscalation[]
+  predicted_cost_usd?: number | null
+}
+
 // Aura gateway enrichment metadata
 export interface AuraMetadata {
   provider: string      // e.g., "openai", "anthropic", "google"
@@ -76,6 +118,9 @@ export interface AuraMetadata {
   consistency?: ConsistencyMetadataResponse
   compression_enabled?: boolean
   compression_config?: CompressionConfigResponse
+  // Auto model routing (model: "auto"): the decision, plus the
+  // routing_strategy label ("auto:<tier>") the gateway recorded.
+  routing?: RoutingDecisionMetadata
 }
 
 // Routing strategies available

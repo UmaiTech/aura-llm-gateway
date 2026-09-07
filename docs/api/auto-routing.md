@@ -15,6 +15,67 @@ Send `model: "auto"` and Aura scores the request's complexity, maps it to a tier
 
 Only models the gateway can actually serve (a provider key is configured) are ever considered. Tier lists are configurable per gateway; when none are configured the gateway derives them from its model catalog (price thirds, `reasoning` tag) at startup.
 
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Request["Per request (crates/aura-proxy → aura-core/router/auto)"]
+        direction LR
+        A["model: auto[:mode]<br/>+ routing options"] --> B["Features<br/>tokens, code, reasoning,<br/>tools, images, intent"]
+        B --> C{"Classifier"}
+        C -->|heuristic| D["Complexity score<br/>+ mode offset"]
+        C -->|learned_lr| D
+        C -->|llm| D
+        D --> E["Tier<br/>simple · medium ·<br/>complex · reasoning"]
+        E --> F["Hard filters<br/>vision · tools · context ·<br/>allow/deny · breaker"]
+        F --> G["Within-tier pick<br/>list price · Thompson ·<br/>predicted cost · budget"]
+        G --> H["Provider call<br/>escalate on failure"]
+    end
+    subgraph Inputs
+        K[("Model catalog<br/>model_pricing")]
+        O[("Org overrides<br/>organizations.settings")]
+        M[("router_models<br/>learned_lr · cost_lr")]
+        S[("routing_arm_stats")]
+    end
+    K --> F
+    O --> E
+    M --> C
+    M --> G
+    S --> G
+    H --> R["Response<br/>metadata.aura.routing<br/>x-aura-selected-model"]
+    H --> L[("routing_decisions")]
+```
+
+Every decision is made in-process from numeric features (no prompt text leaves the gateway unless you opt into the LLM classifier), takes well under a millisecond with the heuristic or learned classifier, and is recorded whether it was applied or only shadowed.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as Client
+    participant Proxy as aura-proxy<br/>/v1/responses
+    participant Router as AutoRouter<br/>(aura-core)
+    participant Oracle as GatewayEligibility<br/>catalog · breaker · cost model
+    participant Provider as Provider
+    participant DB as Postgres
+
+    App->>Proxy: POST model "auto:balanced", input, tools, routing{…}
+    Proxy->>Proxy: merge org overrides<br/>(modes, min/max tier, allow/deny, max_cost_usd)
+    Proxy->>Router: decide(request, context, oracle)
+    Router->>Router: extract features → classify → tier
+    Router->>Oracle: is_eligible(model)? predicted_cost_usd(model)? arm_stats?
+    Oracle-->>Router: eligible candidates with prices / predictions
+    Router-->>Proxy: AutoDecision (tier, candidates, selected, reason)
+    Proxy->>Provider: request with the selected model
+    alt provider fails before any output
+        Provider-->>Proxy: 429 / 5xx / timeout
+        Proxy->>Router: next candidate (same tier, then up)
+        Proxy->>Provider: retry on the escalation target
+    end
+    Provider-->>Proxy: response / stream
+    Proxy-->>App: model = selected, metadata.aura.routing, x-aura-selected-model
+    Proxy--)DB: upsert routing_decisions (features, decision, shadow flag)
+```
+
 ## Request
 
 ```json
@@ -238,6 +299,26 @@ Feature `weights`, `token_thresholds` and every `keywords` list are configurable
 ## Decision log
 
 Every decision, applied or shadow, is stored in the `routing_decisions` table (numeric features only, never prompt text) and joined with what actually happened in the `v_routing_outcomes` view: request status, tokens, cost, latency, explicit feedback, and for shadow rows an `estimated_savings_usd` computed from the pinned model's and the auto-selected model's blended prices at this request's token counts.
+
+The stored decisions close a learning loop that runs entirely on the gateway's own traces:
+
+```mermaid
+flowchart TB
+    D[("routing_decisions<br/>features · tier · selected · shadow")] --> V["v_routing_outcomes<br/>⨝ request_logs, feedback, next turn"]
+    V --> RO["Outcome rollup<br/>every 15 min or POST /admin/routing/rollup"]
+    RO --> RW[("routing_outcomes<br/>reward per decision")]
+    RW --> AS[("routing_arm_stats<br/>Beta(α, β) per tier × model")]
+    AS -->|within_tier: thompson| Router["AutoRouter"]
+    RW --> T1["scripts/router/train.py<br/>learned classifier"]
+    GL[("routing_gold<br/>cheap vs strong pairs")] --> T1
+    D --> T2["scripts/router/train_cost.py<br/>cost model"]
+    V --> T2
+    T1 --> RM[("router_models<br/>one active per kind")]
+    T2 --> RM
+    RM -->|classifier: learned| Router
+    RM -->|within_tier: predicted_cost<br/>max_cost_usd| Router
+    RP["scripts/router/replay.py<br/>dry-run on captured traffic"] -.-> Router
+```
 
 Admin endpoints (bearer `AURA_ADMIN_KEY`):
 

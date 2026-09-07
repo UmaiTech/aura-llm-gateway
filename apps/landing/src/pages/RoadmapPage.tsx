@@ -230,6 +230,8 @@ const releases: Release[] = [
       { label: 'Auto-updating pricing scraper', note: 'Weekly Vercel cron scrapes each provider’s own pricing page (9 providers incl. Together & Fireworks) into versioned price history, with batch-tier prices and conservative validation.' },
       { label: 'Public pricing page', note: 'aura-llm.dev/pricing — live scraped prices across every provider, filterable, with expandable per-model detail and inferred capability tags.' },
       { label: 'Auto model routing', note: 'model: "auto" scores each request\'s complexity and dispatches to the cheapest capable model in a tier; auto:cost / auto:quality shift the dial, every response explains the decision, and pinned-model traffic is shadow-scored for savings reporting.' },
+      { label: 'Auto router learns from your traffic', note: 'Outcome signals (retries, corrections, feedback) score every decision; Thompson sampling, a learned tier classifier and a learned per-request cost model are trained from the gateway\'s own logs. Per-request budgets (max_cost_usd) and provider-failure escalation with a per-model circuit breaker.' },
+      { label: 'Routing inspector in the playground', note: 'Every auto-routed answer shows its tier, score, signals, candidates with predicted cost and the reason it was picked.' },
     ],
     issueRefs: ['#123', '#209'],
   },
