@@ -285,7 +285,7 @@ All five recommendations were accepted before PR 1:
 
 ## Status
 
-Delivered as eight stacked PRs, each on the previous one's branch:
+Delivered as nine stacked PRs, each on the previous one's branch:
 
 | # | PR | Branch | What changed from the plan |
 |---|---|---|---|
@@ -297,8 +297,49 @@ Delivered as eight stacked PRs, each on the previous one's branch:
 | 6 | [#222](https://github.com/UmaiTech/aura-llm-gateway/pull/222) LLM classifier, gold labels, replay | `claude/auto-router-6-llm-classifier-gold` | Gold pairs compare the lowest and highest populated tiers; `POST /admin/routing/score` is the dry-run surface `replay.py` uses. |
 | 7 | [#223](https://github.com/UmaiTech/aura-llm-gateway/pull/223) learned classifier, model registry | `claude/auto-router-7-learned-classifier` | Numeric features only (no text n-grams) so training needs no retained prompt text; pure-stdlib logistic regression instead of LightGBM. |
 | 8 | [#224](https://github.com/UmaiTech/aura-llm-gateway/pull/224) escalation, circuit breaker | `claude/auto-router-8-escalation` | Escalates within the same tier before moving up; breaker feeds eligibility. |
+| 9 | [#225](https://github.com/UmaiTech/aura-llm-gateway/pull/225) learned cost model, predicted-cost ranking, budgets | `claude/auto-router-9-cost-model` | Not in the original plan. Per-model closed-form ridge on the classifier's feature vector predicts output length → per-request cost; powers `within_tier: predicted_cost` and `routing.max_cost_usd`. One active `router_models` row per kind. |
 
-Merge in order (1 → 8); each PR's base is the previous branch, so GitHub retargets automatically as they land.
+Merge in order (1 → 9); each PR's base is the previous branch, so GitHub retargets automatically as they land.
+
+## Follow-ups
+
+### Budget-aware allocation (linear program)
+
+Today every decision is a per-request argmin: classify the tier, then pick
+one candidate by list price, Thompson reward, or predicted cost. That is
+the right shape per request, but it cannot honour a *fleet-level*
+constraint such as "spend at most $X per day on this org" or "at most Y
+requests/min on provider Z" while still maximising quality. That is a
+linear program:
+
+- **Variables** `x[t, m]`: fraction of tier-`t` traffic sent to eligible
+  model `m` (`Σ_m x[t, m] = 1`, `x ≥ 0`).
+- **Objective** maximise `Σ_t v_t · Σ_m x[t, m] · q[t, m]` where `q` is the
+  arm's mean reward from `routing_arm_stats` and `v_t` the tier's traffic
+  volume over the window.
+- **Constraints** `Σ_t v_t · Σ_m x[t, m] · c[t, m] ≤ budget` with `c` the
+  mean predicted cost per (tier, model) from the cost model; optional
+  per-provider throughput caps `Σ_t v_t · Σ_{m ∈ provider} x[t, m] ≤ cap`.
+
+With a single budget constraint the optimum is greedy: sort arms by
+`(q − q_cheapest) / (c − c_cheapest)` and buy quality-per-dollar until the
+budget runs out, with at most one fractional arm. Simplex is only needed
+once provider caps or several budgets are added; the problem stays tiny
+(4 tiers × ~10 models, a handful of constraints), so a small dense
+simplex in `aura-core` with no new crates is fine.
+
+Proposed shape: solve in the rollup job (it already has the arm stats and
+volumes), store the mixing weights per org in `organizations.settings.
+routing.auto.allocation`, and add `WithinTierStrategy::Allocation` that
+samples a candidate from those weights. Per-request `max_cost_usd` keeps
+working as a hard filter on top. Not started.
+
+### Docs, diagrams and the playground
+
+Architecture and sequence diagrams for the whole pipeline, public docs on
+the landing site, and a routing inspector in the chat playground that
+shows the decision (`metadata.aura.routing`) next to the answer: PR 10.
+
 
 ---
 
