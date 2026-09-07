@@ -49,6 +49,45 @@ export function canonicalModelId(raw: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+/**
+ * SQL twin of `canonicalModelId` for matching against `model_pricing.model_id`
+ * in Postgres. Must stay in sync with the function above: lowercase, collapse
+ * every run of non-alphanumerics to '-', trim leading/trailing '-'.
+ */
+export const CANONICAL_MODEL_ID_SQL =
+  "btrim(regexp_replace(lower(model_id), '[^a-z0-9]+', '-', 'g'), '-')"
+
+/**
+ * Collapse "current" pricing rows that are really the same model.
+ *
+ * `model_pricing` has no uniqueness on the open (`effective_until IS NULL`)
+ * row, so siblings accumulate from two sources: seed rows from migrations
+ * carry the provider's API id (`gpt-3.5-turbo`) while the scraper wrote the
+ * canonical slug (`gpt-3-5-turbo`), and the LLM extractor drifts between
+ * runs. Each sibling rendered as a duplicate row on /pricing. Group by
+ * (provider, canonical id) and keep the newest `effective_from` — the most
+ * recently scraped price — preserving first-seen order.
+ */
+export function dedupeCurrentRows<
+  T extends { provider: string; model_id: string; effective_from: Date | string },
+>(rows: T[]): T[] {
+  const best = new Map<string, T>()
+  const order: string[] = []
+  for (const r of rows) {
+    const key = `${r.provider}\u0000${canonicalModelId(r.model_id)}`
+    const cur = best.get(key)
+    if (!cur) {
+      best.set(key, r)
+      order.push(key)
+    } else if (
+      new Date(r.effective_from).getTime() > new Date(cur.effective_from).getTime()
+    ) {
+      best.set(key, r)
+    }
+  }
+  return order.map((k) => best.get(k) as T)
+}
+
 function isUsablePrice(n: number | null | undefined): n is number {
   return typeof n === 'number' && Number.isFinite(n) && n >= 0
 }
