@@ -285,7 +285,7 @@ All five recommendations were accepted before PR 1:
 
 ## Status
 
-Delivered as nine stacked PRs, each on the previous one's branch:
+Delivered as ten stacked PRs, each on the previous one's branch:
 
 | # | PR | Branch | What changed from the plan |
 |---|---|---|---|
@@ -298,8 +298,9 @@ Delivered as nine stacked PRs, each on the previous one's branch:
 | 7 | [#223](https://github.com/UmaiTech/aura-llm-gateway/pull/223) learned classifier, model registry | `claude/auto-router-7-learned-classifier` | Numeric features only (no text n-grams) so training needs no retained prompt text; pure-stdlib logistic regression instead of LightGBM. |
 | 8 | [#224](https://github.com/UmaiTech/aura-llm-gateway/pull/224) escalation, circuit breaker | `claude/auto-router-8-escalation` | Escalates within the same tier before moving up; breaker feeds eligibility. |
 | 9 | [#225](https://github.com/UmaiTech/aura-llm-gateway/pull/225) learned cost model, predicted-cost ranking, budgets | `claude/auto-router-9-cost-model` | Not in the original plan. Per-model closed-form ridge on the classifier's feature vector predicts output length → per-request cost; powers `within_tier: predicted_cost` and `routing.max_cost_usd`. One active `router_models` row per kind. |
+| 10 | [#226](https://github.com/UmaiTech/aura-llm-gateway/pull/226) diagrams, public docs, playground inspector | `claude/auto-router-10-docs-playground` | Architecture, sequence and learning-loop diagrams in `docs/api/auto-routing.md`; public page on the landing site; the chat playground shows each decision (score bar, signals, candidates with predicted cost, reason) under the answer. |
 
-Merge in order (1 → 9); each PR's base is the previous branch, so GitHub retargets automatically as they land.
+Merge in order (1 → 10); each PR's base is the previous branch, so GitHub retargets automatically as they land.
 
 ## Follow-ups
 
@@ -334,11 +335,6 @@ routing.auto.allocation`, and add `WithinTierStrategy::Allocation` that
 samples a candidate from those weights. Per-request `max_cost_usd` keeps
 working as a hard filter on top. Not started.
 
-### Docs, diagrams and the playground
-
-Architecture and sequence diagrams for the whole pipeline, public docs on
-the landing site, and a routing inspector in the chat playground that
-shows the decision (`metadata.aura.routing`) next to the answer: PR 10.
 
 
 ---
