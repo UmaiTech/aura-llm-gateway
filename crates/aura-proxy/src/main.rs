@@ -6,7 +6,9 @@
 mod routes;
 
 use anyhow::Context;
-use aura_core::router::auto::{ArmStats, CatalogSource, LearnedModel, TierModels};
+use aura_core::router::auto::{
+    ArmStats, CatalogSource, CostModel, LearnedModel, TierModels, COST_MODEL_KIND,
+};
 use aura_core::{
     cost::ScrapedPricing, AnthropicProvider, AutoDecision, AutoRouter, BedrockProvider,
     CostCalculator, FireworksProvider, GeminiProvider, HuggingFaceProvider, MistralProvider,
@@ -64,6 +66,9 @@ pub struct AppState {
     arm_stats: Arc<std::sync::RwLock<HashMap<(String, String), ArmStats>>>,
     /// Active learned classifier (`classifier: learned`), if any.
     learned_model: Arc<std::sync::RwLock<Option<Arc<LearnedModel>>>>,
+    /// Active learned cost model (`within_tier: predicted_cost`,
+    /// `routing.max_cost_usd`), if any.
+    cost_model: Arc<std::sync::RwLock<Option<Arc<CostModel>>>>,
     /// Per-model circuit breaker fed by auto-routing provider failures.
     model_breaker: Arc<std::sync::Mutex<HashMap<String, BreakerState>>>,
 }
@@ -393,6 +398,7 @@ impl AppState {
             org_settings_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             arm_stats: Arc::new(std::sync::RwLock::new(HashMap::new())),
             learned_model: Arc::new(std::sync::RwLock::new(None)),
+            cost_model: Arc::new(std::sync::RwLock::new(None)),
             model_breaker: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
     }
@@ -450,41 +456,84 @@ impl AppState {
         }
     }
 
-    /// Load the learned classifier: the active `router_models` row when a
-    /// database is present, else `routing.auto.learned_weights_file`.
-    /// Returns a description of what was loaded.
-    pub async fn reload_learned_model(&self) -> Result<Option<String>, String> {
+    /// The active learned cost model, if one is loaded.
+    pub fn cost_model(&self) -> Option<Arc<CostModel>> {
+        self.cost_model.read().ok().and_then(|g| g.clone())
+    }
+
+    /// Install (or clear) the learned cost model.
+    pub fn set_cost_model(&self, model: Option<CostModel>) {
+        if let Ok(mut guard) = self.cost_model.write() {
+            *guard = model.map(Arc::new);
+        }
+    }
+
+    /// Weights JSON for a kind: the active `router_models` row when a
+    /// database is present, else the configured file. `Ok(None)` when
+    /// neither exists.
+    async fn load_model_weights(
+        &self,
+        kind: &str,
+        file: Option<&str>,
+    ) -> Result<Option<serde_json::Value>, String> {
         if let Some(pool) = &self.db_pool {
-            match aura_db::RouterModelRepo::active(pool).await {
-                Ok(Some(row)) => {
-                    let model = LearnedModel::from_json(&row.weights)?;
-                    let label = model.classifier_label();
-                    self.set_learned_model(Some(model));
-                    return Ok(Some(label));
-                }
+            match aura_db::RouterModelRepo::active(pool, kind).await {
+                Ok(Some(row)) => return Ok(Some(row.weights)),
                 Ok(None) => {}
                 Err(e) => return Err(format!("failed to read router_models: {e}")),
             }
         }
-        let path = self
-            .config
-            .routing
-            .auto
-            .learned_weights_file
-            .as_deref()
-            .map(str::trim)
-            .filter(|p| !p.is_empty());
+        let path = file.map(str::trim).filter(|p| !p.is_empty());
         if let Some(path) = path {
             let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
             let json: serde_json::Value =
                 serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?;
-            let model = LearnedModel::from_json(&json)?;
-            let label = model.classifier_label();
-            self.set_learned_model(Some(model));
-            return Ok(Some(label));
+            return Ok(Some(json));
         }
-        self.set_learned_model(None);
         Ok(None)
+    }
+
+    /// Load the learned classifier: the active `learned_lr` row when a
+    /// database is present, else `routing.auto.learned_weights_file`.
+    /// Returns a description of what was loaded.
+    pub async fn reload_learned_model(&self) -> Result<Option<String>, String> {
+        let file = self.config.routing.auto.learned_weights_file.clone();
+        match self
+            .load_model_weights("learned_lr", file.as_deref())
+            .await?
+        {
+            Some(json) => {
+                let model = LearnedModel::from_json(&json)?;
+                let label = model.classifier_label();
+                self.set_learned_model(Some(model));
+                Ok(Some(label))
+            }
+            None => {
+                self.set_learned_model(None);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Load the learned cost model: the active `cost_lr` row when a
+    /// database is present, else `routing.auto.cost_weights_file`.
+    pub async fn reload_cost_model(&self) -> Result<Option<String>, String> {
+        let file = self.config.routing.auto.cost_weights_file.clone();
+        match self
+            .load_model_weights(COST_MODEL_KIND, file.as_deref())
+            .await?
+        {
+            Some(json) => {
+                let model = CostModel::from_json(&json)?;
+                let label = model.label();
+                self.set_cost_model(Some(model));
+                Ok(Some(label))
+            }
+            None => {
+                self.set_cost_model(None);
+                Ok(None)
+            }
+        }
     }
 
     /// Arm statistics for a (tier, model), if the rollup has produced any.
@@ -1531,11 +1580,16 @@ async fn main() -> anyhow::Result<()> {
     // database or a configured router).
     routes::routing_rollup::spawn_rollup_loop(state.clone());
 
-    // Learned classifier, if one is active in the database or on disk.
+    // Learned classifier and cost model, if active in the database or on disk.
     match state.reload_learned_model().await {
         Ok(Some(label)) => info!(classifier = %label, "Learned router classifier loaded"),
         Ok(None) => debug!("No learned router classifier configured"),
         Err(e) => warn!(error = %e, "Failed to load learned router classifier"),
+    }
+    match state.reload_cost_model().await {
+        Ok(Some(label)) => info!(cost_model = %label, "Learned router cost model loaded"),
+        Ok(None) => debug!("No learned router cost model configured"),
+        Err(e) => warn!(error = %e, "Failed to load learned router cost model"),
     }
 
     info!(

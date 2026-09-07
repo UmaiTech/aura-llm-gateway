@@ -1,0 +1,275 @@
+{
+  "kind": "cost_lr",
+  "name": "cost-lr",
+  "version": "test1",
+  "feature_names": [
+    "log_input_tokens",
+    "log_last_user_tokens",
+    "input_items",
+    "user_messages",
+    "function_call_outputs",
+    "is_continuation",
+    "is_tool_loop_turn",
+    "tool_count",
+    "tool_required",
+    "has_images",
+    "log_max_output_tokens",
+    "code",
+    "code_matches",
+    "reasoning",
+    "reasoning_matches",
+    "technical",
+    "technical_matches",
+    "simple",
+    "simple_matches",
+    "multi_step",
+    "question_marks",
+    "intent_quick",
+    "intent_deep",
+    "non_ascii_ratio"
+  ],
+  "mean": [
+    5.478658,
+    4.815339,
+    6.375833,
+    3.503333,
+    1.495833,
+    0.384167,
+    0.159167,
+    3.92,
+    0.085,
+    0.056667,
+    4.25124,
+    0.293333,
+    1.765833,
+    0.194167,
+    0.593333,
+    0.499773,
+    2.414167,
+    0.249468,
+    1.0275,
+    0.492478,
+    1.51,
+    0.228333,
+    0.275,
+    0.050241
+  ],
+  "scale": [
+    1.721651,
+    1.792476,
+    3.455852,
+    1.701956,
+    1.118026,
+    0.486398,
+    0.365831,
+    2.590097,
+    0.278882,
+    0.231205,
+    3.469447,
+    0.45529,
+    3.067464,
+    0.395558,
+    1.360621,
+    0.286908,
+    1.678581,
+    0.144608,
+    0.806274,
+    0.285963,
+    1.123195,
+    0.419759,
+    0.446514,
+    0.028819
+  ],
+  "heads": {
+    "claude-sonnet-4": {
+      "coef": [
+        0.170357,
+        0.042228,
+        0.027418,
+        0.020461,
+        0.003869,
+        -0.011562,
+        -0.001588,
+        0.020365,
+        -0.023807,
+        0.007678,
+        -0.06259,
+        0.317102,
+        -0.024463,
+        0.115087,
+        0.057482,
+        -0.042608,
+        0.014116,
+        0.002938,
+        0.0066,
+        -0.024408,
+        0.036973,
+        0.024123,
+        0.008118,
+        0.038151
+      ],
+      "intercept": 5.979843,
+      "rows": 322
+    },
+    "gpt-4o": {
+      "coef": [
+        0.140228,
+        0.05031,
+        -0.001193,
+        -0.010979,
+        -0.0158,
+        -0.041354,
+        -0.01407,
+        -0.024081,
+        -0.027402,
+        -0.041624,
+        -0.005159,
+        0.320541,
+        -0.022335,
+        0.178616,
+        0.051094,
+        0.033221,
+        -0.015078,
+        0.007194,
+        0.046694,
+        0.007822,
+        0.026422,
+        0.014262,
+        -0.014839,
+        0.015251
+      ],
+      "intercept": 5.632907,
+      "rows": 309
+    },
+    "gpt-4o-mini": {
+      "coef": [
+        0.134289,
+        0.032968,
+        0.004056,
+        -0.020605,
+        0.012399,
+        -0.034275,
+        -0.008747,
+        -0.012308,
+        -0.016685,
+        0.010371,
+        0.014345,
+        0.32366,
+        0.008503,
+        0.246936,
+        -0.01989,
+        0.034445,
+        -0.002677,
+        0.003933,
+        0.004962,
+        0.01984,
+        0.030293,
+        0.019679,
+        -0.003825,
+        0.007816
+      ],
+      "intercept": 5.119051,
+      "rows": 325
+    }
+  },
+  "global": {
+    "coef": [
+      0.09834,
+      0.090215,
+      -0.004492,
+      -0.000519,
+      -0.004407,
+      -0.030358,
+      -0.003077,
+      -0.001061,
+      -0.029769,
+      0.011489,
+      -0.021733,
+      0.340002,
+      -0.027921,
+      0.186548,
+      0.024435,
+      -0.01105,
+      0.003827,
+      -0.035202,
+      0.037301,
+      0.015776,
+      0.038109,
+      0.030236,
+      -0.000177,
+      0.027383
+    ],
+    "intercept": 5.573606,
+    "rows": 960
+  },
+  "prices": {
+    "gpt-4o": {
+      "input_per_million": 2.5,
+      "output_per_million": 10.0
+    },
+    "gpt-4o-mini": {
+      "input_per_million": 0.15,
+      "output_per_million": 0.6
+    },
+    "claude-sonnet-4": {
+      "input_per_million": 3.0,
+      "output_per_million": 15.0
+    }
+  },
+  "metrics": {
+    "global": {
+      "train": {
+        "rows": 960,
+        "median_abs_error_tokens": 84.2,
+        "mean_abs_log_error": 0.405
+      },
+      "holdout": {
+        "rows": 240,
+        "median_abs_error_tokens": 93.1,
+        "mean_abs_log_error": 0.419
+      }
+    },
+    "per_model": {
+      "claude-sonnet-4": {
+        "train": {
+          "rows": 322,
+          "median_abs_error_tokens": 92.1,
+          "mean_abs_log_error": 0.295
+        },
+        "holdout": {
+          "rows": 77,
+          "median_abs_error_tokens": 103.5,
+          "mean_abs_log_error": 0.315
+        }
+      },
+      "gpt-4o": {
+        "train": {
+          "rows": 309,
+          "median_abs_error_tokens": 52.3,
+          "mean_abs_log_error": 0.246
+        },
+        "holdout": {
+          "rows": 87,
+          "median_abs_error_tokens": 51.6,
+          "mean_abs_log_error": 0.248
+        }
+      },
+      "gpt-4o-mini": {
+        "train": {
+          "rows": 325,
+          "median_abs_error_tokens": 27.0,
+          "mean_abs_log_error": 0.221
+        },
+        "holdout": {
+          "rows": 76,
+          "median_abs_error_tokens": 31.3,
+          "mean_abs_log_error": 0.235
+        }
+      },
+      "small-rare": {
+        "rows": 4,
+        "skipped": "too few rows"
+      }
+    }
+  }
+}

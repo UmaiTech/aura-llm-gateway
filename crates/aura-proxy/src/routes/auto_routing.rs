@@ -38,6 +38,9 @@ pub struct GatewayEligibility<'a> {
     /// Rough tokens the model must fit: estimated input plus requested
     /// output. Compared against the catalog's context window when known.
     needs_context: u32,
+    /// Feature vector for cost prediction (only computed when a cost
+    /// model is loaded and the router is configured).
+    features: Option<RequestFeatures>,
 }
 
 impl<'a> GatewayEligibility<'a> {
@@ -72,11 +75,16 @@ impl<'a> GatewayEligibility<'a> {
             .unwrap_or(false);
         let est_input = estimate_tokens(&"x".repeat(text_chars.min(4_000_000)));
         let needs_context = est_input.saturating_add(request.max_output_tokens.unwrap_or(0));
+        let features = match (state.cost_model(), state.auto_router()) {
+            (Some(_), Some(router)) => Some(router.features(request)),
+            _ => None,
+        };
         Self {
             state,
             needs_vision,
             needs_tools,
             needs_context,
+            features,
         }
     }
 }
@@ -124,6 +132,25 @@ impl Eligibility for GatewayEligibility<'_> {
 
     fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
         self.state.arm_stats_for(tier.as_str(), model)
+    }
+
+    fn predicted_cost_usd(&self, model: &str) -> Option<f64> {
+        let cost_model = self.state.cost_model()?;
+        let features = self.features.as_ref()?;
+        let catalog_prices = self
+            .state
+            .model_catalog()
+            .get(model)
+            .and_then(|e| Some((e.input_per_million?, e.output_per_million?)))
+            .or_else(|| {
+                self.state
+                    .cost_calculator()
+                    .get_pricing(model)
+                    .map(|p| (p.input_per_million, p.output_per_million))
+            });
+        cost_model
+            .predict_cost(features, model, catalog_prices)
+            .map(|p| p.cost_usd)
     }
 }
 
