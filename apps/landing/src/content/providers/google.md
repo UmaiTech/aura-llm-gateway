@@ -5,52 +5,62 @@ description: "Gemini models and capabilities through Aura Gateway"
 
 # Google Provider
 
-Aura provides full support for Google's Gemini models, offering industry-leading multimodal capabilities with massive context windows and competitive pricing.
+Aura provides full support for Google's Gemini models, offering industry-leading multimodal capabilities with massive context windows and competitive pricing. Catalog last refreshed 2026-09-07; ids match what Google's `models.list` endpoint serves (the bare `gemini-3-pro` / `gemini-3-flash` ids do not exist upstream).
 
 ## Supported Models
 
-### Gemini 3 Series (Latest)
-- **gemini-3-pro** - Most capable model
-- **gemini-3-flash** - Fast, efficient variant
+### Gemini 3.x Flash (Latest)
+- **gemini-3.7-flash** - Google's most intelligent workhorse model for coding and agents (GA 2026-08-13)
+- **gemini-3.6-flash** - Previous Flash generation (GA 2026-07-21)
+- **gemini-3.5-flash** - Earlier Flash generation
+- **gemini-3.5-flash-lite** - Lowest-cost 3.x option (GA 2026-07-21)
+- **gemini-3.1-flash-lite**, **gemini-3.1-flash-lite-preview**
 
-### Gemini 2.5 Series
-- **gemini-2.5-pro** - Powerful general-purpose model
-- **gemini-2.5-flash** - Balanced speed and capability
+### Gemini 3.x Pro (preview)
+- **gemini-3.1-pro-preview** - Current Pro tier (Gemini 3.5 Pro has not shipped yet)
+- **gemini-3-pro-preview**, **gemini-3-flash-preview** - Original Gemini 3 previews
+
+### Gemini 2.5 Series (GA)
+- **gemini-2.5-pro**, **gemini-2.5-flash**, **gemini-2.5-flash-lite**
 
 ### Gemini 2.0 Series
-- **gemini-2.0-flash** - Ultra-fast, cost-effective
+- **gemini-2.0-flash**, **gemini-2.0-flash-lite** (and their `-001` pins)
 
-### Gemini 1.5 Series (Legacy)
-- **gemini-1.5-pro** - Previous flagship
-- **gemini-1.5-flash** - Previous fast variant
+### Floating aliases
+- **gemini-pro-latest**, **gemini-flash-latest**, **gemini-flash-lite-latest** - always resolve to Google's current pick
+
+Gemini 1.5 models have been retired by Google and are no longer routable.
 
 ## Model Capabilities
 
-| Feature | 3-Pro | 3-Flash | 2.5-Pro | 2.0-Flash | 1.5-Pro |
-|---------|-------|---------|---------|-----------|---------|
-| **Text Generation** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Tool/Function Calling** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Vision/Multimodal** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Audio Input** | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Video Input** | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **JSON Mode** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Context Window** | 2M | 2M | 2M | 1M | 2M |
-| **Max Output** | 8K | 8K | 8K | 8K | 8K |
+| Feature | 3.7 Flash | 3.6 Flash | 3.5 Flash-Lite | 3.1 Pro (preview) | 2.5 Pro | 2.0 Flash |
+|---------|-----------|-----------|----------------|-------------------|---------|-----------|
+| **Text Generation** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Tool/Function Calling** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Vision/Multimodal** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Audio Input** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Video Input** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **JSON Mode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Context Window** | 1M | 1M | 1M | 1M | 1M | 1M |
+| **Max Output** | 64K | 64K | 64K | 64K | 64K | 8K |
 
 ## Pricing
 
-*Prices per 1M tokens (USD)*
+*Prices per 1M tokens (USD), as published 2026-09-07. Gemini 3.6 / 3.7 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
-| **gemini-3-pro** | $2.50 | $10.00 | $0.625 |
-| **gemini-3-flash** | $0.15 | $0.60 | $0.0375 |
+| **gemini-3.7-flash** | $0.75 | $3.75 | $0.075 |
+| **gemini-3.6-flash** | $0.75 | $3.75 | $0.075 |
+| **gemini-3.5-flash** | $0.20 | $0.80 | $0.05 |
+| **gemini-3.5-flash-lite** | $0.30 | $2.50 | $0.03 |
+| **gemini-3.1-pro-preview** | $2.50 | $10.00 | $0.625 |
+| **gemini-3-pro-preview** | $2.50 | $10.00 | $0.625 |
+| **gemini-3-flash-preview** | $0.15 | $0.60 | $0.0375 |
 | **gemini-2.5-pro** | $1.25 | $10.00 | $0.3125 |
 | **gemini-2.5-flash** | $0.30 | $2.50 | $0.075 |
 | **gemini-2.0-flash** | $0.10 | $0.40 | $0.025 |
-| **gemini-1.5-pro** | $1.25 | $5.00 | $0.3125 |
-| **gemini-1.5-flash** | $0.075 | $0.30 | $0.01875 |
 
 ## Configuration
 
@@ -74,7 +84,7 @@ GOOGLE_API_KEY=AIza...
 curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3-flash",
+    "model": "gemini-3.7-flash",
     "input": [
       {"type": "message", "role": "user", "content": "Hello Gemini!"}
     ]
@@ -87,7 +97,7 @@ curl -X POST https://api.aura-llm.dev/v1/responses \
 curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3-pro",
+    "model": "gemini-3.1-pro-preview",
     "instructions": "You are a helpful assistant specializing in science.",
     "input": [
       {"type": "message", "role": "user", "content": "Explain photosynthesis"}
@@ -101,7 +111,7 @@ curl -X POST https://api.aura-llm.dev/v1/responses \
 curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3-pro",
+    "model": "gemini-3.1-pro-preview",
     "input": [
       {
         "type": "message",
@@ -124,7 +134,7 @@ curl -X POST https://api.aura-llm.dev/v1/responses \
 curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3-pro",
+    "model": "gemini-3.1-pro-preview",
     "input": [
       {
         "type": "message",
@@ -170,7 +180,7 @@ curl -X POST https://api.aura-llm.dev/v1/responses \
 curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3-flash",
+    "model": "gemini-3.7-flash",
     "input": [
       {"type": "message", "role": "user", "content": "What is the weather in Tokyo?"}
     ],
@@ -234,7 +244,7 @@ Force structured JSON output:
 curl -X POST https://api.aura-llm.dev/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-3-flash",
+    "model": "gemini-3.7-flash",
     "input": [
       {"type": "message", "role": "user", "content": "Extract all names from: Alice met Bob"}
     ],

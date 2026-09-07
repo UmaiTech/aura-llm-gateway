@@ -91,7 +91,7 @@ impl Default for CostCalculator {
 
 impl CostCalculator {
     /// Create a new cost calculator with default pricing data
-    /// Pricing last updated: May 2026
+    /// Pricing last updated: September 2026
     /// Sources:
     /// - OpenAI: <https://openai.com/api/pricing/>
     /// - Anthropic: <https://www.anthropic.com/pricing>
@@ -110,8 +110,33 @@ impl CostCalculator {
         let mut pricing = HashMap::new();
 
         // =================================================================
-        // OpenAI pricing (as of May 2026)
+        // OpenAI pricing (as of September 2026)
         // =================================================================
+
+        // GPT-6 (September 2026)
+        pricing.insert(
+            "gpt-6-astra".to_string(),
+            ModelPricing::new(10.00, 50.00).with_cached(1.00),
+        );
+
+        // GPT-5.6 family (August 2026). Sol is promo-priced through
+        // 2026-11-21; `gpt-5.6` is OpenAI's alias for Sol.
+        pricing.insert(
+            "gpt-5.6-sol".to_string(),
+            ModelPricing::new(4.00, 20.00).with_cached(0.40),
+        );
+        pricing.insert(
+            "gpt-5.6".to_string(),
+            ModelPricing::new(4.00, 20.00).with_cached(0.40),
+        );
+        pricing.insert(
+            "gpt-5.6-terra".to_string(),
+            ModelPricing::new(2.00, 12.00).with_cached(0.20),
+        );
+        pricing.insert(
+            "gpt-5.6-luna".to_string(),
+            ModelPricing::new(0.20, 1.20).with_cached(0.02),
+        );
 
         // GPT-5.5 family (2026)
         pricing.insert("gpt-5.5-pro".to_string(), ModelPricing::new(30.00, 180.00));
@@ -256,8 +281,35 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Anthropic pricing (as of May 2026)
+        // Anthropic pricing (as of September 2026)
         // =================================================================
+
+        // Claude Fable 5.x (2026 — top tier). Fable 5.1 (2026-09-01) bills
+        // cache reads at $0.25/MTok; Fable 5 at the usual 10% of input.
+        pricing.insert(
+            "claude-fable-5-1".to_string(),
+            ModelPricing::new(10.00, 50.00).with_cached(0.25),
+        );
+        pricing.insert(
+            "claude-fable-5".to_string(),
+            ModelPricing::new(10.00, 50.00).with_cached(1.00),
+        );
+
+        // Claude 5 family (2026 — Opus 5 released 2026-07-24)
+        pricing.insert(
+            "claude-opus-5".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "claude-sonnet-5".to_string(),
+            ModelPricing::new(2.00, 10.00).with_cached(0.20),
+        );
+
+        // Claude 4.8 family (2026 — Opus only in this line)
+        pricing.insert(
+            "claude-opus-4-8".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
 
         // Claude 4.7 family (2026 — Opus only in this line, no Sonnet 4.7 shipped)
         pricing.insert(
@@ -364,6 +416,23 @@ impl CostCalculator {
         //   GET https://generativelanguage.googleapis.com/v1beta/models?key=$KEY
         // and updating $/MTok from https://ai.google.dev/pricing.
         // =================================================================
+
+        // Gemini 3.6 / 3.7 Flash (GA 2026-07-21 / 2026-08-13) and
+        // 3.5 Flash-Lite (GA 2026-07-21). The Flash rows are Google's
+        // introductory price through 2026-12-31; the standard rate from
+        // 2027-01-01 is $1.50 / $7.50.
+        pricing.insert(
+            "gemini-3.7-flash".to_string(),
+            ModelPricing::new(0.75, 3.75).with_cached(0.075),
+        );
+        pricing.insert(
+            "gemini-3.6-flash".to_string(),
+            ModelPricing::new(0.75, 3.75).with_cached(0.075),
+        );
+        pricing.insert(
+            "gemini-3.5-flash-lite".to_string(),
+            ModelPricing::new(0.30, 2.50).with_cached(0.03),
+        );
 
         // Gemini 3.x family
         pricing.insert(
@@ -836,6 +905,36 @@ mod tests {
         // (10000/1M * 3.00) + (5000/1M * 15.00) = 0.03 + 0.075 = 0.105
         assert!(cost.is_some());
         assert!((cost.unwrap() - 0.105).abs() < 0.00001);
+    }
+
+    #[test]
+    fn test_cost_calculator_september_2026_models() {
+        // Every id added in the 2026-09-07 catalog refresh must have a
+        // seed price so cost tracking never silently reports $0 for them.
+        let calculator = CostCalculator::new();
+        for model in [
+            "gpt-6-astra",
+            "gpt-5.6-sol",
+            "gpt-5.6",
+            "gpt-5.6-terra",
+            "gpt-5.6-luna",
+            "claude-fable-5-1",
+            "claude-fable-5",
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-opus-4-8",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash-lite",
+        ] {
+            assert!(
+                calculator.get_pricing(model).is_some(),
+                "missing seed pricing for {model}"
+            );
+        }
+        // gpt-6-astra: (1000/1M * 10.00) + (500/1M * 50.00) = 0.01 + 0.025
+        let cost = calculator.calculate_cost("gpt-6-astra", 1000, 500, None, None);
+        assert!((cost.unwrap() - 0.035).abs() < 0.00001);
     }
 
     #[test]

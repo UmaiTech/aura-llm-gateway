@@ -255,12 +255,17 @@ export const AGENT_SYSTEM_PROMPTS = {
 //
 // Rule of thumb for free-tier: small/fast/cheap models from each provider
 // so the playground is a useful demo without burning the free quota in
-// two requests. Frontier models (Opus/Sonnet 4.6+, GPT-5/5.4+, Gemini 3
-// Pro, Mistral Large) are beta-gated.
+// two requests. Frontier models (Fable/Opus/Sonnet 5, Opus/Sonnet 4.6+,
+// GPT-6/5.6/5.4+, Gemini 3.x Flash/Pro, Mistral Large) are beta-gated.
+// Catalog last refreshed 2026-09-07.
 import type { Model } from './types'
 
 export const AVAILABLE_MODELS: Model[] = [
-  // OpenAI — frontier locked, mini/nano free
+  // OpenAI — frontier locked, mini/nano/Luna free
+  { id: 'gpt-6-astra', name: 'GPT-6 Astra', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', provider: 'openai', tier: 'free' },
   { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', tier: 'beta' },
   { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', tier: 'beta' },
   { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', tier: 'beta' },
@@ -280,6 +285,10 @@ export const AVAILABLE_MODELS: Model[] = [
   // gateway still lists it in SUPPORTED_MODELS for backwards-compat
   // but the upstream call fails. Haiku 4.5 is the current cheap
   // Anthropic model.
+  { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', tier: 'beta' },
@@ -296,7 +305,12 @@ export const AVAILABLE_MODELS: Model[] = [
   //    version v1beta"
   // when sending requests. See /v1/models against the gateway for
   // the canonical list at any time.
+  // 3.7 / 3.6 Flash and 3.5 Flash-Lite added 2026-09-07 from Google's
+  // model docs (GA 2026-08-13 / 2026-07-21).
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', tier: 'beta' },
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'google', tier: 'beta' },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', provider: 'google', tier: 'free' },
   { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', provider: 'google', tier: 'free' },
   { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (preview)', provider: 'google', tier: 'beta' },
   { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (preview)', provider: 'google', tier: 'free' },
