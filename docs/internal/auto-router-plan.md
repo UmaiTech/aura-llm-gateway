@@ -339,6 +339,12 @@ working as a hard filter on top. Not started.
 
 
 
+### Synthetic training traces (PR 11)
+
+Cheap-model generation of realistic requests at controlled difficulty,
+ladder labelling with the gateway's judge, and isolated ingestion into the
+gold table: see [auto-router-synthetic-traces-plan.md](./auto-router-synthetic-traces-plan.md).
+
 ---
 
 ## Sources
