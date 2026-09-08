@@ -287,7 +287,7 @@ All five recommendations were accepted before PR 1:
 
 ## Status
 
-Delivered as ten stacked PRs, each on the previous one's branch:
+Delivered as eleven stacked PRs, each on the previous one's branch:
 
 | # | PR | Branch | What changed from the plan |
 |---|---|---|---|
@@ -301,8 +301,9 @@ Delivered as ten stacked PRs, each on the previous one's branch:
 | 8 | [#224](https://github.com/UmaiTech/aura-llm-gateway/pull/224) escalation, circuit breaker | `claude/auto-router-8-escalation` | Escalates within the same tier before moving up; breaker feeds eligibility. |
 | 9 | [#225](https://github.com/UmaiTech/aura-llm-gateway/pull/225) learned cost model, predicted-cost ranking, budgets | `claude/auto-router-9-cost-model` | Not in the original plan. Per-model closed-form ridge on the classifier's feature vector predicts output length → per-request cost; powers `within_tier: predicted_cost` and `routing.max_cost_usd`. One active `router_models` row per kind. |
 | 10 | [#226](https://github.com/UmaiTech/aura-llm-gateway/pull/226) diagrams, public docs, playground inspector | `claude/auto-router-10-docs-playground` | Architecture, sequence and learning-loop diagrams in `docs/api/auto-routing.md`; public page on the landing site; the chat playground shows each decision (score bar, signals, candidates with predicted cost, reason) under the answer. |
+| 11 | [#231](https://github.com/UmaiTech/aura-llm-gateway/pull/231) synthetic training traces | `claude/auto-router-11-synthetic-traces` | Generators are `gpt-5.6-luna` (70 %) and `claude-haiku-4-5` (30 %) rather than one model, so the corpus is not written in a single voice. Also fixes a NUMERIC/FLOAT8 decode in the auto-router stats found during the end-to-end run. |
 
-Merge in order (1 → 10); each PR's base is the previous branch, so GitHub retargets automatically as they land.
+Merge in order (1 → 11); each PR's base is the previous branch, so GitHub retargets automatically as they land.
 
 ## Follow-ups
 
@@ -339,11 +340,6 @@ working as a hard filter on top. Not started.
 
 
 
-### Synthetic training traces (PR 11)
-
-Cheap-model generation of realistic requests at controlled difficulty,
-ladder labelling with the gateway's judge, and isolated ingestion into the
-gold table: see [auto-router-synthetic-traces-plan.md](./auto-router-synthetic-traces-plan.md).
 
 ---
 

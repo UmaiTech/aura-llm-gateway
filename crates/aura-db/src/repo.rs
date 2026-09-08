@@ -2247,7 +2247,7 @@ impl RoutingDecisionRepo {
                    requested_model, mode, classifier, score, classified_tier, tier,
                    selected_model, selected_provider, reason, shadow, hard_filters,
                    decision_latency_us, created_at, status, actual_model,
-                   input_tokens, output_tokens, cost_usd, latency_ms, feedback,
+                   input_tokens, output_tokens, cost_usd::FLOAT8 AS cost_usd, latency_ms, feedback,
                    estimated_savings_usd
             FROM v_routing_outcomes
             WHERE ($2::BOOLEAN IS NULL OR shadow = $2)

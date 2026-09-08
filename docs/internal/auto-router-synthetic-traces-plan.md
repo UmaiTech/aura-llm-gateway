@@ -1,6 +1,6 @@
 # Synthetic traces for the auto router (PR 11 plan)
 
-**Status:** proposal, September 2026. Stacks on [#226](https://github.com/UmaiTech/aura-llm-gateway/pull/226).
+**Status:** implemented as [#231](https://github.com/UmaiTech/aura-llm-gateway/pull/231), September 2026. Stacks on [#226](https://github.com/UmaiTech/aura-llm-gateway/pull/226).
 **Companion:** [auto-router-plan.md](./auto-router-plan.md) (the series this extends).
 
 Use cheap models to generate realistic requests at controlled difficulty, label
