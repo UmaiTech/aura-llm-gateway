@@ -5,15 +5,7 @@ import { calculateCost } from '../lib/pricing'
 import { useChatStore } from '../stores/chatStore'
 import { ComparePane } from './ComparePane'
 import { cn } from '../lib/utils'
-import type {
-  Message,
-  MessageUsage,
-  PaneConfig,
-  RoutingStrategy,
-  ValidationStrategy,
-  ConsistencyStrategy,
-  CompressionStrategy,
-} from '../lib/types'
+import type { Message, MessageUsage, PaneConfig, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, AuraMetadata, RoutingDecisionMetadata } from '../lib/types'
 
 const MAX_PANES = 3
 const DEFAULT_MODELS = ['gpt-5.4-mini', 'claude-haiku-4-5-20251001', 'gemini-2.5-flash']
@@ -125,6 +117,7 @@ export function CompareView() {
       let fullContent = ''
       let responseId: string | undefined
       let usage: MessageUsage | undefined
+      let aura: AuraMetadata | undefined
 
       try {
         const stream = api.createResponseStream({
@@ -163,8 +156,30 @@ export function CompareView() {
                 output_tokens?: number
                 cost_usd?: number
               }
+              metadata?: {
+                aura?: {
+                  provider?: string
+                  gateway_version?: string
+                  latency_ms?: number
+                  request_id?: string
+                  routing_strategy?: string
+                  routing?: RoutingDecisionMetadata
+                }
+              }
             }
             responseId = response?.id
+            // Aura metadata, so the pane's MessageBubble can show the
+            // auto-routing chip and inspector next to a pinned model.
+            if (response?.metadata?.aura) {
+              aura = {
+                provider: response.metadata.aura.provider || 'unknown',
+                gatewayVersion: response.metadata.aura.gateway_version || '',
+                latencyMs: response.metadata.aura.latency_ms,
+                requestId: response.metadata.aura.request_id,
+                routingStrategy: response.metadata.aura.routing_strategy,
+                routing: response.metadata.aura.routing,
+              }
+            }
             if (
               response?.usage &&
               typeof response.usage.input_tokens === 'number' &&
@@ -203,7 +218,7 @@ export function CompareView() {
                   isStreaming: false,
                   messages: p.messages.map((m) =>
                     m.id === assistantId
-                      ? { ...m, isStreaming: false, usage, responseId }
+                      ? { ...m, isStreaming: false, usage, responseId, aura }
                       : m
                   ),
                 }

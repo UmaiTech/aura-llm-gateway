@@ -5,7 +5,7 @@ import { WelcomeScreen } from './WelcomeScreen'
 import { RateLimitNotice } from './RateLimitNotice'
 import { RATE_LIMIT_SENTINEL } from '../hooks/useAgent'
 import { useQuotaStore } from '../stores/quotaStore'
-import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity } from '../lib/types'
+import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity, AutoRoutingSettings } from '../lib/types'
 
 interface ChatContainerProps {
   messages: Message[]
@@ -33,6 +33,8 @@ interface ChatContainerProps {
   onConsistencyStyleVerbosityChange: (verbosity: Verbosity) => void
   compressionStrategy: CompressionStrategy
   onCompressionStrategyChange: (strategy: CompressionStrategy) => void
+  autoRouting: AutoRoutingSettings
+  onAutoRoutingChange: (updates: Partial<AutoRoutingSettings>) => void
 }
 
 export function ChatContainer({
@@ -61,6 +63,8 @@ export function ChatContainer({
   onConsistencyStyleVerbosityChange,
   compressionStrategy,
   onCompressionStrategyChange,
+  autoRouting,
+  onAutoRoutingChange,
 }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -141,6 +145,8 @@ export function ChatContainer({
         onConsistencyStyleVerbosityChange={onConsistencyStyleVerbosityChange}
         compressionStrategy={compressionStrategy}
         onCompressionStrategyChange={onCompressionStrategyChange}
+        autoRouting={autoRouting}
+        onAutoRoutingChange={onAutoRoutingChange}
       />
     </div>
   )

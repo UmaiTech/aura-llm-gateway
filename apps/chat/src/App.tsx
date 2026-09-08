@@ -54,6 +54,8 @@ export default function App() {
     consistencyStyleVerbosity,
     setConsistencyStyleVerbosity,
     compressionStrategy,
+    autoRouting,
+    setAutoRouting,
     setCompressionStrategy,
     enabledTools,
     createConversation,
@@ -184,12 +186,14 @@ export default function App() {
       let responseId: string | undefined
       let usage: MessageUsage | undefined
 
+      const routing = useChatStore.getState().getRoutingOptions()
       for await (const event of api.createResponseStream({
         model,
         input,
         instructions: systemPrompt || undefined,
         stream: true,
         previous_response_id: previousResponseId,
+        ...(routing && { routing }),
       })) {
         // Log ALL events to debug
         console.log('[Stream Event]', event.type, event)
@@ -351,6 +355,7 @@ export default function App() {
             ? BUILT_IN_TOOLS
             : BUILT_IN_TOOLS.filter((t) => enabledTools.includes(t.name))
 
+        const routingOptions = useChatStore.getState().getRoutingOptions()
         const request = {
           model,
           input,
@@ -365,6 +370,7 @@ export default function App() {
           })),
           stream: true,
           ...(lastResponseId && { previous_response_id: lastResponseId }),
+          ...(routingOptions && { routing: routingOptions }),
         }
 
         const response = await fetch(`${API_BASE}/v1/responses`, {
@@ -722,6 +728,8 @@ export default function App() {
             consistencyStyleVerbosity={consistencyStyleVerbosity}
             onConsistencyStyleVerbosityChange={setConsistencyStyleVerbosity}
             compressionStrategy={compressionStrategy}
+            autoRouting={autoRouting}
+            onAutoRoutingChange={setAutoRouting}
             onCompressionStrategyChange={setCompressionStrategy}
           />
         )}

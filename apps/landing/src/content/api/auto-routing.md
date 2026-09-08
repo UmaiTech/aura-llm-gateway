@@ -135,6 +135,8 @@ Organizations can set the same options as defaults or limits in their settings, 
 
 The playground shows the same decision on every answer: click the **auto · tier · model** chip under a response to open the routing inspector with the score bar, signals, candidates and reason.
 
+To try it there, pick **Auto (balanced / cost / quality)** from the model picker. An **Auto** chip appears next to the other strategy chips with the request options: mode, min and max tier, classifier, per-request budget, and sticky tool loops. Pick a concrete model to turn the router off again; its answers then carry an amber **shadow** chip showing what auto would have done. Compare mode puts auto and a pinned model side by side on the same prompt.
+
 ## Shadow mode
 
 Requests that pin a concrete model are still scored by default. The decision `auto` would have made is returned with `"shadow": true`, the request is sent to the model you asked for, and the admin dashboard reports the estimated savings. This lets you evaluate the router on real traffic before switching anything over.

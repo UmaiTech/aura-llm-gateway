@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive, Lock } from 'lucide-react'
+import { Send, Square, Paperclip, ChevronDown, Check, Route, Shield, Sparkles, FileArchive, Lock, Wand2 } from 'lucide-react'
 import { cn } from '../lib/utils'
-import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity } from '../lib/types'
+import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity, AutoRoutingSettings, AutoRoutingTier } from '../lib/types'
 import { useQuotaStore } from '../stores/quotaStore'
-import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES } from '../lib/types'
+import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES, AUTO_ROUTING_TIERS, AUTO_ROUTING_CLASSIFIERS, isAutoModel } from '../lib/types'
 import { DEFAULT_CONSTITUTIONAL_PRINCIPLES } from '../stores/chatStore'
 
 interface ChatInputProps {
@@ -40,6 +40,9 @@ interface ChatInputProps {
   onConsistencyStyleVerbosityChange: (verbosity: Verbosity) => void
   compressionStrategy: CompressionStrategy
   onCompressionStrategyChange: (strategy: CompressionStrategy) => void
+  // Auto router options — shown only while an `auto*` model is selected.
+  autoRouting: AutoRoutingSettings
+  onAutoRoutingChange: (updates: Partial<AutoRoutingSettings>) => void
 }
 
 export function ChatInput({
@@ -68,10 +71,12 @@ export function ChatInput({
   onConsistencyStyleVerbosityChange,
   compressionStrategy,
   onCompressionStrategyChange,
+  autoRouting,
+  onAutoRoutingChange,
 }: ChatInputProps) {
   const [input, setInput] = useState('')
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
-  const [activeDropdown, setActiveDropdown] = useState<'routing' | 'validation' | 'consistency' | 'compression' | null>(null)
+  const [activeDropdown, setActiveDropdown] = useState<'routing' | 'validation' | 'consistency' | 'compression' | 'auto' | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const strategyDropdownRef = useRef<HTMLDivElement>(null)
@@ -150,11 +155,181 @@ export function ChatInput({
   const currentConsistency = CONSISTENCY_STRATEGIES.find(s => s.id === consistencyStrategy) || CONSISTENCY_STRATEGIES[0]
   const currentCompression = COMPRESSION_STRATEGIES.find(s => s.id === compressionStrategy) || COMPRESSION_STRATEGIES[0]
 
+  // Auto router: the model alias carries the mode; everything else is
+  // sent as the request's `routing` object.
+  const autoActive = isAutoModel(model.id)
+  const autoMode = model.id === 'auto:cost' ? 'cost' : model.id === 'auto:quality' ? 'quality' : 'balanced'
+  const autoModels = models.filter((m) => isAutoModel(m.id))
+  const autoTweaks =
+    (autoRouting.minTier ? 1 : 0) +
+    (autoRouting.maxTier ? 1 : 0) +
+    (autoRouting.classifier ? 1 : 0) +
+    (autoRouting.maxCostUsd !== null && autoRouting.maxCostUsd > 0 ? 1 : 0) +
+    (autoRouting.sticky ? 0 : 1)
+  const tierIndex = (t: AutoRoutingTier | null) => (t ? AUTO_ROUTING_TIERS.indexOf(t) : -1)
+
   return (
     <div className="border-t border-border/50 glass p-4">
       <div className="max-w-3xl mx-auto">
         {/* Strategy options row */}
         <div className="flex items-center gap-2 mb-3 flex-wrap" ref={strategyDropdownRef}>
+          {/* Auto router — only while an auto alias is the model. Switch
+              to a concrete model to turn the router off; pick "Auto"
+              in the model picker to turn it back on. */}
+          {autoActive && (
+            <div className="relative">
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'auto' ? null : 'auto')}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
+                  "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                )}
+                title="Auto router options"
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Auto · {autoMode}</span>
+                {autoTweaks > 0 && (
+                  <span className="px-1 rounded bg-emerald-500/20 text-[10px] font-semibold">{autoTweaks}</span>
+                )}
+                <ChevronDown className={cn("h-3 w-3", activeDropdown === 'auto' && "rotate-180")} />
+              </button>
+              {activeDropdown === 'auto' && (
+                <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="p-3 space-y-3 text-xs">
+                    <div className="flex items-center justify-between border-b border-border pb-1.5">
+                      <span className="font-medium text-muted-foreground uppercase tracking-wider">Auto router</span>
+                      <button
+                        onClick={() => onAutoRoutingChange({ minTier: null, maxTier: null, classifier: null, maxCostUsd: null, sticky: true })}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Reset to gateway defaults"
+                      >
+                        reset
+                      </button>
+                    </div>
+
+                    {/* Mode = which auto alias is selected */}
+                    <div>
+                      <div className="text-muted-foreground mb-1">Mode</div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['cost', 'balanced', 'quality'] as const).map((mode) => {
+                          const target = autoModels.find((m) => m.id === (mode === 'balanced' ? 'auto' : `auto:${mode}`))
+                          return (
+                            <button
+                              key={mode}
+                              disabled={!target}
+                              onClick={() => target && onModelChange(target)}
+                              className={cn(
+                                "px-2 py-1 rounded-lg border transition-colors capitalize",
+                                autoMode === mode
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : "border-transparent hover:bg-secondary text-muted-foreground"
+                              )}
+                            >
+                              {mode}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="text-muted-foreground mt-1">Shifts the complexity score before it maps to a tier.</div>
+                    </div>
+
+                    {/* Tier clamps */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <div className="text-muted-foreground mb-1">Min tier</div>
+                        <select
+                          value={autoRouting.minTier ?? ''}
+                          onChange={(e) => {
+                            const v = (e.target.value || null) as AutoRoutingTier | null
+                            onAutoRoutingChange({
+                              minTier: v,
+                              maxTier: v && tierIndex(autoRouting.maxTier) >= 0 && tierIndex(autoRouting.maxTier) < tierIndex(v) ? v : autoRouting.maxTier,
+                            })
+                          }}
+                          className="w-full h-7 rounded-md border border-input bg-background px-1.5"
+                        >
+                          <option value="">default</option>
+                          {AUTO_ROUTING_TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <div className="text-muted-foreground mb-1">Max tier</div>
+                        <select
+                          value={autoRouting.maxTier ?? ''}
+                          onChange={(e) => {
+                            const v = (e.target.value || null) as AutoRoutingTier | null
+                            onAutoRoutingChange({
+                              maxTier: v,
+                              minTier: v && tierIndex(autoRouting.minTier) > tierIndex(v) ? v : autoRouting.minTier,
+                            })
+                          }}
+                          className="w-full h-7 rounded-md border border-input bg-background px-1.5"
+                        >
+                          <option value="">default</option>
+                          {AUTO_ROUTING_TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </label>
+                    </div>
+
+                    {/* Classifier */}
+                    <label className="block">
+                      <div className="text-muted-foreground mb-1">Classifier</div>
+                      <select
+                        value={autoRouting.classifier ?? ''}
+                        onChange={(e) => onAutoRoutingChange({ classifier: (e.target.value || null) as AutoRoutingSettings['classifier'] })}
+                        className="w-full h-7 rounded-md border border-input bg-background px-1.5"
+                      >
+                        <option value="">gateway default</option>
+                        {AUTO_ROUTING_CLASSIFIERS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      {autoRouting.classifier && (
+                        <div className="text-muted-foreground mt-1">
+                          {AUTO_ROUTING_CLASSIFIERS.find((c) => c.id === autoRouting.classifier)?.description}
+                        </div>
+                      )}
+                    </label>
+
+                    {/* Budget */}
+                    <label className="block">
+                      <div className="text-muted-foreground mb-1">Max cost per request (USD)</div>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.001}
+                        placeholder="no budget"
+                        value={autoRouting.maxCostUsd ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? null : Number(e.target.value)
+                          onAutoRoutingChange({ maxCostUsd: v !== null && Number.isFinite(v) && v > 0 ? v : null })
+                        }}
+                        className="w-full h-7 rounded-md border border-input bg-background px-1.5 font-mono"
+                      />
+                      <div className="text-muted-foreground mt-1">Needs an active cost model; candidates predicted above this are skipped.</div>
+                    </label>
+
+                    {/* Sticky */}
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span>
+                        <div>Sticky tool loops</div>
+                        <div className="text-muted-foreground">Keep the previous model while an agent turn continues.</div>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={autoRouting.sticky}
+                        onChange={(e) => onAutoRoutingChange({ sticky: e.target.checked })}
+                        className="h-4 w-4 accent-emerald-500"
+                      />
+                    </label>
+
+                    <div className="text-muted-foreground border-t border-border pt-2">
+                      Every answer gets an <span className="text-emerald-400">auto · tier · model</span> chip; click it to see the score, candidates and reason. Pinned models still show a <span className="text-amber-400">shadow</span> chip with what auto would have done.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Routing */}
           <div className="relative">
             <button

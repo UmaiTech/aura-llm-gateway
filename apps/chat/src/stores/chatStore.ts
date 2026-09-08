@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity, CompressionStrategy, CompressionConfig } from '../lib/types'
+import type { Conversation, Message, RoutingStrategy, ValidationStrategy, SelectionCriteria, ValidationConfig, ConsistencyStrategy, ConsistencyConfig, Tone, Formality, Verbosity, CompressionStrategy, CompressionConfig, AutoRoutingSettings, RoutingOptionsRequest } from '../lib/types'
+import { DEFAULT_AUTO_ROUTING_SETTINGS, isAutoModel, toRoutingOptions } from '../lib/types'
 import { generateId } from '../lib/utils'
 
 /**
@@ -45,6 +46,8 @@ interface ChatState {
   consistencyStyleVerbosity: Verbosity
   consistencyApplyCalibration: boolean
   compressionStrategy: CompressionStrategy
+  // Auto router options sent as `routing` when the model is an auto alias.
+  autoRouting: AutoRoutingSettings
 
   // Compare Mode — see `PaneConfig` in lib/types.ts for the full
   // rationale. Ephemeral: not persisted; clears on toggle-off.
@@ -82,6 +85,10 @@ interface ChatState {
   getConsistencyConfig: () => ConsistencyConfig | undefined
   setCompressionStrategy: (strategy: CompressionStrategy) => void
   getCompressionConfig: () => CompressionConfig | undefined
+  setAutoRouting: (updates: Partial<AutoRoutingSettings>) => void
+  /** `routing` for the request, or undefined when the model is pinned or
+   *  every option is at its default. */
+  getRoutingOptions: () => RoutingOptionsRequest | undefined
 
   // Compare mode actions
   setCompareMode: (enabled: boolean) => void
@@ -114,6 +121,7 @@ export const useChatStore = create<ChatState>()(
       consistencyStyleVerbosity: 'balanced',
       consistencyApplyCalibration: false,
       compressionStrategy: 'none',
+      autoRouting: DEFAULT_AUTO_ROUTING_SETTINGS,
 
       // Conversation actions
       createConversation: () => {
@@ -274,6 +282,15 @@ export const useChatStore = create<ChatState>()(
 
       setRoutingStrategy: (routingStrategy) => set({ routingStrategy }),
 
+      setAutoRouting: (updates) =>
+        set((state) => ({ autoRouting: { ...state.autoRouting, ...updates } })),
+
+      getRoutingOptions: () => {
+        const { model, autoRouting } = get()
+        if (!isAutoModel(model)) return undefined
+        return toRoutingOptions(autoRouting)
+      },
+
       setValidationStrategy: (validationStrategy) => set({ validationStrategy }),
 
       setValidationN: (validationN) => set({ validationN }),
@@ -418,6 +435,7 @@ export const useChatStore = create<ChatState>()(
         consistencyStyleTone: state.consistencyStyleTone,
         consistencyStyleFormality: state.consistencyStyleFormality,
         consistencyStyleVerbosity: state.consistencyStyleVerbosity,
+        autoRouting: state.autoRouting,
         consistencyApplyCalibration: state.consistencyApplyCalibration,
         compressionStrategy: state.compressionStrategy,
       }),
