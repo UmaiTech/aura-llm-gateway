@@ -898,6 +898,9 @@ pub struct RoutingDecision {
     pub decision_latency_us: i32,
     #[sqlx(default)]
     pub escalations: Option<serde_json::Value>,
+    /// Request came from a synthetic-trace run; excluded from stats.
+    #[serde(default)]
+    pub synthetic: bool,
     pub created_at: DateTime<Utc>,
 }
 
@@ -928,6 +931,7 @@ pub struct NewRoutingDecision {
     pub selected_blended_per_million: Option<f64>,
     pub decision_latency_us: i32,
     pub escalations: serde_json::Value,
+    pub synthetic: bool,
 }
 
 /// One decision joined with its outcome (`v_routing_outcomes`)
@@ -1036,6 +1040,40 @@ pub struct RoutingGoldPair {
     pub judge_rationale: Option<String>,
     pub error: Option<String>,
     pub created_at: DateTime<Utc>,
+    /// `live` or `synthetic`.
+    #[serde(default = "default_gold_source")]
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch_id: Option<String>,
+    /// `train` or `holdout`.
+    #[serde(default = "default_gold_split")]
+    pub split: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intended_tier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_tier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<String>,
+    #[serde(default = "default_gold_weight")]
+    pub weight: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generator_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ladder: Option<serde_json::Value>,
+}
+
+fn default_gold_source() -> String {
+    "live".to_string()
+}
+
+fn default_gold_split() -> String {
+    "train".to_string()
+}
+
+fn default_gold_weight() -> f64 {
+    1.0
 }
 
 /// New gold-label pair for insertion
@@ -1063,6 +1101,42 @@ pub struct NewRoutingGoldPair {
     pub judge_confidence: Option<f64>,
     pub judge_rationale: Option<String>,
     pub error: Option<String>,
+    /// Provenance and training labels; `Default` gives a live train row.
+    pub provenance: GoldProvenance,
+}
+
+/// Provenance and training labels of a gold pair.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoldProvenance {
+    /// `live` or `synthetic`.
+    pub source: String,
+    pub batch_id: Option<String>,
+    /// `train` or `holdout`.
+    pub split: String,
+    pub intended_tier: Option<String>,
+    pub label_tier: Option<String>,
+    pub family: Option<String>,
+    pub shape: Option<String>,
+    pub weight: f64,
+    pub generator_model: Option<String>,
+    pub ladder: Option<serde_json::Value>,
+}
+
+impl Default for GoldProvenance {
+    fn default() -> Self {
+        Self {
+            source: "live".to_string(),
+            batch_id: None,
+            split: "train".to_string(),
+            intended_tier: None,
+            label_tier: None,
+            family: None,
+            shape: None,
+            weight: 1.0,
+            generator_model: None,
+            ladder: None,
+        }
+    }
 }
 
 /// Gold-label summary counts
@@ -1073,6 +1147,17 @@ pub struct RoutingGoldSummary {
     pub strong_better: i64,
     pub ties: i64,
     pub failed: i64,
+    /// Rows sampled from live traffic.
+    pub live: i64,
+    /// Rows produced by scripts/router/synth.py.
+    pub synthetic: i64,
+    /// Synthetic train rows.
+    pub synthetic_train: i64,
+    /// Synthetic holdout rows.
+    pub synthetic_holdout: i64,
+    /// Synthetic rows whose ladder label matched the generator's intended
+    /// tier.
+    pub synthetic_agreed: i64,
 }
 
 /// Trained auto-router classifier

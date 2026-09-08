@@ -14,6 +14,7 @@ pub mod rate_limit;
 pub mod responses;
 pub mod routing_gold;
 pub mod routing_rollup;
+pub mod routing_synthetic;
 
 use axum::Router;
 

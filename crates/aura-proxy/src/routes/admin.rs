@@ -38,6 +38,18 @@ pub fn router() -> Router<AppState> {
         .route("/admin/routing/rollup", post(run_routing_rollup))
         .route("/admin/routing/arms", get(get_routing_arms))
         .route("/admin/routing/gold", get(get_routing_gold))
+        .route(
+            "/admin/routing/gold/synthetic",
+            post(crate::routes::routing_synthetic::ingest_synthetic_gold),
+        )
+        .route(
+            "/admin/routing/feature-profile",
+            get(crate::routes::routing_synthetic::get_feature_profile),
+        )
+        .route(
+            "/admin/routing/judge",
+            post(crate::routes::routing_synthetic::judge_answers),
+        )
         .route("/admin/routing/score", post(score_routing_request))
         .route(
             "/admin/routing/models",
@@ -850,6 +862,7 @@ async fn get_auto_routing_stats(
             END AS applied_success_rate
         FROM v_routing_outcomes
         WHERE created_at >= NOW() - INTERVAL '{}'
+          AND NOT synthetic
         "#,
         interval
     ))
@@ -891,6 +904,7 @@ async fn get_auto_routing_stats(
             COUNT(*) FILTER (WHERE next_turn = 'escalation') AS escalation
         FROM v_routing_outcomes
         WHERE created_at >= NOW() - INTERVAL '{}'
+          AND NOT synthetic
         GROUP BY shadow, tier
         ORDER BY shadow, CASE tier
             WHEN 'simple' THEN 0 WHEN 'medium' THEN 1 WHEN 'complex' THEN 2 ELSE 3 END
@@ -939,6 +953,7 @@ async fn get_auto_routing_stats(
             COALESCE(AVG(latency_ms), 0)::INT AS avg_latency_ms
         FROM v_routing_outcomes
         WHERE created_at >= NOW() - INTERVAL '{}'
+          AND NOT synthetic
         GROUP BY shadow, tier, selected_model
         ORDER BY decisions DESC
         LIMIT 50
