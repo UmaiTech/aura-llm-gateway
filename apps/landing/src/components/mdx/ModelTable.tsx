@@ -24,7 +24,11 @@ interface Model {
  *     prices/context below are only used until the API responds.
  */
 const FALLBACK_MODELS: Model[] = [
-  // OpenAI — 2026 lineup
+  // OpenAI — 2026 lineup (refreshed 2026-09-07)
+  { id: 'gpt-6-astra', name: 'GPT-6 Astra', provider: 'openai', inputPrice: 10.0, outputPrice: 50.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai', inputPrice: 4.0, outputPrice: 20.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', provider: 'openai', inputPrice: 2.0, outputPrice: 12.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', provider: 'openai', inputPrice: 0.2, outputPrice: 1.2, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', inputPrice: 30.0, outputPrice: 180.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', inputPrice: 5.0, outputPrice: 30.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', inputPrice: 2.5, outputPrice: 15.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
@@ -34,16 +38,25 @@ const FALLBACK_MODELS: Model[] = [
   { id: 'o3-mini', name: 'o3-mini (reasoning)', provider: 'openai', inputPrice: 1.1, outputPrice: 4.4, contextWindow: 200000, streaming: true, functionCalling: true, vision: false },
   { id: 'gpt-4o', name: 'GPT-4o (legacy)', provider: 'openai', inputPrice: 2.5, outputPrice: 10.0, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini (legacy)', provider: 'openai', inputPrice: 0.15, outputPrice: 0.6, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
-  // Anthropic — 2026 lineup
+  // Anthropic — 2026 lineup (refreshed 2026-09-07)
+  { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', inputPrice: 10.0, outputPrice: 50.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', inputPrice: 3.0, outputPrice: 15.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-sonnet-4-5-20250514', name: 'Claude Sonnet 4.5', provider: 'anthropic', inputPrice: 3.0, outputPrice: 15.0, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-4-5-20250514', name: 'Claude Opus 4.5', provider: 'anthropic', inputPrice: 15.0, outputPrice: 75.0, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
-  { id: 'claude-haiku-4-5-20250514', name: 'Claude Haiku 4.5', provider: 'anthropic', inputPrice: 0.8, outputPrice: 4.0, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
-  // Google
-  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', provider: 'google', inputPrice: 1.5, outputPrice: 6.0, contextWindow: 2000000, streaming: true, functionCalling: true, vision: true },
-  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', provider: 'google', inputPrice: 0.15, outputPrice: 0.6, contextWindow: 2000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', inputPrice: 1.0, outputPrice: 5.0, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
+  // Google — ids match the gateway's SUPPORTED_MODELS (the old bare
+  // 'gemini-3-pro' / 'gemini-3-flash' ids do not exist upstream).
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', provider: 'google', inputPrice: 0.3, outputPrice: 2.5, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (preview)', provider: 'google', inputPrice: 2.5, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (preview)', provider: 'google', inputPrice: 0.15, outputPrice: 0.6, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google', inputPrice: 1.25, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'google', inputPrice: 0.1, outputPrice: 0.4, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
 ]

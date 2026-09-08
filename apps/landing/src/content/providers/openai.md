@@ -5,63 +5,67 @@ description: "OpenAI models and capabilities through Aura Gateway"
 
 # OpenAI Provider
 
-Aura provides first-class support for OpenAI's latest models including GPT-5, GPT-4.1, o-series reasoning models, and legacy GPT-4 models.
+Aura provides first-class support for OpenAI's latest models including GPT-6 Astra, the GPT-5.6 Sol / Terra / Luna tiers, the GPT-5.5 and GPT-5.4 families, o-series reasoning models, and legacy GPT-4o models. Catalog last refreshed 2026-09-07.
 
 ## Supported Models
 
-### GPT-5 Series (Latest)
-- **gpt-5** - Most capable model, optimized for complex tasks
-- **gpt-5.2** - Enhanced version with improved reasoning
-- **gpt-5-mini** - Fast, cost-effective alternative
+### GPT-6 (Latest — September 2026)
+- **gpt-6-astra** - Flagship for computer use, browsing, software engineering and multi-step professional work
 
-### GPT-4.1 Series
-- **gpt-4.1** - Balanced performance and cost
-- **gpt-4.1-mini** - Efficient for most tasks
-- **gpt-4.1-nano** - Ultra-fast, low-cost option
+### GPT-5.6 Series (August 2026)
+- **gpt-5.6-sol** - Flagship tier for complex reasoning, coding and agentic workflows (`gpt-5.6` is an alias for Sol)
+- **gpt-5.6-terra** - Production default with the 5.6 family's capabilities at a lower price
+- **gpt-5.6-luna** - Cheapest tier for classification, extraction and routing
 
-### GPT-4o Series (Vision & Multimodal)
-- **gpt-4.5** - Original multimodal model
-- **gpt-4.5-mini** - Affordable vision-enabled model
+### GPT-5.5 / GPT-5.4 Series
+- **gpt-5.5-pro**, **gpt-5.5** - Previous flagship line
+- **gpt-5.4**, **gpt-5.4-mini**, **gpt-5.4-nano** - Balanced, efficient and ultra-low-cost options
+
+### GPT-5 Series (older 2026 line)
+- **gpt-5.2**, **gpt-5**, **gpt-5-mini**
+
+### Legacy (kept for backward compatibility)
+- **gpt-4o**, **gpt-4o-mini**, **gpt-4-turbo**, **gpt-4**, **gpt-3.5-turbo**
+- GPT-4.5 was retired by OpenAI on 2026-06-27 and is no longer routable.
 
 ### Reasoning Models (o-series)
-- **o1** - Advanced reasoning capabilities
-- **o1-pro** - Maximum reasoning performance
-- **o3** - Next-generation reasoning
-- **o3-mini** - Compact reasoning model
-- **o4-mini** - Latest compact reasoning model
+- **o1**, **o1-mini**, **o1-preview**, **o3-mini**
 
 ## Model Capabilities
 
-| Feature | GPT-5 | GPT-4.1 | GPT-4o | o-series |
-|---------|-------|---------|--------|----------|
-| **Text Generation** | ✅ | ✅ | ✅ | ✅ |
-| **Tool/Function Calling** | ✅ | ✅ | ✅ | ✅ |
-| **Streaming** | ✅ | ✅ | ✅ | ✅ |
-| **Vision/Multimodal** | ✅ | ✅ | ✅ | ❌ |
-| **Extended Reasoning** | ❌ | ❌ | ❌ | ✅ |
-| **Reasoning Tokens** | ❌ | ❌ | ❌ | ✅ |
-| **JSON Mode** | ✅ | ✅ | ✅ | ✅ |
-| **Context Window** | 128K | 128K | 128K | 200K |
+| Feature | GPT-6 | GPT-5.6 | GPT-5.5 / 5.4 | GPT-4o (legacy) | o-series |
+|---------|-------|---------|---------------|-----------------|----------|
+| **Text Generation** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Tool/Function Calling** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Vision/Multimodal** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Extended Reasoning** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Reasoning Tokens** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **JSON Mode** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Context Window** | 1M | 1M | 1M | 128K | 200K |
 
 ## Pricing
 
-*Prices per 1M tokens (USD)*
+*Prices per 1M tokens (USD), as published 2026-09-07. GPT-5.6 Sol is promotional pricing through 2026-11-21.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
-| **gpt-5** | $5.00 | $20.00 | $1.25 |
+| **gpt-6-astra** | $10.00 | $50.00 | $1.00 |
+| **gpt-5.6-sol** | $4.00 | $20.00 | $0.40 |
+| **gpt-5.6-terra** | $2.00 | $12.00 | $0.20 |
+| **gpt-5.6-luna** | $0.20 | $1.20 | $0.02 |
+| **gpt-5.5-pro** | $30.00 | $180.00 | — |
+| **gpt-5.5** | $5.00 | $30.00 | $0.50 |
+| **gpt-5.4** | $2.50 | $15.00 | $0.25 |
+| **gpt-5.4-mini** | $0.75 | $4.50 | $0.075 |
+| **gpt-5.4-nano** | $0.20 | $1.25 | $0.02 |
 | **gpt-5.2** | $5.00 | $20.00 | $1.25 |
+| **gpt-5** | $5.00 | $20.00 | $1.25 |
 | **gpt-5-mini** | $0.50 | $2.00 | $0.125 |
-| **gpt-4.1** | $2.00 | $8.00 | $0.50 |
-| **gpt-4.1-mini** | $0.40 | $1.60 | $0.10 |
-| **gpt-4.1-nano** | $0.10 | $0.40 | $0.025 |
-| **gpt-4.5** | $2.50 | $10.00 | $1.25 |
-| **gpt-4.5-mini** | $0.15 | $0.60 | $0.075 |
+| **gpt-4o** | $2.50 | $10.00 | $1.25 |
+| **gpt-4o-mini** | $0.15 | $0.60 | $0.075 |
 | **o1** | $15.00 | $60.00 | $7.50 |
-| **o1-pro** | $150.00 | $600.00 | $75.00 |
-| **o3** | $2.00 | $8.00 | $1.00 |
 | **o3-mini** | $1.10 | $4.40 | $0.55 |
-| **o4-mini** | $1.10 | $4.40 | $0.55 |
 
 ## Configuration
 
