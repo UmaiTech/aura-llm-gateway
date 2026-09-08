@@ -11,6 +11,7 @@
 
 import { Pool } from 'pg'
 import type { PoolClient } from 'pg'
+import { CANONICAL_MODEL_ID_SQL } from './_normalize.js'
 import type {
   PriceChange,
   ProviderId,
@@ -48,9 +49,41 @@ async function providerId(name: ProviderId): Promise<string | null> {
 
 interface CurrentRow {
   id: string
+  model_id: string
   input_per_million: number
   output_per_million: number
   cached_input_per_million: number | null
+}
+
+/**
+ * Drop repeat `success` rows for the same model within one scrape. Pricing
+ * pages often list a model more than once (standard vs long-context tier,
+ * introductory vs next-year price); the first occurrence wins, and the
+ * duplicates are reported as `unchanged` with a note rather than written —
+ * writing both would version the row twice per run and flip-flop the price.
+ */
+export function dedupeScrapedRows(rows: ScrapedPrice[]): {
+  rows: ScrapedPrice[]
+  dropped: PriceChange[]
+} {
+  const seen = new Set<string>()
+  const kept: ScrapedPrice[] = []
+  const dropped: PriceChange[] = []
+  for (const row of rows) {
+    if (row.status !== 'success' || !seen.has(row.model_id)) {
+      if (row.status === 'success') seen.add(row.model_id)
+      kept.push(row)
+      continue
+    }
+    dropped.push({
+      model_id: row.model_id,
+      kind: 'unchanged',
+      note: 'duplicate row for this model on the pricing page; first occurrence kept',
+      source_url: row.source_url,
+      reasoning: row.reasoning,
+    })
+  }
+  return { rows: kept, dropped }
 }
 
 /** A price is "changed" if input, output, or cached input moved. */
@@ -91,7 +124,11 @@ export async function persistProvider(
     throw new Error(`provider '${provider}' missing from providers table`)
   }
 
-  for (const row of rows) {
+  const deduped = dedupeScrapedRows(rows)
+  changes.push(...deduped.dropped)
+  unchanged += deduped.dropped.length
+
+  for (const row of deduped.rows) {
     if (row.status !== 'success') {
       flagged++
       changes.push({
@@ -104,14 +141,31 @@ export async function persistProvider(
       continue
     }
 
+    // Match the open row by *canonical* id so a seed row keyed by the
+    // provider's API id (`gpt-3.5-turbo`) is versioned in place instead of
+    // gaining a `gpt-3-5-turbo` sibling. Newest first; any extra open rows
+    // for the same model are legacy duplicates and get closed below.
     const curRes = await pool.query<CurrentRow>(
-      `SELECT id, input_per_million::float8, output_per_million::float8,
+      `SELECT id, model_id, input_per_million::float8, output_per_million::float8,
               cached_input_per_million::float8
          FROM model_pricing
-        WHERE provider_id = $1 AND model_id = $2 AND effective_until IS NULL`,
+        WHERE provider_id = $1 AND effective_until IS NULL
+          AND ${CANONICAL_MODEL_ID_SQL} = $2
+        ORDER BY effective_from DESC, created_at DESC`,
       [pid, row.model_id],
     )
-    const current = curRes.rowCount ? curRes.rows[0] : null
+    const [current = null, ...stale] = curRes.rows
+    if (stale.length && !dryRun) {
+      await pool.query(
+        `UPDATE model_pricing
+            SET effective_until = NOW(), updated_at = NOW()
+          WHERE id = ANY($1::uuid[])`,
+        [stale.map((s) => s.id)],
+      )
+    }
+    const staleNote = stale.length
+      ? ` Closed ${stale.length} duplicate open row(s) for the same model.`
+      : ''
 
     if (!current) {
       changes.push({
@@ -135,17 +189,20 @@ export async function persistProvider(
     if (!pricesDiffer(current, row)) {
       unchanged++
       changes.push({
-        model_id: row.model_id,
+        model_id: current.model_id,
         kind: 'unchanged',
         source_url: row.source_url,
         reasoning: row.reasoning,
+        note: staleNote || undefined,
       })
       continue
     }
 
-    // Price changed → close the old row and open a new one atomically.
+    // Price changed → close the old row and open a new one atomically. The
+    // new row keeps the existing model_id (the id the gateway routes and
+    // the CostCalculator seeds with), not the scraper's canonical slug.
     changes.push({
-      model_id: row.model_id,
+      model_id: current.model_id,
       kind: 'version',
       before: {
         input_per_million: current.input_per_million,
@@ -159,9 +216,10 @@ export async function persistProvider(
       },
       source_url: row.source_url,
       reasoning: row.reasoning,
+      note: staleNote || undefined,
     })
     upserted++
-    if (!dryRun) await versionRow(pool, pid, current.id, row)
+    if (!dryRun) await versionRow(pool, pid, current, row)
   }
 
   return { upserted, unchanged, flagged, changes }
@@ -198,11 +256,15 @@ async function insertRow(
   )
 }
 
-/** Close the current row and insert the new price, in one transaction. */
+/**
+ * Close the current row and insert the new price, in one transaction. The
+ * replacement row reuses `current.model_id` so the model keeps one stable id
+ * across versions (see the canonical-id lookup in persistProvider).
+ */
 async function versionRow(
   p: Pool,
   providerUuid: string,
-  currentId: string,
+  current: CurrentRow,
   row: ScrapedPrice,
 ): Promise<void> {
   const client: PoolClient = await p.connect()
@@ -210,7 +272,7 @@ async function versionRow(
     await client.query('BEGIN')
     await client.query(
       'UPDATE model_pricing SET effective_until = NOW(), updated_at = NOW() WHERE id = $1',
-      [currentId],
+      [current.id],
     )
     await client.query(
       `INSERT INTO model_pricing
@@ -222,7 +284,7 @@ async function versionRow(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW(), NULL)`,
       [
         providerUuid,
-        row.model_id,
+        current.model_id,
         row.model_name,
         row.input_per_million,
         row.output_per_million,

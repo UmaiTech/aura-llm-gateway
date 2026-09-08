@@ -573,7 +573,7 @@ function ProviderTable({ provider }: { provider: ProviderBlock }) {
           </thead>
           <tbody>
             {provider.models.map((m) => (
-              <ModelRow key={m.model_id} model={m} />
+              <ModelRow key={`${m.model_id}:${m.effective_from}`} model={m} />
             ))}
           </tbody>
         </table>
