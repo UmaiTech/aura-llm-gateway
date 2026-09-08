@@ -15,7 +15,13 @@ export interface ModelPricing {
 // Hardcoded reference prices — fallback only. Kept current-ish by hand; the
 // live values from /api/pricing take precedence once loaded.
 export const FALLBACK_PRICING: Record<string, ModelPricing> = {
-  // OpenAI — 2026 lineup
+  // OpenAI — 2026 lineup (refreshed 2026-09-07). Sol is promo-priced
+  // through 2026-11-21; 'gpt-5.6' is OpenAI's alias for Sol.
+  'gpt-6-astra': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
+  'gpt-5.6-sol': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
+  'gpt-5.6': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
+  'gpt-5.6-terra': { inputPerMillion: 2.00, outputPerMillion: 12.00 },
+  'gpt-5.6-luna': { inputPerMillion: 0.20, outputPerMillion: 1.20 },
   'gpt-5.5-pro': { inputPerMillion: 30.00, outputPerMillion: 180.00 },
   'gpt-5.5': { inputPerMillion: 5.00, outputPerMillion: 30.00 },
   'gpt-5.4': { inputPerMillion: 2.50, outputPerMillion: 15.00 },
@@ -29,7 +35,12 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   'gpt-4-turbo': { inputPerMillion: 10.00, outputPerMillion: 30.00 },
   'gpt-3.5-turbo': { inputPerMillion: 0.50, outputPerMillion: 1.50 },
 
-  // Anthropic — 2026 lineup
+  // Anthropic — 2026 lineup (refreshed 2026-09-07)
+  'claude-fable-5-1': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
+  'claude-fable-5': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
+  'claude-opus-5': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
+  'claude-sonnet-5': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
+  'claude-opus-4-8': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
   'claude-opus-4-7': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
   'claude-opus-4-6': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
   'claude-sonnet-4-6': { inputPerMillion: 3.00, outputPerMillion: 15.00 },
@@ -44,7 +55,13 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // Google — ids match Google's models.list (verified 2026-05-22).
   // Approximate $/MTok numbers from the public pricing page; refresh
   // when Google publishes 3.x GA pricing.
+  // 3.6/3.7/3.8 Flash are Google's introductory price through 2026-12-31
+  // ($1.50 / $7.50 standard from 2027-01-01).
+  'gemini-3.8-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
+  'gemini-3.7-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
+  'gemini-3.6-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.5-flash': { inputPerMillion: 0.20, outputPerMillion: 0.80 },
+  'gemini-3.5-flash-lite': { inputPerMillion: 0.30, outputPerMillion: 2.50 },
   'gemini-3.1-flash-lite': { inputPerMillion: 0.075, outputPerMillion: 0.30 },
   'gemini-3-pro-preview': { inputPerMillion: 1.50, outputPerMillion: 6.00 },
   'gemini-3-flash-preview': { inputPerMillion: 0.15, outputPerMillion: 0.60 },
