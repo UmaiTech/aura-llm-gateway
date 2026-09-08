@@ -86,10 +86,14 @@ against live gold texts and against the batch.
 
 ### 3.3 Generation with a cheap model
 
-`scripts/router/synth.py generate` calls a cheap model (default
-`gpt-5.4-nano`, alternatives `gemini-3.1-flash-lite`, `claude-haiku-4-5`)
-through the gateway itself with a pinned model and a dedicated synthetic API
-key. Structured JSON output: a complete Open Responses request body (`input`
+`scripts/router/synth.py generate` calls a cheap model through the gateway
+itself with a pinned model and a dedicated synthetic API key. Two generators
+are used, split per batch: `gpt-5.6-luna` (0.20 / 1.20 USD per million
+tokens) and `claude-haiku-4-5` (about 1 / 5 USD per million). Luna carries
+most of the volume because it is five times cheaper; Haiku takes a fixed
+share (default 30 %) so the corpus is not written in one model's voice, which
+is the cheapest defence against the classifier learning a generator's style.
+Either model is the retry for the other. Structured JSON output: a complete Open Responses request body (`input`
 items, `instructions`, `tools`, `tool_choice`, `max_output_tokens`, hints)
 plus the intended level and family. Five specs per call to cut cost, high
 temperature for diversity.
@@ -172,7 +176,7 @@ savings.
 
 | Step | Model class | Approx. USD |
 |---|---|---|
-| Generation, 5 specs per call, self-rating | nano / flash-lite | 1 |
+| Generation, 5 specs per call, self-rating | Luna 70 % / Haiku 4.5 30 % | 1 to 2 |
 | Shape verification via score endpoint | none | 0 |
 | Ladder answers, about 2.3 per row | mixed tiers | 5 to 8 |
 | Reference answer | strongest tier | 8 to 15 |
@@ -221,8 +225,8 @@ and docs: items 6 to 8) if reviewing in one go is too much.
 
 ## 6. Decisions needed
 
-1. **Generator model**: default `gpt-5.4-nano`; alternatives flash-lite or
-   haiku. Recommendation: nano, with flash-lite as the retry model.
+1. **Generator models**: `gpt-5.6-luna` and `claude-haiku-4-5` (decided).
+   Default split 70 / 30 by volume, each the retry for the other.
 2. **Judge**: keep `gold_judge_model` (`claude-sonnet-4-6`) for label
    consistency with live gold. Recommendation: yes.
 3. **Labelling**: ladder (recommended) or the live pair procedure.
