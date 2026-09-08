@@ -15,7 +15,16 @@ on:
   # PR's "Sync SDK versions" step keeps package.json's version aligned.
   release:
     types: [published]
+  # Manual publish of an existing release tag. Release events run the
+  # workflow file *as of the tagged commit*, so a publish that failed because
+  # of a workflow bug can't be fixed by re-running it — dispatch from main
+  # with the tag instead (v0.17.0 was recovered this way).
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish to npm (e.g. v0.17.0). Empty = tests only.'
+        required: false
+        default: ''
 
 defaults:
   run:
@@ -27,9 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install
       - run: npm run typecheck
       - run: npm run test:coverage
@@ -43,8 +54,10 @@ jobs:
     # rejects re-publishing an existing version, so a release whose version
     # already exists on npm is simply a no-op failure — guarded below.
     if: >-
-      github.event_name == 'release' &&
-      startsWith(github.event.release.tag_name, 'v')
+      (github.event_name == 'release' &&
+       startsWith(github.event.release.tag_name, 'v')) ||
+      (github.event_name == 'workflow_dispatch' &&
+       startsWith(inputs.tag, 'v'))
     environment:
       name: npm
       url: https://www.npmjs.com/package/aura-llm
@@ -53,9 +66,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      # Node 22 (matches the root package.json engines field). Trusted
+      # publishing needs npm >= 11.5.1 on Node >= 22.14; Node 20 only ever
+      # worked while `npm@latest` resolved to 11.x.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
       # Derive the version from the release tag (v1.2.3 -> 1.2.3) and force it
       # into package.json before install/build. The release-PR "Sync SDK
@@ -63,16 +81,22 @@ jobs:
       # package.json (e.g. v0.16.0 tagged with 0.1.0); deriving here makes the
       # published version always match the tag, independent of that step.
       - name: Set version from release tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${INPUT_TAG:-$GITHUB_REF_NAME}"
+          TAG_VERSION="${TAG#v}"
           echo "Release tag version: ${TAG_VERSION}"
           npm version "${TAG_VERSION}" --no-git-tag-version --allow-same-version
       - run: npm install
       - run: npm run build
       # Trusted publishing (OIDC): npm 11.5+ authenticates via the id-token,
       # no NPM_TOKEN secret. --provenance emits a signed SLSA attestation.
-      - run: npm install -g npm@latest
+      # Pinned to the 11.x line: `npm@latest` broke the v0.17.0 publish
+      # (EBADENGINE — npm 12 requires Node >= 22.22.2) and would break again
+      # on the next major. Bump deliberately, together with node-version.
+      - run: npm install -g npm@11
       # Skip (don't fail) if this version is already on npm — mirrors PyPI's
       # skip-existing, so a re-run or an SDK-unchanged release is a no-op.
       - name: Publish to npm (skip if version exists)
