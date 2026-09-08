@@ -40,6 +40,10 @@ interface Model {
   capabilities: string[] | null
   good_at: string | null
   effective_from: string
+  /** Every model id folded into this row (representative first). */
+  model_ids?: string[]
+  /** How many price rows were voted on for the numbers shown. */
+  price_samples?: number
 }
 
 interface ProviderBlock {
@@ -681,6 +685,18 @@ function ModelRow({ model: m }: { model: Model }) {
                 }
               />
               <Detail label="Tracked since" value={fmtDate(m.effective_from)} />
+              {m.model_ids && m.model_ids.length > 1 && (
+                <Detail
+                  label="Also listed as"
+                  value={m.model_ids.filter((id) => id !== m.model_id).join(', ')}
+                />
+              )}
+              {m.price_samples && m.price_samples > 1 && (
+                <Detail
+                  label="Price sources"
+                  value={`${m.price_samples} rows (majority vote)`}
+                />
+              )}
             </dl>
           </td>
         </tr>
