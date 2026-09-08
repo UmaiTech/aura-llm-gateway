@@ -15,7 +15,8 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pricingPool } from '../cron/_db.js'
-import { dedupeCurrentRows } from '../cron/_normalize.js'
+import { groupCurrentRows } from '../cron/_normalize.js'
+import type { CurrentPriceRow } from '../cron/_normalize.js'
 import { PROVIDERS } from '../cron/_providers.js'
 
 /** provider name → { description, models_url } from the scraper config. */
@@ -26,21 +27,8 @@ const PROVIDER_META = new Map(
   ]),
 )
 
-interface PriceRow {
-  provider: string
+interface PriceRow extends CurrentPriceRow {
   display_name: string
-  model_id: string
-  model_name: string
-  input_per_million: number
-  output_per_million: number
-  cached_input_per_million: number | null
-  batch_input_per_million: number | null
-  batch_output_per_million: number | null
-  context_window: number | null
-  max_output_tokens: number | null
-  capabilities: string[] | null
-  good_at: string | null
-  effective_from: Date
 }
 
 export default async function handler(
@@ -59,9 +47,11 @@ export default async function handler(
   }
 
   try {
-    // One row per (provider, model): seed rows and scraper rows for the
-    // same model used to both be "current" and rendered twice on /pricing.
-    const rows = dedupeCurrentRows(await fetchCurrentPrices())
+    // One row per (provider, model family). The same model reaches
+    // model_pricing under several ids (migration seeds, dated API ids, LLM
+    // extractor drift such as `haiku4-5` / `sonnet5`); group them and vote
+    // on the price instead of rendering each id as its own row.
+    const rows = groupByProvider(await fetchCurrentPrices())
     const lastRun = await fetchLastRun()
     const rates = await fetchExchangeRates()
 
@@ -101,6 +91,8 @@ export default async function handler(
         capabilities: r.capabilities,
         good_at: r.good_at,
         effective_from: r.effective_from.toISOString(),
+        model_ids: r.model_ids,
+        price_samples: r.price_samples,
       })
       if (!newest || r.effective_from > newest) newest = r.effective_from
     }
@@ -123,6 +115,21 @@ export default async function handler(
       message: (err instanceof Error ? err.message : String(err)).slice(0, 200),
     })
   }
+}
+
+/** Group rows per provider; keeps the SQL's provider/price ordering. */
+function groupByProvider(rows: PriceRow[]) {
+  const perProvider = new Map<string, PriceRow[]>()
+  for (const r of rows) {
+    const list = perProvider.get(r.provider)
+    if (list) list.push(r)
+    else perProvider.set(r.provider, [r])
+  }
+  return [...perProvider.entries()].flatMap(([provider, list]) =>
+    groupCurrentRows(list, provider)
+      .map((g) => ({ ...g, display_name: list[0].display_name }))
+      .sort((a, b) => a.input_per_million - b.input_per_million),
+  )
 }
 
 async function fetchCurrentPrices(): Promise<PriceRow[]> {

@@ -50,42 +50,214 @@ export function canonicalModelId(raw: string): string {
 }
 
 /**
- * SQL twin of `canonicalModelId` for matching against `model_pricing.model_id`
- * in Postgres. Must stay in sync with the function above: lowercase, collapse
- * every run of non-alphanumerics to '-', trim leading/trailing '-'.
+ * Tokens that say who sells a model, not which model it is. Dropped from the
+ * family key so `claude-haiku-3`, `anthropic.claude-3-haiku-20240307` and a
+ * bare `haiku-3` all land in the same family.
  */
-export const CANONICAL_MODEL_ID_SQL =
-  "btrim(regexp_replace(lower(model_id), '[^a-z0-9]+', '-', 'g'), '-')"
+const BRAND_TOKENS = new Set([
+  'claude',
+  'anthropic',
+  'openai',
+  'google',
+  'accounts',
+  'models',
+  'fireworks',
+  'together',
+  'mistralai',
+  'meta',
+  'latest',
+])
 
 /**
- * Collapse "current" pricing rows that are really the same model.
+ * Model *family* key — the identity of a model once every cosmetic
+ * difference between the ways providers, migrations and the LLM extractor
+ * spell it has been removed. `canonicalModelId` only normalizes separators;
+ * this goes further and is what /pricing groups on:
  *
- * `model_pricing` has no uniqueness on the open (`effective_until IS NULL`)
- * row, so siblings accumulate from two sources: seed rows from migrations
- * carry the provider's API id (`gpt-3.5-turbo`) while the scraper wrote the
- * canonical slug (`gpt-3-5-turbo`), and the LLM extractor drifts between
- * runs. Each sibling rendered as a duplicate row on /pricing. Group by
- * (provider, canonical id) and keep the newest `effective_from` — the most
- * recently scraped price — preserving first-seen order.
+ *  - dated snapshots (`-20240307`, `-2024-11-20`), Bedrock `-v1:0` and
+ *    3-digit pins (`-001`) are stripped,
+ *  - letters and digits are split (`haiku4-5` → haiku 4 5, `sonnet5` → sonnet 5),
+ *  - brand tokens and the provider name are dropped,
+ *  - word tokens are sorted so `claude-3-haiku` and `claude-haiku-3` agree,
+ *  - numeric tokens keep their order (`gpt-5-4-mini` ≠ `gpt-4-5-mini`).
+ *
+ * The result is `words|numbers`, e.g. `haiku|3-5`, `flash-gemini|3-8`,
+ * `gpt-mini|5-4`. Only rows from the same provider are ever compared.
  */
-export function dedupeCurrentRows<
-  T extends { provider: string; model_id: string; effective_from: Date | string },
->(rows: T[]): T[] {
-  const best = new Map<string, T>()
-  const order: string[] = []
-  for (const r of rows) {
-    const key = `${r.provider}\u0000${canonicalModelId(r.model_id)}`
-    const cur = best.get(key)
-    if (!cur) {
-      best.set(key, r)
-      order.push(key)
-    } else if (
-      new Date(r.effective_from).getTime() > new Date(cur.effective_from).getTime()
-    ) {
-      best.set(key, r)
+export function modelFamilyKey(raw: string, provider?: string): string {
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/-v\d+:\d+$/, '')
+    .replace(/(?<![a-z0-9])20\d{2}[-_.]?\d{2}[-_.]?\d{2}(?![a-z0-9])/g, ' ')
+    .replace(/-\d{3}$/, '')
+  const words = new Set<string>()
+  const nums: string[] = []
+  for (const chunk of s.split(/[^a-z0-9]+/)) {
+    for (const t of chunk.match(/[a-z]+|\d+/g) ?? []) {
+      if (/^\d+$/.test(t)) nums.push(String(Number(t)))
+      else if (!BRAND_TOKENS.has(t) && t !== provider) words.add(t)
     }
   }
-  return order.map((k) => best.get(k) as T)
+  return `${[...words].sort().join('-')}|${nums.join('-')}`
+}
+
+/**
+ * The keys a row can be matched on: its id's family, plus its display name's
+ * family when the name carries a version number (a versionless name like
+ * "Claude Sonnet" must not glue different generations together). Namespaced
+ * so ids only match ids and names only match names.
+ */
+export function familyKeys(
+  row: { model_id: string; model_name?: string | null },
+  provider?: string,
+): string[] {
+  const keys = [`id:${modelFamilyKey(row.model_id, provider)}`]
+  if (row.model_name && /\d/.test(row.model_name)) {
+    keys.push(`name:${modelFamilyKey(row.model_name, provider)}`)
+  }
+  return keys
+}
+
+/**
+ * Partition rows into model families (union-find over `familyKeys`). Input
+ * order is preserved within each group, so callers that sort newest-first
+ * get the newest row first in every group.
+ */
+export function groupByFamily<T extends { model_id: string; model_name?: string | null }>(
+  rows: T[],
+  provider?: string,
+): T[][] {
+  const parent = rows.map((_, i) => i)
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]]
+      i = parent[i]
+    }
+    return i
+  }
+  const byKey = new Map<string, number>()
+  rows.forEach((r, i) => {
+    for (const k of familyKeys(r, provider)) {
+      const j = byKey.get(k)
+      if (j === undefined) byKey.set(k, i)
+      else {
+        const a = find(i)
+        const b = find(j)
+        if (a !== b) parent[Math.max(a, b)] = Math.min(a, b)
+      }
+    }
+  })
+  const groups = new Map<number, T[]>()
+  rows.forEach((r, i) => {
+    const root = find(i)
+    const g = groups.get(root)
+    if (g) g.push(r)
+    else groups.set(root, [r])
+  })
+  return [...groups.values()]
+}
+
+/**
+ * Pick one price from several observations of the same model: the value a
+ * strict majority agrees on, else the median (which for two observations is
+ * their average and for more resists a single mis-scraped outlier). Nulls
+ * are ignored; null if nothing usable.
+ */
+export function majorityOrMedian(values: Array<number | null | undefined>): number | null {
+  const vs = values.filter(
+    (v): v is number => typeof v === 'number' && Number.isFinite(v),
+  )
+  if (!vs.length) return null
+  const counts = new Map<number, number>()
+  for (const v of vs) counts.set(v, (counts.get(v) ?? 0) + 1)
+  let best = vs[0]
+  let bestN = 0
+  for (const [v, n] of counts) {
+    if (n > bestN) {
+      best = v
+      bestN = n
+    }
+  }
+  if (bestN * 2 > vs.length) return best
+  const sorted = [...vs].sort((a, b) => a - b)
+  const mid = sorted.length >> 1
+  return sorted.length % 2 ? sorted[mid] : round6((sorted[mid - 1] + sorted[mid]) / 2)
+}
+
+/** Majority value, else the largest — for context windows and output caps. */
+function majorityOrMax(values: Array<number | null | undefined>): number | null {
+  const vs = values.filter(
+    (v): v is number => typeof v === 'number' && Number.isFinite(v),
+  )
+  if (!vs.length) return null
+  const counts = new Map<number, number>()
+  for (const v of vs) counts.set(v, (counts.get(v) ?? 0) + 1)
+  for (const [v, n] of counts) if (n * 2 > vs.length) return v
+  return Math.max(...vs)
+}
+
+export interface CurrentPriceRow {
+  provider: string
+  model_id: string
+  model_name: string
+  input_per_million: number
+  output_per_million: number
+  cached_input_per_million: number | null
+  batch_input_per_million: number | null
+  batch_output_per_million: number | null
+  context_window: number | null
+  max_output_tokens: number | null
+  capabilities: string[] | null
+  good_at: string | null
+  effective_from: Date
+}
+
+export interface GroupedPriceRow extends CurrentPriceRow {
+  /** Every id that was folded into this row, representative first. */
+  model_ids: string[]
+  /** How many open rows contributed to the prices shown. */
+  price_samples: number
+}
+
+/**
+ * Collapse the "current" rows of one provider into one row per model
+ * family. The representative id/name come from the newest row; each price
+ * column is a majority vote across the family with a median fallback (see
+ * `majorityOrMedian`); context and output caps take the majority else the
+ * largest; capabilities are unioned.
+ *
+ * Why this exists: `model_pricing` has no uniqueness on the open row, and
+ * the same model reaches it under several ids — migration seeds
+ * (`claude-haiku-3`), dated API ids (`claude-3-haiku-20240307`) and LLM
+ * extractor drift (`haiku4-5`, `sonnet5`). Each rendered as its own row
+ * on /pricing, sometimes with a different price.
+ */
+export function groupCurrentRows(
+  rows: CurrentPriceRow[],
+  provider: string,
+): GroupedPriceRow[] {
+  const newestFirst = [...rows].sort(
+    (a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime(),
+  )
+  return groupByFamily(newestFirst, provider).map((g) => {
+    const rep = g[0]
+    const caps = [...new Set(g.flatMap((r) => r.capabilities ?? []))]
+    return {
+      ...rep,
+      input_per_million: majorityOrMedian(g.map((r) => r.input_per_million)) ?? rep.input_per_million,
+      output_per_million: majorityOrMedian(g.map((r) => r.output_per_million)) ?? rep.output_per_million,
+      cached_input_per_million: majorityOrMedian(g.map((r) => r.cached_input_per_million)),
+      batch_input_per_million: majorityOrMedian(g.map((r) => r.batch_input_per_million)),
+      batch_output_per_million: majorityOrMedian(g.map((r) => r.batch_output_per_million)),
+      context_window: majorityOrMax(g.map((r) => r.context_window)),
+      max_output_tokens: majorityOrMax(g.map((r) => r.max_output_tokens)),
+      capabilities: caps.length ? caps : null,
+      good_at: g.find((r) => r.good_at)?.good_at ?? null,
+      model_ids: [...new Set(g.map((r) => r.model_id))],
+      price_samples: g.length,
+    }
+  })
 }
 
 function isUsablePrice(n: number | null | undefined): n is number {

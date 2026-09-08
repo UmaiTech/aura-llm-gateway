@@ -11,7 +11,7 @@
 
 import { Pool } from 'pg'
 import type { PoolClient } from 'pg'
-import { CANONICAL_MODEL_ID_SQL } from './_normalize.js'
+import { familyKeys, groupByFamily } from './_normalize.js'
 import type {
   PriceChange,
   ProviderId,
@@ -50,15 +50,17 @@ async function providerId(name: ProviderId): Promise<string | null> {
 interface CurrentRow {
   id: string
   model_id: string
+  model_name: string
   input_per_million: number
   output_per_million: number
   cached_input_per_million: number | null
 }
 
 /**
- * Drop repeat `success` rows for the same model within one scrape. Pricing
- * pages often list a model more than once (standard vs long-context tier,
- * introductory vs next-year price); the first occurrence wins, and the
+ * Drop repeat `success` rows for the same model *family* within one scrape.
+ * Pricing pages often list a model more than once (standard vs long-context
+ * tier, introductory vs next-year price) and the extractor sometimes emits
+ * the same model under two spellings; the first occurrence wins, and the
  * duplicates are reported as `unchanged` with a note rather than written —
  * writing both would version the row twice per run and flip-flop the price.
  */
@@ -70,8 +72,9 @@ export function dedupeScrapedRows(rows: ScrapedPrice[]): {
   const kept: ScrapedPrice[] = []
   const dropped: PriceChange[] = []
   for (const row of rows) {
-    if (row.status !== 'success' || !seen.has(row.model_id)) {
-      if (row.status === 'success') seen.add(row.model_id)
+    const keys = row.status === 'success' ? familyKeys(row, row.provider) : []
+    if (!keys.some((k) => seen.has(k))) {
+      for (const k of keys) seen.add(k)
       kept.push(row)
       continue
     }
@@ -128,6 +131,29 @@ export async function persistProvider(
   changes.push(...deduped.dropped)
   unchanged += deduped.dropped.length
 
+  // Load every open row for the provider once and partition it into model
+  // families, so a scraped row is matched by *family* (see modelFamilyKey):
+  // a seed row keyed by the API id (`claude-3-haiku-20240307`), an alias
+  // (`claude-haiku-3`) and an extractor spelling (`haiku3`) are one model.
+  // Each family is newest-first; extra open rows are legacy duplicates.
+  const openRes = await pool.query<CurrentRow>(
+    `SELECT id, model_id, model_name,
+            input_per_million::float8, output_per_million::float8,
+            cached_input_per_million::float8
+       FROM model_pricing
+      WHERE provider_id = $1 AND effective_until IS NULL
+      ORDER BY effective_from DESC, created_at DESC`,
+    [pid],
+  )
+  const families = groupByFamily(openRes.rows, provider)
+  const familyByKey = new Map<string, CurrentRow[]>()
+  for (const family of families) {
+    for (const r of family) {
+      for (const k of familyKeys(r, provider)) familyByKey.set(k, family)
+    }
+  }
+  const touched = new Set<CurrentRow[]>()
+
   for (const row of deduped.rows) {
     if (row.status !== 'success') {
       flagged++
@@ -141,20 +167,15 @@ export async function persistProvider(
       continue
     }
 
-    // Match the open row by *canonical* id so a seed row keyed by the
-    // provider's API id (`gpt-3.5-turbo`) is versioned in place instead of
-    // gaining a `gpt-3-5-turbo` sibling. Newest first; any extra open rows
-    // for the same model are legacy duplicates and get closed below.
-    const curRes = await pool.query<CurrentRow>(
-      `SELECT id, model_id, input_per_million::float8, output_per_million::float8,
-              cached_input_per_million::float8
-         FROM model_pricing
-        WHERE provider_id = $1 AND effective_until IS NULL
-          AND ${CANONICAL_MODEL_ID_SQL} = $2
-        ORDER BY effective_from DESC, created_at DESC`,
-      [pid, row.model_id],
-    )
-    const [current = null, ...stale] = curRes.rows
+    // The scraped row's family, if any open row belongs to it. The newest
+    // open row is versioned in place and keeps its model_id (the id the
+    // gateway routes with); the rest are closed as duplicates.
+    const family =
+      familyKeys(row, provider)
+        .map((k) => familyByKey.get(k))
+        .find((f) => f !== undefined) ?? []
+    const [current = null, ...stale] = family
+    if (family.length) touched.add(family)
     if (stale.length && !dryRun) {
       await pool.query(
         `UPDATE model_pricing
@@ -220,6 +241,30 @@ export async function persistProvider(
     })
     upserted++
     if (!dryRun) await versionRow(pool, pid, current, row)
+  }
+
+  // Families the page no longer lists (retired models, aliases the extractor
+  // stopped emitting) would otherwise keep their legacy duplicates forever.
+  // Close all but the newest open row of each untouched family too.
+  for (const family of families) {
+    if (touched.has(family) || family.length < 2) continue
+    const [keep, ...stale] = family
+    if (!dryRun) {
+      await pool.query(
+        `UPDATE model_pricing
+            SET effective_until = NOW(), updated_at = NOW()
+          WHERE id = ANY($1::uuid[])`,
+        [stale.map((s) => s.id)],
+      )
+    }
+    unchanged++
+    changes.push({
+      model_id: keep.model_id,
+      kind: 'unchanged',
+      note:
+        `Not on the pricing page this run; closed ${stale.length} duplicate ` +
+        `open row(s) for the same model (${stale.map((s) => s.model_id).join(', ')}).`,
+    })
   }
 
   return { upserted, unchanged, flagged, changes }
