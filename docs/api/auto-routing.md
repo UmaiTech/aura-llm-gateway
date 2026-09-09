@@ -8,10 +8,10 @@ Send `model: "auto"` and Aura scores the request's complexity, maps it to a tier
 
 | Tier | Typical request | Default candidates |
 |------|-----------------|--------------------|
-| `simple` | Short factual questions, rewrites, translations, greetings | `gemini-3.1-flash-lite`, `gpt-5.4-nano`, `claude-haiku-4-5` |
-| `medium` | Everyday assistant work, light code, tool calls | `gemini-3.5-flash`, `gpt-5.4-mini`, `claude-sonnet-4-6` |
-| `complex` | Multi-step engineering work, debugging, long context | `claude-sonnet-4-6`, `gpt-5.5`, `gemini-3.1-pro-preview` |
-| `reasoning` | Proofs, derivations, deep analysis, explicit "think hard" | `claude-opus-4-7`, `gpt-5.5-pro`, `o3-mini` |
+| `simple` | Short factual questions, rewrites, translations, greetings | `gemini-3.1-flash-lite`, `gemini-3.5-flash`, `gpt-5.6-luna` |
+| `medium` | Everyday assistant work, light code, tool calls | `gemini-3.8-flash`, `gpt-5.4-mini`, `claude-haiku-4-5` |
+| `complex` | Multi-step engineering work, debugging, long context | `claude-sonnet-5`, `gemini-3-pro-preview`, `gpt-5.6-terra` |
+| `reasoning` | Proofs, derivations, deep analysis, explicit "think hard" | `claude-opus-5`, `gpt-5.6-sol`, `claude-fable-5-1` |
 
 Only models the gateway can actually serve (a provider key is configured) are ever considered. Tier lists are configurable per gateway; when none are configured the gateway derives them from its model catalog (price thirds, `reasoning` tag) at startup.
 
@@ -198,10 +198,10 @@ routing:
     default_mode: balanced          # cost | balanced | quality
     shadow_for_pinned_models: true  # score pinned-model requests too
     tiers:
-      simple:    [gemini-3.1-flash-lite, gpt-5.4-nano, claude-haiku-4-5]
-      medium:    [gemini-3.5-flash, gpt-5.4-mini, claude-sonnet-4-6]
-      complex:   [claude-sonnet-4-6, gpt-5.5, gemini-3.1-pro-preview]
-      reasoning: [claude-opus-4-7, gpt-5.5-pro, o3-mini]
+      simple:    [gemini-3.1-flash-lite, gemini-3.5-flash, gpt-5.6-luna]
+      medium:    [gemini-3.8-flash, gpt-5.4-mini, claude-haiku-4-5]
+      complex:   [claude-sonnet-5, gemini-3-pro-preview, gpt-5.6-terra]
+      reasoning: [claude-opus-5, gpt-5.6-sol, claude-fable-5-1]
     boundaries: { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.60 }
     mode_offsets: { cost: -0.10, balanced: 0.0, quality: 0.15 }
     within_tier: cheapest           # cheapest | config_order | round_robin | thompson
@@ -212,7 +212,7 @@ routing:
     arm_stats_window_days: 30
     llm_classifier: { model: claude-haiku-4-5, timeout_ms: 800 }
     gold_sample_rate: 0.0            # e.g. 0.01 = 1% of eligible requests
-    gold_judge_model: claude-sonnet-4-6
+    gold_judge_model: claude-sonnet-5
     gold_max_text_chars: 4000
     learned_weights_file: null       # or /etc/aura/router-weights.json
 ```
@@ -263,7 +263,7 @@ Tool-loop continuation turns (function outputs without a new user message) are n
 
 ### Gold labels
 
-With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self-contained text requests (no tools, images or continuations) is answered in the background by the cheapest eligible model of the lowest tier (A) and of the highest tier (B); `gold_judge_model` (default `claude-sonnet-4-6`) grades the pair and the result lands in `routing_gold_pairs` with the request's feature vector. A verdict of `a` or `tie` means the cheap tier would have sufficed. This is the augmentation RouteLLM used to train its routers, run on live traffic; it costs two extra completions and a judge call per sampled request, so keep the rate small (1% or less). `GET /admin/routing/gold?limit=` returns the summary and recent pairs.
+With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self-contained text requests (no tools, images or continuations) is answered in the background by the cheapest eligible model of the lowest tier (A) and of the highest tier (B); `gold_judge_model` (default `claude-sonnet-5`) grades the pair and the result lands in `routing_gold_pairs` with the request's feature vector. A verdict of `a` or `tie` means the cheap tier would have sufficed. This is the augmentation RouteLLM used to train its routers, run on live traffic; it costs two extra completions and a judge call per sampled request, so keep the rate small (1% or less). `GET /admin/routing/gold?limit=` returns the summary and recent pairs.
 
 ### Learned classifier
 
