@@ -98,59 +98,32 @@ analytics.track('tool_usage', { tools: toolsUsed });
 
 Aura includes up-to-date pricing for all supported models. Prices are per 1 million tokens in USD.
 
-*Last updated: August 2026*
 
 ### OpenAI Models
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
-| gpt-5.6-sol | $5.00 | $30.00 | $0.50 |
-| gpt-5.6-terra | $2.00 | $12.00 | $0.20 |
-| gpt-5.6-luna | $0.20 | $1.20 | $0.02 |
-| gpt-5.5 | $5.00 | $30.00 | $0.50 |
-| gpt-5.5-pro | $30.00 | $180.00 | — |
-| gpt-5.4 | $2.50 | $15.00 | $0.25 |
-| gpt-5.4-mini | $0.75 | $4.50 | $0.075 |
-| gpt-5.4-nano | $0.20 | $1.25 | $0.02 |
-| gpt-5.3-codex | $1.75 | $14.00 | $0.175 |
-| codex-mini-latest | $1.50 | $6.00 | $0.375 |
 | gpt-5.2 | $5.00 | $20.00 | $1.25 |
 | gpt-5 | $5.00 | $20.00 | $1.25 |
 | gpt-5-mini | $0.50 | $2.00 | $0.125 |
 | gpt-4o | $2.50 | $10.00 | $1.25 |
 | gpt-4o-mini | $0.15 | $0.60 | $0.075 |
 | o1 | $15.00 | $60.00 | $7.50 |
-| o1-pro | $150.00 | $600.00 | $75.00 |
-| o3 | $2.00 | $8.00 | $0.50 |
-| o3-mini | $1.10 | $4.40 | $0.55 |
-| o4-mini | $1.10 | $4.40 | $0.275 |
 
 ### Anthropic Models
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
-| claude-fable-5 | $10.00 | $50.00 | $1.00 |
-| claude-opus-5 | $5.00 | $25.00 | $0.50 |
-| claude-opus-4-8 | $5.00 | $25.00 | $0.50 |
-| claude-opus-4-7 | $5.00 | $25.00 | $0.50 |
-| claude-opus-4-6 | $5.00 | $25.00 | $0.50 |
-| claude-opus-4-5 | $5.00 | $25.00 | $0.50 |
-| claude-sonnet-5 | $2.00 | $10.00 | $0.20 |
-| claude-sonnet-4-6 | $3.00 | $15.00 | $0.30 |
 | claude-sonnet-4-5 | $3.00 | $15.00 | $0.30 |
 | claude-haiku-4-5 | $1.00 | $5.00 | $0.10 |
 | claude-3-5-haiku | $0.80 | $4.00 | $0.08 |
-| claude-3-opus | $15.00 | $75.00 | $1.50 |
 
 ### Google Models
 
+Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31 ($1.50 / $7.50 standard from 2027-01-01).
+
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
-| gemini-3.1-pro-preview | $2.00 | $12.00 | $0.20 |
-| gemini-3.5-flash | $1.50 | $9.00 | $0.15 |
-| gemini-3-flash-preview | $0.50 | $3.00 | $0.05 |
-| gemini-3.1-flash-lite | $0.25 | $1.50 | $0.025 |
-| gemini-3-pro-preview | $2.50 | $10.00 | $0.625 |
 | gemini-2.5-pro | $1.25 | $10.00 | $0.3125 |
 | gemini-2.5-flash | $0.30 | $2.50 | $0.075 |
 | gemini-2.5-flash-lite | $0.10 | $0.40 | $0.025 |
