@@ -122,7 +122,7 @@ export interface ToolInvocation {
 export interface Model {
   id: string
   name: string
-  provider: 'openai' | 'anthropic' | 'google'
+  provider: 'aura' | 'openai' | 'anthropic' | 'google'
   description?: string
   /**
    * Access tier for this model on the hosted playground.

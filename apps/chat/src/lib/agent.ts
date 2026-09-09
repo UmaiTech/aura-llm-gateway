@@ -261,6 +261,16 @@ export const AGENT_SYSTEM_PROMPTS = {
 import type { Model } from './types'
 
 export const AVAILABLE_MODELS: Model[] = [
+  // Aura — gateway aliases. The gateway scores each request's complexity
+  // and dispatches to the cheapest capable model in a tier; the response
+  // reports the concrete model and metadata.aura.routing explains why.
+  // Free: only free-tier models can be reached through it on the hosted
+  // playground once per-org tier lists land, and the gateway prices the
+  // actual model that answered.
+  { id: 'auto', name: 'Auto (balanced)', provider: 'aura', tier: 'free', description: 'Gateway picks the cheapest capable model per request' },
+  { id: 'auto:cost', name: 'Auto (cost)', provider: 'aura', tier: 'free', description: 'Prefer cheaper models' },
+  { id: 'auto:quality', name: 'Auto (quality)', provider: 'aura', tier: 'free', description: 'Prefer stronger models' },
+
   // OpenAI — frontier locked, mini/nano/Luna free
   { id: 'gpt-6-astra', name: 'GPT-6 Astra', provider: 'openai', tier: 'beta' },
   { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai', tier: 'beta' },

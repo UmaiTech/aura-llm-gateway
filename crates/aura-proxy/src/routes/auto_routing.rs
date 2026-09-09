@@ -9,9 +9,9 @@
 //! `auto` would have made is computed and returned with `shadow: true`
 //! but the request is left untouched.
 
-use aura_core::router::auto::{model_supports_tools, model_supports_vision};
+use aura_core::router::auto::{estimate_tokens, model_supports_tools, model_supports_vision};
 use aura_core::{metrics, AutoDecision, AutoRouteError, DecisionContext, Eligibility};
-use aura_types::{parse_auto_model, CreateResponseRequest};
+use aura_types::{parse_auto_model, CreateResponseRequest, RoutingOptions};
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::Json;
 use tracing::{debug, warn};
@@ -28,18 +28,34 @@ pub struct GatewayEligibility<'a> {
     state: &'a AppState,
     needs_vision: bool,
     needs_tools: bool,
+    /// Rough tokens the model must fit: estimated input plus requested
+    /// output. Compared against the catalog's context window when known.
+    needs_context: u32,
 }
 
 impl<'a> GatewayEligibility<'a> {
     /// Build an oracle for one request.
     pub fn for_request(state: &'a AppState, request: &CreateResponseRequest) -> Self {
+        let mut text_chars = request.instructions.as_ref().map(|s| s.len()).unwrap_or(0);
         let needs_vision = request.input.iter().any(|item| match item {
             aura_types::InputItem::Message { content, .. } => match content {
-                aura_types::InputContent::Parts(parts) => parts
-                    .iter()
-                    .any(|p| matches!(p, aura_types::ContentPart::Image { .. })),
-                aura_types::InputContent::Text(_) => false,
+                aura_types::InputContent::Parts(parts) => parts.iter().any(|p| match p {
+                    aura_types::ContentPart::Image { .. } => true,
+                    aura_types::ContentPart::Text { text } => {
+                        text_chars += text.len();
+                        false
+                    }
+                    _ => false,
+                }),
+                aura_types::InputContent::Text(t) => {
+                    text_chars += t.len();
+                    false
+                }
             },
+            aura_types::InputItem::FunctionCallOutput { output, .. } => {
+                text_chars += output.len();
+                false
+            }
             _ => false,
         });
         let needs_tools = request
@@ -47,10 +63,13 @@ impl<'a> GatewayEligibility<'a> {
             .as_ref()
             .map(|t| !t.is_empty())
             .unwrap_or(false);
+        let est_input = estimate_tokens(&"x".repeat(text_chars.min(4_000_000)));
+        let needs_context = est_input.saturating_add(request.max_output_tokens.unwrap_or(0));
         Self {
             state,
             needs_vision,
             needs_tools,
+            needs_context,
         }
     }
 }
@@ -60,17 +79,33 @@ impl Eligibility for GatewayEligibility<'_> {
         if self.state.provider_name_for_catalog_model(model).is_none() {
             return false;
         }
-        if self.needs_vision && !model_supports_vision(model) {
+        let entry = self.state.model_catalog().get(model);
+        let vision_ok = entry
+            .map(|e| e.supports_vision())
+            .unwrap_or_else(|| model_supports_vision(model));
+        if self.needs_vision && !vision_ok {
             return false;
         }
-        if self.needs_tools && !model_supports_tools(model) {
+        let tools_ok = entry
+            .map(|e| e.supports_tools())
+            .unwrap_or_else(|| model_supports_tools(model));
+        if self.needs_tools && !tools_ok {
             return false;
+        }
+        if let Some(window) = entry.and_then(|e| e.context_window) {
+            if self.needs_context > window {
+                return false;
+            }
         }
         true
     }
 
     fn blended_cost_per_million(&self, model: &str) -> Option<f64> {
-        self.state.cost_calculator().blended_cost_per_million(model)
+        self.state
+            .model_catalog()
+            .get(model)
+            .and_then(|e| e.blended_per_million())
+            .or_else(|| self.state.cost_calculator().blended_cost_per_million(model))
     }
 
     fn provider_of(&self, model: &str) -> Option<String> {
@@ -99,6 +134,7 @@ async fn previous_turn_model(state: &AppState, request: &CreateResponseRequest) 
 pub async fn resolve_auto_model(
     state: &AppState,
     request: &mut CreateResponseRequest,
+    organization_id: Option<uuid::Uuid>,
 ) -> Result<Option<AutoDecision>, (StatusCode, Json<ApiError>)> {
     let alias = parse_auto_model(&request.model);
     let Some(router) = state.auto_router() else {
@@ -117,24 +153,56 @@ pub async fn resolve_auto_model(
         return Ok(None);
     };
 
+    // Organization override (settings.routing.auto): may switch auto on
+    // or off for this org and narrows the request's options.
+    let org = state.org_auto_routing_override(organization_id).await;
     let shadow = alias.is_none();
-    if shadow && !router.config().shadow_for_pinned_models {
+    let shadow_enabled = org
+        .shadow_for_pinned_models
+        .unwrap_or(router.config().shadow_for_pinned_models);
+    if shadow && !shadow_enabled {
         return Ok(None);
+    }
+    let enabled = org.enabled.unwrap_or(router.is_enabled());
+    if !shadow && !enabled {
+        metrics::record_routing_failure("disabled");
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiError::with_param(
+                "model_not_found",
+                "Model 'auto' is not enabled for this organization",
+                "model",
+            )),
+        ));
     }
 
     let previous_model = previous_turn_model(state, request).await;
     let requested_model = request.model.clone();
+    let merged: Option<RoutingOptions> = if org.is_empty() {
+        None
+    } else {
+        Some(org.merged_with(request.routing.as_ref(), alias.and_then(|a| a.mode)))
+    };
+    if let Some(m) = &merged {
+        // Everything downstream (escalation, gold sampling) reads the
+        // request's options; make sure they see the org policy too.
+        request.routing = Some(m.clone());
+    }
+    let options = merged.as_ref().or(request.routing.as_ref());
     let ctx = DecisionContext {
         requested_model: &requested_model,
         alias_mode: alias.and_then(|a| a.mode),
-        options: request.routing.as_ref(),
+        options,
         previous_model: previous_model.as_deref(),
-        shadow,
+        // Only the org override can enable a router the gateway config
+        // left disabled; tell the router to treat this as allowed.
+        shadow: shadow || !router.is_enabled(),
     };
     let oracle = GatewayEligibility::for_request(state, request);
 
     match router.decide(request, &ctx, &oracle) {
-        Ok(decision) => {
+        Ok(mut decision) => {
+            decision.shadow = shadow;
             metrics::record_routing_decision(
                 decision.mode.as_str(),
                 decision.tier.as_str(),

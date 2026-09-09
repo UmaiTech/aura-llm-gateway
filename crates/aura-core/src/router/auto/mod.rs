@@ -18,15 +18,17 @@
 //! classifier runs in well under a millisecond.
 
 pub mod capabilities;
+pub mod catalog;
 pub mod config;
 pub mod features;
 pub mod scorer;
 pub mod tiers;
 
 pub use capabilities::{model_supports_tools, model_supports_vision};
+pub use catalog::{canonical_slug, CatalogEntry, CatalogSource, ModelCatalog};
 pub use config::{
     AutoRoutingConfig, FeatureWeights, KeywordLists, LlmClassifierConfig, ModeOffsets,
-    TierBoundaries, TierModels, TokenThresholds, WithinTierStrategy,
+    OrgAutoRoutingOverride, TierBoundaries, TierModels, TokenThresholds, WithinTierStrategy,
 };
 pub use features::{
     estimate_tokens, extract_features, IntentHint, KeywordMatcher, RequestFeatures,

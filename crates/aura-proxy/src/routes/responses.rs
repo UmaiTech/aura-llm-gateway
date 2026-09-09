@@ -653,7 +653,12 @@ pub async fn create_response(
     // a shadow decision for a pinned model). Must run before the cache
     // lookup so cache keys are built from the resolved model.
     let mut request = request;
-    let auto_decision = resolve_auto_model(&state, &mut request).await?;
+    let auto_decision = resolve_auto_model(
+        &state,
+        &mut request,
+        auth_context.as_ref().and_then(|a| a.tenant.organization_id),
+    )
+    .await?;
     let routing_strategy = match auto_decision.as_ref().filter(|d| !d.shadow) {
         Some(decision) => Some(format!("auto:{}", decision.tier)),
         None => routing_strategy,

@@ -214,6 +214,11 @@ pub struct RoutingOptions {
     /// Defaults to the gateway setting (`true`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sticky: Option<bool>,
+    /// Second allow list applied by organization policy; a candidate must
+    /// be permitted by both `allow` and this list. Never on the wire: the
+    /// gateway fills it from the organization override.
+    #[serde(skip)]
+    pub policy_allow: Vec<String>,
 
     /// Which classifier to use for this request.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -276,12 +281,13 @@ impl RoutingOptions {
         {
             return false;
         }
-        if self.allow.is_empty() {
-            return true;
-        }
-        self.allow
-            .iter()
-            .any(|p| Self::pattern_matches(p, provider, model))
+        let allowed = |list: &[String]| {
+            list.is_empty()
+                || list
+                    .iter()
+                    .any(|p| Self::pattern_matches(p, provider, model))
+        };
+        allowed(&self.allow) && allowed(&self.policy_allow)
     }
 }
 
@@ -336,6 +342,7 @@ mod tests {
             max_tier: None,
             allow: vec!["anthropic/*".into()],
             deny: vec![],
+            policy_allow: vec![],
             sticky: Some(false),
             classifier: Some(ClassifierKind::Heuristic),
         };
@@ -414,6 +421,21 @@ mod tests {
         assert!(opts.permits("openai", "gpt-5.4-mini"));
         assert!(!opts.permits("openai", "gpt-5.6-sol"));
         assert!(!opts.permits("google", "gemini-3-pro-preview"));
+
+        // Organization policy narrows what the request may allow.
+        let policy = RoutingOptions {
+            allow: vec!["openai/*".into()],
+            policy_allow: vec!["anthropic/*".into()],
+            ..Default::default()
+        };
+        assert!(!policy.permits("openai", "gpt-5.5"));
+        assert!(!policy.permits("anthropic", "claude-sonnet-4-6"));
+        let policy_only = RoutingOptions {
+            policy_allow: vec!["anthropic/*".into()],
+            ..Default::default()
+        };
+        assert!(policy_only.permits("anthropic", "claude-sonnet-4-6"));
+        assert!(!policy_only.permits("openai", "gpt-5.5"));
 
         let deny_only = RoutingOptions {
             deny: vec!["google/*".into()],

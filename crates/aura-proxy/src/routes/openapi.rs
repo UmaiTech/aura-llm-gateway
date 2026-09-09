@@ -56,6 +56,7 @@ impl Modify for SecurityAddon {
     ),
     tags(
         (name = "responses", description = "Create LLM responses (streaming and non-streaming)"),
+        (name = "models", description = "Servable models and auto-routing details"),
         (name = "conversations", description = "Manage conversation history"),
         (name = "auth", description = "API key management"),
         (name = "organizations", description = "Organization, team, and project management"),
@@ -66,6 +67,8 @@ impl Modify for SecurityAddon {
         super::health::health_check,
         // Responses
         super::responses::create_response,
+        // Models
+        super::models::list_models,
         // Auth
         super::auth::create_api_key,
         super::auth::list_api_keys,
@@ -82,6 +85,15 @@ impl Modify for SecurityAddon {
             // Response types
             aura_types::Response,
             aura_types::CreateResponseRequest,
+            aura_types::RoutingOptions,
+            aura_types::RoutingMode,
+            aura_types::Tier,
+            aura_types::ClassifierKind,
+            super::models::ListModelsResponse,
+            super::models::ModelEntry,
+            super::models::ModelAuraInfo,
+            super::models::AutoInfo,
+            super::models::TierListing,
             aura_types::ResponseStatus,
             aura_types::ResponseError,
             aura_types::IncompleteReason,

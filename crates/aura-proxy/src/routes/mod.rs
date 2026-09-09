@@ -7,6 +7,7 @@ pub mod conversations;
 pub mod feedback;
 pub mod health;
 pub mod metrics;
+pub mod models;
 pub mod openapi;
 pub mod organizations;
 pub mod rate_limit;
@@ -30,6 +31,8 @@ pub fn app_router() -> Router<AppState> {
         .merge(metrics::router())
         // Response creation endpoint
         .merge(responses::router())
+        // Model listing
+        .merge(models::router())
         // Conversation management endpoints
         .merge(conversations::router())
         // Feedback management endpoints
