@@ -219,23 +219,23 @@ impl Default for TierModels {
         Self {
             simple: vec![
                 "gemini-3.1-flash-lite".into(),
-                "gpt-5.4-nano".into(),
-                "claude-haiku-4-5".into(),
+                "gemini-3.5-flash".into(),
+                "gpt-5.6-luna".into(),
             ],
             medium: vec![
-                "gemini-3.5-flash".into(),
+                "gemini-3.8-flash".into(),
                 "gpt-5.4-mini".into(),
-                "claude-sonnet-4-6".into(),
+                "claude-haiku-4-5".into(),
             ],
             complex: vec![
-                "claude-sonnet-4-6".into(),
-                "gpt-5.5".into(),
-                "gemini-3.1-pro-preview".into(),
+                "claude-sonnet-5".into(),
+                "gemini-3-pro-preview".into(),
+                "gpt-5.6-terra".into(),
             ],
             reasoning: vec![
-                "claude-opus-4-7".into(),
-                "gpt-5.5-pro".into(),
-                "o3-mini".into(),
+                "claude-opus-5".into(),
+                "gpt-5.6-sol".into(),
+                "claude-fable-5-1".into(),
             ],
         }
     }
@@ -691,10 +691,14 @@ mod tests {
         let cfg = AutoRoutingConfig::default();
         assert!(!cfg.enabled);
         assert!(cfg.has_candidates());
-        assert_eq!(cfg.tiers.tier_of("gpt-5.4-nano"), Some(Tier::Simple));
-        // claude-sonnet-4-6 appears in medium and complex: highest wins.
-        assert_eq!(cfg.tiers.tier_of("claude-sonnet-4-6"), Some(Tier::Complex));
+        assert_eq!(cfg.tiers.tier_of("gpt-5.6-luna"), Some(Tier::Simple));
+        assert_eq!(cfg.tiers.tier_of("claude-fable-5-1"), Some(Tier::Reasoning));
         assert_eq!(cfg.tiers.tier_of("nope"), None);
+
+        // A model listed in two tiers resolves to the highest one.
+        let mut tiers = TierModels::default();
+        tiers.medium.push("claude-sonnet-5".into());
+        assert_eq!(tiers.tier_of("claude-sonnet-5"), Some(Tier::Complex));
     }
 
     #[test]
@@ -712,9 +716,9 @@ mod tests {
     fn prune_drops_unknown_models() {
         let mut cfg = AutoRoutingConfig::default();
         let dropped = cfg.prune_unknown_models(|m| m.starts_with("gpt-"));
-        assert!(dropped.iter().any(|d| d == "simple:claude-haiku-4-5"));
-        assert_eq!(cfg.tiers.simple, vec!["gpt-5.4-nano".to_string()]);
-        assert_eq!(cfg.tiers.reasoning, vec!["gpt-5.5-pro".to_string()]);
+        assert!(dropped.iter().any(|d| d == "simple:gemini-3.1-flash-lite"));
+        assert_eq!(cfg.tiers.simple, vec!["gpt-5.6-luna".to_string()]);
+        assert_eq!(cfg.tiers.reasoning, vec!["gpt-5.6-sol".to_string()]);
         assert!(cfg.has_candidates());
 
         let mut none = AutoRoutingConfig::default();
@@ -785,7 +789,7 @@ mod tests {
 enabled: true
 default_mode: cost
 tiers:
-  simple: [gpt-5.4-nano]
+  simple: [gpt-5.6-luna]
 boundaries:
   simple_medium: 0.2
 within_tier: round_robin
@@ -793,7 +797,7 @@ within_tier: round_robin
         let cfg: AutoRoutingConfig = serde_yaml::from_str(yaml).unwrap();
         assert!(cfg.enabled);
         assert_eq!(cfg.default_mode, RoutingMode::Cost);
-        assert_eq!(cfg.tiers.simple, vec!["gpt-5.4-nano".to_string()]);
+        assert_eq!(cfg.tiers.simple, vec!["gpt-5.6-luna".to_string()]);
         // Untouched tiers keep defaults.
         assert_eq!(cfg.tiers.medium, TierModels::default().medium);
         assert_eq!(cfg.boundaries.simple_medium, 0.2);
