@@ -456,17 +456,18 @@ mod tests {
 
     fn oracle() -> Oracle {
         let mut costs = HashMap::new();
-        costs.insert("gemini-3.1-flash-lite", 0.3);
-        costs.insert("gpt-5.4-nano", 0.4);
-        costs.insert("claude-haiku-4-5", 2.0);
-        costs.insert("gemini-3.5-flash", 1.5);
+        costs.insert("gemini-3.1-flash-lite", 0.15);
+        costs.insert("gemini-3.5-flash", 0.4);
+        costs.insert("gpt-5.6-luna", 0.5);
+        costs.insert("gemini-3.8-flash", 1.5);
         costs.insert("gpt-5.4-mini", 1.0);
-        costs.insert("claude-sonnet-4-6", 9.0);
-        costs.insert("gpt-5.5", 8.0);
-        costs.insert("gemini-3.1-pro-preview", 7.0);
-        costs.insert("claude-opus-4-7", 30.0);
-        costs.insert("gpt-5.5-pro", 60.0);
-        costs.insert("o3-mini", 5.0);
+        costs.insert("claude-haiku-4-5", 2.0);
+        costs.insert("claude-sonnet-5", 4.0);
+        costs.insert("gemini-3-pro-preview", 3.0);
+        costs.insert("gpt-5.6-terra", 5.0);
+        costs.insert("claude-opus-5", 10.0);
+        costs.insert("gpt-5.6-sol", 8.0);
+        costs.insert("claude-fable-5-1", 20.0);
         Oracle {
             blocked: vec![],
             costs,
@@ -499,11 +500,11 @@ mod tests {
             r.decide(&req, &ctx("auto", None), &oracle()).unwrap_err(),
             AutoRouteError::Disabled
         );
-        let mut c = ctx("gpt-5.5", None);
+        let mut c = ctx("gpt-5.6-terra", None);
         c.shadow = true;
         let d = r.decide(&req, &c, &oracle()).unwrap();
         assert!(d.shadow);
-        assert_eq!(d.requested_model, "gpt-5.5");
+        assert_eq!(d.requested_model, "gpt-5.6-terra");
     }
 
     #[test]
@@ -570,7 +571,7 @@ mod tests {
             .unwrap();
         assert_eq!(d.tier, Tier::Complex);
         assert_eq!(d.classified_tier, Tier::Simple);
-        assert_eq!(d.selected, "gemini-3.1-pro-preview");
+        assert_eq!(d.selected, "gemini-3-pro-preview");
 
         let hard = CreateResponseRequest::text(
             "auto",
@@ -603,7 +604,7 @@ mod tests {
         assert!(d.hard_filters.iter().any(|f| f == "allow/deny lists"));
 
         let opts = RoutingOptions {
-            deny: vec!["google/*".into(), "gpt-5.4-nano".into()],
+            deny: vec!["google/*".into(), "openai/*".into()],
             ..Default::default()
         };
         let d = r
@@ -618,8 +619,8 @@ mod tests {
         let mut o = oracle();
         o.blocked = vec![
             "gemini-3.1-flash-lite".into(),
-            "gpt-5.4-nano".into(),
-            "claude-haiku-4-5".into(),
+            "gemini-3.5-flash".into(),
+            "gpt-5.6-luna".into(),
         ];
         let req = CreateResponseRequest::text("auto", "hi");
         let d = r.decide(&req, &ctx("auto", None), &o).unwrap();
@@ -637,7 +638,7 @@ mod tests {
         match r.decide(&req, &ctx("auto", None), &o) {
             Err(AutoRouteError::NoCandidate { tier, considered }) => {
                 assert_eq!(tier, Tier::Simple);
-                assert_eq!(considered, 11);
+                assert_eq!(considered, 12);
             }
             other => panic!("expected NoCandidate, got {:?}", other),
         }
@@ -666,9 +667,9 @@ mod tests {
         let r = router();
         let req = tool_loop_request();
         let mut c = ctx("auto", None);
-        c.previous_model = Some("gpt-5.5");
+        c.previous_model = Some("gpt-5.6-terra");
         let d = r.decide(&req, &c, &oracle()).unwrap();
-        assert_eq!(d.selected, "gpt-5.5");
+        assert_eq!(d.selected, "gpt-5.6-terra");
         assert_eq!(d.tier, Tier::Complex);
         assert!(d.hard_filters.iter().any(|f| f == "sticky tool loop"));
         assert!(d.reason.contains("tool loop"));
@@ -681,17 +682,17 @@ mod tests {
         // Tools floor puts this turn at medium; a simple-tier previous
         // model is not strong enough.
         let mut c = ctx("auto", None);
-        c.previous_model = Some("gpt-5.4-nano");
+        c.previous_model = Some("gpt-5.6-luna");
         let d = r.decide(&req, &c, &oracle()).unwrap();
-        assert_ne!(d.selected, "gpt-5.4-nano");
+        assert_ne!(d.selected, "gpt-5.6-luna");
         assert!(!d.hard_filters.iter().any(|f| f == "sticky tool loop"));
 
         let mut o = oracle();
-        o.blocked = vec!["gpt-5.5".into()];
+        o.blocked = vec!["gpt-5.6-terra".into()];
         let mut c = ctx("auto", None);
-        c.previous_model = Some("gpt-5.5");
+        c.previous_model = Some("gpt-5.6-terra");
         let d = r.decide(&req, &c, &o).unwrap();
-        assert_ne!(d.selected, "gpt-5.5");
+        assert_ne!(d.selected, "gpt-5.6-terra");
     }
 
     #[test]
@@ -742,7 +743,7 @@ mod tests {
             ..Default::default()
         };
         let mut c = ctx("auto", Some(&opts));
-        c.previous_model = Some("gpt-5.5");
+        c.previous_model = Some("gpt-5.6-terra");
         let d = r.decide(&req, &c, &oracle()).unwrap();
         assert_eq!(d.selected, "gpt-5.4-mini");
     }
