@@ -417,6 +417,16 @@ export const useChatStore = create<ChatState>()(
     {
       name: 'aura-chat-storage',
       storage: createJSONStorage(() => localStorage),
+      // Nested settings objects gain keys over time; fill new keys from
+      // the defaults instead of rehydrating them as undefined.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<ChatState>
+        return {
+          ...current,
+          ...p,
+          autoRouting: { ...DEFAULT_AUTO_ROUTING_SETTINGS, ...(p.autoRouting ?? {}) },
+        }
+      },
       partialize: (state) => ({
         conversations: state.conversations,
         currentConversationId: state.currentConversationId,

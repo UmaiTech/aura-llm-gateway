@@ -5,6 +5,7 @@ import { calculateCost } from '../lib/pricing'
 import { useChatStore } from '../stores/chatStore'
 import { ComparePane } from './ComparePane'
 import { cn } from '../lib/utils'
+import { isAutoModel, toRoutingOptions } from '../lib/types'
 import type { Message, MessageUsage, PaneConfig, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, AuraMetadata, RoutingDecisionMetadata } from '../lib/types'
 
 const MAX_PANES = 3
@@ -120,12 +121,17 @@ export function CompareView() {
       let aura: AuraMetadata | undefined
 
       try {
+        // Auto panes use the same router options as the single-pane chat.
+        const routing = isAutoModel(pane.model)
+          ? toRoutingOptions(useChatStore.getState().autoRouting)
+          : undefined
         const stream = api.createResponseStream({
           model: pane.model,
           input: [{ type: 'message', role: 'user', content: userContent }],
           instructions: pane.systemPrompt || undefined,
           stream: true,
           previous_response_id: previousResponseId,
+          ...(routing && { routing }),
         })
 
         for await (const event of stream) {

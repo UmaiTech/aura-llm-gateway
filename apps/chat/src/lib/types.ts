@@ -90,6 +90,8 @@ export interface RoutingDecisionMetadata {
   raw_score: number
   classified_tier: string
   tier: string
+  /** Score boundaries in force (inclusive lower bound of each upper tier). */
+  boundaries?: { simple_medium: number; medium_complex: number; complex_reasoning: number }
   signals?: Record<string, number>
   features?: Record<string, unknown>
   hard_filters?: string[]

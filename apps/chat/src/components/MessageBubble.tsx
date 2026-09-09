@@ -554,14 +554,20 @@ const TIER_STYLE: Record<string, { chip: string; bar: string }> = {
   reasoning: { chip: 'bg-rose-500/10 text-rose-400', bar: 'bg-rose-400' },
 }
 
-// Tier boundaries on the complexity score; keep in sync with
-// crates/aura-core/src/router/auto/scorer.rs.
-const TIER_BOUNDARIES: Array<{ tier: string; from: number; to: number }> = [
-  { tier: 'simple', from: 0, to: 0.15 },
-  { tier: 'medium', from: 0.15, to: 0.35 },
-  { tier: 'complex', from: 0.35, to: 0.6 },
-  { tier: 'reasoning', from: 0.6, to: 1 },
-]
+// Tier bands on the complexity score. The gateway reports the boundaries
+// in force on every decision (operators can change them, and a learned
+// classifier calibrates its own); the defaults only cover older gateways.
+const DEFAULT_BOUNDARIES = { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.6 }
+
+function tierBands(b: RoutingDecisionMetadata['boundaries']): Array<{ tier: string; from: number; to: number }> {
+  const { simple_medium, medium_complex, complex_reasoning } = b ?? DEFAULT_BOUNDARIES
+  return [
+    { tier: 'simple', from: 0, to: simple_medium },
+    { tier: 'medium', from: simple_medium, to: medium_complex },
+    { tier: 'complex', from: medium_complex, to: complex_reasoning },
+    { tier: 'reasoning', from: complex_reasoning, to: 1 },
+  ]
+}
 
 const formatUsd = (v: number) => (v < 0.001 ? `$${v.toExponential(2)}` : `$${v.toFixed(4)}`)
 
@@ -575,6 +581,7 @@ const formatUsd = (v: number) => (v < 0.001 ? `$${v.toExponential(2)}` : `$${v.t
  */
 function RoutingInspector({ routing, onClose }: { routing: RoutingDecisionMetadata; onClose: () => void }) {
   const tierStyle = TIER_STYLE[routing.tier] ?? TIER_STYLE.medium
+  const bands = tierBands(routing.boundaries)
   const score = Math.min(1, Math.max(0, routing.score))
   const signals = Object.entries(routing.signals ?? {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
   const candidates = routing.candidates ?? []
@@ -610,7 +617,7 @@ function RoutingInspector({ routing, onClose }: { routing: RoutingDecisionMetada
           <span>{routing.classifier}</span>
         </div>
         <div className="relative h-2 w-full rounded overflow-hidden flex">
-          {TIER_BOUNDARIES.map((b) => (
+          {bands.map((b) => (
             <div
               key={b.tier}
               className={cn('h-full opacity-30', (TIER_STYLE[b.tier] ?? tierStyle).bar)}
@@ -624,7 +631,7 @@ function RoutingInspector({ routing, onClose }: { routing: RoutingDecisionMetada
           />
         </div>
         <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-          {TIER_BOUNDARIES.map((b) => (
+          {bands.map((b) => (
             <span key={b.tier} className={cn(b.tier === routing.tier && 'font-medium text-foreground')}>
               {b.tier}
               {b.tier === routing.classified_tier && b.tier !== routing.tier && ' (classified)'}
@@ -687,7 +694,7 @@ function RoutingInspector({ routing, onClose }: { routing: RoutingDecisionMetada
                 const selected = c.model === routing.selected
                 return (
                   <tr
-                    key={c.model}
+                    key={`${c.tier}:${c.model}`}
                     className={cn(selected && 'font-medium', !c.eligible && 'text-muted-foreground/60 line-through')}
                   >
                     <td className="pr-3 py-0.5 font-mono">

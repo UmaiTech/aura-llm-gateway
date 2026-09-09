@@ -40,7 +40,7 @@ Send `model: "auto"` and Aura scores the request's complexity, maps it to a tier
 | `complex` | Multi-step engineering work, debugging, long context | `claude-sonnet-4-6`, `gpt-5.5`, `gemini-3.1-pro-preview` |
 | `reasoning` | Proofs, derivations, deep analysis, explicit "think hard" | `claude-opus-4-7`, `gpt-5.5-pro`, `o3-mini` |
 
-Only models the gateway can actually serve are considered. Tier lists are configurable per gateway and per organization; when none are configured the gateway derives them from its model catalog at startup.
+Only models the gateway can actually serve are considered. Tier lists are configurable per gateway, and an organization can narrow them with allow / deny lists and tier clamps; when none are configured the gateway derives them from its model catalog at startup.
 
 ## How a decision is made
 
