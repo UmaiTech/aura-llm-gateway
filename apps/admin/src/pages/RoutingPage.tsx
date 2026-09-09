@@ -11,7 +11,13 @@ import {
   Refresh1Line,
   InformationLine,
 } from '@mingcute/react'
-import { getRoutingStats, type RoutingStats } from '@/lib/api'
+import {
+  getAutoRoutingStats,
+  getRoutingStats,
+  type AutoRoutingStats,
+  type RoutingStats,
+  type TimeRange,
+} from '@/lib/api'
 
 /**
  * Routing page — read-only stats view.
@@ -27,6 +33,10 @@ import { getRoutingStats, type RoutingStats } from '@/lib/api'
  * editor back. Tracking issue: #175 (A6 placeholder).
  */
 const strategyLabels: Record<string, string> = {
+  'auto:simple': 'Auto · simple tier',
+  'auto:medium': 'Auto · medium tier',
+  'auto:complex': 'Auto · complex tier',
+  'auto:reasoning': 'Auto · reasoning tier',
   round_robin: 'Round Robin',
   weighted: 'Weighted',
   random: 'Random',
@@ -42,6 +52,10 @@ const strategyLabels: Record<string, string> = {
 }
 
 const strategyDescriptions: Record<string, string> = {
+  'auto:simple': 'model: "auto" classified the request as simple',
+  'auto:medium': 'model: "auto" classified the request as medium',
+  'auto:complex': 'model: "auto" classified the request as complex',
+  'auto:reasoning': 'model: "auto" classified the request as reasoning',
   round_robin: 'Distribute requests evenly across providers',
   weighted: 'Route by configured weights per provider',
   random: 'Randomly select from available providers',
@@ -53,8 +67,23 @@ const strategyDescriptions: Record<string, string> = {
   reasoning_depth: 'Route by required reasoning depth',
 }
 
+const tierOrder = ['simple', 'medium', 'complex', 'reasoning']
+const tierTone: Record<string, string> = {
+  simple: 'bg-emerald-500/20 text-emerald-300',
+  medium: 'bg-blue-500/20 text-blue-300',
+  complex: 'bg-violet-500/20 text-violet-300',
+  reasoning: 'bg-pink-500/20 text-pink-300',
+}
+
+function formatMicros(us: number): string {
+  if (us >= 1000) return `${(us / 1000).toFixed(1)} ms`
+  return `${us} µs`
+}
+
 export function RoutingPage() {
   const [stats, setStats] = useState<RoutingStats[]>([])
+  const [auto, setAuto] = useState<AutoRoutingStats | null>(null)
+  const [autoPeriod, setAutoPeriod] = useState<TimeRange>('24h')
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,8 +91,14 @@ export function RoutingPage() {
   const fetchData = async () => {
     setError(null)
     try {
-      const data = await getRoutingStats()
+      const [data, autoData] = await Promise.all([
+        getRoutingStats(),
+        // The auto-router table only exists once its migration ran; a
+        // failure here must not take the whole page down.
+        getAutoRoutingStats(autoPeriod).catch(() => null),
+      ])
       setStats(data)
+      setAuto(autoData)
     } catch (err) {
       // Don't silently render the empty-state copy ("No routing
       // activity in the observed window") on a network/auth failure
@@ -79,7 +114,8 @@ export function RoutingPage() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPeriod])
 
   const handleRefresh = () => {
     setIsRefreshing(true)
@@ -224,6 +260,205 @@ export function RoutingPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Auto router (model: "auto") */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base font-medium">Auto router</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Complexity-based model selection for <code className="text-foreground">model: "auto"</code>.
+                Shadow rows are pinned-model requests scored for comparison only.
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              {(['24h', '7d', 'all'] as TimeRange[]).map((p) => (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={autoPeriod === p ? 'secondary' : 'ghost'}
+                  onClick={() => setAutoPeriod(p)}
+                >
+                  {p}
+                </Button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {!auto ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Auto-router stats are unavailable. Run the latest migrations and make sure the
+                gateway has a database connection.
+              </p>
+            ) : auto.summary.applied_decisions + auto.summary.shadow_decisions === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No auto-routing decisions in this window. Send a request with{' '}
+                <code className="text-foreground">model: "auto"</code>, or leave shadow scoring on
+                and pinned-model traffic will show up here.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Applied decisions</div>
+                    <div className="text-xl font-semibold tabular-nums">
+                      {formatNumber(auto.summary.applied_decisions)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Shadow decisions</div>
+                    <div className="text-xl font-semibold tabular-nums">
+                      {formatNumber(auto.summary.shadow_decisions)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Applied cost</div>
+                    <div className="text-xl font-semibold tabular-nums">
+                      {formatCurrency(auto.summary.applied_cost)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Est. savings (shadow)</div>
+                    <div
+                      className={cn(
+                        'text-xl font-semibold tabular-nums',
+                        auto.summary.estimated_savings > 0 && 'text-emerald-400',
+                      )}
+                    >
+                      {formatCurrency(auto.summary.estimated_savings)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Decision latency</div>
+                    <div className="text-xl font-semibold tabular-nums">
+                      {formatMicros(auto.summary.avg_decision_us)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-muted-foreground border-b border-border/40">
+                        <th className="text-left py-2 pr-3 font-medium">Tier</th>
+                        <th className="text-left py-2 pr-3 font-medium">Kind</th>
+                        <th className="text-right py-2 pr-3 font-medium">Decisions</th>
+                        <th className="text-right py-2 pr-3 font-medium">Avg score</th>
+                        <th className="text-right py-2 pr-3 font-medium">Completed</th>
+                        <th className="text-right py-2 pr-3 font-medium">Avg latency</th>
+                        <th className="text-right py-2 pr-3 font-medium">Cost</th>
+                        <th className="text-right py-2 pr-3 font-medium">Est. savings</th>
+                        <th className="text-right py-2 pr-3 font-medium">Feedback</th>
+                        <th className="text-left py-2 font-medium">Top model</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...auto.by_tier]
+                        .sort(
+                          (a, b) =>
+                            Number(a.shadow) - Number(b.shadow) ||
+                            tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier),
+                        )
+                        .map((t) => (
+                          <tr
+                            key={`${t.shadow}-${t.tier}`}
+                            className="border-b border-border/20 last:border-0"
+                          >
+                            <td className="py-2 pr-3">
+                              <span
+                                className={cn(
+                                  'inline-block rounded px-2 py-0.5 text-xs font-medium',
+                                  tierTone[t.tier] ?? 'bg-muted text-muted-foreground',
+                                )}
+                              >
+                                {t.tier}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-3 text-muted-foreground">
+                              {t.shadow ? 'shadow' : 'applied'}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {formatNumber(t.decisions)}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {t.avg_score.toFixed(2)}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {t.completed + t.failed > 0
+                                ? `${((t.completed / (t.completed + t.failed)) * 100).toFixed(0)}%`
+                                : '—'}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {formatDuration(t.avg_latency_ms)}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {formatCurrency(t.actual_cost)}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {t.shadow ? formatCurrency(t.estimated_savings) : '—'}
+                            </td>
+                            <td className="py-2 pr-3 text-right tabular-nums">
+                              {t.approved + t.rejected > 0
+                                ? `${t.approved} / ${t.rejected}`
+                                : '—'}
+                            </td>
+                            <td className="py-2 font-mono text-xs">{t.top_model ?? '—'}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {auto.recent.length > 0 && (
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Recent decisions</div>
+                    <div className="space-y-1">
+                      {auto.recent.slice(0, 10).map((d) => (
+                        <div
+                          key={d.response_id}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs py-1 border-b border-border/20 last:border-0"
+                        >
+                          <span
+                            className={cn(
+                              'rounded px-1.5 py-0.5 font-medium',
+                              tierTone[d.tier] ?? 'bg-muted text-muted-foreground',
+                            )}
+                          >
+                            {d.tier}
+                          </span>
+                          <span className="text-muted-foreground">{d.shadow ? 'shadow' : d.mode}</span>
+                          <span className="font-mono">
+                            {d.requested_model} → {d.selected_model}
+                          </span>
+                          <span className="tabular-nums text-muted-foreground">
+                            score {d.score.toFixed(2)}
+                          </span>
+                          {d.status && (
+                            <span
+                              className={cn(
+                                d.status === 'completed' ? 'text-emerald-400' : 'text-destructive/80',
+                              )}
+                            >
+                              {d.status}
+                            </span>
+                          )}
+                          {d.shadow && d.estimated_savings_usd != null && (
+                            <span className="tabular-nums text-emerald-400">
+                              saves {formatCurrency(d.estimated_savings_usd)}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground truncate max-w-md" title={d.reason}>
+                            {d.reason}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Per-strategy breakdown */}
         <Card>

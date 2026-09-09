@@ -13,8 +13,8 @@ use aura_core::{
     TogetherProvider,
 };
 use aura_db::{
-    ApiKeyUsageRepo, DbPool, ModelPricingRepo, NewApiKeyUsage, NewRequestLog, PoolConfig,
-    RequestLogRepo,
+    ApiKeyUsageRepo, DbPool, ModelPricingRepo, NewApiKeyUsage, NewRequestLog, NewRoutingDecision,
+    PoolConfig, RequestLogRepo, RoutingDecisionRepo,
 };
 use axum::http::HeaderValue;
 use axum::{middleware, Router};
@@ -399,6 +399,60 @@ impl AppState {
                     error!(error = %e, "Failed to log request to database");
                 }
             }
+        }
+    }
+
+    /// Persist an auto-routing decision (applied or shadow) for a request.
+    ///
+    /// No-op without a database or without a decision. Upserts on the
+    /// gateway request id so completion paths can re-record with the
+    /// provider response id once it is known.
+    pub async fn record_routing_decision(
+        &self,
+        decision: Option<&AutoDecision>,
+        request_id: &str,
+        provider_response_id: Option<&str>,
+        auth_context: Option<&crate::routes::AuthContext>,
+        conversation_id: Option<uuid::Uuid>,
+    ) {
+        let (Some(pool), Some(d)) = (&self.db_pool, decision) else {
+            return;
+        };
+        let requested_price = if d.shadow {
+            self.cost_calculator
+                .blended_cost_per_million(&d.requested_model)
+        } else {
+            None
+        };
+        let new = NewRoutingDecision {
+            response_id: request_id.to_string(),
+            provider_response_id: provider_response_id.map(|s| s.to_string()),
+            organization_id: auth_context.and_then(|a| a.tenant.organization_id),
+            api_key_id: auth_context.map(|a| a.api_key.id),
+            conversation_id,
+            requested_model: d.requested_model.clone(),
+            mode: d.mode.as_str().to_string(),
+            classifier: d.classifier.clone(),
+            score: d.score,
+            raw_score: d.raw_score,
+            classified_tier: d.classified_tier.as_str().to_string(),
+            tier: d.tier.as_str().to_string(),
+            selected_model: d.selected.clone(),
+            selected_provider: d.selected_provider.clone(),
+            reason: d.reason.clone(),
+            shadow: d.shadow,
+            features: serde_json::to_value(&d.features).unwrap_or(serde_json::json!({})),
+            signals: serde_json::to_value(&d.signals).unwrap_or(serde_json::json!({})),
+            hard_filters: d.hard_filters.clone(),
+            candidates: serde_json::to_value(&d.candidates).unwrap_or(serde_json::json!([])),
+            requested_blended_per_million: requested_price,
+            selected_blended_per_million: self
+                .cost_calculator
+                .blended_cost_per_million(&d.selected),
+            decision_latency_us: d.latency_us.min(i32::MAX as u64) as i32,
+        };
+        if let Err(e) = RoutingDecisionRepo::upsert(pool, new).await {
+            error!(error = %e, request_id = %request_id, "Failed to record routing decision");
         }
     }
 

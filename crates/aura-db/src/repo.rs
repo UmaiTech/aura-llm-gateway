@@ -2103,3 +2103,103 @@ pub struct FeedbackSampleStats {
     pub rejected: u64,
     pub total_uses: u64,
 }
+
+/// Repository for auto-router decisions
+pub struct RoutingDecisionRepo;
+
+impl RoutingDecisionRepo {
+    /// Insert a decision, or update it when a row for the same gateway
+    /// request id already exists (the completion path re-records with
+    /// the provider response id).
+    pub async fn upsert(pool: &DbPool, new: NewRoutingDecision) -> Result<(), DbError> {
+        sqlx::query(
+            r#"
+            INSERT INTO routing_decisions (
+                response_id, provider_response_id, organization_id, api_key_id, conversation_id,
+                requested_model, mode, classifier, score, raw_score, classified_tier, tier,
+                selected_model, selected_provider, reason, shadow,
+                features, signals, hard_filters, candidates,
+                requested_blended_per_million, selected_blended_per_million, decision_latency_us
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                    $17, $18, $19, $20, $21, $22, $23)
+            ON CONFLICT (response_id) DO UPDATE SET
+                provider_response_id = COALESCE(EXCLUDED.provider_response_id, routing_decisions.provider_response_id),
+                conversation_id = COALESCE(EXCLUDED.conversation_id, routing_decisions.conversation_id)
+            "#,
+        )
+        .bind(&new.response_id)
+        .bind(&new.provider_response_id)
+        .bind(new.organization_id)
+        .bind(new.api_key_id)
+        .bind(new.conversation_id)
+        .bind(&new.requested_model)
+        .bind(&new.mode)
+        .bind(&new.classifier)
+        .bind(new.score)
+        .bind(new.raw_score)
+        .bind(&new.classified_tier)
+        .bind(&new.tier)
+        .bind(&new.selected_model)
+        .bind(&new.selected_provider)
+        .bind(&new.reason)
+        .bind(new.shadow)
+        .bind(&new.features)
+        .bind(&new.signals)
+        .bind(&new.hard_filters)
+        .bind(&new.candidates)
+        .bind(new.requested_blended_per_million)
+        .bind(new.selected_blended_per_million)
+        .bind(new.decision_latency_us)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Fetch one decision by gateway request id (`aura_...`) or provider
+    /// response id (`resp_...`).
+    pub async fn find_by_response_id(
+        pool: &DbPool,
+        response_id: &str,
+    ) -> Result<Option<RoutingDecision>, DbError> {
+        let row = sqlx::query_as::<_, RoutingDecision>(
+            r#"
+            SELECT * FROM routing_decisions
+            WHERE response_id = $1 OR provider_response_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(response_id)
+        .fetch_optional(pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// Most recent decisions joined with their outcomes.
+    pub async fn recent_outcomes(
+        pool: &DbPool,
+        limit: i64,
+        shadow: Option<bool>,
+    ) -> Result<Vec<RoutingOutcome>, DbError> {
+        let rows = sqlx::query_as::<_, RoutingOutcome>(
+            r#"
+            SELECT response_id, provider_response_id, organization_id, conversation_id,
+                   requested_model, mode, classifier, score, classified_tier, tier,
+                   selected_model, selected_provider, reason, shadow, hard_filters,
+                   decision_latency_us, created_at, status, actual_model,
+                   input_tokens, output_tokens, cost_usd, latency_ms, feedback,
+                   estimated_savings_usd
+            FROM v_routing_outcomes
+            WHERE ($2::BOOLEAN IS NULL OR shadow = $2)
+            ORDER BY created_at DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .bind(shadow)
+        .fetch_all(pool)
+        .await?;
+        Ok(rows)
+    }
+}
