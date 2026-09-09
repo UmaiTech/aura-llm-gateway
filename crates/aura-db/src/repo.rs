@@ -2231,6 +2231,7 @@ impl RoutingOutcomeRepo {
     pub async fn pending(
         pool: &DbPool,
         grace_secs: i64,
+        window_days: i32,
         limit: i64,
     ) -> Result<Vec<PendingRoutingOutcome>, DbError> {
         let rows = sqlx::query_as::<_, PendingRoutingOutcome>(
@@ -2271,12 +2272,14 @@ impl RoutingOutcomeRepo {
             ) fb ON TRUE
             WHERE o.response_id IS NULL
               AND d.created_at < NOW() - ($1::BIGINT * INTERVAL '1 second')
+              AND d.created_at >= NOW() - ($3::INT * INTERVAL '1 day')
             ORDER BY d.created_at ASC
             LIMIT $2
             "#,
         )
         .bind(grace_secs)
         .bind(limit)
+        .bind(window_days)
         .fetch_all(pool)
         .await?;
         Ok(rows)
@@ -2340,6 +2343,23 @@ impl RoutingOutcomeRepo {
                 beta = EXCLUDED.beta,
                 observations = EXCLUDED.observations,
                 updated_at = NOW()
+            "#,
+        )
+        .bind(window_days)
+        .execute(pool)
+        .await?;
+        // Arms with no applied outcome inside the window fall back to the
+        // uninformative prior instead of keeping a stale posterior.
+        sqlx::query(
+            r#"
+            DELETE FROM routing_arm_stats s
+            WHERE NOT EXISTS (
+                SELECT 1 FROM routing_outcomes o
+                WHERE NOT o.shadow
+                  AND o.decided_at >= NOW() - ($1::INT * INTERVAL '1 day')
+                  AND o.tier = s.tier
+                  AND o.selected_model = s.model
+            )
             "#,
         )
         .bind(window_days)
