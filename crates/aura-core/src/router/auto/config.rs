@@ -66,6 +66,10 @@ pub struct AutoRoutingConfig {
     pub gold_judge_model: String,
     /// Gold labels: characters of each text stored and sent to the judge.
     pub gold_max_text_chars: usize,
+    /// Learned classifier: path to a weights JSON file produced by
+    /// `scripts/router/train.py`, for gateways without a database or to
+    /// pin a model. The active row in `router_models` takes precedence.
+    pub learned_weights_file: Option<String>,
 }
 
 impl Default for AutoRoutingConfig {
@@ -93,6 +97,7 @@ impl Default for AutoRoutingConfig {
             gold_sample_shadow: false,
             gold_judge_model: "claude-sonnet-5".to_string(),
             gold_max_text_chars: 4000,
+            learned_weights_file: None,
         }
     }
 }
@@ -141,6 +146,10 @@ pub struct OrgAutoRoutingOverride {
     /// Default mode for this organization.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_mode: Option<RoutingMode>,
+    /// Default classifier for this organization (A/B the learned model
+    /// per org).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_classifier: Option<ClassifierKind>,
     /// Never route below this tier.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_tier: Option<Tier>,
@@ -205,7 +214,7 @@ impl OrgAutoRoutingOverride {
             policy_allow: self.allow.clone(),
             deny,
             sticky: req.sticky,
-            classifier: req.classifier,
+            classifier: req.classifier.or(self.default_classifier),
         }
     }
 }

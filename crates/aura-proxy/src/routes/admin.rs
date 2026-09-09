@@ -39,6 +39,19 @@ pub fn router() -> Router<AppState> {
         .route("/admin/routing/arms", get(get_routing_arms))
         .route("/admin/routing/gold", get(get_routing_gold))
         .route("/admin/routing/score", post(score_routing_request))
+        .route(
+            "/admin/routing/models",
+            get(list_router_models).post(upload_router_model),
+        )
+        .route(
+            "/admin/routing/models/{id}/activate",
+            post(activate_router_model),
+        )
+        .route("/admin/routing/models/reload", post(reload_router_model))
+        .route(
+            "/admin/routing/models/deactivate",
+            post(deactivate_router_models),
+        )
         .route("/admin/stats/features", get(get_feature_stats))
         .route("/admin/stats/timeline/hourly", get(get_hourly_timeline))
         .route("/admin/stats/timeline/daily", get(get_daily_timeline))
@@ -1055,6 +1068,152 @@ async fn score_routing_request(
             Json(serde_json::json!({"error": e.to_string()})),
         )),
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct RouterModelsResponse {
+    /// Classifier label currently loaded in memory (`learned@<version>`), if any.
+    pub loaded: Option<String>,
+    pub models: Vec<aura_db::RouterModelSummary>,
+}
+
+/// Trained classifiers known to the gateway.
+async fn list_router_models(
+    State(state): State<AppState>,
+) -> Result<Json<RouterModelsResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let models = aura_db::RouterModelRepo::list(pool).await.map_err(|e| {
+        tracing::error!("Failed to list router models: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    })?;
+    Ok(Json(RouterModelsResponse {
+        loaded: state.learned_model().map(|m| m.classifier_label()),
+        models,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+struct UploadRouterModel {
+    /// Weights JSON as produced by scripts/router/train.py.
+    weights: serde_json::Value,
+    /// Activate immediately (default false).
+    #[serde(default)]
+    activate: bool,
+}
+
+/// Store a trained classifier (validated against the gateway's feature
+/// vector) and optionally activate it.
+async fn upload_router_model(
+    State(state): State<AppState>,
+    Json(payload): Json<UploadRouterModel>,
+) -> Result<Json<aura_db::RouterModelSummary>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let model = aura_core::LearnedModel::from_json(&payload.weights).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e})),
+        )
+    })?;
+    let db_err = |e: aura_db::DbError| {
+        tracing::error!("Failed to store router model: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+        )
+    };
+    let mut summary = aura_db::RouterModelRepo::upsert(
+        pool,
+        aura_db::NewRouterModel {
+            name: model.name.clone(),
+            version: model.version.clone(),
+            kind: "learned_lr".into(),
+            weights: payload.weights.clone(),
+            metrics: model.metrics.clone(),
+        },
+    )
+    .await
+    .map_err(db_err)?;
+    if payload.activate {
+        aura_db::RouterModelRepo::activate(pool, summary.id)
+            .await
+            .map_err(db_err)?;
+        summary.is_active = true;
+        state.set_learned_model(Some(model));
+        tracing::info!(id = %summary.id, version = %summary.version, "router model uploaded and activated");
+    }
+    Ok(Json(summary))
+}
+
+/// Activate a stored classifier and load it.
+async fn activate_router_model(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let pool = match state.db_pool() {
+        Some(p) => p,
+        None => return Err(db_unavailable()),
+    };
+    let found = aura_db::RouterModelRepo::activate(pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+            )
+        })?;
+    if !found {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "router model not found"})),
+        ));
+    }
+    match state.reload_learned_model().await {
+        Ok(loaded) => Ok(Json(serde_json::json!({"activated": id, "loaded": loaded}))),
+        Err(e) => Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(serde_json::json!({"error": e})),
+        )),
+    }
+}
+
+/// Re-read the active classifier from the database (or weights file).
+async fn reload_router_model(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    match state.reload_learned_model().await {
+        Ok(loaded) => Ok(Json(serde_json::json!({"loaded": loaded}))),
+        Err(e) => Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(serde_json::json!({"error": e})),
+        )),
+    }
+}
+
+/// Deactivate every stored classifier and unload the in-memory one.
+async fn deactivate_router_models(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if let Some(pool) = state.db_pool() {
+        aura_db::RouterModelRepo::deactivate_all(pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Database error: {}", e)})),
+                )
+            })?;
+    }
+    state.set_learned_model(None);
+    Ok(Json(serde_json::json!({"loaded": serde_json::Value::Null})))
 }
 
 /// Learned (tier, model) arm statistics used by Thompson sampling.

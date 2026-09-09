@@ -40,7 +40,7 @@ pub use router::{
     AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, ClassifierOverride,
     DecisionContext, Eligibility, EndpointConfig, EndpointHealth, EndpointPool,
     EndpointPoolBuilder, FallbackChain, FallbackChainBuilder, FallbackConfig, HealthConfig,
-    HealthState, HealthTracker, ModelCatalog, ModelMapping, ModelProfile, ModelTrait,
+    HealthState, HealthTracker, LearnedModel, ModelCatalog, ModelMapping, ModelProfile, ModelTrait,
     MultiObjectiveSelector, OptimizationGoal, OrgAutoRoutingOverride, ProviderEndpoint,
     ProviderEndpointBuilder, Region, RoutingConfig, RoutingDecision, RoutingStrategy,
     RoutingWeights, SmartRouter, SmartRouterBuilder, StrategySelector,
