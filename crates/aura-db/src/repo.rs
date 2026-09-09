@@ -2476,7 +2476,6 @@ impl RouterModelRepo {
             INSERT INTO router_models (name, version, kind, weights, metrics)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (name, version) DO UPDATE SET
-                kind = EXCLUDED.kind,
                 weights = EXCLUDED.weights,
                 metrics = EXCLUDED.metrics
             RETURNING id, name, version, kind, metrics, is_active, created_at

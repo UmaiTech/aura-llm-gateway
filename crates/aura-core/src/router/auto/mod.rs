@@ -477,6 +477,20 @@ impl AutoRouter {
             inner: &filtered,
             exclude,
         };
+        // Respect the request budget on escalation too; when nothing fits
+        // it, fall back to the unconstrained pick like the first decision.
+        if let Some(limit) = options.and_then(|o| o.max_cost_usd).filter(|b| *b > 0.0) {
+            let budgeted = BudgetOracle {
+                inner: &excluding,
+                limit,
+            };
+            if let Some(sel) =
+                self.catalog
+                    .select(decision.tier, decision.tier, max_tier, &budgeted)
+            {
+                return Some(sel);
+            }
+        }
         self.catalog
             .select(decision.tier, decision.tier, max_tier, &excluding)
     }
