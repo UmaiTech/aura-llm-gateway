@@ -227,7 +227,7 @@ and docs: items 6 to 8) if reviewing in one go is too much.
 
 1. **Generator models**: `gpt-5.6-luna` and `claude-haiku-4-5` (decided).
    Default split 70 / 30 by volume, each the retry for the other.
-2. **Judge**: keep `gold_judge_model` (`claude-sonnet-4-6`) for label
+2. **Judge**: keep `gold_judge_model` (`claude-sonnet-5`) for label
    consistency with live gold. Recommendation: yes.
 3. **Labelling**: ladder (recommended) or the live pair procedure.
 4. **Weight and share**: synthetic weight 0.5, share cap 50 %. Recommendation:
