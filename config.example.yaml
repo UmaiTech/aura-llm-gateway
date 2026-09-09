@@ -142,5 +142,21 @@ routing:
     outcome_rollup_interval_secs: 900
     outcome_grace_secs: 1800
     arm_stats_window_days: 30
+    # Classifier used when the request doesn't pick one: heuristic | llm.
+    # `llm` calls llm_classifier.model with a hard timeout and falls back
+    # to the heuristic on any failure.
+    default_classifier: heuristic
+    llm_classifier:
+      model: claude-haiku-4-5
+      timeout_ms: 800
+    # Gold labels: answer a sampled fraction of plain-text requests with the
+    # cheapest and strongest tiers in the background and have the judge
+    # model grade them (two extra completions + one judge call per sample).
+    gold_sample_rate: 0.0
+    # Sample pinned-model (shadow) requests too. Off: their prompts would
+    # otherwise be answered by providers the tenant did not choose.
+    gold_sample_shadow: false
+    gold_judge_model: claude-sonnet-5
+    gold_max_text_chars: 4000
     # keywords: { code: [...], reasoning: [...], technical: [...], simple: [...],
     #             intent_quick: [...], intent_deep: [...] }  — override the built-in lists

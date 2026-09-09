@@ -657,6 +657,7 @@ pub async fn create_response(
         &state,
         &mut request,
         auth_context.as_ref().and_then(|a| a.tenant.organization_id),
+        &request_id,
     )
     .await?;
     let routing_strategy = match auto_decision.as_ref().filter(|d| !d.shadow) {

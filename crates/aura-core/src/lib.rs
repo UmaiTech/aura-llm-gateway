@@ -37,13 +37,13 @@ pub use provider::{
 pub use rate_limit::{RateLimitError, RateLimitResult, RateLimiter};
 pub use redis::{RedisError, RedisPool};
 pub use router::{
-    AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, DecisionContext, Eligibility,
-    EndpointConfig, EndpointHealth, EndpointPool, EndpointPoolBuilder, FallbackChain,
-    FallbackChainBuilder, FallbackConfig, HealthConfig, HealthState, HealthTracker, ModelCatalog,
-    ModelMapping, ModelProfile, ModelTrait, MultiObjectiveSelector, OptimizationGoal,
-    OrgAutoRoutingOverride, ProviderEndpoint, ProviderEndpointBuilder, Region, RoutingConfig,
-    RoutingDecision, RoutingStrategy, RoutingWeights, SmartRouter, SmartRouterBuilder,
-    StrategySelector,
+    AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, ClassifierOverride,
+    DecisionContext, Eligibility, EndpointConfig, EndpointHealth, EndpointPool,
+    EndpointPoolBuilder, FallbackChain, FallbackChainBuilder, FallbackConfig, HealthConfig,
+    HealthState, HealthTracker, ModelCatalog, ModelMapping, ModelProfile, ModelTrait,
+    MultiObjectiveSelector, OptimizationGoal, OrgAutoRoutingOverride, ProviderEndpoint,
+    ProviderEndpointBuilder, Region, RoutingConfig, RoutingDecision, RoutingStrategy,
+    RoutingWeights, SmartRouter, SmartRouterBuilder, StrategySelector,
 };
 pub use state::{AppState, AppStateBuilder};
 pub use validation::{run_fanout, FanoutError, FanoutSelector};

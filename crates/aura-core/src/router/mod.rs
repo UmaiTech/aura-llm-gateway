@@ -39,7 +39,8 @@ mod strategy;
 
 pub use auto::{
     AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, CatalogEntry, CatalogSource,
-    DecisionContext, Eligibility, ModelCatalog, OrgAutoRoutingOverride, RequestFeatures,
+    ClassifierOverride, DecisionContext, Eligibility, ModelCatalog, OrgAutoRoutingOverride,
+    RequestFeatures,
 };
 pub use config::{EndpointConfig, FallbackConfig, RoutingConfig, RoutingWeights};
 pub use endpoint::{ProviderEndpoint, ProviderEndpointBuilder};

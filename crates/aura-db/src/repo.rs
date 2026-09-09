@@ -2378,3 +2378,80 @@ impl RoutingOutcomeRepo {
         Ok(rows)
     }
 }
+
+/// Repository for auto-router gold-label pairs
+pub struct RoutingGoldPairRepo;
+
+impl RoutingGoldPairRepo {
+    /// Insert a pair.
+    pub async fn insert(pool: &DbPool, new: NewRoutingGoldPair) -> Result<Uuid, DbError> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO routing_gold_pairs (
+                response_id, organization_id, decided_tier, heuristic_score, features,
+                prompt_hash, user_text,
+                tier_a, model_a, text_a, cost_a, latency_a_ms,
+                tier_b, model_b, text_b, cost_b, latency_b_ms,
+                judge_model, verdict, judge_confidence, judge_rationale, error
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                    $17, $18, $19, $20, $21, $22)
+            RETURNING id
+            "#,
+        )
+        .bind(&new.response_id)
+        .bind(new.organization_id)
+        .bind(&new.decided_tier)
+        .bind(new.heuristic_score)
+        .bind(&new.features)
+        .bind(&new.prompt_hash)
+        .bind(&new.user_text)
+        .bind(&new.tier_a)
+        .bind(&new.model_a)
+        .bind(&new.text_a)
+        .bind(new.cost_a)
+        .bind(new.latency_a_ms)
+        .bind(&new.tier_b)
+        .bind(&new.model_b)
+        .bind(&new.text_b)
+        .bind(new.cost_b)
+        .bind(new.latency_b_ms)
+        .bind(&new.judge_model)
+        .bind(&new.verdict)
+        .bind(new.judge_confidence)
+        .bind(&new.judge_rationale)
+        .bind(&new.error)
+        .fetch_one(pool)
+        .await?;
+        Ok(row.get("id"))
+    }
+
+    /// Most recent pairs.
+    pub async fn recent(pool: &DbPool, limit: i64) -> Result<Vec<RoutingGoldPair>, DbError> {
+        let rows = sqlx::query_as::<_, RoutingGoldPair>(
+            "SELECT * FROM routing_gold_pairs ORDER BY created_at DESC LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Summary counts over all pairs.
+    pub async fn summary(pool: &DbPool) -> Result<RoutingGoldSummary, DbError> {
+        let row = sqlx::query_as::<_, RoutingGoldSummary>(
+            r#"
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE verdict IN ('a', 'tie')) AS cheap_sufficed,
+                COUNT(*) FILTER (WHERE verdict = 'b') AS strong_better,
+                COUNT(*) FILTER (WHERE verdict = 'tie') AS ties,
+                COUNT(*) FILTER (WHERE verdict IS NULL) AS failed
+            FROM routing_gold_pairs
+            "#,
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(row)
+    }
+}
