@@ -9,6 +9,7 @@ from aura.types import (
     TextContent,
     Tool,
     Usage,
+    ValidationStrategy,
     assistant_message,
     system_message,
     user_message,
@@ -237,3 +238,79 @@ class TestUsage:
         assert usage.cost_usd == 0.005
         assert usage.input_tokens_details is not None
         assert usage.input_tokens_details["cached"] == 20
+
+
+class TestValidationMetadata:
+    """Tests for Response.validation parsing (gateway validation extension)."""
+
+    def test_parse_best_of_n(self):
+        """Test parsing best_of_n validation metadata."""
+        data = {
+            "id": "resp_v1",
+            "object": "response",
+            "created_at": 1706140800,
+            "status": "completed",
+            "model": "gpt-5.4-mini",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "9"}],
+                }
+            ],
+            "validation": {
+                "strategy": "best_of_n",
+                "confidence": 0.92,
+                "candidates_generated": 3,
+                "selected_index": 1,
+            },
+        }
+        response = Response.model_validate(data)
+        assert response.validation is not None
+        assert response.validation.strategy == ValidationStrategy.BEST_OF_N
+        assert response.validation.strategy.value == "best_of_n"
+        assert response.validation.confidence == 0.92
+        assert response.validation.candidates_generated == 3
+        assert response.validation.selected_index == 1
+        assert response.validation.min_confidence is None
+
+    def test_parse_self_consistency(self):
+        """Test parsing self_consistency validation metadata."""
+        data = {
+            "id": "resp_v2",
+            "object": "response",
+            "created_at": 1706140800,
+            "status": "completed",
+            "model": "gpt-5.4-mini",
+            "output": [],
+            "validation": {
+                "strategy": "self_consistency",
+                "confidence": 0.85,
+                "candidates_generated": 3,
+                "min_confidence": 0.7,
+            },
+        }
+        response = Response.model_validate(data)
+        assert response.validation is not None
+        assert response.validation.strategy == ValidationStrategy.SELF_CONSISTENCY
+        assert response.validation.min_confidence == 0.7
+
+    def test_response_without_validation(self):
+        """Test that a response without validation parses with validation=None."""
+        data = {
+            "id": "resp_v3",
+            "object": "response",
+            "created_at": 1706140800,
+            "status": "completed",
+            "model": "gpt-5.4-mini",
+            "output": [],
+        }
+        response = Response.model_validate(data)
+        assert response.validation is None
+
+    def test_feedback_signal_values(self):
+        """Test FeedbackSignal serializes to the gateway's PascalCase values."""
+        from aura.types import FeedbackSignal
+
+        assert FeedbackSignal.THUMBS_UP.value == "ThumbsUp"
+        assert FeedbackSignal.THUMBS_DOWN.value == "ThumbsDown"

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from aura import AuraClient
+from aura import AuraClient, FeedbackSignal
 from aura.exceptions import (
     APIError,
     AuthenticationError,
@@ -277,3 +277,94 @@ data: {{"type": "response.completed", "response": {json.dumps(response_data)}}}"
         assert event.type == "response.completed"
         assert event.response.id == "resp_123"
         assert event.response.status.value == "completed"
+
+
+class TestFeedback:
+    """Tests for the Feedback resource."""
+
+    def test_submit_builds_payload(self):
+        """Test submit() posts the right body to /v1/feedback."""
+        client = AuraClient()
+        captured = {}
+
+        def fake_request(method, path, **kwargs):
+            captured["method"] = method
+            captured["path"] = path
+            captured["json"] = kwargs.get("json")
+            return {"id": "fb_1", "recorded": True, "message": "feedback recorded"}
+
+        client._request = fake_request
+
+        result = client.feedback.submit(
+            response_id="resp_1",
+            signal=FeedbackSignal.THUMBS_UP,
+            reason="good",
+            tags=["math"],
+        )
+
+        assert result["recorded"] is True
+        assert captured["method"] == "POST"
+        assert captured["path"] == "/v1/feedback"
+        assert captured["json"]["response_id"] == "resp_1"
+        assert captured["json"]["signal"] == "ThumbsUp"
+        assert captured["json"]["reason"] == "good"
+        assert captured["json"]["tags"] == ["math"]
+
+    def test_submit_accepts_plain_string_signal(self):
+        """Test submit() accepts a raw string signal (gateway format)."""
+        client = AuraClient()
+        captured = {}
+
+        def fake_request(method, path, **kwargs):
+            captured["json"] = kwargs.get("json")
+            return {"id": "fb_2", "recorded": True}
+
+        client._request = fake_request
+
+        client.feedback.submit(response_id="resp_2", signal="ThumbsDown")
+        assert captured["json"]["signal"] == "ThumbsDown"
+
+    def test_submit_minimal_payload(self):
+        """Test submit() omits optional fields when not provided."""
+        client = AuraClient()
+        captured = {}
+
+        def fake_request(method, path, **kwargs):
+            captured["json"] = kwargs.get("json")
+            return {"id": "fb_3", "recorded": True}
+
+        client._request = fake_request
+
+        client.feedback.submit(response_id="resp_3", signal=FeedbackSignal.THUMBS_UP)
+        assert "reason" not in captured["json"]
+        assert "tags" not in captured["json"]
+
+    def test_list_passes_limit(self):
+        """Test list() passes limit as a query param."""
+        client = AuraClient()
+        captured = {}
+
+        def fake_request(method, path, **kwargs):
+            captured["path"] = path
+            captured["params"] = kwargs.get("params")
+            return {"samples": [], "total": 0}
+
+        client._request = fake_request
+
+        client.feedback.list(limit=5)
+        assert captured["path"] == "/v1/feedback"
+        assert captured["params"] == {"limit": 5}
+
+    def test_stats_hits_stats_endpoint(self):
+        """Test stats() hits /v1/feedback/stats."""
+        client = AuraClient()
+        captured = {}
+
+        def fake_request(method, path, **kwargs):
+            captured["path"] = path
+            return {"total": 1, "approved": 1}
+
+        client._request = fake_request
+
+        client.feedback.stats()
+        assert captured["path"] == "/v1/feedback/stats"
