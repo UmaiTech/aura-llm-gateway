@@ -1,6 +1,6 @@
 # Auto Model Router — Research & Implementation Plan
 
-**Status:** proposal, September 2026
+**Status:** implemented as a stacked PR series, September 2026 (see [Status](#status) at the end)
 **Scope:** a `model: "auto"` alias that scores each request's complexity, picks the cheapest model expected to answer it well, records the decision, and learns from Aura's existing tracing data.
 
 ---
@@ -275,13 +275,32 @@ Also in PR 1 or 2: add `wiremock` + `insta` as dev-dependencies and a first inte
 
 ---
 
-## 5. Decisions needed before PR 1
+## 5. Decisions taken
 
-1. **Request surface:** support both `model: "auto[:mode]"` and the `routing` object (recommended), or only one?
-2. **Default mode:** `balanced` (recommended) or `cost`?
-3. **LLM classifier:** acceptable to add ~0.5 s and ~$0.0001 per request for orgs that opt in, or heuristic + learned only?
-4. **Config home:** `AURA_CONFIG_FILE` YAML + org override (recommended) vs. DB-only.
-5. **Shadow mode default on** for pinned-model traffic (recommended; it's what makes the data loop start immediately) — needs a note in the payload-capture / privacy docs since decisions store feature vectors (numbers, not text).
+All five recommendations were accepted before PR 1:
+
+1. **Request surface:** both `model: "auto[:mode]"` and the `routing` object.
+2. **Default mode:** `balanced`.
+3. **LLM classifier:** available per request / per org (`classifier: llm`), heuristic fallback on any failure.
+4. **Config home:** `AURA_CONFIG_FILE` YAML (+ `AURA_AUTO_ROUTING=on|off`) with per-organization overrides in `organizations.settings.routing.auto`.
+5. **Shadow mode default on** for pinned-model traffic; decisions store numeric feature vectors only.
+
+## Status
+
+Delivered as eight stacked PRs, each on the previous one's branch:
+
+| # | PR | Branch | What changed from the plan |
+|---|---|---|---|
+| 1 | [#217](https://github.com/UmaiTech/aura-llm-gateway/pull/217) scorer, tiers, config | `claude/llm-model-router-complexity-ys0nnt` | Raw score clamps to `[-1, 1]` so trivial prompts resist the quality offset. |
+| 2 | [#218](https://github.com/UmaiTech/aura-llm-gateway/pull/218) `model: "auto"` in the proxy | `claude/auto-router-2-proxy-resolution` | Provider health as a hard filter moved to PR 8 (breaker). `wiremock` + `http-body-util` added; `insta` was not needed. |
+| 3 | [#219](https://github.com/UmaiTech/aura-llm-gateway/pull/219) decisions table, shadow mode, admin stats | `claude/auto-router-3-decisions-shadow` | Decisions are upserted from the completion paths (one write per request) instead of insert-then-update. No separate harness drawer: the harness already renders `metadata.aura`. |
+| 4 | [#220](https://github.com/UmaiTech/aura-llm-gateway/pull/220) catalog, org overrides, `/v1/models` | `claude/auto-router-4-catalog-org-overrides` | Org settings cached 60 s in `AppState` and shared with payload capture. Tiers auto-derived from the catalog when config leaves them empty. |
+| 5 | [#221](https://github.com/UmaiTech/aura-llm-gateway/pull/221) outcome signals, Thompson | `claude/auto-router-5-outcomes-thompson` | Rollup runs inside the gateway (15 min default, plus `POST /admin/routing/rollup`) rather than as an external nightly job; Beta sampling implemented without new crates. |
+| 6 | [#222](https://github.com/UmaiTech/aura-llm-gateway/pull/222) LLM classifier, gold labels, replay | `claude/auto-router-6-llm-classifier-gold` | Gold pairs compare the lowest and highest populated tiers; `POST /admin/routing/score` is the dry-run surface `replay.py` uses. |
+| 7 | [#223](https://github.com/UmaiTech/aura-llm-gateway/pull/223) learned classifier, model registry | `claude/auto-router-7-learned-classifier` | Numeric features only (no text n-grams) so training needs no retained prompt text; pure-stdlib logistic regression instead of LightGBM. |
+| 8 | [#224](https://github.com/UmaiTech/aura-llm-gateway/pull/224) escalation, circuit breaker | `claude/auto-router-8-escalation` | Escalates within the same tier before moving up; breaker feeds eligibility. |
+
+Merge in order (1 → 8); each PR's base is the previous branch, so GitHub retargets automatically as they land.
 
 ---
 

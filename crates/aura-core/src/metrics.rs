@@ -45,6 +45,8 @@ pub mod names {
     pub const ROUTING_CLASSIFIER_SECONDS: &str = "aura_routing_classifier_seconds";
     /// Auto-routing requests that could not be routed
     pub const ROUTING_FAILURES_TOTAL: &str = "aura_routing_failures_total";
+    /// Auto-routing escalations after provider failures
+    pub const ROUTING_ESCALATIONS_TOTAL: &str = "aura_routing_escalations_total";
 }
 
 /// Labels commonly used with metrics
@@ -237,6 +239,17 @@ pub fn record_routing_decision(
     .record(classifier_secs);
 }
 
+/// Record an auto-routing escalation after a provider failure.
+pub fn record_routing_escalation(from_tier: &str, to_tier: &str, error_code: &str) {
+    counter!(
+        names::ROUTING_ESCALATIONS_TOTAL,
+        "from_tier" => from_tier.to_string(),
+        "to_tier" => to_tier.to_string(),
+        labels::ERROR_TYPE => error_code.to_string()
+    )
+    .increment(1);
+}
+
 /// Record an auto-routing request that could not be routed.
 pub fn record_routing_failure(reason: &str) {
     counter!(
@@ -313,6 +326,10 @@ pub fn describe_metrics() {
     metrics::describe_counter!(
         names::ROUTING_FAILURES_TOTAL,
         "Total number of auto-routing requests that could not be routed"
+    );
+    metrics::describe_counter!(
+        names::ROUTING_ESCALATIONS_TOTAL,
+        "Total number of auto-routing escalations after provider failures"
     );
 }
 

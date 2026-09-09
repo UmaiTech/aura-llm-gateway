@@ -896,6 +896,8 @@ pub struct RoutingDecision {
     pub requested_blended_per_million: Option<f64>,
     pub selected_blended_per_million: Option<f64>,
     pub decision_latency_us: i32,
+    #[sqlx(default)]
+    pub escalations: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -925,6 +927,7 @@ pub struct NewRoutingDecision {
     pub requested_blended_per_million: Option<f64>,
     pub selected_blended_per_million: Option<f64>,
     pub decision_latency_us: i32,
+    pub escalations: serde_json::Value,
 }
 
 /// One decision joined with its outcome (`v_routing_outcomes`)

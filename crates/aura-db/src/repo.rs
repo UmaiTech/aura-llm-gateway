@@ -2137,13 +2137,21 @@ impl RoutingDecisionRepo {
                 requested_model, mode, classifier, score, raw_score, classified_tier, tier,
                 selected_model, selected_provider, reason, shadow,
                 features, signals, hard_filters, candidates,
-                requested_blended_per_million, selected_blended_per_million, decision_latency_us
+                requested_blended_per_million, selected_blended_per_million, decision_latency_us,
+                escalations, selected_model_final
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-                    $17, $18, $19, $20, $21, $22, $23)
+                    $17, $18, $19, $20, $21, $22, $23, $24, $13)
             ON CONFLICT (response_id) DO UPDATE SET
                 provider_response_id = COALESCE(EXCLUDED.provider_response_id, routing_decisions.provider_response_id),
-                conversation_id = COALESCE(EXCLUDED.conversation_id, routing_decisions.conversation_id)
+                conversation_id = COALESCE(EXCLUDED.conversation_id, routing_decisions.conversation_id),
+                selected_model = EXCLUDED.selected_model,
+                selected_provider = EXCLUDED.selected_provider,
+                tier = EXCLUDED.tier,
+                reason = EXCLUDED.reason,
+                candidates = EXCLUDED.candidates,
+                escalations = EXCLUDED.escalations,
+                selected_model_final = EXCLUDED.selected_model_final
             "#,
         )
         .bind(&new.response_id)
@@ -2169,6 +2177,7 @@ impl RoutingDecisionRepo {
         .bind(new.requested_blended_per_million)
         .bind(new.selected_blended_per_million)
         .bind(new.decision_latency_us)
+        .bind(&new.escalations)
         .execute(pool)
         .await?;
         Ok(())

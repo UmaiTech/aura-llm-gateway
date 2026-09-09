@@ -28,7 +28,9 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
-use crate::routes::auto_routing::{resolve_auto_model, selected_model_header};
+use crate::routes::auto_routing::{
+    escalate_after_failure, resolve_auto_model, selected_model_header,
+};
 use crate::routes::AuthContext;
 use crate::AppState;
 
@@ -653,7 +655,7 @@ pub async fn create_response(
     // a shadow decision for a pinned model). Must run before the cache
     // lookup so cache keys are built from the resolved model.
     let mut request = request;
-    let auto_decision = resolve_auto_model(
+    let mut auto_decision = resolve_auto_model(
         &state,
         &mut request,
         auth_context.as_ref().and_then(|a| a.tenant.organization_id),
@@ -666,7 +668,7 @@ pub async fn create_response(
     };
 
     // Get the provider for this request
-    let provider = state.get_provider(&request.model).ok_or_else(|| {
+    let mut provider = state.get_provider(&request.model).ok_or_else(|| {
         let err = ProviderError::model_not_found(&request.model);
         ApiError::from_provider_error(&err)
     })?;
@@ -721,14 +723,46 @@ pub async fn create_response(
             }
         };
 
-        // Streaming response
-        let stream = provider
-            .complete_stream(request.clone())
-            .await
-            .map_err(|e| {
-                error!(request_id = %request_id, error = %e, "Streaming request failed");
-                ApiError::from_provider_error(&e)
-            })?;
+        // Streaming response. A failure before the first byte on an
+        // auto-routed request escalates to the next candidate.
+        let mut attempt = 0u32;
+        let stream = loop {
+            match provider.complete_stream(request.clone()).await {
+                Ok(stream) => break stream,
+                Err(e) => {
+                    if let Some(next) = escalate_after_failure(
+                        &state,
+                        &mut request,
+                        &mut auto_decision,
+                        &e,
+                        attempt,
+                    ) {
+                        provider = next;
+                        attempt += 1;
+                        continue;
+                    }
+                    error!(request_id = %request_id, error = %e, "Streaming request failed");
+                    // Keep the decision (and any escalations taken) so the
+                    // failure counts in the rollup and stats.
+                    state
+                        .record_routing_decision(
+                            auto_decision.as_ref(),
+                            &request_id,
+                            None,
+                            auth_context.as_ref(),
+                            conversation_id,
+                        )
+                        .await;
+                    return Err(ApiError::from_provider_error(&e));
+                }
+            }
+        };
+        // Every successful completion clears the model's failure window.
+        state.record_model_success(&request.model);
+        let routing_strategy = match auto_decision.as_ref().filter(|d| !d.shadow) {
+            Some(decision) => Some(format!("auto:{}", decision.tier)),
+            None => routing_strategy,
+        };
 
         // Snapshot org_id and the original (pre-compression) request JSON
         // for payload capture. Both are evaluated once here — before the
@@ -1137,7 +1171,6 @@ pub async fn create_response(
     } else {
         // Non-streaming response - track latency
         let start = Instant::now();
-        let model_id = request.model.clone();
         let bypass_cache = should_bypass_cache(&headers);
 
         // Check cache first (if caching is enabled and request is cacheable)
@@ -1258,7 +1291,34 @@ pub async fn create_response(
                     }
                 })?
         } else {
-            provider.complete(request.clone()).await.map_err(|e| {
+            // Single provider call; a failure on an auto-routed request
+            // escalates to the next candidate before giving up.
+            let mut attempt = 0u32;
+            let outcome = loop {
+                match provider.complete(request.clone()).await {
+                    Ok(r) => break Ok(r),
+                    Err(e) => {
+                        if let Some(next) = escalate_after_failure(
+                            &state,
+                            &mut request,
+                            &mut auto_decision,
+                            &e,
+                            attempt,
+                        ) {
+                            provider = next;
+                            attempt += 1;
+                            continue;
+                        }
+                        break Err(e);
+                    }
+                }
+            };
+            if outcome.is_ok() {
+                state.record_model_success(&request.model);
+            }
+            let provider_name = provider.name().to_string();
+            let model_id = request.model.clone();
+            outcome.map_err(|e| {
                 // Decrement active requests on error
                 metrics::decrement_active_requests(&provider_name);
                 metrics::record_provider_error(&provider_name, e.error_code());
@@ -1310,6 +1370,14 @@ pub async fn create_response(
         };
 
         let latency_ms = start.elapsed().as_millis() as u64;
+
+        // Escalation may have moved the request to another model/provider.
+        let provider_name = provider.name().to_string();
+        let model_id = request.model.clone();
+        let routing_strategy = match auto_decision.as_ref().filter(|d| !d.shadow) {
+            Some(decision) => Some(format!("auto:{}", decision.tier)),
+            None => routing_strategy,
+        };
 
         // Decrement active requests
         metrics::decrement_active_requests(&provider_name);
