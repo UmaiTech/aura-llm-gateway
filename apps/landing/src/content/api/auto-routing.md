@@ -35,10 +35,10 @@ Send `model: "auto"` and Aura scores the request's complexity, maps it to a tier
 
 | Tier | Typical request | Default candidates |
 |------|-----------------|--------------------|
-| `simple` | Short factual questions, rewrites, translations, greetings | `gemini-3.1-flash-lite`, `gpt-5.4-nano`, `claude-haiku-4-5` |
-| `medium` | Everyday assistant work, light code, tool calls | `gemini-3.5-flash`, `gpt-5.4-mini`, `claude-sonnet-4-6` |
-| `complex` | Multi-step engineering work, debugging, long context | `claude-sonnet-4-6`, `gpt-5.5`, `gemini-3.1-pro-preview` |
-| `reasoning` | Proofs, derivations, deep analysis, explicit "think hard" | `claude-opus-4-7`, `gpt-5.5-pro`, `o3-mini` |
+| `simple` | Short factual questions, rewrites, translations, greetings | `gemini-3.1-flash-lite`, `gemini-3.5-flash`, `gpt-5.6-luna` |
+| `medium` | Everyday assistant work, light code, tool calls | `gemini-3.8-flash`, `gpt-5.4-mini`, `claude-haiku-4-5` |
+| `complex` | Multi-step engineering work, debugging, long context | `claude-sonnet-5`, `gemini-3-pro-preview`, `gpt-5.6-terra` |
+| `reasoning` | Proofs, derivations, deep analysis, explicit "think hard" | `claude-opus-5`, `gpt-5.6-sol`, `claude-fable-5-1` |
 
 Only models the gateway can actually serve are considered. Tier lists are configurable per gateway, and an organization can narrow them with allow / deny lists and tier clamps; when none are configured the gateway derives them from its model catalog at startup.
 
