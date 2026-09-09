@@ -157,22 +157,35 @@ impl OrgAutoRoutingOverride {
 
     /// Merge the organization override under the request's own options.
     ///
-    /// Request fields win when set. Allow lists intersect in effect
-    /// (both must permit) by concatenating deny lists and keeping the
-    /// request's allow list when it has one, else the org's.
-    pub fn merged_with(&self, request: Option<&RoutingOptions>) -> RoutingOptions {
+    /// Preferences follow request > alias > organization > gateway: the
+    /// org's `default_mode` only applies when neither the request's
+    /// `routing.mode` nor the `auto:<mode>` alias chose one. Policy
+    /// bounds cannot be loosened by the request: `min_tier` is the
+    /// stronger of the two, `max_tier` the weaker, deny lists concatenate,
+    /// and the org's allow list is kept as `policy_allow` so both lists
+    /// must permit a candidate.
+    pub fn merged_with(
+        &self,
+        request: Option<&RoutingOptions>,
+        alias_mode: Option<RoutingMode>,
+    ) -> RoutingOptions {
         let req = request.cloned().unwrap_or_default();
         let mut deny = self.deny.clone();
         deny.extend(req.deny.iter().cloned());
+        let min_tier = match (req.min_tier, self.min_tier) {
+            (Some(r), Some(o)) => Some(r.max(o)),
+            (r, o) => r.or(o),
+        };
+        let max_tier = match (req.max_tier, self.max_tier) {
+            (Some(r), Some(o)) => Some(r.min(o)),
+            (r, o) => r.or(o),
+        };
         RoutingOptions {
-            mode: req.mode.or(self.default_mode),
-            min_tier: req.min_tier.or(self.min_tier),
-            max_tier: req.max_tier.or(self.max_tier),
-            allow: if req.allow.is_empty() {
-                self.allow.clone()
-            } else {
-                req.allow.clone()
-            },
+            mode: req.mode.or(alias_mode).or(self.default_mode),
+            min_tier,
+            max_tier,
+            allow: req.allow.clone(),
+            policy_allow: self.allow.clone(),
             deny,
             sticky: req.sticky,
             classifier: req.classifier,
@@ -742,9 +755,35 @@ mod tests {
             deny: vec!["google/*".into()],
             ..Default::default()
         };
-        let merged = o.merged_with(Some(&req));
+        let merged = o.merged_with(Some(&req), None);
         assert_eq!(merged.mode, Some(RoutingMode::Quality), "request wins");
         assert_eq!(merged.max_tier, Some(Tier::Complex), "org fills the gap");
+        // The alias beats the org default; the org default only fills a gap.
+        let bare = RoutingOptions::default();
+        assert_eq!(
+            o.merged_with(Some(&bare), Some(RoutingMode::Quality)).mode,
+            Some(RoutingMode::Quality)
+        );
+        assert_eq!(o.merged_with(None, None).mode, Some(RoutingMode::Cost));
+        // Policy bounds cannot be loosened: the request's max_tier is capped.
+        let loose = RoutingOptions {
+            max_tier: Some(Tier::Reasoning),
+            allow: vec!["openai/*".into()],
+            ..Default::default()
+        };
+        let m = o.merged_with(Some(&loose), None);
+        assert_eq!(m.max_tier, Some(Tier::Complex));
+        assert_eq!(m.allow, vec!["openai/*".to_string()]);
+        assert!(m.policy_allow.is_empty());
+        let strict = OrgAutoRoutingOverride {
+            allow: vec!["anthropic/*".into()],
+            min_tier: Some(Tier::Medium),
+            ..Default::default()
+        };
+        let m = strict.merged_with(Some(&loose), None);
+        assert_eq!(m.policy_allow, vec!["anthropic/*".to_string()]);
+        assert!(!m.permits("openai", "gpt-5.5"), "org policy still applies");
+        assert_eq!(m.min_tier, Some(Tier::Medium));
         assert_eq!(
             merged.deny,
             vec!["*-preview".to_string(), "google/*".to_string()]
@@ -752,7 +791,7 @@ mod tests {
 
         let none = OrgAutoRoutingOverride::from_org_settings(&serde_json::json!({"x": 1}));
         assert!(none.is_empty());
-        assert_eq!(none.merged_with(None), RoutingOptions::default());
+        assert_eq!(none.merged_with(None, None), RoutingOptions::default());
     }
 
     #[test]

@@ -214,10 +214,41 @@ pub struct RoutingOptions {
     /// Defaults to the gateway setting (`true`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sticky: Option<bool>,
+    /// Second allow list applied by organization policy; a candidate must
+    /// be permitted by both `allow` and this list. Never on the wire: the
+    /// gateway fills it from the organization override.
+    #[serde(skip)]
+    pub policy_allow: Vec<String>,
 
     /// Which classifier to use for this request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub classifier: Option<ClassifierKind>,
+}
+
+/// `*` matches any run of characters (including none) anywhere in the
+/// pattern: `anthropic/*`, `*-preview`, `gpt-5.4-*`, `*/gemini-*`.
+fn glob_matches(pattern: &str, text: &str) -> bool {
+    let parts: Vec<&str> = pattern.split('*').collect();
+    let (first, last) = (parts[0], parts[parts.len() - 1]);
+    if !text.starts_with(first) || !text.ends_with(last) {
+        return false;
+    }
+    if parts.len() == 2 {
+        return text.len() >= first.len() + last.len();
+    }
+    // Middle segments must appear in order between the fixed ends.
+    let mut pos = first.len();
+    let end = text.len() - last.len();
+    for seg in &parts[1..parts.len() - 1] {
+        if seg.is_empty() {
+            continue;
+        }
+        match text[pos..end].find(seg) {
+            Some(i) => pos += i + seg.len(),
+            None => return false,
+        }
+    }
+    true
 }
 
 impl RoutingOptions {
@@ -235,10 +266,10 @@ impl RoutingOptions {
         if pattern == "*" {
             return true;
         }
-        if let Some(prefix) = pattern.strip_suffix('*') {
-            return model_l.starts_with(prefix) || qualified.starts_with(prefix);
+        if !pattern.contains('*') {
+            return model_l == pattern || qualified == pattern;
         }
-        model_l == pattern || qualified == pattern
+        glob_matches(&pattern, &model_l) || glob_matches(&pattern, &qualified)
     }
 
     /// Apply the allow / deny lists to a candidate.
@@ -250,12 +281,13 @@ impl RoutingOptions {
         {
             return false;
         }
-        if self.allow.is_empty() {
-            return true;
-        }
-        self.allow
-            .iter()
-            .any(|p| Self::pattern_matches(p, provider, model))
+        let allowed = |list: &[String]| {
+            list.is_empty()
+                || list
+                    .iter()
+                    .any(|p| Self::pattern_matches(p, provider, model))
+        };
+        allowed(&self.allow) && allowed(&self.policy_allow)
     }
 }
 
@@ -310,6 +342,7 @@ mod tests {
             max_tier: None,
             allow: vec!["anthropic/*".into()],
             deny: vec![],
+            policy_allow: vec![],
             sticky: Some(false),
             classifier: Some(ClassifierKind::Heuristic),
         };
@@ -349,6 +382,32 @@ mod tests {
         assert!(RoutingOptions::pattern_matches(
             "GPT-5.5", "openai", "gpt-5.5"
         ));
+        // Suffix and infix wildcards.
+        assert!(RoutingOptions::pattern_matches(
+            "*-preview",
+            "google",
+            "gemini-3-pro-preview"
+        ));
+        assert!(!RoutingOptions::pattern_matches(
+            "*-preview",
+            "google",
+            "gemini-3.5-flash"
+        ));
+        assert!(RoutingOptions::pattern_matches(
+            "*/gemini-*",
+            "google",
+            "gemini-3.5-flash"
+        ));
+        assert!(RoutingOptions::pattern_matches(
+            "gpt-*-mini",
+            "openai",
+            "gpt-5.4-mini"
+        ));
+        assert!(!RoutingOptions::pattern_matches(
+            "gpt-*-mini",
+            "openai",
+            "gpt-5.4-nano"
+        ));
 
         let opts = RoutingOptions {
             allow: vec!["anthropic/*".into(), "gpt-5.4-mini".into()],
@@ -360,6 +419,21 @@ mod tests {
         assert!(opts.permits("openai", "gpt-5.4-mini"));
         assert!(!opts.permits("openai", "gpt-5.5"));
         assert!(!opts.permits("google", "gemini-3-pro-preview"));
+
+        // Organization policy narrows what the request may allow.
+        let policy = RoutingOptions {
+            allow: vec!["openai/*".into()],
+            policy_allow: vec!["anthropic/*".into()],
+            ..Default::default()
+        };
+        assert!(!policy.permits("openai", "gpt-5.5"));
+        assert!(!policy.permits("anthropic", "claude-sonnet-4-6"));
+        let policy_only = RoutingOptions {
+            policy_allow: vec!["anthropic/*".into()],
+            ..Default::default()
+        };
+        assert!(policy_only.permits("anthropic", "claude-sonnet-4-6"));
+        assert!(!policy_only.permits("openai", "gpt-5.5"));
 
         let deny_only = RoutingOptions {
             deny: vec!["google/*".into()],

@@ -187,8 +187,13 @@ pub async fn resolve_auto_model(
     let merged: Option<RoutingOptions> = if org.is_empty() {
         None
     } else {
-        Some(org.merged_with(request.routing.as_ref()))
+        Some(org.merged_with(request.routing.as_ref(), alias.and_then(|a| a.mode)))
     };
+    if let Some(m) = &merged {
+        // Everything downstream (escalation, gold sampling) reads the
+        // request's options; make sure they see the org policy too.
+        request.routing = Some(m.clone());
+    }
     let options = merged.as_ref().or(request.routing.as_ref());
     let ctx = DecisionContext {
         requested_model: &requested_model,
