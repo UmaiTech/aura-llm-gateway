@@ -142,7 +142,9 @@ routing:
     outcome_rollup_interval_secs: 900
     outcome_grace_secs: 1800
     arm_stats_window_days: 30
-    # Classifier used when the request doesn't pick one: heuristic | llm.
+    # Classifier used when the request doesn't pick one: heuristic | learned | llm.
+    # `learned` uses the active trained model and falls back to the heuristic
+    # when none is loaded.
     # `llm` calls llm_classifier.model with a hard timeout and falls back
     # to the heuristic on any failure.
     default_classifier: heuristic

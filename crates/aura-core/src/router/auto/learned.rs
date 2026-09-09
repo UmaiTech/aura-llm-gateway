@@ -157,6 +157,12 @@ impl LearnedModel {
         if self.scale.iter().any(|s| *s <= 0.0 || !s.is_finite()) {
             return Err(LearnedModelError::Scale);
         }
+        if self.coef.iter().flatten().any(|v| !v.is_finite())
+            || self.intercept.iter().any(|v| !v.is_finite())
+            || self.mean.iter().any(|v| !v.is_finite())
+        {
+            return Err(LearnedModelError::Shape);
+        }
         Ok(())
     }
 
