@@ -29,6 +29,7 @@
 //!    └─────────────────────┘
 //! ```
 
+pub mod auto;
 mod config;
 mod endpoint;
 mod fallback;
@@ -36,6 +37,10 @@ mod health;
 mod pool;
 mod strategy;
 
+pub use auto::{
+    AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, DecisionContext, Eligibility,
+    RequestFeatures,
+};
 pub use config::{EndpointConfig, FallbackConfig, RoutingConfig, RoutingWeights};
 pub use endpoint::{ProviderEndpoint, ProviderEndpointBuilder};
 pub use fallback::{FallbackChain, FallbackChainBuilder, ModelMapping};

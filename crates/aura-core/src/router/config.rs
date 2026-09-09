@@ -3,6 +3,7 @@
 //! Configuration types for smart routing, including strategy selection,
 //! health check parameters, and fallback settings.
 
+use super::auto::AutoRoutingConfig;
 use super::health::HealthConfig;
 use super::strategy::{ModelTrait, OptimizationGoal, Region, RoutingStrategy, ToolCategory};
 use serde::{Deserialize, Serialize};
@@ -39,6 +40,9 @@ pub struct RoutingConfig {
     pub context_routing: ContextRoutingConfig,
     /// Reasoning configuration for reasoning_depth strategy
     pub reasoning: ReasoningConfig,
+
+    /// Complexity-based auto model routing (`model: "auto"`)
+    pub auto: AutoRoutingConfig,
 }
 
 impl Default for RoutingConfig {
@@ -57,6 +61,7 @@ impl Default for RoutingConfig {
             tool_routing: ToolRoutingConfig::default(),
             context_routing: ContextRoutingConfig::default(),
             reasoning: ReasoningConfig::default(),
+            auto: AutoRoutingConfig::default(),
         }
     }
 }

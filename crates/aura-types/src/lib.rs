@@ -44,6 +44,7 @@ pub mod compression;
 pub mod consistency;
 pub mod item;
 pub mod response;
+pub mod routing;
 pub mod stream;
 pub mod validation;
 
@@ -76,6 +77,11 @@ pub use consistency::{
 pub use compression::{
     AispConfig, AispSymbolSet, CompressionAnalysis, CompressionConfig, CompressionMetadata,
     CompressionStrategy, DataFormat, SemanticFormat, StructureType, ToonConfig, YamlConfig,
+};
+
+pub use routing::{
+    parse_auto_model, AutoModelAlias, ClassifierKind, RoutingMode, RoutingOptions, Tier,
+    AUTO_MODEL_ALIAS,
 };
 
 /// Returns the crate version

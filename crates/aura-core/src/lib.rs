@@ -37,6 +37,7 @@ pub use provider::{
 pub use rate_limit::{RateLimitError, RateLimitResult, RateLimiter};
 pub use redis::{RedisError, RedisPool};
 pub use router::{
+    AutoDecision, AutoRouteError, AutoRouter, AutoRoutingConfig, DecisionContext, Eligibility,
     EndpointConfig, EndpointHealth, EndpointPool, EndpointPoolBuilder, FallbackChain,
     FallbackChainBuilder, FallbackConfig, HealthConfig, HealthState, HealthTracker, ModelMapping,
     ModelProfile, ModelTrait, MultiObjectiveSelector, OptimizationGoal, ProviderEndpoint,
