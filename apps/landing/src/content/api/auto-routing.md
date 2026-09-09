@@ -131,6 +131,7 @@ Organizations can set the same options as defaults or limits in their settings, 
 | `hard_filters` | Constraints that shaped the decision, in order. |
 | `candidates` | Every model considered with eligibility, list price and, when a cost model is active, `predicted_cost_usd`. |
 | `selected` / `reason` | The winner and why, including escalations. |
+| `options` | The routing options the gateway applied: the request's `routing` merged with any organization override. Absent when none were sent. |
 | `shadow` | `true` when the request pinned a model and the router only recorded what it would have done. |
 
 The playground shows the same decision on every answer: click the **auto · tier · model** chip under a response to open the routing inspector with the score bar, signals, candidates and reason.

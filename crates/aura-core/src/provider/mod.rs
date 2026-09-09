@@ -12,6 +12,7 @@ mod huggingface;
 mod mistral;
 mod ollama;
 mod openai;
+pub mod sse;
 mod together;
 
 pub use anthropic::AnthropicProvider;

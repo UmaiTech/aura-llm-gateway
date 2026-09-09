@@ -521,6 +521,8 @@ struct AnthropicStreamTransformer {
     model: String,
     response_id: String,
     buffer: String,
+    /// Trailing bytes of an incomplete UTF-8 character from the last chunk.
+    utf8_pending: Vec<u8>,
     accumulated_text: String,
     accumulated_tool_calls: std::collections::HashMap<usize, PartialToolCall>,
     accumulated_thinking: String,
@@ -546,6 +548,7 @@ impl AnthropicStreamTransformer {
             model,
             response_id: format!("resp_ant_{}", uuid::Uuid::new_v4()),
             buffer: String::new(),
+            utf8_pending: Vec::new(),
             accumulated_text: String::new(),
             accumulated_tool_calls: std::collections::HashMap::new(),
             accumulated_thinking: String::new(),
@@ -613,9 +616,11 @@ impl AnthropicStreamTransformer {
                     // Need more data
                     match stream.next().await {
                         Some(Ok(bytes)) => {
-                            if let Ok(text) = String::from_utf8(bytes.to_vec()) {
-                                transformer.buffer.push_str(&text);
-                            }
+                            crate::provider::sse::push_utf8(
+                                &mut transformer.buffer,
+                                &mut transformer.utf8_pending,
+                                &bytes,
+                            );
                         }
                         Some(Err(e)) => {
                             return Some((

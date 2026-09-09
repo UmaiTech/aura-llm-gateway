@@ -103,6 +103,8 @@ export interface RoutingDecisionMetadata {
   latency_us?: number
   escalations?: RoutingEscalation[]
   predicted_cost_usd?: number | null
+  /** The routing options the gateway applied (request merged with any org override). */
+  options?: RoutingOptionsRequest
 }
 
 // Request-level options for the auto router (the `routing` object on

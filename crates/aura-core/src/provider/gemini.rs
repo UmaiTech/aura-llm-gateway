@@ -725,8 +725,15 @@ struct GeminiStreamTransformer {
     model: String,
     response_id: String,
     buffer: String,
+    /// Trailing bytes of an incomplete UTF-8 character from the last chunk.
+    utf8_pending: Vec<u8>,
     accumulated_text: String,
     accumulated_function_calls: std::collections::HashMap<usize, PartialFunctionCall>,
+    /// Events produced by one Gemini chunk, drained one per poll. A chunk
+    /// can yield several (item added, part added, a delta and the final
+    /// response when it carries the finish reason).
+    pending: std::collections::VecDeque<Result<StreamEvent, ProviderError>>,
+    completed_sent: bool,
     sent_created: bool,
     sent_in_progress: bool,
     output_item_added: bool,
@@ -747,8 +754,11 @@ impl GeminiStreamTransformer {
             model,
             response_id: format!("resp_gem_{}", uuid::Uuid::new_v4()),
             buffer: String::new(),
+            utf8_pending: Vec::new(),
             accumulated_text: String::new(),
             accumulated_function_calls: std::collections::HashMap::new(),
+            pending: std::collections::VecDeque::new(),
+            completed_sent: false,
             sent_created: false,
             sent_in_progress: false,
             output_item_added: false,
@@ -791,6 +801,11 @@ impl GeminiStreamTransformer {
                         ));
                     }
 
+                    // Events left over from the last chunk
+                    if let Some(event) = transformer.pending.pop_front() {
+                        return Some((event, (transformer, stream)));
+                    }
+
                     // Process buffered lines
                     if let Some(line_end) = transformer.buffer.find('\n') {
                         let line = transformer.buffer[..line_end].trim().to_string();
@@ -802,9 +817,7 @@ impl GeminiStreamTransformer {
 
                         // Gemini SSE format: "data: {json}"
                         if let Some(data) = line.strip_prefix("data: ") {
-                            if let Some(event) = transformer.process_sse_data(data) {
-                                return Some((event, (transformer, stream)));
-                            }
+                            transformer.process_sse_data(data);
                         }
 
                         continue;
@@ -813,9 +826,11 @@ impl GeminiStreamTransformer {
                     // Need more data
                     match stream.next().await {
                         Some(Ok(bytes)) => {
-                            if let Ok(text) = String::from_utf8(bytes.to_vec()) {
-                                transformer.buffer.push_str(&text);
-                            }
+                            crate::provider::sse::push_utf8(
+                                &mut transformer.buffer,
+                                &mut transformer.utf8_pending,
+                                &bytes,
+                            );
                         }
                         Some(Err(e)) => {
                             return Some((
@@ -824,37 +839,14 @@ impl GeminiStreamTransformer {
                             ));
                         }
                         None => {
-                            // Stream ended - emit final response if we have content
-                            if !transformer.accumulated_text.is_empty()
-                                || !transformer.accumulated_function_calls.is_empty()
+                            // Stream ended without a finish reason: close
+                            // the response ourselves if there is content.
+                            if !transformer.completed_sent
+                                && (!transformer.accumulated_text.is_empty()
+                                    || !transformer.accumulated_function_calls.is_empty())
                             {
-                                let mut output = Vec::new();
-                                if !transformer.accumulated_text.is_empty() {
-                                    output.push(Item::Message(MessageItem::assistant(
-                                        "msg_0",
-                                        &transformer.accumulated_text,
-                                    )));
-                                }
-                                for (idx, fc) in &transformer.accumulated_function_calls {
-                                    output.push(Item::FunctionCall(FunctionCallItem::new(
-                                        format!("fc_{}", idx),
-                                        format!("call_{}", fc.name),
-                                        &fc.name,
-                                        &fc.args,
-                                    )));
-                                }
-
-                                let usage =
-                                    Usage::new(transformer.input_tokens, transformer.output_tokens);
-                                let response = Response::builder(
-                                    transformer.response_id.clone(),
-                                    transformer.model.clone(),
-                                )
-                                .outputs(output)
-                                .usage(usage)
-                                .completed()
-                                .build();
-
+                                transformer.completed_sent = true;
+                                let response = transformer.completed_response();
                                 return Some((
                                     Ok(StreamEvent::response_completed(response)),
                                     (transformer, stream),
@@ -868,12 +860,48 @@ impl GeminiStreamTransformer {
         )
     }
 
-    fn process_sse_data(&mut self, data: &str) -> Option<Result<StreamEvent, ProviderError>> {
+    /// The final `Response` for everything accumulated so far.
+    fn completed_response(&self) -> Response {
+        let mut output = Vec::new();
+        if !self.accumulated_text.is_empty() {
+            output.push(Item::Message(MessageItem::assistant(
+                "msg_0",
+                &self.accumulated_text,
+            )));
+        }
+        let mut calls: Vec<(&usize, &PartialFunctionCall)> =
+            self.accumulated_function_calls.iter().collect();
+        calls.sort_by_key(|(idx, _)| **idx);
+        for (idx, fc) in calls {
+            output.push(Item::FunctionCall(FunctionCallItem::new(
+                format!("fc_{}", idx),
+                format!("call_{}", fc.name),
+                &fc.name,
+                &fc.args,
+            )));
+        }
+        let usage = Usage::new(self.input_tokens, self.output_tokens);
+        Response::builder(self.response_id.clone(), self.model.clone())
+            .outputs(output)
+            .usage(usage)
+            .completed()
+            .build()
+    }
+
+    /// Turn one Gemini SSE chunk into zero or more events on `pending`.
+    ///
+    /// Gemini streams *incremental* parts: each chunk's text is new text,
+    /// not the whole answer so far. (An earlier version sliced off the
+    /// previous chunk's length, which dropped the start of every chunk
+    /// longer than its predecessor.) A chunk may carry both content and
+    /// the finish reason, so content is handled first and the final
+    /// response is queued after it.
+    fn process_sse_data(&mut self, data: &str) {
         let chunk: GeminiResponse = match serde_json::from_str(data) {
             Ok(c) => c,
             Err(e) => {
                 warn!(error = %e, data = %data, "Failed to parse Gemini stream chunk");
-                return None;
+                return;
             }
         };
 
@@ -887,95 +915,70 @@ impl GeminiStreamTransformer {
             }
         }
 
-        let candidate = chunk.candidates.as_ref().and_then(|c| c.first())?;
+        let Some(candidate) = chunk.candidates.as_ref().and_then(|c| c.first()) else {
+            return;
+        };
 
-        // Check for finish reason
-        if let Some(finish_reason) = &candidate.finish_reason {
-            if finish_reason == "STOP" || finish_reason == "MAX_TOKENS" || finish_reason == "SAFETY"
-            {
-                // Build final response
-                let mut output = Vec::new();
-                if !self.accumulated_text.is_empty() {
-                    output.push(Item::Message(MessageItem::assistant(
-                        "msg_0",
-                        &self.accumulated_text,
-                    )));
-                }
-                for (idx, fc) in &self.accumulated_function_calls {
-                    output.push(Item::FunctionCall(FunctionCallItem::new(
-                        format!("fc_{}", idx),
-                        format!("call_{}", fc.name),
-                        &fc.name,
-                        &fc.args,
-                    )));
-                }
-
-                let usage = Usage::new(self.input_tokens, self.output_tokens);
-                let response = Response::builder(self.response_id.clone(), self.model.clone())
-                    .outputs(output)
-                    .usage(usage)
-                    .completed()
-                    .build();
-
-                return Some(Ok(StreamEvent::response_completed(response)));
-            }
-        }
-
-        // Process content parts
-        let content = candidate.content.as_ref()?;
-        for (part_idx, part) in content.parts.iter().enumerate() {
-            match part {
-                GeminiPart::Text { text } => {
-                    // Emit output_item.added if not done yet
-                    if !self.output_item_added {
-                        self.output_item_added = true;
-                        let item = Item::Message(MessageItem::assistant("msg_0", ""));
-                        return Some(Ok(StreamEvent::output_item_added(0, item)));
-                    }
-
-                    // Emit content_part.added if not done yet
-                    if !self.content_part_added {
-                        self.content_part_added = true;
-                        return Some(Ok(StreamEvent::content_part_added(0, 0, "text")));
-                    }
-
-                    // Calculate delta (new text since last update)
-                    let delta = if text.len() > self.accumulated_text.len() {
-                        text[self.accumulated_text.len()..].to_string()
-                    } else {
-                        text.clone()
-                    };
-
-                    if !delta.is_empty() {
-                        self.accumulated_text = text.clone();
-                        return Some(Ok(StreamEvent::output_text_delta(0, 0, delta)));
-                    }
-                }
-                GeminiPart::FunctionCall { function_call } => {
-                    let entry = self.accumulated_function_calls.entry(part_idx).or_default();
-                    entry.name = function_call.name.clone();
-                    let args_str = serde_json::to_string(&function_call.args).unwrap_or_default();
-
-                    // Calculate delta for arguments
-                    let delta = if args_str.len() > entry.args.len() {
-                        args_str[entry.args.len()..].to_string()
-                    } else {
-                        args_str.clone()
-                    };
-
-                    entry.args = args_str;
-
-                    if !delta.is_empty() {
-                        return Some(Ok(StreamEvent::function_call_arguments_delta(
-                            part_idx, delta,
+        if let Some(content) = candidate.content.as_ref() {
+            for (part_idx, part) in content.parts.iter().enumerate() {
+                match part {
+                    GeminiPart::Text { text } => {
+                        if text.is_empty() {
+                            continue;
+                        }
+                        if !self.output_item_added {
+                            self.output_item_added = true;
+                            let item = Item::Message(MessageItem::assistant("msg_0", ""));
+                            self.pending
+                                .push_back(Ok(StreamEvent::output_item_added(0, item)));
+                        }
+                        if !self.content_part_added {
+                            self.content_part_added = true;
+                            self.pending
+                                .push_back(Ok(StreamEvent::content_part_added(0, 0, "text")));
+                        }
+                        self.accumulated_text.push_str(text);
+                        self.pending.push_back(Ok(StreamEvent::output_text_delta(
+                            0,
+                            0,
+                            text.clone(),
                         )));
                     }
+                    GeminiPart::FunctionCall { function_call } => {
+                        // Gemini sends each function call as one complete part.
+                        let entry = self.accumulated_function_calls.entry(part_idx).or_default();
+                        entry.name = function_call.name.clone();
+                        let args_str =
+                            serde_json::to_string(&function_call.args).unwrap_or_default();
+                        let delta = match args_str.strip_prefix(entry.args.as_str()) {
+                            Some(rest) if !entry.args.is_empty() => rest.to_string(),
+                            _ => args_str.clone(),
+                        };
+                        entry.args = args_str;
+                        if !delta.is_empty() {
+                            self.pending
+                                .push_back(Ok(StreamEvent::function_call_arguments_delta(
+                                    part_idx, delta,
+                                )));
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
-        None
+        if let Some(finish_reason) = &candidate.finish_reason {
+            if (finish_reason == "STOP"
+                || finish_reason == "MAX_TOKENS"
+                || finish_reason == "SAFETY")
+                && !self.completed_sent
+            {
+                self.completed_sent = true;
+                let response = self.completed_response();
+                self.pending
+                    .push_back(Ok(StreamEvent::response_completed(response)));
+            }
+        }
     }
 }
 
@@ -1386,5 +1389,135 @@ mod tests {
             2,
             "two parallel calls should batch into one model content with two functionCall parts"
         );
+    }
+
+    /// Drive the stream transformer with raw SSE bytes split at the
+    /// given chunk boundaries and collect every event.
+    async fn run_transformer(chunks: Vec<&[u8]>) -> Vec<StreamEvent> {
+        let owned: Vec<Result<bytes::Bytes, reqwest::Error>> = chunks
+            .into_iter()
+            .map(|c| Ok(bytes::Bytes::copy_from_slice(c)))
+            .collect();
+        let stream = futures_util::stream::iter(owned);
+        GeminiStreamTransformer::new("gemini-3.8-flash".into())
+            .transform(stream)
+            .map(|r| r.expect("transformer error"))
+            .collect()
+            .await
+    }
+
+    fn sse_text_chunk(text: &str, finish: Option<&str>) -> String {
+        let mut candidate = serde_json::json!({
+            "content": {"role": "model", "parts": [{"text": text}]}
+        });
+        if let Some(f) = finish {
+            candidate["finishReason"] = serde_json::Value::String(f.to_string());
+        }
+        format!(
+            "data: {}\n\n",
+            serde_json::json!({
+                "candidates": [candidate],
+                "usageMetadata": {"promptTokenCount": 7, "candidatesTokenCount": 3}
+            })
+        )
+    }
+
+    fn collected_text(events: &[StreamEvent]) -> String {
+        events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::OutputTextDelta { delta, .. } => Some(delta.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn completed_text(events: &[StreamEvent]) -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|e| match e {
+                StreamEvent::ResponseCompleted { response } => {
+                    let v = serde_json::to_value(response).unwrap();
+                    Some(
+                        v["output"][0]["content"][0]["text"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string(),
+                    )
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn stream_chunks_are_incremental_not_cumulative() {
+        // Each chunk longer than the previous one used to lose its prefix
+        // ("5. " + "Multi-agent" became "5.ti-agent").
+        let sse = [
+            sse_text_chunk("5. ", None),
+            sse_text_chunk("Multi-agent workflows", None),
+            sse_text_chunk(" need", None),
+            sse_text_chunk(" strict budgets.", Some("STOP")),
+        ]
+        .concat();
+        let events = run_transformer(vec![sse.as_bytes()]).await;
+        assert_eq!(
+            collected_text(&events),
+            "5. Multi-agent workflows need strict budgets."
+        );
+        // Exactly one completed event, carrying the whole text and usage.
+        let done = completed_text(&events);
+        assert_eq!(
+            done,
+            vec!["5. Multi-agent workflows need strict budgets.".to_string()]
+        );
+        let completed = events
+            .iter()
+            .find_map(|e| match e {
+                StreamEvent::ResponseCompleted { response } => Some(response),
+                _ => None,
+            })
+            .unwrap();
+        let usage = completed.usage.as_ref().unwrap();
+        assert_eq!(usage.input_tokens, 7);
+        assert_eq!(usage.output_tokens, 3);
+    }
+
+    #[tokio::test]
+    async fn text_in_the_finishing_chunk_is_not_dropped_and_multibyte_splits_survive() {
+        // A box-drawing diagram whose 3-byte characters are cut by the
+        // network in the middle of a character.
+        let body = [
+            sse_text_chunk("Layout:\n```\n\u{250c}\u{2500}\u{2500}\u{2510}\n", None),
+            sse_text_chunk(
+                "\u{2502} A \u{2502}\n\u{2514}\u{2500}\u{2500}\u{2518}\n```",
+                Some("STOP"),
+            ),
+        ]
+        .concat();
+        let bytes = body.as_bytes();
+        // Split inside the first multi-byte character of the diagram.
+        let cut = bytes.iter().position(|b| *b == 0xE2).unwrap() + 1;
+        let events =
+            run_transformer(vec![&bytes[..cut], &bytes[cut..cut + 5], &bytes[cut + 5..]]).await;
+        let text = collected_text(&events);
+        assert_eq!(
+            text,
+            "Layout:\n```\n\u{250c}\u{2500}\u{2500}\u{2510}\n\u{2502} A \u{2502}\n\u{2514}\u{2500}\u{2500}\u{2518}\n```"
+        );
+        assert_eq!(completed_text(&events), vec![text]);
+    }
+
+    #[tokio::test]
+    async fn stream_without_finish_reason_still_completes_once() {
+        let sse = [
+            sse_text_chunk("partial", None),
+            sse_text_chunk(" answer", None),
+        ]
+        .concat();
+        let events = run_transformer(vec![sse.as_bytes()]).await;
+        assert_eq!(collected_text(&events), "partial answer");
+        assert_eq!(completed_text(&events), vec!["partial answer".to_string()]);
     }
 }

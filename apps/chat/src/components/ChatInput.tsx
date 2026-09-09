@@ -194,7 +194,7 @@ export function ChatInput({
                 <ChevronDown className={cn("h-3 w-3", activeDropdown === 'auto' && "rotate-180")} />
               </button>
               {activeDropdown === 'auto' && (
-                <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl glass-card shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-border bg-popover shadow-premium-xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                   <div className="p-3 space-y-3 text-xs">
                     <div className="flex items-center justify-between border-b border-border pb-1.5">
                       <span className="font-medium text-muted-foreground uppercase tracking-wider">Auto router</span>

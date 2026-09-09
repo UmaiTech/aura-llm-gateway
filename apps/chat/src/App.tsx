@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { createThrottledSetter } from './lib/streamFlush'
 import { BetaUpsellModal } from './components/BetaUpsellModal'
 import { ChatContainer } from './components/ChatContainer'
 import { CompareView } from './components/CompareView'
@@ -185,6 +186,9 @@ export default function App() {
       let fullContent = ''
       let responseId: string | undefined
       let usage: MessageUsage | undefined
+      const contentSink = createThrottledSetter((content) =>
+        updateMessage(assistantMessageId, { content })
+      )
 
       const routing = useChatStore.getState().getRoutingOptions()
       for await (const event of api.createResponseStream({
@@ -195,13 +199,11 @@ export default function App() {
         previous_response_id: previousResponseId,
         ...(routing && { routing }),
       })) {
-        // Log ALL events to debug
-        console.log('[Stream Event]', event.type, event)
-
         if (event.type === 'response.output_text.delta' && event.delta) {
           fullContent += event.delta
-          updateMessage(assistantMessageId, { content: fullContent })
+          contentSink.set(fullContent)
         } else if (event.type === 'response.completed') {
+          contentSink.flush()
           // Extract usage and metadata from completed response (gateway enriches with cost_usd and aura metadata)
           const response = event.response as {
             id?: string
@@ -395,6 +397,9 @@ export default function App() {
         const decoder = new TextDecoder()
         let buffer = ''
         let fullContent = ''
+        const contentSink = createThrottledSetter((content) =>
+          updateMessage(assistantMessageId, { content })
+        )
         const toolCalls: Array<{ id: string; name: string; arguments: string }> = []
         let usage: MessageUsage | undefined
         let aura: AuraMetadata | undefined
@@ -421,7 +426,7 @@ export default function App() {
                   // Text delta
                   if (event.type === 'response.output_text.delta' && event.delta) {
                     fullContent += event.delta
-                    updateMessage(assistantMessageId, { content: fullContent })
+                    contentSink.set(fullContent)
                   }
 
                   // Function call added
@@ -453,6 +458,7 @@ export default function App() {
 
                   // Response completed - extract function calls and usage
                   if (event.type === 'response.completed' && event.response) {
+                    contentSink.flush()
                     // Store response ID for next roundtrip
                     responseId = event.response.id
                     lastResponseId = responseId
