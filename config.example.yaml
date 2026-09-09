@@ -97,10 +97,10 @@ routing:
     # Candidate models per tier, in preference order. Models this gateway
     # cannot serve (no provider key) are dropped at startup.
     tiers:
-      simple: [gemini-3.1-flash-lite, gpt-5.4-nano, claude-haiku-4-5]
-      medium: [gemini-3.5-flash, gpt-5.4-mini, claude-sonnet-4-6]
-      complex: [claude-sonnet-4-6, gpt-5.5, gemini-3.1-pro-preview]
-      reasoning: [claude-opus-4-7, gpt-5.5-pro, o3-mini]
+      simple: [gemini-3.1-flash-lite, gemini-3.5-flash, gpt-5.6-luna]
+      medium: [gemini-3.8-flash, gpt-5.4-mini, claude-haiku-4-5]
+      complex: [claude-sonnet-5, gemini-3-pro-preview, gpt-5.6-terra]
+      reasoning: [claude-opus-5, gpt-5.6-sol, claude-fable-5-1]
     # Complexity score boundaries (inclusive lower bound of the upper tier).
     boundaries:
       simple_medium: 0.15
@@ -158,7 +158,7 @@ routing:
     # Sample pinned-model (shadow) requests too. Off: their prompts would
     # otherwise be answered by providers the tenant did not choose.
     gold_sample_shadow: false
-    gold_judge_model: claude-sonnet-4-6
+    gold_judge_model: claude-sonnet-5
     gold_max_text_chars: 4000
     # Escalation after provider failures on auto-routed requests, and the
     # per-model circuit breaker that keeps a struggling model out of the
