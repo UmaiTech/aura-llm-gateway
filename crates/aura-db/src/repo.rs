@@ -2476,7 +2476,6 @@ impl RouterModelRepo {
             INSERT INTO router_models (name, version, kind, weights, metrics)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (name, version) DO UPDATE SET
-                kind = EXCLUDED.kind,
                 weights = EXCLUDED.weights,
                 metrics = EXCLUDED.metrics
             RETURNING id, name, version, kind, metrics, is_active, created_at
@@ -2502,35 +2501,50 @@ impl RouterModelRepo {
         Ok(rows)
     }
 
-    /// The active model with weights, if any.
-    pub async fn active(pool: &DbPool) -> Result<Option<RouterModel>, DbError> {
-        let row =
-            sqlx::query_as::<_, RouterModel>("SELECT * FROM router_models WHERE is_active LIMIT 1")
-                .fetch_optional(pool)
-                .await?;
+    /// The active model of a kind (`learned_lr`, `cost_lr`) with weights.
+    pub async fn active(pool: &DbPool, kind: &str) -> Result<Option<RouterModel>, DbError> {
+        let row = sqlx::query_as::<_, RouterModel>(
+            "SELECT * FROM router_models WHERE is_active AND kind = $1 LIMIT 1",
+        )
+        .bind(kind)
+        .fetch_optional(pool)
+        .await?;
         Ok(row)
     }
 
-    /// Make one model active (and every other inactive). Returns false
-    /// when the id does not exist.
-    pub async fn activate(pool: &DbPool, id: Uuid) -> Result<bool, DbError> {
+    /// Make one model active and every other model of the same kind
+    /// inactive. Returns the activated row's kind, or `None` when the id
+    /// does not exist.
+    pub async fn activate(pool: &DbPool, id: Uuid) -> Result<Option<String>, DbError> {
         let mut tx = pool.begin().await?;
-        sqlx::query("UPDATE router_models SET is_active = FALSE WHERE is_active")
+        let kind: Option<String> =
+            sqlx::query_scalar("SELECT kind FROM router_models WHERE id = $1")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let Some(kind) = kind else {
+            return Ok(None);
+        };
+        sqlx::query("UPDATE router_models SET is_active = FALSE WHERE is_active AND kind = $1")
+            .bind(&kind)
             .execute(&mut *tx)
             .await?;
-        let result = sqlx::query("UPDATE router_models SET is_active = TRUE WHERE id = $1")
+        sqlx::query("UPDATE router_models SET is_active = TRUE WHERE id = $1")
             .bind(id)
             .execute(&mut *tx)
             .await?;
         tx.commit().await?;
-        Ok(result.rows_affected() > 0)
+        Ok(Some(kind))
     }
 
-    /// Deactivate every model.
-    pub async fn deactivate_all(pool: &DbPool) -> Result<(), DbError> {
-        sqlx::query("UPDATE router_models SET is_active = FALSE WHERE is_active")
-            .execute(pool)
-            .await?;
+    /// Deactivate every model, or only those of one kind.
+    pub async fn deactivate(pool: &DbPool, kind: Option<&str>) -> Result<(), DbError> {
+        sqlx::query(
+            "UPDATE router_models SET is_active = FALSE WHERE is_active AND ($1::TEXT IS NULL OR kind = $1)",
+        )
+        .bind(kind)
+        .execute(pool)
+        .await?;
         Ok(())
     }
 }

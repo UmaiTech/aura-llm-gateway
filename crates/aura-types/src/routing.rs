@@ -223,6 +223,12 @@ pub struct RoutingOptions {
     /// Which classifier to use for this request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub classifier: Option<ClassifierKind>,
+
+    /// Budget for this request in USD. Candidates whose predicted cost
+    /// (from the learned cost model) exceeds it are skipped; when none fit,
+    /// the budget is ignored and the decision says so.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_cost_usd: Option<f64>,
 }
 
 /// `*` matches any run of characters (including none) anywhere in the
@@ -345,6 +351,7 @@ mod tests {
             policy_allow: vec![],
             sticky: Some(false),
             classifier: Some(ClassifierKind::Heuristic),
+            max_cost_usd: Some(0.01),
         };
         let json = serde_json::to_string(&opts).unwrap();
         assert!(json.contains("\"mode\":\"cost\""));

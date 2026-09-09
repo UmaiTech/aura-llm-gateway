@@ -1074,10 +1074,12 @@ async fn score_routing_request(
 pub struct RouterModelsResponse {
     /// Classifier label currently loaded in memory (`learned@<version>`), if any.
     pub loaded: Option<String>,
+    /// Cost model label currently loaded in memory (`cost@<version>`), if any.
+    pub loaded_cost_model: Option<String>,
     pub models: Vec<aura_db::RouterModelSummary>,
 }
 
-/// Trained classifiers known to the gateway.
+/// Trained classifiers and cost models known to the gateway.
 async fn list_router_models(
     State(state): State<AppState>,
 ) -> Result<Json<RouterModelsResponse>, (StatusCode, Json<serde_json::Value>)> {
@@ -1094,21 +1096,51 @@ async fn list_router_models(
     })?;
     Ok(Json(RouterModelsResponse {
         loaded: state.learned_model().map(|m| m.classifier_label()),
+        loaded_cost_model: state.cost_model().map(|m| m.label()),
         models,
     }))
 }
 
 #[derive(Debug, Deserialize)]
 struct UploadRouterModel {
-    /// Weights JSON as produced by scripts/router/train.py.
+    /// Weights JSON as produced by scripts/router/train.py (`kind:
+    /// learned_lr`) or scripts/router/train_cost.py (`kind: cost_lr`).
     weights: serde_json::Value,
     /// Activate immediately (default false).
     #[serde(default)]
     activate: bool,
 }
 
-/// Store a trained classifier (validated against the gateway's feature
-/// vector) and optionally activate it.
+/// A validated upload of either model kind.
+enum ParsedRouterModel {
+    Classifier(Box<aura_core::LearnedModel>),
+    Cost(Box<aura_core::router::auto::CostModel>),
+}
+
+impl ParsedRouterModel {
+    fn new_row(&self, weights: serde_json::Value) -> aura_db::NewRouterModel {
+        match self {
+            ParsedRouterModel::Classifier(m) => aura_db::NewRouterModel {
+                name: m.name.clone(),
+                version: m.version.clone(),
+                kind: "learned_lr".into(),
+                weights,
+                metrics: m.metrics.clone(),
+            },
+            ParsedRouterModel::Cost(m) => aura_db::NewRouterModel {
+                name: m.name.clone(),
+                version: m.version.clone(),
+                kind: aura_core::router::auto::COST_MODEL_KIND.into(),
+                weights,
+                metrics: m.metrics.clone(),
+            },
+        }
+    }
+}
+
+/// Store a trained classifier or cost model (validated against the
+/// gateway's feature vector) and optionally activate it. The `kind` field
+/// of the weights decides which; it defaults to the classifier.
 async fn upload_router_model(
     State(state): State<AppState>,
     Json(payload): Json<UploadRouterModel>,
@@ -1117,12 +1149,30 @@ async fn upload_router_model(
         Some(p) => p,
         None => return Err(db_unavailable()),
     };
-    let model = aura_core::LearnedModel::from_json(&payload.weights).map_err(|e| {
+    let bad_request = |e: String| {
         (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": e})),
         )
-    })?;
+    };
+    let kind = payload
+        .weights
+        .get("kind")
+        .and_then(|k| k.as_str())
+        .unwrap_or("learned_lr");
+    let model = match kind {
+        aura_core::router::auto::COST_MODEL_KIND => ParsedRouterModel::Cost(Box::new(
+            aura_core::router::auto::CostModel::from_json(&payload.weights).map_err(bad_request)?,
+        )),
+        "learned_lr" => ParsedRouterModel::Classifier(Box::new(
+            aura_core::LearnedModel::from_json(&payload.weights).map_err(bad_request)?,
+        )),
+        other => {
+            return Err(bad_request(format!(
+                "unknown router model kind `{other}` (expected learned_lr or cost_lr)"
+            )))
+        }
+    };
     let db_err = |e: aura_db::DbError| {
         tracing::error!("Failed to store router model: {}", e);
         (
@@ -1130,30 +1180,27 @@ async fn upload_router_model(
             Json(serde_json::json!({"error": format!("Database error: {}", e)})),
         )
     };
-    let mut summary = aura_db::RouterModelRepo::upsert(
-        pool,
-        aura_db::NewRouterModel {
-            name: model.name.clone(),
-            version: model.version.clone(),
-            kind: "learned_lr".into(),
-            weights: payload.weights.clone(),
-            metrics: model.metrics.clone(),
-        },
-    )
-    .await
-    .map_err(db_err)?;
+    let mut summary =
+        aura_db::RouterModelRepo::upsert(pool, model.new_row(payload.weights.clone()))
+            .await
+            .map_err(db_err)?;
     if payload.activate {
         aura_db::RouterModelRepo::activate(pool, summary.id)
             .await
             .map_err(db_err)?;
         summary.is_active = true;
-        state.set_learned_model(Some(model));
-        tracing::info!(id = %summary.id, version = %summary.version, "router model uploaded and activated");
+        match model {
+            ParsedRouterModel::Classifier(m) => state.set_learned_model(Some(*m)),
+            ParsedRouterModel::Cost(m) => state.set_cost_model(Some(*m)),
+        }
+        tracing::info!(id = %summary.id, kind = %summary.kind, version = %summary.version, "router model uploaded and activated");
     }
     Ok(Json(summary))
 }
 
-/// Activate a stored classifier and load it.
+/// Activate a stored model and load it. Only one model per kind is active
+/// at a time, so activating a classifier leaves the cost model alone and
+/// vice versa.
 async fn activate_router_model(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -1162,7 +1209,7 @@ async fn activate_router_model(
         Some(p) => p,
         None => return Err(db_unavailable()),
     };
-    let found = aura_db::RouterModelRepo::activate(pool, id)
+    let kind = aura_db::RouterModelRepo::activate(pool, id)
         .await
         .map_err(|e| {
             (
@@ -1170,14 +1217,21 @@ async fn activate_router_model(
                 Json(serde_json::json!({"error": format!("Database error: {}", e)})),
             )
         })?;
-    if !found {
+    let Some(kind) = kind else {
         return Err((
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "router model not found"})),
         ));
-    }
-    match state.reload_learned_model().await {
-        Ok(loaded) => Ok(Json(serde_json::json!({"activated": id, "loaded": loaded}))),
+    };
+    let reloaded = if kind == aura_core::router::auto::COST_MODEL_KIND {
+        state.reload_cost_model().await
+    } else {
+        state.reload_learned_model().await
+    };
+    match reloaded {
+        Ok(loaded) => Ok(Json(
+            serde_json::json!({"activated": id, "kind": kind, "loaded": loaded}),
+        )),
         Err(e) => Err((
             StatusCode::UNPROCESSABLE_ENTITY,
             Json(serde_json::json!({"error": e})),
@@ -1185,25 +1239,38 @@ async fn activate_router_model(
     }
 }
 
-/// Re-read the active classifier from the database (or weights file).
+/// Re-read the active classifier and cost model from the database (or
+/// weights files).
 async fn reload_router_model(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    match state.reload_learned_model().await {
-        Ok(loaded) => Ok(Json(serde_json::json!({"loaded": loaded}))),
-        Err(e) => Err((
+    let unprocessable = |e: String| {
+        (
             StatusCode::UNPROCESSABLE_ENTITY,
             Json(serde_json::json!({"error": e})),
-        )),
-    }
+        )
+    };
+    let loaded = state.reload_learned_model().await.map_err(unprocessable)?;
+    let loaded_cost_model = state.reload_cost_model().await.map_err(unprocessable)?;
+    Ok(Json(
+        serde_json::json!({"loaded": loaded, "loaded_cost_model": loaded_cost_model}),
+    ))
 }
 
-/// Deactivate every stored classifier and unload the in-memory one.
+#[derive(Debug, Deserialize)]
+struct KindQuery {
+    /// `learned_lr` or `cost_lr`; omit to deactivate both kinds.
+    kind: Option<String>,
+}
+
+/// Deactivate stored models (one kind, or every kind) and unload the
+/// matching in-memory ones.
 async fn deactivate_router_models(
     State(state): State<AppState>,
+    Query(query): Query<KindQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     if let Some(pool) = state.db_pool() {
-        aura_db::RouterModelRepo::deactivate_all(pool)
+        aura_db::RouterModelRepo::deactivate(pool, query.kind.as_deref())
             .await
             .map_err(|e| {
                 (
@@ -1212,8 +1279,17 @@ async fn deactivate_router_models(
                 )
             })?;
     }
-    state.set_learned_model(None);
-    Ok(Json(serde_json::json!({"loaded": serde_json::Value::Null})))
+    let kind = query.kind.as_deref();
+    if kind.is_none() || kind == Some("learned_lr") {
+        state.set_learned_model(None);
+    }
+    if kind.is_none() || kind == Some(aura_core::router::auto::COST_MODEL_KIND) {
+        state.set_cost_model(None);
+    }
+    Ok(Json(serde_json::json!({
+        "loaded": state.learned_model().map(|m| m.classifier_label()),
+        "loaded_cost_model": state.cost_model().map(|m| m.label()),
+    })))
 }
 
 /// Learned (tier, model) arm statistics used by Thompson sampling.

@@ -72,6 +72,10 @@ pub struct AutoRoutingConfig {
     /// `scripts/router/train.py`, for gateways without a database or to
     /// pin a model. The active row in `router_models` takes precedence.
     pub learned_weights_file: Option<String>,
+    /// Learned cost model: path to a weights JSON file produced by
+    /// `scripts/router/train_cost.py`. The active `cost_lr` row in
+    /// `router_models` takes precedence.
+    pub cost_weights_file: Option<String>,
 }
 
 impl Default for AutoRoutingConfig {
@@ -101,6 +105,7 @@ impl Default for AutoRoutingConfig {
             gold_max_text_chars: 4000,
             escalation: EscalationConfig::default(),
             learned_weights_file: None,
+            cost_weights_file: None,
         }
     }
 }
@@ -215,6 +220,10 @@ pub struct OrgAutoRoutingOverride {
     /// Never consider models matching these patterns.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub deny: Vec<String>,
+    /// Per-request budget in USD applied to every request of the
+    /// organization (the request's own `max_cost_usd` wins when lower).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_cost_usd: Option<f64>,
 }
 
 impl OrgAutoRoutingOverride {
@@ -268,6 +277,10 @@ impl OrgAutoRoutingOverride {
             deny,
             sticky: req.sticky,
             classifier: req.classifier.or(self.default_classifier),
+            max_cost_usd: match (req.max_cost_usd, self.max_cost_usd) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            },
         }
     }
 }
@@ -774,6 +787,9 @@ pub enum WithinTierStrategy {
     /// Thompson sampling over per-(tier, model) outcome statistics learned
     /// from the routing decision log; unknown models use a uniform prior.
     Thompson,
+    /// Lowest predicted request cost from the learned cost model (list
+    /// price order when no prediction is available).
+    PredictedCost,
 }
 
 #[cfg(test)]

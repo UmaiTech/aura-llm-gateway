@@ -20,6 +20,7 @@
 pub mod capabilities;
 pub mod catalog;
 pub mod config;
+pub mod cost_model;
 pub mod features;
 pub mod learned;
 pub mod llm;
@@ -33,6 +34,7 @@ pub use config::{
     AutoRoutingConfig, FeatureWeights, KeywordLists, LlmClassifierConfig, ModeOffsets,
     OrgAutoRoutingOverride, TierBoundaries, TierModels, TokenThresholds, WithinTierStrategy,
 };
+pub use cost_model::{CostHead, CostModel, CostModelError, CostPrediction, COST_MODEL_KIND};
 pub use features::{
     estimate_tokens, extract_features, IntentHint, KeywordMatcher, RequestFeatures,
 };
@@ -140,6 +142,10 @@ pub struct AutoDecision {
     /// Escalations taken after provider failures, oldest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub escalations: Vec<Escalation>,
+    /// Predicted cost of this request on the selected model, when a cost
+    /// model is loaded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predicted_cost_usd: Option<f64>,
 }
 
 /// Why no model could be selected.
@@ -368,6 +374,7 @@ impl AutoRouter {
                             tier: selected_tier,
                             cost_per_million: oracle.blended_cost_per_million(prev),
                             eligible: true,
+                            predicted_cost_usd: oracle.predicted_cost_usd(prev),
                         }],
                         selected: prev.to_string(),
                         selected_provider: oracle.provider_of(prev),
@@ -375,24 +382,54 @@ impl AutoRouter {
                         shadow: ctx.shadow,
                         latency_us: started.elapsed().as_micros() as u64,
                         escalations: Vec::new(),
+                        predicted_cost_usd: oracle.predicted_cost_usd(prev),
                     });
                 }
             }
         }
 
-        let selection = self
-            .catalog
-            .select(tier, min_tier, max_tier, &filtered)
-            .ok_or_else(|| AutoRouteError::NoCandidate {
-                tier,
-                considered: self.catalog.all_models().len(),
-            })?;
+        // Per-request budget: skip candidates whose predicted cost exceeds
+        // it; when nothing fits, fall back to an unconstrained selection
+        // and say so.
+        let budget = options.and_then(|o| o.max_cost_usd).filter(|b| *b > 0.0);
+        let mut budget_note = None;
+        let selection = match budget {
+            Some(limit) => {
+                hard_filters.push(format!("max_cost_usd {:.5}", limit));
+                let budgeted = BudgetOracle {
+                    inner: &filtered,
+                    limit,
+                };
+                match self.catalog.select(tier, min_tier, max_tier, &budgeted) {
+                    Some(sel) => sel,
+                    None => {
+                        budget_note = Some(format!(
+                            "no candidate within max_cost_usd {:.5}; budget ignored",
+                            limit
+                        ));
+                        self.catalog.select(tier, min_tier, max_tier, &filtered)
+                    }
+                    .ok_or_else(|| AutoRouteError::NoCandidate {
+                        tier,
+                        considered: self.catalog.all_models().len(),
+                    })?,
+                }
+            }
+            None => self
+                .catalog
+                .select(tier, min_tier, max_tier, &filtered)
+                .ok_or_else(|| AutoRouteError::NoCandidate {
+                    tier,
+                    considered: self.catalog.all_models().len(),
+                })?,
+        };
 
         let mut reason = selection.reason;
-        for note in &scored.notes {
+        for note in scored.notes.iter().chain(budget_note.iter()) {
             reason.push_str("; ");
             reason.push_str(note);
         }
+        let predicted_cost_usd = filtered.predicted_cost_usd(&selection.model);
 
         Ok(AutoDecision {
             requested_model: ctx.requested_model.to_string(),
@@ -413,6 +450,7 @@ impl AutoRouter {
             shadow: ctx.shadow,
             latency_us: started.elapsed().as_micros() as u64,
             escalations: Vec::new(),
+            predicted_cost_usd,
         })
     }
 }
@@ -439,6 +477,20 @@ impl AutoRouter {
             inner: &filtered,
             exclude,
         };
+        // Respect the request budget on escalation too; when nothing fits
+        // it, fall back to the unconstrained pick like the first decision.
+        if let Some(limit) = options.and_then(|o| o.max_cost_usd).filter(|b| *b > 0.0) {
+            let budgeted = BudgetOracle {
+                inner: &excluding,
+                limit,
+            };
+            if let Some(sel) =
+                self.catalog
+                    .select(decision.tier, decision.tier, max_tier, &budgeted)
+            {
+                return Some(sel);
+            }
+        }
         self.catalog
             .select(decision.tier, decision.tier, max_tier, &excluding)
     }
@@ -497,6 +549,44 @@ impl Eligibility for FilteredOracle<'_> {
     fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
         self.inner.arm_stats(tier, model)
     }
+
+    fn predicted_cost_usd(&self, model: &str) -> Option<f64> {
+        self.inner.predicted_cost_usd(model)
+    }
+}
+
+/// Wraps an oracle to reject models whose predicted request cost exceeds
+/// a budget. Models without a prediction are kept (unknown is not "over").
+struct BudgetOracle<'a> {
+    inner: &'a dyn Eligibility,
+    limit: f64,
+}
+
+impl Eligibility for BudgetOracle<'_> {
+    fn is_eligible(&self, model: &str) -> bool {
+        if let Some(cost) = self.inner.predicted_cost_usd(model) {
+            if cost > self.limit {
+                return false;
+            }
+        }
+        self.inner.is_eligible(model)
+    }
+
+    fn blended_cost_per_million(&self, model: &str) -> Option<f64> {
+        self.inner.blended_cost_per_million(model)
+    }
+
+    fn provider_of(&self, model: &str) -> Option<String> {
+        self.inner.provider_of(model)
+    }
+
+    fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
+        self.inner.arm_stats(tier, model)
+    }
+
+    fn predicted_cost_usd(&self, model: &str) -> Option<f64> {
+        self.inner.predicted_cost_usd(model)
+    }
 }
 
 /// Wraps an oracle to reject models that already failed this request.
@@ -520,6 +610,10 @@ impl Eligibility for ExcludingOracle<'_> {
 
     fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
         self.inner.arm_stats(tier, model)
+    }
+
+    fn predicted_cost_usd(&self, model: &str) -> Option<f64> {
+        self.inner.predicted_cost_usd(model)
     }
 }
 
@@ -869,6 +963,66 @@ mod tests {
         assert!(d.reason.contains("heuristic said simple"));
         // The heuristic score is still there for comparison.
         assert!(d.raw_score < 0.0);
+    }
+
+    struct CostOracle;
+    impl Eligibility for CostOracle {
+        fn is_eligible(&self, _: &str) -> bool {
+            true
+        }
+        fn blended_cost_per_million(&self, m: &str) -> Option<f64> {
+            oracle().blended_cost_per_million(m)
+        }
+        fn provider_of(&self, m: &str) -> Option<String> {
+            oracle().provider_of(m)
+        }
+        fn predicted_cost_usd(&self, model: &str) -> Option<f64> {
+            // Everything in complex/reasoning is pricey; medium fits a
+            // tight budget only on gpt-5.4-mini.
+            Some(match model {
+                "gpt-5.4-mini" => 0.0008,
+                "gemini-3.8-flash" => 0.0015,
+                "claude-sonnet-5" => 0.0090,
+                "gpt-5.6-terra" => 0.0100,
+                "gemini-3-pro-preview" => 0.0080,
+                _ => 0.0500,
+            })
+        }
+    }
+
+    #[test]
+    fn max_cost_budget_skips_expensive_candidates_and_falls_back() {
+        let r = router();
+        // Complex prompt with a budget only the medium tier can meet: the
+        // catalog escalates up first (nothing fits), then falls down.
+        let req = CreateResponseRequest::text(
+            "auto",
+            "Here is my code:\n```python\ndef f(x):\n    return x/0\n```\nIt raises an exception. Debug it and explain the root cause.",
+        );
+        let opts = RoutingOptions {
+            max_cost_usd: Some(0.001),
+            ..Default::default()
+        };
+        let d = r
+            .decide(&req, &ctx("auto", Some(&opts)), &CostOracle)
+            .unwrap();
+        assert_eq!(d.classified_tier, Tier::Complex);
+        assert_eq!(d.selected, "gpt-5.4-mini");
+        assert_eq!(d.predicted_cost_usd, Some(0.0008));
+        assert!(d.hard_filters.iter().any(|f| f.starts_with("max_cost_usd")));
+        assert!(!d.reason.contains("budget ignored"));
+
+        // A budget nothing can meet is ignored, and the reason says so.
+        let opts = RoutingOptions {
+            max_cost_usd: Some(0.0001),
+            ..Default::default()
+        };
+        let d = r
+            .decide(&req, &ctx("auto", Some(&opts)), &CostOracle)
+            .unwrap();
+        assert_eq!(d.tier, Tier::Complex);
+        assert!(d.reason.contains("budget ignored"));
+        assert!(d.predicted_cost_usd.is_some());
     }
 
     #[test]

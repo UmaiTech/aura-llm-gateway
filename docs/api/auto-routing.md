@@ -61,6 +61,7 @@ Fine-tune a single request with a top-level `routing` object (an Aura extension,
 | `mode` | `cost` \| `balanced` \| `quality` | gateway default | Overrides the `auto:<mode>` suffix. |
 | `min_tier` | tier | `simple` | Never route below this tier. |
 | `max_tier` | tier | `reasoning` | Never route above this tier (budget guard). |
+| `max_cost_usd` | number | none | Budget for this request. Candidates whose predicted cost (learned cost model) exceeds it are skipped, searching the chosen tier, then above, then below; when nothing fits the budget is ignored and `reason` says so. |
 | `allow` | string[] | all | Only consider models matching one of these patterns. Patterns match the model id or `provider/model`; a trailing `*` is a prefix wildcard. |
 | `deny` | string[] | none | Never consider models matching one of these patterns. |
 | `sticky` | boolean | `true` | Keep the previous turn's model when this request continues a tool loop (has `function_call_output` items and `previous_response_id`). |
@@ -174,6 +175,7 @@ An organization can override the gateway defaults through `organizations.setting
       "shadow_for_pinned_models": false,
       "default_mode": "cost",
       "default_classifier": "learned",
+      "max_cost_usd": 0.02,
       "min_tier": "medium",
       "max_tier": "complex",
       "allow": ["anthropic/*"],
@@ -211,7 +213,7 @@ routing:
       reasoning: [claude-opus-5, gpt-5.6-sol, claude-fable-5-1]
     boundaries: { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.60 }
     mode_offsets: { cost: -0.10, balanced: 0.0, quality: 0.15 }
-    within_tier: cheapest           # cheapest | config_order | round_robin | thompson
+    within_tier: cheapest           # cheapest | config_order | round_robin | thompson | predicted_cost
     sticky_tool_loops: true
     tools_min_tier: medium
     outcome_rollup_interval_secs: 900
@@ -222,6 +224,7 @@ routing:
     gold_judge_model: claude-sonnet-5
     gold_max_text_chars: 4000
     learned_weights_file: null       # or /etc/aura/router-weights.json
+    cost_weights_file: null          # or /etc/aura/cost-weights.json
     escalation:
       enabled: true
       max_attempts: 1
@@ -246,11 +249,11 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | `POST /admin/routing/rollup` | Score pending decisions now and refresh arm statistics; returns counts per signal. |
 | `GET /admin/routing/arms` | Learned Beta(α, β) per (tier, model) used by `within_tier: thompson`. |
 | `GET /admin/routing/gold?limit=` | Gold-label summary (cheap sufficed / strong better / ties / failed) and recent pairs. |
-| `GET /admin/routing/models` | Stored classifiers and the one loaded in memory. |
-| `POST /admin/routing/models` | Store a weights JSON (`{"weights": ..., "activate": bool}`), validated against the gateway's feature vector. |
-| `POST /admin/routing/models/{id}/activate` | Activate a stored classifier and load it. |
-| `POST /admin/routing/models/reload` | Re-read the active classifier from the database or weights file. |
-| `POST /admin/routing/models/deactivate` | Unload and deactivate every classifier (back to the heuristic). |
+| `GET /admin/routing/models` | Stored models (`learned_lr` classifiers and `cost_lr` cost models) and the ones loaded in memory. |
+| `POST /admin/routing/models` | Store a weights JSON (`{"weights": ..., "activate": bool}`); the JSON's `kind` picks the validator. |
+| `POST /admin/routing/models/{id}/activate` | Activate a stored model (one active per kind) and load it. |
+| `POST /admin/routing/models/reload` | Re-read the active classifier and cost model from the database or weights files. |
+| `POST /admin/routing/models/deactivate?kind=` | Unload and deactivate models (all kinds, or one). |
 | `POST /admin/routing/score` | Dry-run the router on a request body; returns the decision, dispatches nothing. |
 
 The admin app's Routing page renders the same data as an "Auto router" section.
@@ -282,6 +285,10 @@ With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self
 ### Learned classifier
 
 `classifier: learned` (per request, per organization via `default_classifier`, or gateway-wide) scores the request with a multinomial logistic regression over the same 24-number feature vector the heuristic records. The model is trained offline by `scripts/router/train.py` from gold pairs and scored outcomes, exported as JSON with standardisation stats, weights and tier boundaries calibrated to a target strong-model share, and stored in `router_models` (`POST /admin/routing/models`, `.../{id}/activate`, `.../reload`, `.../deactivate`; `GET /admin/routing/models`). The gateway validates the feature list against its own before accepting a model. The expected tier position `Σ pᵢ·i/3` is the score, so `cost` / `balanced` / `quality` offsets keep working; decisions record `classifier: "learned@<version>"` and the probability of the chosen tier as `classifier_confidence`. Without an active model (or on a gateway without a database, `routing.auto.learned_weights_file` can point at the JSON) the heuristic is used and `aura_routing_failures_total{reason="learned_unavailable"}` increments.
+
+### Learned cost model
+
+List price per million tokens ranks models the same way for every request, but the bill depends on output length, which varies by model and by request. `scripts/router/train_cost.py` fits one ridge regression per model of `log1p(output_tokens)` on the feature vector (plus a global fallback and training-time price snapshots) from `routing_decisions` joined with `request_logs`, including pinned-model traffic, and exports a `cost_lr` weights JSON stored through the same `/admin/routing/models` endpoints (one active model per kind). With a cost model loaded every candidate in `metadata.aura.routing.candidates` carries `predicted_cost_usd`, the decision carries it for the selected model, `within_tier: predicted_cost` ranks candidates by it (falling back to list price when a model has no prediction), and `routing.max_cost_usd` (per request, or `max_cost_usd` in the organization override, the lower wins) budgets the request. Without a cost model those features degrade to list price and no budget.
 
 ### Replaying captured traffic
 

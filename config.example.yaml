@@ -129,7 +129,7 @@ routing:
       long: 400        # at or above: strong "complex" signal
       long_output: 2000
     # How to pick among the eligible candidates of the chosen tier.
-    within_tier: cheapest           # cheapest | config_order | round_robin | thompson
+    within_tier: cheapest           # cheapest | config_order | round_robin | thompson | predicted_cost
     # Keep the previous turn's model on tool-loop continuation turns.
     sticky_tool_loops: true
     # Requests that carry tools never go below this tier.
@@ -173,5 +173,8 @@ routing:
     # Learned classifier weights (scripts/router/train.py) for gateways
     # without a database; the active router_models row wins when present.
     # learned_weights_file: /etc/aura/router-weights.json
+    # Learned cost model weights (scripts/router/train_cost.py); the active
+    # cost_lr router_models row wins when present.
+    # cost_weights_file: /etc/aura/cost-weights.json
     # keywords: { code: [...], reasoning: [...], technical: [...], simple: [...],
     #             intent_quick: [...], intent_deep: [...] }  — override the built-in lists

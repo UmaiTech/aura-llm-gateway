@@ -26,6 +26,11 @@ pub trait Eligibility {
     fn arm_stats(&self, _tier: Tier, _model: &str) -> Option<ArmStats> {
         None
     }
+    /// Predicted cost of *this request* on the model, in USD, when the
+    /// caller has a cost model. `None` means unknown.
+    fn predicted_cost_usd(&self, _model: &str) -> Option<f64> {
+        None
+    }
 }
 
 /// A candidate that was considered for a decision.
@@ -41,6 +46,10 @@ pub struct CandidateInfo {
     /// Blended price per million tokens, if known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cost_per_million: Option<f64>,
+    /// Predicted cost of this request on the model, if a cost model is
+    /// loaded and the model is priced.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub predicted_cost_usd: Option<f64>,
     /// Whether the eligibility oracle accepted it.
     pub eligible: bool,
 }
@@ -166,18 +175,22 @@ impl TierCatalog {
     ) -> Option<(String, String)> {
         let list = self.tiers.get(tier);
         let mut eligible: Vec<(usize, &String, Option<f64>)> = Vec::new();
+        let mut predicted: Vec<Option<f64>> = Vec::new();
         for (idx, model) in list.iter().enumerate() {
             let ok = oracle.is_eligible(model);
             let cost = oracle.blended_cost_per_million(model);
+            let pred = oracle.predicted_cost_usd(model);
             candidates.push(CandidateInfo {
                 model: model.clone(),
                 provider: oracle.provider_of(model),
                 tier,
                 cost_per_million: cost,
+                predicted_cost_usd: pred,
                 eligible: ok,
             });
             if ok {
                 eligible.push((idx, model, cost));
+                predicted.push(pred);
             }
         }
         if eligible.is_empty() {
@@ -185,6 +198,40 @@ impl TierCatalog {
         }
 
         match self.strategy {
+            WithinTierStrategy::PredictedCost => {
+                // Lowest predicted request cost; candidates without a
+                // prediction fall back to blended price order after the
+                // predicted ones.
+                let best_pred = eligible
+                    .iter()
+                    .zip(predicted.iter())
+                    .filter_map(|((idx, m, _), p)| p.map(|p| (*idx, *m, p)))
+                    .min_by(|a, b| {
+                        a.2.partial_cmp(&b.2)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    });
+                if let Some((_, m, p)) = best_pred {
+                    return Some((
+                        m.to_string(),
+                        format!("lowest predicted cost in {} (${:.5})", tier, p),
+                    ));
+                }
+                let best = eligible
+                    .iter()
+                    .filter(|(_, _, c)| c.is_some())
+                    .min_by(|a, b| {
+                        a.2.partial_cmp(&b.2)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    })
+                    .or_else(|| eligible.first());
+                let (_, m, _) = best?;
+                Some((
+                    m.to_string(),
+                    format!("no cost prediction; cheapest by list price in {}", tier),
+                ))
+            }
             WithinTierStrategy::ConfigOrder => {
                 let (_, m, _) = eligible[0];
                 Some((m.clone(), format!("first eligible candidate in {}", tier)))
@@ -448,6 +495,50 @@ mod tests {
         assert!(lite < 20, "lite={} wins={:?}", lite, wins);
         // The unknown arm (Beta(1,1)) is explored sometimes.
         assert!(wins.get("gemini-3.5-flash").copied().unwrap_or(0) > 0);
+    }
+
+    struct PredOracle;
+    impl Eligibility for PredOracle {
+        fn is_eligible(&self, _: &str) -> bool {
+            true
+        }
+        fn blended_cost_per_million(&self, m: &str) -> Option<f64> {
+            oracle(&[]).blended_cost_per_million(m)
+        }
+        fn provider_of(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn predicted_cost_usd(&self, model: &str) -> Option<f64> {
+            match model {
+                // Cheapest by list price but verbose: costs more per request.
+                "gemini-3.1-flash-lite" => Some(0.0040),
+                "gpt-5.6-luna" => Some(0.0012),
+                _ => None,
+            }
+        }
+    }
+
+    #[test]
+    fn predicted_cost_beats_list_price() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::PredictedCost);
+        let sel = cat
+            .select(Tier::Simple, Tier::Simple, Tier::Simple, &PredOracle)
+            .unwrap();
+        assert_eq!(sel.model, "gpt-5.6-luna");
+        assert!(sel.reason.starts_with("lowest predicted cost"));
+        let luna = sel
+            .candidates
+            .iter()
+            .find(|c| c.model == "gpt-5.6-luna")
+            .unwrap();
+        assert_eq!(luna.predicted_cost_usd, Some(0.0012));
+
+        // Without predictions the strategy degrades to list price.
+        let sel = cat
+            .select(Tier::Medium, Tier::Medium, Tier::Medium, &oracle(&[]))
+            .unwrap();
+        assert_eq!(sel.model, "gpt-5.4-mini");
+        assert!(sel.reason.contains("no cost prediction"));
     }
 
     #[test]
