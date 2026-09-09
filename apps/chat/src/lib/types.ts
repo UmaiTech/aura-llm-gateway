@@ -61,6 +61,111 @@ export interface CompressionConfigResponse {
   auto_select?: boolean
 }
 
+// One model the auto router considered for a request.
+export interface RoutingCandidate {
+  model: string
+  provider?: string | null
+  tier: 'simple' | 'medium' | 'complex' | 'reasoning'
+  cost_per_million?: number | null
+  eligible: boolean
+  predicted_cost_usd?: number | null
+}
+
+// A provider failure the auto router escalated past.
+export interface RoutingEscalation {
+  from_model: string
+  from_tier: string
+  to_model: string
+  to_tier: string
+  error_code: string
+}
+
+// The auto router's decision, as returned in metadata.aura.routing.
+// Mirrors AutoDecision in crates/aura-core/src/router/auto/mod.rs.
+export interface RoutingDecisionMetadata {
+  requested_model: string
+  mode: 'cost' | 'balanced' | 'quality' | string
+  classifier: string
+  score: number
+  raw_score: number
+  classified_tier: string
+  tier: string
+  /** Score boundaries in force (inclusive lower bound of each upper tier). */
+  boundaries?: { simple_medium: number; medium_complex: number; complex_reasoning: number }
+  signals?: Record<string, number>
+  features?: Record<string, unknown>
+  hard_filters?: string[]
+  candidates?: RoutingCandidate[]
+  selected: string
+  selected_provider?: string | null
+  reason: string
+  shadow: boolean
+  latency_us?: number
+  escalations?: RoutingEscalation[]
+  predicted_cost_usd?: number | null
+}
+
+// Request-level options for the auto router (the `routing` object on
+// POST /v1/responses). Mirrors RoutingOptions in crates/aura-types.
+export interface RoutingOptionsRequest {
+  mode?: 'cost' | 'balanced' | 'quality'
+  min_tier?: AutoRoutingTier
+  max_tier?: AutoRoutingTier
+  allow?: string[]
+  deny?: string[]
+  sticky?: boolean
+  classifier?: AutoRoutingClassifier
+  max_cost_usd?: number
+}
+
+export type AutoRoutingTier = 'simple' | 'medium' | 'complex' | 'reasoning'
+export type AutoRoutingClassifier = 'heuristic' | 'learned' | 'llm'
+
+export const AUTO_ROUTING_TIERS: AutoRoutingTier[] = ['simple', 'medium', 'complex', 'reasoning']
+
+export const AUTO_ROUTING_CLASSIFIERS: Array<{ id: AutoRoutingClassifier; name: string; description: string }> = [
+  { id: 'heuristic', name: 'Heuristic', description: 'Weighted keyword and shape features, sub-millisecond' },
+  { id: 'learned', name: 'Learned', description: 'Logistic regression trained on this gateway\'s traffic (falls back to heuristic when none is active)' },
+  { id: 'llm', name: 'LLM', description: 'Ask a small model to grade the request (adds latency, falls back to heuristic on failure)' },
+]
+
+// Playground-side settings for the auto router. `null` means "leave it
+// to the gateway / organization default" and is not sent.
+export interface AutoRoutingSettings {
+  minTier: AutoRoutingTier | null
+  maxTier: AutoRoutingTier | null
+  classifier: AutoRoutingClassifier | null
+  /** Per-request budget in USD; null = no budget. */
+  maxCostUsd: number | null
+  /** Keep the previous model inside tool loops (gateway default: on). */
+  sticky: boolean
+}
+
+export const DEFAULT_AUTO_ROUTING_SETTINGS: AutoRoutingSettings = {
+  minTier: null,
+  maxTier: null,
+  classifier: null,
+  maxCostUsd: null,
+  sticky: true,
+}
+
+/** True for the gateway's auto-routing aliases (`auto`, `auto:cost`, …). */
+export function isAutoModel(modelId: string): boolean {
+  return modelId === 'auto' || modelId.startsWith('auto:')
+}
+
+/** Build the request `routing` object from the settings; undefined when
+ *  everything is at its default so pinned-model requests stay untouched. */
+export function toRoutingOptions(settings: AutoRoutingSettings): RoutingOptionsRequest | undefined {
+  const out: RoutingOptionsRequest = {}
+  if (settings.minTier) out.min_tier = settings.minTier
+  if (settings.maxTier) out.max_tier = settings.maxTier
+  if (settings.classifier) out.classifier = settings.classifier
+  if (settings.maxCostUsd !== null && settings.maxCostUsd > 0) out.max_cost_usd = settings.maxCostUsd
+  if (!settings.sticky) out.sticky = false
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 // Aura gateway enrichment metadata
 export interface AuraMetadata {
   provider: string      // e.g., "openai", "anthropic", "google"
@@ -76,6 +181,9 @@ export interface AuraMetadata {
   consistency?: ConsistencyMetadataResponse
   compression_enabled?: boolean
   compression_config?: CompressionConfigResponse
+  // Auto model routing (model: "auto"): the decision, plus the
+  // routing_strategy label ("auto:<tier>") the gateway recorded.
+  routing?: RoutingDecisionMetadata
 }
 
 // Routing strategies available
@@ -200,6 +308,7 @@ export interface CreateResponseRequest {
   temperature?: number
   top_p?: number
   previous_response_id?: string  // For conversation threading
+  routing?: RoutingOptionsRequest  // Auto router options (model: "auto")
 }
 
 export interface InputItem {

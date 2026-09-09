@@ -9,7 +9,7 @@ import { generateId } from './lib/utils'
 import { AuraAPI } from './lib/api'
 import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, CompressionMetadata, ConsistencyMetadataResponse, ValidationMetadataResponse } from './lib/types'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, CompressionMetadata, ConsistencyMetadataResponse, ValidationMetadataResponse, RoutingDecisionMetadata } from './lib/types'
 
 // In production the chat hits same-origin /api/proxy (a serverless
 // function that holds the per-user gateway API key).
@@ -54,6 +54,8 @@ export default function App() {
     consistencyStyleVerbosity,
     setConsistencyStyleVerbosity,
     compressionStrategy,
+    autoRouting,
+    setAutoRouting,
     setCompressionStrategy,
     enabledTools,
     createConversation,
@@ -184,12 +186,14 @@ export default function App() {
       let responseId: string | undefined
       let usage: MessageUsage | undefined
 
+      const routing = useChatStore.getState().getRoutingOptions()
       for await (const event of api.createResponseStream({
         model,
         input,
         instructions: systemPrompt || undefined,
         stream: true,
         previous_response_id: previousResponseId,
+        ...(routing && { routing }),
       })) {
         // Log ALL events to debug
         console.log('[Stream Event]', event.type, event)
@@ -215,6 +219,8 @@ export default function App() {
               compression?: CompressionMetadata
               consistency?: ConsistencyMetadataResponse
               validation?: ValidationMetadataResponse
+              routing_strategy?: string
+              routing?: RoutingDecisionMetadata
             } }
           }
 
@@ -251,6 +257,8 @@ export default function App() {
             compression: auraMetadata.compression,
             consistency: auraMetadata.consistency,
             validation: auraMetadata.validation,
+            routingStrategy: auraMetadata.routing_strategy,
+            routing: auraMetadata.routing,
           } : undefined
 
           console.log('[Standard Chat] Response completed:', {
@@ -347,6 +355,7 @@ export default function App() {
             ? BUILT_IN_TOOLS
             : BUILT_IN_TOOLS.filter((t) => enabledTools.includes(t.name))
 
+        const routingOptions = useChatStore.getState().getRoutingOptions()
         const request = {
           model,
           input,
@@ -361,6 +370,7 @@ export default function App() {
           })),
           stream: true,
           ...(lastResponseId && { previous_response_id: lastResponseId }),
+          ...(routingOptions && { routing: routingOptions }),
         }
 
         const response = await fetch(`${API_BASE}/v1/responses`, {
@@ -490,6 +500,8 @@ export default function App() {
                         compression?: CompressionMetadata
                         consistency?: ConsistencyMetadataResponse
                         validation?: ValidationMetadataResponse
+                        routing_strategy?: string
+                        routing?: RoutingDecisionMetadata
                       }
                     } | undefined
                     if (metadata?.aura) {
@@ -501,6 +513,8 @@ export default function App() {
                         compression: metadata.aura.compression,
                         consistency: metadata.aura.consistency,
                         validation: metadata.aura.validation,
+                        routingStrategy: metadata.aura.routing_strategy,
+                        routing: metadata.aura.routing,
                       }
                     }
 
@@ -714,6 +728,8 @@ export default function App() {
             consistencyStyleVerbosity={consistencyStyleVerbosity}
             onConsistencyStyleVerbosityChange={setConsistencyStyleVerbosity}
             compressionStrategy={compressionStrategy}
+            autoRouting={autoRouting}
+            onAutoRoutingChange={setAutoRouting}
             onCompressionStrategyChange={setCompressionStrategy}
           />
         )}

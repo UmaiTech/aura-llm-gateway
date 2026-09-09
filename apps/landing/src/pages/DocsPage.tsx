@@ -111,6 +111,7 @@ const docSections = [
       { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
       { title: 'Rate Limiting', path: '/docs/api/rate-limiting', icon: Shield },
       { title: 'Smart Routing', path: '/docs/api/routing', icon: ArrowRightLeft },
+      { title: 'Auto Model Routing', path: '/docs/api/auto-routing', icon: ArrowRightLeft },
       { title: 'Prompt Compression', path: '/docs/api/compression', icon: Package },
       { title: 'Response Validation', path: '/docs/api/validation', icon: Shield },
       { title: 'Response Consistency', path: '/docs/api/consistency', icon: Layers },

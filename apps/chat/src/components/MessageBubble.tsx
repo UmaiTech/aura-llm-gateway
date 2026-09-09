@@ -2,7 +2,7 @@ import {
   User, Sparkles, Copy, Check, Wrench, Loader2,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
   Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send, Code2,
-  Gauge
+  Gauge, Route
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -11,7 +11,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '../lib/utils'
 import { useChatStore } from '../stores/chatStore'
-import type { Message, ToolInvocation } from '../lib/types'
+import type { Message, ToolInvocation, RoutingDecisionMetadata } from '../lib/types'
 
 // Tool-specific icons and colors
 const TOOL_CONFIG: Record<string, { icon: typeof Wrench; color: string; bgColor: string }> = {
@@ -539,9 +539,209 @@ interface UsageDisplayProps {
       selection?: string
       include_logprobs?: boolean
     }
+    routingStrategy?: string
+    routing?: RoutingDecisionMetadata
   }
   responseId?: string
   rawResponse?: unknown
+}
+
+// Tier colours for the routing chip and inspector.
+const TIER_STYLE: Record<string, { chip: string; bar: string }> = {
+  simple: { chip: 'bg-emerald-500/10 text-emerald-400', bar: 'bg-emerald-400' },
+  medium: { chip: 'bg-sky-500/10 text-sky-400', bar: 'bg-sky-400' },
+  complex: { chip: 'bg-violet-500/10 text-violet-400', bar: 'bg-violet-400' },
+  reasoning: { chip: 'bg-rose-500/10 text-rose-400', bar: 'bg-rose-400' },
+}
+
+// Tier bands on the complexity score. The gateway reports the boundaries
+// in force on every decision (operators can change them, and a learned
+// classifier calibrates its own); the defaults only cover older gateways.
+const DEFAULT_BOUNDARIES = { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.6 }
+
+function tierBands(b: RoutingDecisionMetadata['boundaries']): Array<{ tier: string; from: number; to: number }> {
+  const { simple_medium, medium_complex, complex_reasoning } = b ?? DEFAULT_BOUNDARIES
+  return [
+    { tier: 'simple', from: 0, to: simple_medium },
+    { tier: 'medium', from: simple_medium, to: medium_complex },
+    { tier: 'complex', from: medium_complex, to: complex_reasoning },
+    { tier: 'reasoning', from: complex_reasoning, to: 1 },
+  ]
+}
+
+const formatUsd = (v: number) => (v < 0.001 ? `$${v.toExponential(2)}` : `$${v.toFixed(4)}`)
+
+/**
+ * Routing inspector: explains what the auto router did for this
+ * response. Shows the complexity score against the tier boundaries, the
+ * signals that moved it, every candidate the router considered (with
+ * list and predicted cost), the hard constraints, any escalations, and
+ * the final reason. Shadow decisions (a pinned model was used but the
+ * router scored the request anyway) are labelled as such.
+ */
+function RoutingInspector({ routing, onClose }: { routing: RoutingDecisionMetadata; onClose: () => void }) {
+  const tierStyle = TIER_STYLE[routing.tier] ?? TIER_STYLE.medium
+  const bands = tierBands(routing.boundaries)
+  const score = Math.min(1, Math.max(0, routing.score))
+  const signals = Object.entries(routing.signals ?? {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+  const candidates = routing.candidates ?? []
+  const hasPredicted = candidates.some((c) => c.predicted_cost_usd !== undefined && c.predicted_cost_usd !== null)
+
+  return (
+    <div className="w-full mt-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-foreground animate-in fade-in slide-in-from-top-1 duration-150">
+      <div className="flex items-center justify-between mb-2">
+        <span className="flex items-center gap-1.5 font-medium">
+          <Route className="h-3.5 w-3.5" />
+          Auto routing
+          {routing.shadow && (
+            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-normal">
+              shadow · would have picked {routing.selected}
+            </span>
+          )}
+        </span>
+        <button onClick={onClose} className="p-1 rounded hover:bg-secondary" title="Close">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Score against the tier boundaries */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-muted-foreground mb-1">
+          <span>
+            complexity <span className="font-medium text-foreground">{routing.score.toFixed(2)}</span>
+            {routing.raw_score !== routing.score && (
+              <span> (raw {routing.raw_score.toFixed(2)}, mode {routing.mode})</span>
+            )}
+            {routing.raw_score === routing.score && <span> · mode {routing.mode}</span>}
+          </span>
+          <span>{routing.classifier}</span>
+        </div>
+        <div className="relative h-2 w-full rounded overflow-hidden flex">
+          {bands.map((b) => (
+            <div
+              key={b.tier}
+              className={cn('h-full opacity-30', (TIER_STYLE[b.tier] ?? tierStyle).bar)}
+              style={{ width: `${(b.to - b.from) * 100}%` }}
+              title={`${b.tier}: ${b.from}–${b.to}`}
+            />
+          ))}
+          <div
+            className="absolute top-0 h-full w-0.5 bg-foreground"
+            style={{ left: `calc(${score * 100}% - 1px)` }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+          {bands.map((b) => (
+            <span key={b.tier} className={cn(b.tier === routing.tier && 'font-medium text-foreground')}>
+              {b.tier}
+              {b.tier === routing.classified_tier && b.tier !== routing.tier && ' (classified)'}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Signals */}
+      {signals.length > 0 && (
+        <div className="mb-3">
+          <div className="text-muted-foreground mb-1">signals</div>
+          <div className="flex flex-wrap gap-1">
+            {signals.map(([name, value]) => (
+              <span
+                key={name}
+                className={cn(
+                  'px-1.5 py-0.5 rounded font-mono',
+                  value > 0 ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400',
+                )}
+              >
+                {name} {value > 0 ? '+' : ''}
+                {value.toFixed(2)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hard filters */}
+      {routing.hard_filters && routing.hard_filters.length > 0 && (
+        <div className="mb-3">
+          <div className="text-muted-foreground mb-1">constraints</div>
+          <div className="flex flex-wrap gap-1">
+            {routing.hard_filters.map((f, i) => (
+              <span key={i} className="px-1.5 py-0.5 rounded bg-secondary font-mono">
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Candidates */}
+      {candidates.length > 0 && (
+        <div className="mb-3 overflow-x-auto">
+          <div className="text-muted-foreground mb-1">candidates in {routing.tier}</div>
+          <table className="w-full text-left">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="font-normal pr-3 py-0.5">model</th>
+                <th className="font-normal pr-3 py-0.5">provider</th>
+                <th className="font-normal pr-3 py-0.5 text-right">$/1M</th>
+                {hasPredicted && <th className="font-normal pr-3 py-0.5 text-right">predicted</th>}
+                <th className="font-normal py-0.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map((c) => {
+                const selected = c.model === routing.selected
+                return (
+                  <tr
+                    key={`${c.tier}:${c.model}`}
+                    className={cn(selected && 'font-medium', !c.eligible && 'text-muted-foreground/60 line-through')}
+                  >
+                    <td className="pr-3 py-0.5 font-mono">
+                      {selected && '▸ '}
+                      {c.model}
+                    </td>
+                    <td className="pr-3 py-0.5">{c.provider ?? '—'}</td>
+                    <td className="pr-3 py-0.5 text-right font-mono">
+                      {c.cost_per_million !== undefined && c.cost_per_million !== null ? c.cost_per_million.toFixed(2) : '—'}
+                    </td>
+                    {hasPredicted && (
+                      <td className="pr-3 py-0.5 text-right font-mono">
+                        {c.predicted_cost_usd !== undefined && c.predicted_cost_usd !== null ? formatUsd(c.predicted_cost_usd) : '—'}
+                      </td>
+                    )}
+                    <td className="py-0.5 text-muted-foreground">{c.eligible ? '' : 'ineligible'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Escalations */}
+      {routing.escalations && routing.escalations.length > 0 && (
+        <div className="mb-3">
+          <div className="text-muted-foreground mb-1">escalations</div>
+          <ul className="space-y-0.5 font-mono">
+            {routing.escalations.map((e, i) => (
+              <li key={i}>
+                {e.from_model} ({e.from_tier}) → {e.to_model} ({e.to_tier}) after {e.error_code}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="text-muted-foreground">
+        <span className="text-foreground">{routing.reason}</span>
+        {routing.predicted_cost_usd !== undefined && routing.predicted_cost_usd !== null && (
+          <span> · predicted {formatUsd(routing.predicted_cost_usd)}</span>
+        )}
+        {routing.latency_us !== undefined && <span> · decided in {(routing.latency_us / 1000).toFixed(1)} ms</span>}
+      </div>
+    </div>
+  )
 }
 
 type FeedbackState = 'none' | 'pending_up' | 'pending_down' | 'up' | 'down' | 'submitting'
@@ -550,6 +750,7 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
   const [feedback, setFeedback] = useState<FeedbackState>('none')
   const [reason, setReason] = useState('')
   const [showRaw, setShowRaw] = useState(false)
+  const [showRouting, setShowRouting] = useState(false)
   const [rawCopied, setRawCopied] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -635,6 +836,29 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
           <Server className="h-3 w-3" />
           <span className="capitalize">{aura.provider}</span>
         </span>
+      )}
+
+      {/* Auto routing chip: tier and the model the router picked (or,
+          for shadow decisions, would have picked). Click to open the
+          inspector. */}
+      {aura?.routing && (
+        <button
+          onClick={() => setShowRouting((v) => !v)}
+          className={cn(
+            'flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors',
+            aura.routing.shadow
+              ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+              : cn((TIER_STYLE[aura.routing.tier] ?? TIER_STYLE.medium).chip, 'hover:opacity-80'),
+          )}
+          title={aura.routing.shadow ? `Shadow: auto would have picked ${aura.routing.selected}` : aura.routing.reason}
+        >
+          <Route className="h-3 w-3" />
+          <span className="font-medium">{aura.routing.shadow ? 'shadow' : 'auto'}</span>
+          <span>·</span>
+          <span>{aura.routing.tier}</span>
+          {!aura.routing.shadow && <span className="font-mono">{aura.routing.selected}</span>}
+          <ChevronDown className={cn('h-3 w-3 transition-transform', showRouting && 'rotate-180')} />
+        </button>
       )}
 
       {/* Latency */}
@@ -839,6 +1063,11 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
           <Code2 className="h-3 w-3" />
           <span className="text-xs">Raw</span>
         </button>
+      )}
+
+      {/* Routing inspector (inline, below the chips) */}
+      {showRouting && aura?.routing && (
+        <RoutingInspector routing={aura.routing} onClose={() => setShowRouting(false)} />
       )}
 
       {/* Raw Response Panel */}
