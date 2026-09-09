@@ -125,6 +125,16 @@ impl CostModel {
         if self.scale.iter().any(|s| *s <= 0.0 || !s.is_finite()) {
             return Err(CostModelError::Scale);
         }
+        if self.mean.iter().any(|v| !v.is_finite()) {
+            return Err(CostModelError::Shape("standardisation".into()));
+        }
+        let finite = |h: &CostHead| h.intercept.is_finite() && h.coef.iter().all(|v| v.is_finite());
+        if !finite(&self.global) {
+            return Err(CostModelError::Shape("global".into()));
+        }
+        if let Some((name, _)) = self.heads.iter().find(|(_, h)| !finite(h)) {
+            return Err(CostModelError::Shape(name.clone()));
+        }
         if self.global.coef.len() != f {
             return Err(CostModelError::Shape("global".into()));
         }

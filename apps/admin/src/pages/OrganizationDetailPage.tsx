@@ -65,6 +65,7 @@ export function OrganizationDetailPage() {
   const [routingMaxTier, setRoutingMaxTier] = useState<string>('inherit')
   const [routingAllow, setRoutingAllow] = useState('')
   const [routingDeny, setRoutingDeny] = useState('')
+  const [routingMaxCost, setRoutingMaxCost] = useState('')
   const [isSavingRouting, setIsSavingRouting] = useState(false)
   const [routingError, setRoutingError] = useState<string | null>(null)
   const [routingSavedAt, setRoutingSavedAt] = useState<number | null>(null)
@@ -81,6 +82,23 @@ export function OrganizationDetailPage() {
       ])
       const matched = orgs.find((o) => o.id === id) ?? null
       setOrg(matched)
+      // Prefill the auto-routing override from the stored settings so a
+      // save never wipes fields the form did not show.
+      const settings = (matched?.settings ?? {}) as { routing?: { auto?: Record<string, unknown> } }
+      const auto = settings.routing?.auto ?? {}
+      const tri = (v: unknown): 'inherit' | 'on' | 'off' => (typeof v === 'boolean' ? (v ? 'on' : 'off') : 'inherit')
+      setRoutingEnabled(tri(auto.enabled))
+      setRoutingShadow(tri(auto.shadow_for_pinned_models))
+      setRoutingMode(
+        auto.default_mode === 'cost' || auto.default_mode === 'balanced' || auto.default_mode === 'quality'
+          ? auto.default_mode
+          : 'inherit',
+      )
+      setRoutingMinTier(typeof auto.min_tier === 'string' ? auto.min_tier : 'inherit')
+      setRoutingMaxTier(typeof auto.max_tier === 'string' ? auto.max_tier : 'inherit')
+      setRoutingAllow(Array.isArray(auto.allow) ? auto.allow.join('\n') : '')
+      setRoutingDeny(Array.isArray(auto.deny) ? auto.deny.join('\n') : '')
+      setRoutingMaxCost(typeof auto.max_cost_usd === 'number' ? String(auto.max_cost_usd) : '')
       setTeams(allTeams.filter((t) => t.organization_id === id))
       setApiKeys(keys)
       setEndUsers(users)
@@ -156,6 +174,8 @@ export function OrganizationDetailPage() {
     const deny = list(routingDeny)
     if (allow.length) auto.allow = allow
     if (deny.length) auto.deny = deny
+    const maxCost = Number(routingMaxCost)
+    if (routingMaxCost.trim() !== '' && Number.isFinite(maxCost) && maxCost > 0) auto.max_cost_usd = maxCost
     try {
       // `settings` merges shallowly server-side, so send the whole
       // routing object; an empty object clears the override.
@@ -610,6 +630,18 @@ export function OrganizationDetailPage() {
                     <option value="complex">Complex</option>
                     <option value="reasoning">Reasoning</option>
                   </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Max cost per request (USD)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.001}
+                    placeholder="inherit"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    value={routingMaxCost}
+                    onChange={(e) => setRoutingMaxCost(e.target.value)}
+                  />
                 </label>
                 <label className="space-y-1 md:col-span-3 lg:col-span-1">
                   <span className="text-xs text-muted-foreground">Allow (one pattern per line)</span>
