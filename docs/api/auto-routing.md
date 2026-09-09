@@ -76,7 +76,7 @@ The response's `model` field is the concrete model that answered, and the decisi
 ```json
 {
   "id": "resp_...",
-  "model": "gpt-5.4-nano",
+  "model": "gemini-3.1-flash-lite",
   "metadata": {
     "aura": {
       "routing_strategy": "auto:simple",
@@ -93,7 +93,8 @@ The response's `model` field is the concrete model that answered, and the decisi
         "hard_filters": [],
         "candidates": [
           {"model": "gemini-3.1-flash-lite", "provider": "google", "tier": "simple", "cost_per_million": 0.11, "eligible": true},
-          {"model": "gpt-5.4-nano", "provider": "openai", "tier": "simple", "cost_per_million": 0.16, "eligible": true}
+          {"model": "gemini-3.5-flash", "provider": "google", "tier": "simple", "cost_per_million": 0.29, "eligible": true},
+          {"model": "gpt-5.6-luna", "provider": "openai", "tier": "simple", "cost_per_million": 0.35, "eligible": true}
         ],
         "selected": "gemini-3.1-flash-lite",
         "selected_provider": "google",
@@ -155,9 +156,9 @@ When `routing.auto.shadow_for_pinned_models` is on (the default), requests that 
   "object": "list",
   "data": [
     {"id": "auto", "object": "model", "owned_by": "aura", "aura": {"capabilities": ["auto-routing", "mode:balanced"], "supports_vision": true, "supports_tools": true}},
-    {"id": "gpt-5.4-nano", "object": "model", "owned_by": "openai", "aura": {"tier": "simple", "capabilities": ["fast", "cost-efficient"], "input_per_million": 0.1, "output_per_million": 0.4, "context_window": 400000, "supports_vision": true, "supports_tools": true}}
+    {"id": "gpt-5.6-luna", "object": "model", "owned_by": "openai", "aura": {"tier": "simple", "capabilities": ["fast", "cost-efficient"], "input_per_million": 0.2, "output_per_million": 1.2, "context_window": 400000, "supports_vision": true, "supports_tools": true}}
   ],
-  "auto": {"enabled": true, "shadow_for_pinned_models": true, "default_mode": "balanced", "aliases": ["auto", "auto:cost", "auto:balanced", "auto:quality"], "tiers": {"simple": ["gpt-5.4-nano"], "medium": ["..."], "complex": ["..."], "reasoning": ["..."]}}
+  "auto": {"enabled": true, "shadow_for_pinned_models": true, "default_mode": "balanced", "aliases": ["auto", "auto:cost", "auto:balanced", "auto:quality"], "tiers": {"simple": ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gpt-5.6-luna"], "medium": ["..."], "complex": ["..."], "reasoning": ["..."]}}
 }
 ```
 
