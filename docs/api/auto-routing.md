@@ -150,9 +150,9 @@ When `routing.auto.shadow_for_pinned_models` is on (the default), requests that 
   "object": "list",
   "data": [
     {"id": "auto", "object": "model", "owned_by": "aura", "aura": {"capabilities": ["auto-routing", "mode:balanced"], "supports_vision": true, "supports_tools": true}},
-    {"id": "gpt-5.4-nano", "object": "model", "owned_by": "openai", "aura": {"tier": "simple", "capabilities": ["fast", "cost-efficient"], "input_per_million": 0.1, "output_per_million": 0.4, "context_window": 400000, "supports_vision": true, "supports_tools": true}}
+    {"id": "gpt-5.6-luna", "object": "model", "owned_by": "openai", "aura": {"tier": "simple", "capabilities": ["fast", "cost-efficient"], "input_per_million": 0.2, "output_per_million": 1.2, "context_window": 400000, "supports_vision": true, "supports_tools": true}}
   ],
-  "auto": {"enabled": true, "shadow_for_pinned_models": true, "default_mode": "balanced", "aliases": ["auto", "auto:cost", "auto:balanced", "auto:quality"], "tiers": {"simple": ["gpt-5.4-nano"], "medium": ["..."], "complex": ["..."], "reasoning": ["..."]}}
+  "auto": {"enabled": true, "shadow_for_pinned_models": true, "default_mode": "balanced", "aliases": ["auto", "auto:cost", "auto:balanced", "auto:quality"], "tiers": {"simple": ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gpt-5.6-luna"], "medium": ["..."], "complex": ["..."], "reasoning": ["..."]}}
 }
 ```
 
