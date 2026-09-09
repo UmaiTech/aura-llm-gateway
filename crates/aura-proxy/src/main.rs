@@ -745,6 +745,7 @@ impl AppState {
                 .blended_cost_per_million(&d.selected),
             decision_latency_us: d.latency_us.min(i32::MAX as u64) as i32,
             escalations: serde_json::to_value(&d.escalations).unwrap_or(serde_json::json!([])),
+            synthetic: d.synthetic,
         };
         if let Err(e) = RoutingDecisionRepo::upsert(pool, new).await {
             error!(error = %e, request_id = %request_id, "Failed to record routing decision");

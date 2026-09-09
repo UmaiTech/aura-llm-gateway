@@ -123,6 +123,7 @@ Fine-tune a single request with a top-level `routing` object (an Aura extension,
 | `min_tier` | tier | `simple` | Never route below this tier. |
 | `max_tier` | tier | `reasoning` | Never route above this tier (budget guard). |
 | `max_cost_usd` | number | none | Budget for this request. Candidates whose predicted cost (learned cost model) exceeds it are skipped, searching the chosen tier, then above, then below; when nothing fits the budget is ignored and `reason` says so. |
+| `allow_synthetic` | Honour `x-aura-synthetic` for this organization's keys (default false). |
 | `allow` | string[] | all | Only consider models matching one of these patterns. Patterns match the model id or `provider/model`; a trailing `*` is a prefix wildcard. |
 | `deny` | string[] | none | Never consider models matching one of these patterns. |
 | `sticky` | boolean | `true` | Keep the previous turn's model when this request continues a tool loop (has `function_call_output` items and `previous_response_id`). |
@@ -336,6 +337,9 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | `POST /admin/routing/models/reload` | Re-read the active classifier and cost model from the database or weights files. |
 | `POST /admin/routing/models/deactivate?kind=` | Unload and deactivate models (all kinds, or one). |
 | `POST /admin/routing/score` | Dry-run the router on a request body; returns the decision, dispatches nothing. |
+| `GET /admin/routing/feature-profile?days=30` | Per-tier quantiles of the feature vector and request-shape shares of recent live decisions. No text; calibrates `synth.py`. |
+| `POST /admin/routing/judge` | Grade two answers to one request with the gold judge (`{"user_text", "answer_a", "answer_b", "judge_model"?}`). |
+| `POST /admin/routing/gold/synthetic` | Upsert a batch of synthetic gold rows (`{"batch_id", "rows": [...]}`, keyed by `prompt_hash`); rejected rows are reported per index. |
 
 The admin app's Routing page renders the same data as an "Auto router" section.
 
@@ -370,6 +374,44 @@ With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self
 ### Learned cost model
 
 List price per million tokens ranks models the same way for every request, but the bill depends on output length, which varies by model and by request. `scripts/router/train_cost.py` fits one ridge regression per model of `log1p(output_tokens)` on the feature vector (plus a global fallback and training-time price snapshots) from `routing_decisions` joined with `request_logs`, including pinned-model traffic, and exports a `cost_lr` weights JSON stored through the same `/admin/routing/models` endpoints (one active model per kind). With a cost model loaded every candidate in `metadata.aura.routing.candidates` carries `predicted_cost_usd`, the decision carries it for the selected model, `within_tier: predicted_cost` ranks candidates by it (falling back to list price when a model has no prediction), and `routing.max_cost_usd` (per request, or `max_cost_usd` in the organization override, the lower wins) budgets the request. Without a cost model those features degrade to list price and no budget.
+
+### Synthetic training traces
+
+Live gold labels are sparse (a small sample of self-contained single-turn
+prompts, compared only across the lowest and highest tier), so
+`scripts/router/synth.py` manufactures labelled rows for the gaps: it asks
+cheap models (by default `gpt-5.6-luna` for 70 % and `claude-haiku-4-5` for
+30 % of the batch) to write realistic requests from specs that fix the
+family, difficulty level, shape (multi-turn, tools, tool-loop continuation,
+long context, language) and length; verifies each request's realised
+feature vector through `POST /admin/routing/score`; drops near-duplicates;
+then labels each row with a **ladder**: the cheapest model of every tier
+answers in ascending order and the gold judge grades each against a
+reference answer from the strongest tier, the label being the lowest tier
+that tied. `GET /admin/routing/feature-profile` supplies the live
+distribution the specs are sampled from without exposing any text.
+
+Every request a run makes carries the `x-aura-synthetic: 1` header. The
+gateway records those decisions with `synthetic: true` (also visible in
+`metadata.aura.routing`) and excludes them from `/admin/stats/routing/auto`,
+the outcome rollup (so rewards and Thompson arm statistics never see them),
+savings and live gold sampling. The header is honoured only for keys of
+an organization whose override sets `allow_synthetic: true` (or on a
+gateway without tenants), so run synthetic batches under a dedicated
+organization with that flag and its own API key; their spend stays
+attributable and nobody else can hide traffic from the stats.
+
+Rows land in `routing_gold_pairs` with `source = 'synthetic'`, a `batch_id`,
+a `split` (`train` or `holdout`, chosen per family × level cluster), the
+generator's `intended_tier`, the ladder's `label_tier` and a `weight`
+(0.5 when the two disagree). `train.py` prefers `label_tier`, multiplies
+synthetic rows' weight by `--synthetic-weight` (0.5), caps their share at
+`--max-synthetic-share` (0.5), can hold out on live rows only
+(`--holdout-real`), reports live and synthetic holdout accuracy separately
+and refuses to write when `--min-live-accuracy` is not met. The ladder's
+answers are real completions with real token counts, written to a cost-rows
+file for `train_cost.py`. Details: `scripts/router/README.md` and
+`docs/internal/auto-router-synthetic-traces-plan.md`.
 
 ### Replaying captured traffic
 

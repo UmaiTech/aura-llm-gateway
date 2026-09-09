@@ -2138,10 +2138,10 @@ impl RoutingDecisionRepo {
                 selected_model, selected_provider, reason, shadow,
                 features, signals, hard_filters, candidates,
                 requested_blended_per_million, selected_blended_per_million, decision_latency_us,
-                escalations, selected_model_final
+                escalations, selected_model_final, synthetic
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-                    $17, $18, $19, $20, $21, $22, $23, $24, $13)
+                    $17, $18, $19, $20, $21, $22, $23, $24, $13, $25)
             ON CONFLICT (response_id) DO UPDATE SET
                 provider_response_id = COALESCE(EXCLUDED.provider_response_id, routing_decisions.provider_response_id),
                 conversation_id = COALESCE(EXCLUDED.conversation_id, routing_decisions.conversation_id),
@@ -2178,6 +2178,7 @@ impl RoutingDecisionRepo {
         .bind(new.selected_blended_per_million)
         .bind(new.decision_latency_us)
         .bind(&new.escalations)
+        .bind(new.synthetic)
         .execute(pool)
         .await?;
         Ok(())
@@ -2203,6 +2204,37 @@ impl RoutingDecisionRepo {
         Ok(row)
     }
 
+    /// Feature vectors and tiers of recent non-synthetic decisions, newest
+    /// first, for the feature profile. Numeric features only.
+    pub async fn feature_sample(
+        pool: &DbPool,
+        days: i32,
+        limit: i64,
+    ) -> Result<Vec<(String, serde_json::Value)>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT tier, features FROM routing_decisions
+            WHERE NOT synthetic
+              AND created_at >= NOW() - ($1::INT * INTERVAL '1 day')
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(days)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.get::<String, _>("tier"),
+                    r.get::<serde_json::Value, _>("features"),
+                )
+            })
+            .collect())
+    }
+
     /// Most recent decisions joined with their outcomes.
     pub async fn recent_outcomes(
         pool: &DbPool,
@@ -2215,10 +2247,11 @@ impl RoutingDecisionRepo {
                    requested_model, mode, classifier, score, classified_tier, tier,
                    selected_model, selected_provider, reason, shadow, hard_filters,
                    decision_latency_us, created_at, status, actual_model,
-                   input_tokens, output_tokens, cost_usd, latency_ms, feedback,
+                   input_tokens, output_tokens, cost_usd::FLOAT8 AS cost_usd, latency_ms, feedback,
                    estimated_savings_usd
             FROM v_routing_outcomes
             WHERE ($2::BOOLEAN IS NULL OR shadow = $2)
+              AND NOT synthetic
             ORDER BY created_at DESC
             LIMIT $1
             "#,
@@ -2280,6 +2313,7 @@ impl RoutingOutcomeRepo {
                 LIMIT 1
             ) fb ON TRUE
             WHERE o.response_id IS NULL
+              AND NOT d.synthetic
               AND d.created_at < NOW() - ($1::BIGINT * INTERVAL '1 second')
               AND d.created_at >= NOW() - ($3::INT * INTERVAL '1 day')
             ORDER BY d.created_at ASC
@@ -2394,6 +2428,15 @@ pub struct RoutingGoldPairRepo;
 impl RoutingGoldPairRepo {
     /// Insert a pair.
     pub async fn insert(pool: &DbPool, new: NewRoutingGoldPair) -> Result<Uuid, DbError> {
+        Self::insert_returning(pool, new).await.map(|(id, _)| id)
+    }
+
+    /// Insert a pair; synthetic rows replace an existing row with the
+    /// same prompt hash. Returns the id and whether the row is new.
+    async fn insert_returning(
+        pool: &DbPool,
+        new: NewRoutingGoldPair,
+    ) -> Result<(Uuid, bool), DbError> {
         let row = sqlx::query(
             r#"
             INSERT INTO routing_gold_pairs (
@@ -2401,11 +2444,27 @@ impl RoutingGoldPairRepo {
                 prompt_hash, user_text,
                 tier_a, model_a, text_a, cost_a, latency_a_ms,
                 tier_b, model_b, text_b, cost_b, latency_b_ms,
-                judge_model, verdict, judge_confidence, judge_rationale, error
+                judge_model, verdict, judge_confidence, judge_rationale, error,
+                source, batch_id, split, intended_tier, label_tier, family, shape, weight,
+                generator_model, ladder
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-                    $17, $18, $19, $20, $21, $22)
-            RETURNING id
+                    $17, $18, $19, $20, $21, $22,
+                    $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+            ON CONFLICT (prompt_hash) WHERE source = 'synthetic' DO UPDATE SET
+                features = EXCLUDED.features,
+                user_text = EXCLUDED.user_text,
+                tier_a = EXCLUDED.tier_a, model_a = EXCLUDED.model_a, text_a = EXCLUDED.text_a,
+                cost_a = EXCLUDED.cost_a, latency_a_ms = EXCLUDED.latency_a_ms,
+                tier_b = EXCLUDED.tier_b, model_b = EXCLUDED.model_b, text_b = EXCLUDED.text_b,
+                cost_b = EXCLUDED.cost_b, latency_b_ms = EXCLUDED.latency_b_ms,
+                judge_model = EXCLUDED.judge_model, verdict = EXCLUDED.verdict,
+                judge_confidence = EXCLUDED.judge_confidence, judge_rationale = EXCLUDED.judge_rationale,
+                error = EXCLUDED.error, batch_id = EXCLUDED.batch_id, split = EXCLUDED.split,
+                intended_tier = EXCLUDED.intended_tier, label_tier = EXCLUDED.label_tier,
+                family = EXCLUDED.family, shape = EXCLUDED.shape, weight = EXCLUDED.weight,
+                generator_model = EXCLUDED.generator_model, ladder = EXCLUDED.ladder
+            RETURNING id, (xmax = 0) AS inserted
             "#,
         )
         .bind(&new.response_id)
@@ -2430,9 +2489,28 @@ impl RoutingGoldPairRepo {
         .bind(new.judge_confidence)
         .bind(&new.judge_rationale)
         .bind(&new.error)
+        .bind(&new.provenance.source)
+        .bind(&new.provenance.batch_id)
+        .bind(&new.provenance.split)
+        .bind(&new.provenance.intended_tier)
+        .bind(&new.provenance.label_tier)
+        .bind(&new.provenance.family)
+        .bind(&new.provenance.shape)
+        .bind(new.provenance.weight)
+        .bind(&new.provenance.generator_model)
+        .bind(&new.provenance.ladder)
         .fetch_one(pool)
         .await?;
-        Ok(row.get("id"))
+        Ok((row.get("id"), row.get("inserted")))
+    }
+
+    /// Insert or replace a synthetic row (keyed by prompt hash). Returns
+    /// `true` when a new row was created.
+    pub async fn upsert_synthetic(pool: &DbPool, new: NewRoutingGoldPair) -> Result<bool, DbError> {
+        debug_assert_eq!(new.provenance.source, "synthetic");
+        Self::insert_returning(pool, new)
+            .await
+            .map(|(_, inserted)| inserted)
     }
 
     /// Most recent pairs.
@@ -2455,7 +2533,12 @@ impl RoutingGoldPairRepo {
                 COUNT(*) FILTER (WHERE verdict IN ('a', 'tie')) AS cheap_sufficed,
                 COUNT(*) FILTER (WHERE verdict = 'b') AS strong_better,
                 COUNT(*) FILTER (WHERE verdict = 'tie') AS ties,
-                COUNT(*) FILTER (WHERE verdict IS NULL) AS failed
+                COUNT(*) FILTER (WHERE verdict IS NULL) AS failed,
+                COUNT(*) FILTER (WHERE source = 'live') AS live,
+                COUNT(*) FILTER (WHERE source = 'synthetic') AS synthetic,
+                COUNT(*) FILTER (WHERE source = 'synthetic' AND split = 'train') AS synthetic_train,
+                COUNT(*) FILTER (WHERE source = 'synthetic' AND split = 'holdout') AS synthetic_holdout,
+                COUNT(*) FILTER (WHERE source = 'synthetic' AND intended_tier = label_tier) AS synthetic_agreed
             FROM routing_gold_pairs
             "#,
         )
