@@ -58,6 +58,10 @@ pub struct AutoRoutingConfig {
     /// and graded by the judge model. `0` disables collection. Every
     /// sampled request costs two extra completions plus one judge call.
     pub gold_sample_rate: f64,
+    /// Also sample requests that pinned a concrete model (shadow
+    /// decisions). Off by default: sampling sends the prompt to other
+    /// providers than the one the tenant chose.
+    pub gold_sample_shadow: bool,
     /// Gold labels: model that grades the pair.
     pub gold_judge_model: String,
     /// Gold labels: characters of each text stored and sent to the judge.
@@ -86,6 +90,7 @@ impl Default for AutoRoutingConfig {
             outcome_grace_secs: 1800,
             arm_stats_window_days: 30,
             gold_sample_rate: 0.0,
+            gold_sample_shadow: false,
             gold_judge_model: "claude-sonnet-4-6".to_string(),
             gold_max_text_chars: 4000,
         }
