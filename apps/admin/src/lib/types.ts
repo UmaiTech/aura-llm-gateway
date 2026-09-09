@@ -261,6 +261,8 @@ export interface OrganizationSummary {
   total_tokens: number
   total_cost: number
   total_requests: number
+  /** Raw organization settings (routing override, payload capture). */
+  settings?: unknown
 }
 
 export interface TeamSummary {
