@@ -190,7 +190,7 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
                         }
 
                         return (
-                          <CodeBlock language={language}>
+                          <CodeBlock language={language} streaming={!!isStreaming}>
                             {String(children).replace(/\n$/, '')}
                           </CodeBlock>
                         )
@@ -243,9 +243,17 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
 interface CodeBlockProps {
   language: string
   children: string
+  /**
+   * While the answer is still streaming the block is re-rendered on
+   * every delta. Prism tokenising a long file dozens of times per
+   * second froze the tab ("long code sections hang"), so the code is
+   * shown as plain monospace text until the stream ends, then
+   * highlighted once.
+   */
+  streaming?: boolean
 }
 
-function CodeBlock({ language, children }: CodeBlockProps) {
+function CodeBlock({ language, children, streaming }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
   // Theme-aware syntax highlighting: oneDark in dark mode, oneLight
   // in light. Read the `dark` class that ThemeToggle puts on
@@ -315,6 +323,20 @@ function CodeBlock({ language, children }: CodeBlockProps) {
       {/* Code — theme's background lives on the SyntaxHighlighter pre.
           We pad sides+bottom to match the header's pt-3; the
           highlighter handles font/colors via the prism theme. */}
+      {streaming ? (
+        <pre
+          className="font-mono whitespace-pre-wrap break-words"
+          style={{
+            margin: 0,
+            padding: '0 1rem 1rem 1rem',
+            fontSize: '0.875rem',
+            color: surfaceFg,
+            background: 'transparent',
+          }}
+        >
+          {children}
+        </pre>
+      ) : (
       <SyntaxHighlighter
         style={isDark ? oneDark : oneLight}
         language={language || 'text'}
@@ -330,6 +352,7 @@ function CodeBlock({ language, children }: CodeBlockProps) {
       >
         {children}
       </SyntaxHighlighter>
+      )}
     </div>
   )
 }
@@ -669,6 +692,21 @@ function RoutingInspector({ routing, onClose }: { routing: RoutingDecisionMetada
             {routing.hard_filters.map((f, i) => (
               <span key={i} className="px-1.5 py-0.5 rounded bg-secondary font-mono">
                 {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Applied options — echoed by the gateway so you can confirm the
+          popover settings actually reached it. */}
+      {routing.options && Object.keys(routing.options).length > 0 && (
+        <div className="mb-3">
+          <div className="text-muted-foreground mb-1">applied options</div>
+          <div className="flex flex-wrap gap-1">
+            {Object.entries(routing.options).map(([k, v]) => (
+              <span key={k} className="px-1.5 py-0.5 rounded bg-secondary font-mono">
+                {k}={Array.isArray(v) ? v.join(',') : String(v)}
               </span>
             ))}
           </div>

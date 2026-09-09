@@ -432,6 +432,8 @@ struct FireworksStreamTransformer {
     model: String,
     response_id: String,
     buffer: String,
+    /// Trailing bytes of an incomplete UTF-8 character from the last chunk.
+    utf8_pending: Vec<u8>,
     accumulated_text: String,
     accumulated_tool_calls: HashMap<usize, PartialToolCall>,
     accumulated_usage: Option<aura_types::Usage>,
@@ -455,6 +457,7 @@ impl FireworksStreamTransformer {
             model,
             response_id: format!("resp_fw_{}", uuid::Uuid::new_v4()),
             buffer: String::new(),
+            utf8_pending: Vec::new(),
             accumulated_text: String::new(),
             accumulated_tool_calls: HashMap::new(),
             accumulated_usage: None,
@@ -660,9 +663,11 @@ impl FireworksStreamTransformer {
 
                     match stream.next().await {
                         Some(Ok(bytes)) => {
-                            if let Ok(text) = String::from_utf8(bytes.to_vec()) {
-                                transformer.buffer.push_str(&text);
-                            }
+                            crate::provider::sse::push_utf8(
+                                &mut transformer.buffer,
+                                &mut transformer.utf8_pending,
+                                &bytes,
+                            );
                         }
                         Some(Err(error)) => {
                             return Some((

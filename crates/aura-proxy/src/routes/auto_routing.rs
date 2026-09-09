@@ -645,6 +645,88 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn every_routing_option_is_applied_and_echoed() {
+        // The playground popover sends mode (as the alias), min/max tier,
+        // classifier, sticky and max_cost_usd. All of them must reach the
+        // decision and be visible in metadata.aura.routing.
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .and(body_partial_json(serde_json::json!({"model": "llama3.1"})))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(chat_completion("llama3.1", "ok")),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = state_with_router(&server.uri(), true).await;
+        let app = crate::routes::responses::router().with_state(state);
+        let (status, headers, json) = post_responses(
+            app,
+            serde_json::json!({
+                "model": "auto:cost",
+                "input": [{"type": "message", "role": "user", "content":
+                    "Prove the theorem, derive the bound and justify each step rigorously."}],
+                "routing": {
+                    "min_tier": "medium",
+                    "max_tier": "medium",
+                    "classifier": "heuristic",
+                    "sticky": false,
+                    "max_cost_usd": 5.0,
+                    "deny": ["qwen*"]
+                }
+            }),
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["model"], "llama3.1");
+        assert_eq!(
+            headers
+                .get(SELECTED_MODEL_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("llama3.1")
+        );
+        let routing = &json["metadata"]["aura"]["routing"];
+        // Mode from the alias.
+        assert_eq!(routing["mode"], "cost");
+        // A hard prompt classified above medium, clamped by max_tier.
+        assert_eq!(routing["classified_tier"], "reasoning");
+        assert_eq!(routing["tier"], "medium");
+        assert_eq!(routing["classifier"], "heuristic@v1");
+        let filters: Vec<&str> = routing["hard_filters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|f| f.as_str())
+            .collect();
+        assert!(filters.contains(&"max_tier medium"), "{filters:?}");
+        assert!(filters.contains(&"allow/deny lists"), "{filters:?}");
+        assert!(
+            filters.iter().any(|f| f.starts_with("max_cost_usd 5.")),
+            "{filters:?}"
+        );
+        // The denied medium candidate is recorded as ineligible.
+        let qwen = routing["candidates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["model"] == "qwen2.5")
+            .expect("qwen2.5 listed");
+        assert_eq!(qwen["eligible"], false);
+        // Every option is echoed back verbatim.
+        let opts = &routing["options"];
+        assert_eq!(opts["min_tier"], "medium");
+        assert_eq!(opts["max_tier"], "medium");
+        assert_eq!(opts["classifier"], "heuristic");
+        assert_eq!(opts["sticky"], false);
+        assert_eq!(opts["max_cost_usd"], 5.0);
+        assert_eq!(opts["deny"], serde_json::json!(["qwen*"]));
+        assert!(opts.get("policy_allow").is_none());
+    }
+
+    #[tokio::test]
     async fn pinned_model_gets_shadow_decision_without_rerouting() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))

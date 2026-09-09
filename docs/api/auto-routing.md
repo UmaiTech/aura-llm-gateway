@@ -180,6 +180,7 @@ The response's `model` field is the concrete model that answered, and the decisi
 | `candidates` | Every model considered, with eligibility and blended price. |
 | `reason` | Why the selected model won, including any escalation. |
 | `shadow` | `true` when the decision was recorded but not applied (see below). |
+| `options` | The `routing` options the gateway applied: the request's own merged with any organization override (request wins; `min_tier` / `max_tier` only tighten). Absent when none were sent, so a client can confirm its settings reached the router. |
 
 ### Hard constraints
 

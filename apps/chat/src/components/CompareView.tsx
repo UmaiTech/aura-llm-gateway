@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createThrottledSetter } from '@/lib/streamFlush'
 import { Plus, Send, StopCircle, ArrowLeft } from 'lucide-react'
 import { AuraAPI } from '../lib/api'
 import { calculateCost } from '../lib/pricing'
@@ -134,27 +135,31 @@ export function CompareView() {
           ...(routing && { routing }),
         })
 
+        // Inline message update keyed by assistantId, throttled so a
+        // long answer does not re-render the pane on every token.
+        const contentSink = createThrottledSetter((content) =>
+          setPanes((prev) =>
+            prev.map((p) =>
+              p.id !== pane.id
+                ? p
+                : {
+                    ...p,
+                    messages: p.messages.map((m) =>
+                      m.id === assistantId ? { ...m, content } : m
+                    ),
+                  }
+            )
+          )
+        )
+
         for await (const event of stream) {
           if (controller.signal.aborted) break
 
           if (event.type === 'response.output_text.delta' && event.delta) {
             fullContent += event.delta
-            // Inline message update keyed by assistantId.
-            setPanes((prev) =>
-              prev.map((p) =>
-                p.id !== pane.id
-                  ? p
-                  : {
-                      ...p,
-                      messages: p.messages.map((m) =>
-                        m.id === assistantId
-                          ? { ...m, content: fullContent }
-                          : m
-                      ),
-                    }
-              )
-            )
+            contentSink.set(fullContent)
           } else if (event.type === 'response.completed') {
+            contentSink.flush()
             const response = event.response as {
               id?: string
               usage?: {
