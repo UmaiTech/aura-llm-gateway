@@ -149,12 +149,14 @@ Weighted sum → 0–1 score → tier by boundaries. Starting weights and bounda
 
 **Tiers** (default catalog, overridable per org; built from `model_pricing` and provider `SUPPORTED_MODELS`):
 
-| Tier | Default candidates | Approx. blended $/1M (in/out) |
+| Tier | Default candidates | Approx. $/1M (in / out) |
 |---|---|---|
-| simple | gemini-3.1-flash-lite, gpt-5.4-nano, claude-haiku-4-5 | ≤ 1 |
-| medium | gemini-3.5-flash, gpt-5.4-mini, claude-sonnet-4-6 | 1–5 |
-| complex | claude-sonnet-4-6, gpt-5.5, gemini-3.1-pro-preview | 5–20 |
-| reasoning | claude-opus-4-7, gpt-5.5-pro, o3-mini | > 20 |
+| simple | gemini-3.1-flash-lite, gemini-3.5-flash, gpt-5.6-luna | 0.08–0.20 / 0.30–1.20 |
+| medium | gemini-3.8-flash, gpt-5.4-mini, claude-haiku-4-5 | 0.75–1 / 3.75–5 |
+| complex | claude-sonnet-5, gemini-3-pro-preview, gpt-5.6-terra | 1.5–2 / 6–12 |
+| reasoning | claude-opus-5, gpt-5.6-sol, claude-fable-5-1 | 4–10 / 20–50 |
+
+Defaults track the September 2026 catalog (`model_pricing` in `cost.rs`) and are pruned at startup against the models the configured providers actually serve.
 
 **Within-tier selection**: v1 = cheapest healthy candidate. v2 = Thompson sampling with a reward derived from outcomes (section 3.4), so the router learns *which* medium model is actually good for this org's traffic.
 
@@ -218,10 +220,10 @@ routing:
     llm_classifier: { model: claude-haiku-4-5, timeout_ms: 800 }
     shadow_for_pinned_models: true      # log what auto would have done
     tiers:
-      simple:    [gemini-3.1-flash-lite, gpt-5.4-nano, claude-haiku-4-5]
-      medium:    [gemini-3.5-flash, gpt-5.4-mini, claude-sonnet-4-6]
-      complex:   [claude-sonnet-4-6, gpt-5.5, gemini-3.1-pro-preview]
-      reasoning: [claude-opus-4-7, gpt-5.5-pro, o3-mini]
+      simple:    [gemini-3.1-flash-lite, gemini-3.5-flash, gpt-5.6-luna]
+      medium:    [gemini-3.8-flash, gpt-5.4-mini, claude-haiku-4-5]
+      complex:   [claude-sonnet-5, gemini-3-pro-preview, gpt-5.6-terra]
+      reasoning: [claude-opus-5, gpt-5.6-sol, claude-fable-5-1]
     boundaries: { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.60 }
     mode_offsets: { cost: -0.10, balanced: 0.0, quality: 0.15 }
     weights: { tokens: 0.10, code: 0.30, reasoning: 0.25, technical: 0.25, simple: 0.05, multi_step: 0.03, questions: 0.02, tools: 0.15, explicit_intent: 0.30 }
