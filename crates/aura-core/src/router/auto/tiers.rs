@@ -512,7 +512,7 @@ mod tests {
             match model {
                 // Cheapest by list price but verbose: costs more per request.
                 "gemini-3.1-flash-lite" => Some(0.0040),
-                "gpt-5.4-nano" => Some(0.0012),
+                "gpt-5.6-luna" => Some(0.0012),
                 _ => None,
             }
         }
@@ -524,14 +524,14 @@ mod tests {
         let sel = cat
             .select(Tier::Simple, Tier::Simple, Tier::Simple, &PredOracle)
             .unwrap();
-        assert_eq!(sel.model, "gpt-5.4-nano");
+        assert_eq!(sel.model, "gpt-5.6-luna");
         assert!(sel.reason.starts_with("lowest predicted cost"));
-        let nano = sel
+        let luna = sel
             .candidates
             .iter()
-            .find(|c| c.model == "gpt-5.4-nano")
+            .find(|c| c.model == "gpt-5.6-luna")
             .unwrap();
-        assert_eq!(nano.predicted_cost_usd, Some(0.0012));
+        assert_eq!(luna.predicted_cost_usd, Some(0.0012));
 
         // Without predictions the strategy degrades to list price.
         let sel = cat

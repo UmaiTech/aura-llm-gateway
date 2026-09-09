@@ -981,10 +981,10 @@ mod tests {
             // tight budget only on gpt-5.4-mini.
             Some(match model {
                 "gpt-5.4-mini" => 0.0008,
-                "gemini-3.5-flash" => 0.0015,
-                "claude-sonnet-4-6" => 0.0090,
-                "gpt-5.5" => 0.0100,
-                "gemini-3.1-pro-preview" => 0.0080,
+                "gemini-3.8-flash" => 0.0015,
+                "claude-sonnet-5" => 0.0090,
+                "gpt-5.6-terra" => 0.0100,
+                "gemini-3-pro-preview" => 0.0080,
                 _ => 0.0500,
             })
         }
