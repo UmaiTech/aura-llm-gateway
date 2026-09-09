@@ -105,9 +105,14 @@ pub async fn run_rollup(state: &AppState) -> Result<RollupReport, String> {
 
     let mut report = RollupReport::default();
     for _ in 0..MAX_BATCHES {
-        let pending = RoutingOutcomeRepo::pending(pool, cfg.outcome_grace_secs as i64, BATCH)
-            .await
-            .map_err(|e| e.to_string())?;
+        let pending = RoutingOutcomeRepo::pending(
+            pool,
+            cfg.outcome_grace_secs as i64,
+            cfg.arm_stats_window_days as i32,
+            BATCH,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
         let n = pending.len();
         for row in pending {
             let inputs = inputs_for(state, &row);

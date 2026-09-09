@@ -81,6 +81,22 @@ export function OrganizationDetailPage() {
       ])
       const matched = orgs.find((o) => o.id === id) ?? null
       setOrg(matched)
+      // Prefill the auto-routing override from the stored settings so a
+      // save never wipes fields the form did not show.
+      const settings = (matched?.settings ?? {}) as { routing?: { auto?: Record<string, unknown> } }
+      const auto = settings.routing?.auto ?? {}
+      const tri = (v: unknown): 'inherit' | 'on' | 'off' => (typeof v === 'boolean' ? (v ? 'on' : 'off') : 'inherit')
+      setRoutingEnabled(tri(auto.enabled))
+      setRoutingShadow(tri(auto.shadow_for_pinned_models))
+      setRoutingMode(
+        auto.default_mode === 'cost' || auto.default_mode === 'balanced' || auto.default_mode === 'quality'
+          ? auto.default_mode
+          : 'inherit',
+      )
+      setRoutingMinTier(typeof auto.min_tier === 'string' ? auto.min_tier : 'inherit')
+      setRoutingMaxTier(typeof auto.max_tier === 'string' ? auto.max_tier : 'inherit')
+      setRoutingAllow(Array.isArray(auto.allow) ? auto.allow.join('\n') : '')
+      setRoutingDeny(Array.isArray(auto.deny) ? auto.deny.join('\n') : '')
       setTeams(allTeams.filter((t) => t.organization_id === id))
       setApiKeys(keys)
       setEndUsers(users)

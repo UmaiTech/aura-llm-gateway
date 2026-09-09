@@ -24,6 +24,12 @@ use tracing::{debug, info, warn};
 use crate::routes::auto_routing::GatewayEligibility;
 use crate::AppState;
 
+/// At most this many gold samples run concurrently per gateway process.
+const MAX_GOLD_IN_FLIGHT: usize = 8;
+
+static GOLD_IN_FLIGHT: std::sync::LazyLock<Arc<tokio::sync::Semaphore>> =
+    std::sync::LazyLock::new(|| Arc::new(tokio::sync::Semaphore::new(MAX_GOLD_IN_FLIGHT)));
+
 /// Hard timeout for each background completion and the judge call.
 const CALL_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -156,11 +162,20 @@ fn pick_pair(
     let router = state.auto_router()?;
     let oracle = GatewayEligibility::for_request(state, request);
     let tiers = router.catalog().tiers();
+    // Honour the request's (org-merged) allow / deny lists: a sampled
+    // prompt must never reach a provider the tenant excluded.
+    let permitted = |m: &str| {
+        request
+            .routing
+            .as_ref()
+            .map(|o| o.permits(&oracle.provider_of(m).unwrap_or_default(), m))
+            .unwrap_or(true)
+    };
     let cheapest_in = |tier: Tier| -> Option<String> {
         tiers
             .get(tier)
             .iter()
-            .filter(|m| oracle.is_eligible(m))
+            .filter(|m| permitted(m) && oracle.is_eligible(m))
             .min_by(|a, b| {
                 let ca = oracle.blended_cost_per_million(a).unwrap_or(f64::MAX);
                 let cb = oracle.blended_cost_per_million(b).unwrap_or(f64::MAX);
@@ -306,17 +321,29 @@ pub fn maybe_collect(
     request_id: &str,
     organization_id: Option<uuid::Uuid>,
 ) {
-    let Some(rate) = state.auto_router().map(|r| r.config().gold_sample_rate) else {
+    let Some((rate, sample_shadow)) = state
+        .auto_router()
+        .map(|r| (r.config().gold_sample_rate, r.config().gold_sample_shadow))
+    else {
         return;
     };
+    if decision.shadow && !sample_shadow {
+        return;
+    }
     if state.db_pool().is_none() || !is_gold_eligible(request, decision) || !should_sample(rate) {
         return;
     }
+    // Bounded fan-out: each sample costs two completions and a judge call.
+    let Ok(permit) = GOLD_IN_FLIGHT.clone().try_acquire_owned() else {
+        debug!("gold pair: too many samples in flight; skipping");
+        return;
+    };
     let state = state.clone();
     let request = request.clone();
     let decision = decision.clone();
     let request_id = request_id.to_string();
     tokio::spawn(async move {
+        let _permit = permit;
         collect_gold_pair(state, request, decision, request_id, organization_id).await;
     });
 }
