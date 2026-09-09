@@ -9,9 +9,11 @@
 //! `auto` would have made is computed and returned with `shadow: true`
 //! but the request is left untouched.
 
-use aura_core::router::auto::{estimate_tokens, model_supports_tools, model_supports_vision};
+use aura_core::router::auto::{
+    estimate_tokens, model_supports_tools, model_supports_vision, ArmStats,
+};
 use aura_core::{metrics, AutoDecision, AutoRouteError, DecisionContext, Eligibility};
-use aura_types::{parse_auto_model, CreateResponseRequest, RoutingOptions};
+use aura_types::{parse_auto_model, CreateResponseRequest, RoutingOptions, Tier};
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::Json;
 use tracing::{debug, warn};
@@ -110,6 +112,10 @@ impl Eligibility for GatewayEligibility<'_> {
 
     fn provider_of(&self, model: &str) -> Option<String> {
         self.state.provider_name_for_catalog_model(model)
+    }
+
+    fn arm_stats(&self, tier: Tier, model: &str) -> Option<ArmStats> {
+        self.state.arm_stats_for(tier.as_str(), model)
     }
 }
 

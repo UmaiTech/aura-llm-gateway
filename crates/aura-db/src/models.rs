@@ -956,3 +956,51 @@ pub struct RoutingOutcome {
     pub feedback: Option<String>,
     pub estimated_savings_usd: Option<f64>,
 }
+
+/// A decision awaiting outcome scoring, with the raw inputs the rollup
+/// needs (this turn's user text, status, feedback, and the next turn).
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct PendingRoutingOutcome {
+    pub response_id: String,
+    pub provider_response_id: Option<String>,
+    pub conversation_id: Option<Uuid>,
+    pub tier: String,
+    pub selected_model: String,
+    pub shadow: bool,
+    pub created_at: DateTime<Utc>,
+    pub status: Option<String>,
+    pub feedback: Option<String>,
+    pub tool_calls_count: i32,
+    /// `responses.input_items` for this turn, when persisted.
+    pub input_items: Option<serde_json::Value>,
+    /// The next turn's `responses.input_items`, when one exists.
+    pub next_input_items: Option<serde_json::Value>,
+    /// The next turn's model, when one exists.
+    pub next_model: Option<String>,
+}
+
+/// Computed outcome for one decision
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewRoutingOutcome {
+    pub response_id: String,
+    pub tier: String,
+    pub selected_model: String,
+    pub shadow: bool,
+    pub status: Option<String>,
+    pub feedback: Option<String>,
+    pub next_turn: String,
+    pub next_model: Option<String>,
+    pub reward: f64,
+    pub decided_at: DateTime<Utc>,
+}
+
+/// Per-(tier, model) Beta parameters for Thompson sampling
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingArmStat {
+    pub tier: String,
+    pub model: String,
+    pub alpha: f64,
+    pub beta: f64,
+    pub observations: i32,
+    pub updated_at: DateTime<Utc>,
+}

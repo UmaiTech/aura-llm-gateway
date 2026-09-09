@@ -21,6 +21,7 @@ pub mod capabilities;
 pub mod catalog;
 pub mod config;
 pub mod features;
+pub mod outcomes;
 pub mod scorer;
 pub mod tiers;
 
@@ -32,6 +33,10 @@ pub use config::{
 };
 pub use features::{
     estimate_tokens, extract_features, IntentHint, KeywordMatcher, RequestFeatures,
+};
+pub use outcomes::{
+    classify_next_turn, evaluate, is_correction, reward_for, sample_beta, word_jaccard, ArmStats,
+    NextTurn, NextTurnInputs, Outcome, OutcomeInputs,
 };
 pub use scorer::{HeuristicScorer, ScoreResult, HEURISTIC_VERSION};
 pub use tiers::{CandidateInfo, Eligibility, TierCatalog, TierSelection};

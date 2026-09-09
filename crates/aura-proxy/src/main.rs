@@ -6,7 +6,7 @@
 mod routes;
 
 use anyhow::Context;
-use aura_core::router::auto::{CatalogSource, TierModels};
+use aura_core::router::auto::{ArmStats, CatalogSource, TierModels};
 use aura_core::{
     cost::ScrapedPricing, AnthropicProvider, AutoDecision, AutoRouter, BedrockProvider,
     CostCalculator, FireworksProvider, GeminiProvider, HuggingFaceProvider, MistralProvider,
@@ -59,6 +59,9 @@ pub struct AppState {
     /// Short-lived cache of organization settings JSON, keyed by org id.
     org_settings_cache:
         Arc<tokio::sync::RwLock<HashMap<uuid::Uuid, (std::time::Instant, serde_json::Value)>>>,
+    /// Learned (tier, model) arm statistics for Thompson sampling,
+    /// refreshed by the outcome rollup.
+    arm_stats: Arc<std::sync::RwLock<HashMap<(String, String), ArmStats>>>,
 }
 
 /// How long organization settings are cached before being re-read.
@@ -375,6 +378,23 @@ impl AppState {
             auto_router,
             model_catalog: Arc::new(model_catalog),
             org_settings_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            arm_stats: Arc::new(std::sync::RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Arm statistics for a (tier, model), if the rollup has produced any.
+    pub fn arm_stats_for(&self, tier: &str, model: &str) -> Option<ArmStats> {
+        self.arm_stats
+            .read()
+            .ok()?
+            .get(&(tier.to_string(), model.to_string()))
+            .copied()
+    }
+
+    /// Replace all arm statistics (called by the outcome rollup).
+    pub async fn replace_arm_stats(&self, stats: HashMap<(String, String), ArmStats>) {
+        if let Ok(mut guard) = self.arm_stats.write() {
+            *guard = stats;
         }
     }
 
@@ -1400,6 +1420,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Create app state
     let state = AppState::new(config.clone(), db_pool, redis_pool).await;
+
+    // Score past auto-routing decisions on a schedule (no-op without a
+    // database or a configured router).
+    routes::routing_rollup::spawn_rollup_loop(state.clone());
 
     info!(
         providers = state.provider_names().len(),

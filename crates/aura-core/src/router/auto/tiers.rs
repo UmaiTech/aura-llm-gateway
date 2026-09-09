@@ -7,6 +7,7 @@
 //! eligible candidate.
 
 use super::config::{TierModels, WithinTierStrategy};
+use super::outcomes::{sample_beta, ArmStats};
 use aura_types::Tier;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -20,6 +21,11 @@ pub trait Eligibility {
     fn blended_cost_per_million(&self, model: &str) -> Option<f64>;
     /// Provider that serves the model, for the decision record.
     fn provider_of(&self, model: &str) -> Option<String>;
+    /// Learned arm statistics for Thompson sampling, when the caller has
+    /// them. `None` means "no data": the uniform prior is used.
+    fn arm_stats(&self, _tier: Tier, _model: &str) -> Option<ArmStats> {
+        None
+    }
 }
 
 /// A candidate that was considered for a decision.
@@ -189,6 +195,33 @@ impl TierCatalog {
                 Some((
                     m.clone(),
                     format!("round-robin over {} eligible in {}", eligible.len(), tier),
+                ))
+            }
+            WithinTierStrategy::Thompson => {
+                // One Beta sample per eligible arm; highest sample wins.
+                // Arms without data sample from Beta(1, 1), so new models
+                // get explored rather than ignored. Ties (identical
+                // samples are practically impossible) fall to config order.
+                let mut rng = rand::thread_rng();
+                let mut best: Option<(usize, &String, f64, ArmStats)> = None;
+                for (idx, m, _) in &eligible {
+                    let stats = oracle.arm_stats(tier, m).unwrap_or_default();
+                    let sample = sample_beta(&mut rng, stats.alpha, stats.beta);
+                    if best.map(|(_, _, s, _)| sample > s).unwrap_or(true) {
+                        best = Some((*idx, m, sample, stats));
+                    }
+                }
+                let (_, m, sample, stats) = best?;
+                Some((
+                    m.to_string(),
+                    format!(
+                        "thompson sample {:.2} (mean {:.2}, n={:.0}) over {} eligible in {}",
+                        sample,
+                        stats.mean(),
+                        stats.alpha + stats.beta - 2.0,
+                        eligible.len(),
+                        tier
+                    ),
                 ))
             }
             WithinTierStrategy::Cheapest => {
@@ -368,6 +401,51 @@ mod tests {
         assert_ne!(a.model, b.model);
         assert_ne!(b.model, c.model);
         assert_eq!(a.model, d.model);
+    }
+
+    struct ArmOracle;
+    impl Eligibility for ArmOracle {
+        fn is_eligible(&self, _: &str) -> bool {
+            true
+        }
+        fn blended_cost_per_million(&self, _: &str) -> Option<f64> {
+            None
+        }
+        fn provider_of(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn arm_stats(&self, _tier: Tier, model: &str) -> Option<ArmStats> {
+            match model {
+                "gpt-5.6-luna" => Some(ArmStats {
+                    alpha: 200.0,
+                    beta: 2.0,
+                }),
+                "gemini-3.1-flash-lite" => Some(ArmStats {
+                    alpha: 2.0,
+                    beta: 200.0,
+                }),
+                _ => None,
+            }
+        }
+    }
+
+    #[test]
+    fn thompson_prefers_arms_with_better_history() {
+        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Thompson);
+        let mut wins = std::collections::HashMap::new();
+        for _ in 0..200 {
+            let sel = cat
+                .select(Tier::Simple, Tier::Simple, Tier::Simple, &ArmOracle)
+                .unwrap();
+            *wins.entry(sel.model).or_insert(0) += 1;
+            assert!(sel.reason.starts_with("thompson sample"));
+        }
+        let luna = wins.get("gpt-5.6-luna").copied().unwrap_or(0);
+        let lite = wins.get("gemini-3.1-flash-lite").copied().unwrap_or(0);
+        assert!(luna > 120, "luna={} wins={:?}", luna, wins);
+        assert!(lite < 10, "lite={} wins={:?}", lite, wins);
+        // The unknown arm (Beta(1,1)) is explored sometimes.
+        assert!(wins.get("gemini-3.5-flash").copied().unwrap_or(0) > 0);
     }
 
     #[test]

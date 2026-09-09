@@ -204,9 +204,12 @@ routing:
       reasoning: [claude-opus-5, gpt-5.6-sol, claude-fable-5-1]
     boundaries: { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.60 }
     mode_offsets: { cost: -0.10, balanced: 0.0, quality: 0.15 }
-    within_tier: cheapest           # cheapest | config_order | round_robin
+    within_tier: cheapest           # cheapest | config_order | round_robin | thompson
     sticky_tool_loops: true
     tools_min_tier: medium
+    outcome_rollup_interval_secs: 900
+    outcome_grace_secs: 1800
+    arm_stats_window_days: 30
 ```
 
 Feature `weights`, `token_thresholds` and every `keywords` list are configurable too; see `config.example.yaml` for the full block. Tier models the gateway cannot serve are dropped at startup with a warning.
@@ -221,8 +224,30 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 |----------|-------------|
 | `GET /admin/stats/routing/auto?period=24h\|7d\|all` | Summary (applied / shadow decisions, applied cost, estimated savings, decision latency, success rate), per-tier and per-model breakdowns, and the 25 most recent decisions with outcomes. |
 | `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`). |
+| `POST /admin/routing/rollup` | Score pending decisions now and refresh arm statistics; returns counts per signal. |
+| `GET /admin/routing/arms` | Learned Beta(α, β) per (tier, model) used by `within_tier: thompson`. |
 
 The admin app's Routing page renders the same data as an "Auto router" section.
+
+### Outcome signals and rewards
+
+A background job (every `routing.auto.outcome_rollup_interval_secs`, default 15 minutes, or on demand with `POST /admin/routing/rollup`) scores decisions once they are older than `outcome_grace_secs` (default 30 minutes) using what the traces already hold:
+
+| Signal | Source | Reward |
+|--------|--------|--------|
+| explicit feedback | `feedback_samples` approved / rejected | +1 / −1 (overrides everything else) |
+| request failed / incomplete | `request_logs.status` | −1 / −0.5 |
+| **escalation**: the conversation continued on a stronger-tier model | next `responses` row via `previous_response_id` | −1 |
+| **correction**: the next user message opens with "no", "that's wrong", "try again", … | next `responses.input_items` | −1 |
+| **retry**: the next user message is near-identical (word Jaccard ≥ 0.8) | same | −0.5 |
+| **move on**: the next turn is a different task | same | +1 |
+| no follow-up, response completed | | +0.5 |
+
+Tool-loop continuation turns (function outputs without a new user message) are not counted as a verdict. Results land in `routing_outcomes` and are visible per tier on the admin page (mean reward and the move-on / retry / correction / escalation counts) and in `v_routing_outcomes`.
+
+### Adaptive within-tier selection
+
+With `within_tier: thompson`, the gateway keeps Beta(α, β) statistics per (tier, model) from applied decisions in the trailing `arm_stats_window_days` (default 30): α = 1 + Σ positive rewards, β = 1 + Σ |negative rewards|. Each request samples every eligible candidate's Beta and dispatches to the highest sample, so models that keep users moving on win more traffic while new or rarely used models still get explored. `GET /admin/routing/arms` shows the current statistics; the decision `reason` reports the sample, the mean and the observation count. Shadow decisions never feed the arms.
 
 ## Metrics
 
