@@ -91,7 +91,7 @@ impl Default for AutoRoutingConfig {
             arm_stats_window_days: 30,
             gold_sample_rate: 0.0,
             gold_sample_shadow: false,
-            gold_judge_model: "claude-sonnet-4-6".to_string(),
+            gold_judge_model: "claude-sonnet-5".to_string(),
             gold_max_text_chars: 4000,
         }
     }

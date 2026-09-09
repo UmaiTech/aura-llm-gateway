@@ -211,7 +211,7 @@ routing:
     arm_stats_window_days: 30
     llm_classifier: { model: claude-haiku-4-5, timeout_ms: 800 }
     gold_sample_rate: 0.0            # e.g. 0.01 = 1% of eligible requests
-    gold_judge_model: claude-sonnet-4-6
+    gold_judge_model: claude-sonnet-5
     gold_max_text_chars: 4000
 ```
 
@@ -256,7 +256,7 @@ Tool-loop continuation turns (function outputs without a new user message) are n
 
 ### Gold labels
 
-With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self-contained text requests (no tools, images or continuations) is answered in the background by the cheapest eligible model of the lowest tier (A) and of the highest tier (B); `gold_judge_model` (default `claude-sonnet-4-6`) grades the pair and the result lands in `routing_gold_pairs` with the request's feature vector. A verdict of `a` or `tie` means the cheap tier would have sufficed. This is the augmentation RouteLLM used to train its routers, run on live traffic; it costs two extra completions and a judge call per sampled request, so keep the rate small (1% or less). `GET /admin/routing/gold?limit=` returns the summary and recent pairs.
+With `routing.auto.gold_sample_rate` > 0 (default 0), a Bernoulli sample of self-contained text requests (no tools, images or continuations) is answered in the background by the cheapest eligible model of the lowest tier (A) and of the highest tier (B); `gold_judge_model` (default `claude-sonnet-5`) grades the pair and the result lands in `routing_gold_pairs` with the request's feature vector. A verdict of `a` or `tie` means the cheap tier would have sufficed. This is the augmentation RouteLLM used to train its routers, run on live traffic; it costs two extra completions and a judge call per sampled request, so keep the rate small (1% or less). `GET /admin/routing/gold?limit=` returns the summary and recent pairs.
 
 ### Replaying captured traffic
 
