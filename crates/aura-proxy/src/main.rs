@@ -11,17 +11,18 @@ use aura_core::router::auto::{
 };
 use aura_core::{
     cost::ScrapedPricing, AnthropicProvider, AutoDecision, AutoRouter, BedrockProvider,
-    CostCalculator, FireworksProvider, GeminiProvider, HuggingFaceProvider, MistralProvider,
-    ModelCatalog, OllamaProvider, OpenAIProvider, OrgAutoRoutingOverride, Provider, RateLimiter,
-    RedisPool, ResponseCache, TogetherProvider,
+    CostCalculator, FireworksProvider, GatewaySettings, GeminiProvider, HuggingFaceProvider,
+    MistralProvider, ModelCatalog, OllamaProvider, OpenAIProvider, OrgAutoRoutingOverride,
+    Provider, RateLimiter, RedisPool, ResponseCache, TogetherProvider,
 };
 use aura_db::{
-    ApiKeyUsageRepo, DbPool, ModelPricingRepo, NewApiKeyUsage, NewRequestLog, NewRoutingDecision,
-    PoolConfig, RequestLogRepo, RoutingDecisionRepo,
+    ApiKeyUsageRepo, DbPool, GatewaySettingsRepo, ModelPricingRepo, NewApiKeyUsage, NewRequestLog,
+    NewRoutingDecision, PoolConfig, RequestLogRepo, RoutingDecisionRepo,
 };
 use axum::http::HeaderValue;
 use axum::{middleware, Router};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
@@ -48,13 +49,20 @@ pub struct AppState {
     rate_limiter: Option<RateLimiter>,
     /// Response cache (optional, requires Redis)
     response_cache: Option<ResponseCache>,
-    /// Top-level env flag for payload capture (AURA_PAYLOAD_CAPTURE=on).
-    /// When false the per-org flag is never consulted.
-    pub payload_capture_enabled: bool,
+    /// Flags an operator may flip at runtime (payload capture, tool-context
+    /// replay, response cache, rate limiting). Seeded from the boot config
+    /// and the environment, then overridden by the stored gateway settings.
+    runtime: Arc<RuntimeFlags>,
+    /// Runtime overrides currently applied (`gateway_settings` table).
+    gateway_settings: Arc<std::sync::RwLock<GatewaySettings>>,
     /// Complexity-based auto router (`model: "auto"`). Present when auto
     /// routing or shadow scoring is configured and at least one tier has
-    /// a model this gateway can serve.
-    auto_router: Option<Arc<AutoRouter>>,
+    /// a model this gateway can serve. Rebuilt whenever the runtime
+    /// settings change.
+    auto_router: Arc<std::sync::RwLock<Option<Arc<AutoRouter>>>>,
+    /// Tier models dropped at the last router build because this gateway
+    /// cannot serve them (surfaced in the admin settings page).
+    router_dropped: Arc<std::sync::RwLock<Vec<String>>>,
     /// What the gateway knows about each servable model (prices,
     /// capabilities, context window), built from providers + model_pricing.
     model_catalog: Arc<ModelCatalog>,
@@ -71,6 +79,83 @@ pub struct AppState {
     cost_model: Arc<std::sync::RwLock<Option<Arc<CostModel>>>>,
     /// Per-model circuit breaker fed by auto-routing provider failures.
     model_breaker: Arc<std::sync::Mutex<HashMap<String, BreakerState>>>,
+}
+
+/// Runtime-adjustable switches. Atomics so request handlers read them
+/// without locking; the admin settings endpoint is the only writer.
+#[derive(Debug)]
+pub struct RuntimeFlags {
+    payload_capture: AtomicBool,
+    replay_tool_context: AtomicBool,
+    cache_enabled: AtomicBool,
+    cache_ttl_secs: AtomicU64,
+    rate_limit_enabled: AtomicBool,
+    default_rate_limit_rpm: AtomicU32,
+}
+
+/// Requests per minute for API keys without their own limit.
+pub const DEFAULT_RATE_LIMIT_RPM: u32 = 60;
+
+impl RuntimeFlags {
+    /// Boot values: the config file / environment, no overrides.
+    fn from_config(config: &aura_core::Config) -> Self {
+        Self {
+            payload_capture: AtomicBool::new(config.payload_capture_enabled()),
+            replay_tool_context: AtomicBool::new(routes::tool_context_replay_from_env()),
+            cache_enabled: AtomicBool::new(true),
+            cache_ttl_secs: AtomicU64::new(aura_core::cache::DEFAULT_CACHE_TTL),
+            rate_limit_enabled: AtomicBool::new(true),
+            default_rate_limit_rpm: AtomicU32::new(DEFAULT_RATE_LIMIT_RPM),
+        }
+    }
+
+    /// Apply overrides on top of the boot values.
+    fn apply(&self, config: &aura_core::Config, settings: &GatewaySettings) {
+        let boot = Self::from_config(config);
+        let get = |flag: &AtomicBool| flag.load(Ordering::Relaxed);
+        self.payload_capture.store(
+            settings
+                .features
+                .payload_capture
+                .unwrap_or_else(|| get(&boot.payload_capture)),
+            Ordering::Relaxed,
+        );
+        self.replay_tool_context.store(
+            settings
+                .features
+                .replay_tool_context
+                .unwrap_or_else(|| get(&boot.replay_tool_context)),
+            Ordering::Relaxed,
+        );
+        self.cache_enabled.store(
+            settings
+                .cache
+                .enabled
+                .unwrap_or_else(|| get(&boot.cache_enabled)),
+            Ordering::Relaxed,
+        );
+        self.rate_limit_enabled.store(
+            settings
+                .rate_limit
+                .enabled
+                .unwrap_or_else(|| get(&boot.rate_limit_enabled)),
+            Ordering::Relaxed,
+        );
+        self.cache_ttl_secs.store(
+            settings
+                .cache
+                .default_ttl_secs
+                .unwrap_or_else(|| boot.cache_ttl_secs.load(Ordering::Relaxed)),
+            Ordering::Relaxed,
+        );
+        self.default_rate_limit_rpm.store(
+            settings
+                .rate_limit
+                .default_rpm
+                .unwrap_or_else(|| boot.default_rate_limit_rpm.load(Ordering::Relaxed)),
+            Ordering::Relaxed,
+        );
+    }
 }
 
 /// Circuit-breaker state for one model.
@@ -254,8 +339,8 @@ impl AppState {
             (None, None)
         };
 
-        let payload_capture_enabled = config.payload_capture_enabled();
-        if payload_capture_enabled {
+        let runtime = RuntimeFlags::from_config(&config);
+        if runtime.payload_capture.load(Ordering::Relaxed) {
             info!("Payload capture enabled (AURA_PAYLOAD_CAPTURE=on)");
         }
 
@@ -334,54 +419,12 @@ impl AppState {
             "Model catalog built"
         );
 
-        // Auto router: keep only tier models this gateway can actually
-        // serve, then decide whether there is anything to route to.
-        let auto_router = {
-            let mut auto_cfg = config.routing.auto.clone();
-            if !auto_cfg.has_candidates() {
-                // No tiers configured at all: derive them from the catalog
-                // (price thirds, `reasoning` tag) so `auto` works out of
-                // the box on any gateway with a pricing table.
-                auto_cfg.tiers = TierModels::from_catalog(&model_catalog, 3);
-                if auto_cfg.has_candidates() {
-                    info!(
-                        simple = ?auto_cfg.tiers.simple,
-                        medium = ?auto_cfg.tiers.medium,
-                        complex = ?auto_cfg.tiers.complex,
-                        reasoning = ?auto_cfg.tiers.reasoning,
-                        "Auto routing: derived tiers from the model catalog"
-                    );
-                }
-            }
-            let dropped = auto_cfg.prune_unknown_models(|m| {
-                provider_name_for_catalog_model(&providers, &model_map, m).is_some()
-            });
-            if !dropped.is_empty() {
-                warn!(
-                    dropped = ?dropped,
-                    "Auto routing: dropped tier models this gateway cannot serve"
-                );
-            }
-            let wanted = auto_cfg.enabled || auto_cfg.shadow_for_pinned_models;
-            if wanted && !auto_cfg.has_candidates() {
-                warn!("Auto routing: no tier has a servable model; auto routing disabled");
-                None
-            } else if wanted {
-                info!(
-                    enabled = auto_cfg.enabled,
-                    shadow = auto_cfg.shadow_for_pinned_models,
-                    default_mode = %auto_cfg.default_mode,
-                    simple = ?auto_cfg.tiers.simple,
-                    medium = ?auto_cfg.tiers.medium,
-                    complex = ?auto_cfg.tiers.complex,
-                    reasoning = ?auto_cfg.tiers.reasoning,
-                    "Auto routing configured"
-                );
-                Some(Arc::new(AutoRouter::new(auto_cfg)))
-            } else {
-                None
-            }
-        };
+        let (auto_router, router_dropped) = build_auto_router(
+            config.routing.auto.clone(),
+            &model_catalog,
+            &providers,
+            &model_map,
+        );
 
         Self {
             config: Arc::new(config),
@@ -392,8 +435,10 @@ impl AppState {
             redis_pool,
             rate_limiter,
             response_cache,
-            payload_capture_enabled,
-            auto_router,
+            runtime: Arc::new(runtime),
+            gateway_settings: Arc::new(std::sync::RwLock::new(GatewaySettings::default())),
+            auto_router: Arc::new(std::sync::RwLock::new(auto_router)),
+            router_dropped: Arc::new(std::sync::RwLock::new(router_dropped)),
             model_catalog: Arc::new(model_catalog),
             org_settings_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             arm_stats: Arc::new(std::sync::RwLock::new(HashMap::new())),
@@ -611,8 +656,125 @@ impl AppState {
     }
 
     /// The auto router, when configured (enabled or shadow-only).
-    pub fn auto_router(&self) -> Option<&Arc<AutoRouter>> {
-        self.auto_router.as_ref()
+    pub fn auto_router(&self) -> Option<Arc<AutoRouter>> {
+        self.auto_router.read().ok().and_then(|g| g.clone())
+    }
+
+    /// Tier models dropped at the last router build (`tier:model`).
+    pub fn router_dropped_models(&self) -> Vec<String> {
+        self.router_dropped
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default()
+    }
+
+    /// The auto-routing configuration in force: boot config plus the
+    /// applied runtime overrides, before pruning. Available even when no
+    /// router was built (nothing servable), so the admin app can show it.
+    pub fn effective_auto_config(&self) -> aura_core::AutoRoutingConfig {
+        self.gateway_settings()
+            .apply_to_auto(&self.config.routing.auto)
+    }
+
+    /// Top-level payload capture switch (`AURA_PAYLOAD_CAPTURE` or the
+    /// runtime override). When false the per-org flag is never consulted.
+    pub fn payload_capture_enabled(&self) -> bool {
+        self.runtime.payload_capture.load(Ordering::Relaxed)
+    }
+
+    /// Re-synthesize prior tool calls from `previous_response_id`.
+    pub fn replay_tool_context_enabled(&self) -> bool {
+        self.runtime.replay_tool_context.load(Ordering::Relaxed)
+    }
+
+    /// Serve and store cached responses (still needs Redis).
+    pub fn cache_enabled(&self) -> bool {
+        self.runtime.cache_enabled.load(Ordering::Relaxed)
+    }
+
+    /// TTL for newly cached responses.
+    pub fn cache_ttl_secs(&self) -> u64 {
+        self.runtime.cache_ttl_secs.load(Ordering::Relaxed)
+    }
+
+    /// Enforce per-key rate limits (still needs Redis).
+    pub fn rate_limit_enabled(&self) -> bool {
+        self.runtime.rate_limit_enabled.load(Ordering::Relaxed)
+    }
+
+    /// Requests per minute for keys without their own limit.
+    pub fn default_rate_limit_rpm(&self) -> u32 {
+        self.runtime.default_rate_limit_rpm.load(Ordering::Relaxed)
+    }
+
+    /// The runtime overrides currently applied.
+    pub fn gateway_settings(&self) -> GatewaySettings {
+        self.gateway_settings
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_default()
+    }
+
+    /// Apply runtime overrides: flip the flags and rebuild the auto
+    /// router. Returns the tier models dropped because this gateway
+    /// cannot serve them. Does not persist; see `save_gateway_settings`.
+    pub fn apply_gateway_settings(&self, settings: GatewaySettings) -> Vec<String> {
+        self.runtime.apply(&self.config, &settings);
+        let auto_cfg = settings.apply_to_auto(&self.config.routing.auto);
+        let (router, dropped) = build_auto_router(
+            auto_cfg,
+            &self.model_catalog,
+            &self.providers,
+            &self.model_map,
+        );
+        if let Ok(mut guard) = self.auto_router.write() {
+            *guard = router;
+        }
+        if let Ok(mut guard) = self.router_dropped.write() {
+            *guard = dropped.clone();
+        }
+        if let Ok(mut guard) = self.gateway_settings.write() {
+            *guard = settings;
+        }
+        dropped
+    }
+
+    /// Persist runtime overrides. Returns `Ok(false)` without a database
+    /// (the overrides then live only in this process).
+    pub async fn save_gateway_settings(&self, settings: &GatewaySettings) -> Result<bool, String> {
+        let Some(pool) = self.db_pool.as_ref() else {
+            return Ok(false);
+        };
+        let value = serde_json::to_value(settings).map_err(|e| e.to_string())?;
+        GatewaySettingsRepo::set(pool, &value)
+            .await
+            .map(|_| true)
+            .map_err(|e| e.to_string())
+    }
+
+    /// Load and apply the stored runtime overrides. Returns whether a
+    /// non-empty document was found.
+    pub async fn load_gateway_settings(&self) -> Result<bool, String> {
+        let Some(pool) = self.db_pool.as_ref() else {
+            return Ok(false);
+        };
+        let Some(value) = GatewaySettingsRepo::get(pool)
+            .await
+            .map_err(|e| e.to_string())?
+        else {
+            return Ok(false);
+        };
+        let settings: GatewaySettings =
+            serde_json::from_value(value).map_err(|e| format!("stored gateway_settings: {e}"))?;
+        if settings.is_empty() {
+            return Ok(false);
+        }
+        settings.validate()?;
+        let dropped = self.apply_gateway_settings(settings);
+        if !dropped.is_empty() {
+            warn!(dropped = ?dropped, "gateway settings: tier models this gateway cannot serve");
+        }
+        Ok(true)
     }
 
     /// Cost calculator reference
@@ -656,7 +818,7 @@ impl AppState {
     ///   When `org_id` is `None` (unauthenticated / no org context),
     ///   we fall back to the env flag alone — this matches dev/admin usage.
     pub async fn should_capture_payload(&self, org_id: Option<uuid::Uuid>) -> bool {
-        if !self.payload_capture_enabled {
+        if !self.payload_capture_enabled() {
             return false;
         }
         let Some(oid) = org_id else {
@@ -1421,6 +1583,63 @@ impl AppState {
 /// eligibility oracle: exact catalog hit first, then `supports_model` on
 /// every provider except Ollama (whose `supports_model` accepts any
 /// non-empty name).
+/// Build the auto router from a configuration: derive tiers from the
+/// catalog when none are configured, drop models this gateway cannot
+/// serve, and return `None` when nothing is left to route to (or neither
+/// routing nor shadow scoring is wanted). The second value lists the
+/// dropped `tier:model` entries.
+fn build_auto_router(
+    mut auto_cfg: aura_core::AutoRoutingConfig,
+    model_catalog: &ModelCatalog,
+    providers: &HashMap<String, Arc<dyn Provider>>,
+    model_map: &HashMap<String, String>,
+) -> (Option<Arc<AutoRouter>>, Vec<String>) {
+    if !auto_cfg.has_candidates() {
+        // No tiers configured at all: derive them from the catalog
+        // (price thirds, `reasoning` tag) so `auto` works out of
+        // the box on any gateway with a pricing table.
+        auto_cfg.tiers = TierModels::from_catalog(model_catalog, 3);
+        if auto_cfg.has_candidates() {
+            info!(
+                simple = ?auto_cfg.tiers.simple,
+                medium = ?auto_cfg.tiers.medium,
+                complex = ?auto_cfg.tiers.complex,
+                reasoning = ?auto_cfg.tiers.reasoning,
+                "Auto routing: derived tiers from the model catalog"
+            );
+        }
+    }
+    let dropped = auto_cfg.prune_unknown_models(|m| {
+        provider_name_for_catalog_model(providers, model_map, m).is_some()
+    });
+    if !dropped.is_empty() {
+        warn!(
+            dropped = ?dropped,
+            "Auto routing: dropped tier models this gateway cannot serve"
+        );
+    }
+    let wanted = auto_cfg.enabled || auto_cfg.shadow_for_pinned_models;
+    let router = if wanted && !auto_cfg.has_candidates() {
+        warn!("Auto routing: no tier has a servable model; auto routing disabled");
+        None
+    } else if wanted {
+        info!(
+            enabled = auto_cfg.enabled,
+            shadow = auto_cfg.shadow_for_pinned_models,
+            default_mode = %auto_cfg.default_mode,
+            simple = ?auto_cfg.tiers.simple,
+            medium = ?auto_cfg.tiers.medium,
+            complex = ?auto_cfg.tiers.complex,
+            reasoning = ?auto_cfg.tiers.reasoning,
+            "Auto routing configured"
+        );
+        Some(Arc::new(AutoRouter::new(auto_cfg)))
+    } else {
+        None
+    };
+    (router, dropped)
+}
+
 fn provider_name_for_catalog_model(
     providers: &HashMap<String, Arc<dyn Provider>>,
     model_map: &HashMap<String, String>,
@@ -1575,6 +1794,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Create app state
     let state = AppState::new(config.clone(), db_pool, redis_pool).await;
+
+    // Runtime overrides edited from the admin app (gateway_settings table).
+    match state.load_gateway_settings().await {
+        Ok(true) => info!("Applied stored gateway settings"),
+        Ok(false) => debug!("No stored gateway settings"),
+        Err(e) => warn!(error = %e, "Failed to load stored gateway settings; using boot config"),
+    }
 
     // Score past auto-routing decisions on a schedule (no-op without a
     // database or a configured router).

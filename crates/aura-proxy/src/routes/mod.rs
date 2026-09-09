@@ -1,6 +1,7 @@
 //! API routes for the Aura LLM Gateway
 
 pub mod admin;
+pub mod admin_settings;
 pub mod auth;
 pub mod auto_routing;
 pub mod conversations;
@@ -23,6 +24,7 @@ pub use auth::auth_middleware;
 #[allow(unused_imports)]
 pub use auth::{AuthContext, AuthError};
 pub use rate_limit::rate_limit_middleware;
+pub use responses::tool_context_replay_from_env;
 
 /// Creates the main application router with all routes
 pub fn app_router() -> Router<AppState> {
