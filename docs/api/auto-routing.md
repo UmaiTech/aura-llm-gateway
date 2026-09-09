@@ -76,7 +76,7 @@ The response's `model` field is the concrete model that answered, and the decisi
 ```json
 {
   "id": "resp_...",
-  "model": "gpt-5.4-nano",
+  "model": "gemini-3.1-flash-lite",
   "metadata": {
     "aura": {
       "routing_strategy": "auto:simple",
@@ -93,7 +93,8 @@ The response's `model` field is the concrete model that answered, and the decisi
         "hard_filters": [],
         "candidates": [
           {"model": "gemini-3.1-flash-lite", "provider": "google", "tier": "simple", "cost_per_million": 0.11, "eligible": true},
-          {"model": "gpt-5.4-nano", "provider": "openai", "tier": "simple", "cost_per_million": 0.16, "eligible": true}
+          {"model": "gemini-3.5-flash", "provider": "google", "tier": "simple", "cost_per_million": 0.29, "eligible": true},
+          {"model": "gpt-5.6-luna", "provider": "openai", "tier": "simple", "cost_per_million": 0.35, "eligible": true}
         ],
         "selected": "gemini-3.1-flash-lite",
         "selected_provider": "google",
