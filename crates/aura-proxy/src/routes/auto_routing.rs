@@ -300,8 +300,13 @@ pub async fn resolve_auto_model(
     let merged: Option<RoutingOptions> = if org.is_empty() {
         None
     } else {
-        Some(org.merged_with(request.routing.as_ref()))
+        Some(org.merged_with(request.routing.as_ref(), alias.and_then(|a| a.mode)))
     };
+    if let Some(m) = &merged {
+        // Everything downstream (escalation, gold sampling) reads the
+        // request's options; make sure they see the org policy too.
+        request.routing = Some(m.clone());
+    }
     let options = merged.as_ref().or(request.routing.as_ref());
     let ctx = DecisionContext {
         requested_model: &requested_model,
@@ -440,12 +445,17 @@ pub fn escalate_after_failure(
     attempt: u32,
 ) -> Option<std::sync::Arc<dyn aura_core::Provider>> {
     let failed_model = request.model.clone();
-    state.record_model_failure(&failed_model);
-
-    let d = decision.as_mut().filter(|d| !d.shadow)?;
     let router = state.auto_router()?;
     let cfg = &router.config().escalation;
     let code = error.error_code();
+    // Only provider-side failures (the escalation triggers: rate limits,
+    // 5xx, timeouts, ...) feed the breaker. Client errors such as an
+    // invalid request or a content filter say nothing about the model.
+    if cfg.triggers_on(code) {
+        state.record_model_failure(&failed_model);
+    }
+
+    let d = decision.as_mut().filter(|d| !d.shadow)?;
     if !cfg.triggers_on(code) || attempt >= cfg.max_attempts {
         return None;
     }

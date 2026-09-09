@@ -142,7 +142,9 @@ routing:
     outcome_rollup_interval_secs: 900
     outcome_grace_secs: 1800
     arm_stats_window_days: 30
-    # Classifier used when the request doesn't pick one: heuristic | llm.
+    # Classifier used when the request doesn't pick one: heuristic | learned | llm.
+    # `learned` uses the active trained model and falls back to the heuristic
+    # when none is loaded.
     # `llm` calls llm_classifier.model with a hard timeout and falls back
     # to the heuristic on any failure.
     default_classifier: heuristic
@@ -153,6 +155,9 @@ routing:
     # cheapest and strongest tiers in the background and have the judge
     # model grade them (two extra completions + one judge call per sample).
     gold_sample_rate: 0.0
+    # Sample pinned-model (shadow) requests too. Off: their prompts would
+    # otherwise be answered by providers the tenant did not choose.
+    gold_sample_shadow: false
     gold_judge_model: claude-sonnet-4-6
     gold_max_text_chars: 4000
     # Escalation after provider failures on auto-routed requests, and the

@@ -184,7 +184,7 @@ An organization can override the gateway defaults through `organizations.setting
 }
 ```
 
-Precedence is request `routing` options, then the organization override, then the gateway config. `enabled` can switch `auto` on for one organization while the gateway default stays off, or off for one organization while it is on. Deny lists from the organization and the request are both applied. Settings are cached for 60 seconds on the gateway.
+Preferences follow request `routing` options, then the `auto:<mode>` alias, then the organization override, then the gateway config; the organization's `default_mode` only applies when the request chose none. Bounds are policy and cannot be loosened by a request: `min_tier` is the stronger of the two, `max_tier` the weaker, deny lists from both are applied, and a candidate must be permitted by the organization's `allow` list *and* the request's. `enabled` can switch `auto` on for one organization while the gateway default stays off, or off for one organization while it is on. Settings are cached for 60 seconds on the gateway and refreshed when the organization is updated.
 
 ## Errors
 

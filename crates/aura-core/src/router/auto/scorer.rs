@@ -129,9 +129,11 @@ impl HeuristicScorer {
             if long_output { 0.5 } else { 0.0 },
         );
 
-        let raw_score = raw.clamp(-1.0, 1.0);
+        let raw_score = (raw.clamp(-1.0, 1.0) * 1000.0).round() / 1000.0;
         let offset = self.offsets.for_mode(mode);
-        let score = clamp01(raw_score + offset);
+        // Rounded before the tier lookup so the recorded score and tier
+        // never disagree at a boundary.
+        let score = (clamp01(raw_score + offset) * 1000.0).round() / 1000.0;
         if offset.abs() > f64::EPSILON {
             signals.insert("mode_offset".to_string(), offset);
         }
@@ -152,8 +154,8 @@ impl HeuristicScorer {
         }
 
         ScoreResult {
-            raw_score: (raw_score * 1000.0).round() / 1000.0,
-            score: (score * 1000.0).round() / 1000.0,
+            raw_score,
+            score,
             tier,
             signals,
             notes,
