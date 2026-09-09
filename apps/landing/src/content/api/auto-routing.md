@@ -181,6 +181,22 @@ Models are trained with the scripts in `scripts/router/`, pushed through the adm
 
 Prometheus metrics: `aura_routing_decisions_total{mode,tier,classifier,model,shadow}`, `aura_routing_classifier_seconds{classifier}`, `aura_routing_failures_total{reason}`, `aura_routing_escalations_total{from_tier,to_tier,error_type}`.
 
+### Runtime settings from the admin app
+
+A small set of `routing.auto` values can also be changed while the gateway runs, from the admin app's **Settings** page (`GET` / `PUT /admin/settings`, admin key required): `enabled`, `shadow_for_pinned_models`, `default_mode`, `default_classifier`, `within_tier`, `sticky_tool_loops`, the four tier lists, `llm_classifier.model`, `gold_sample_rate` and `escalation.enabled`, plus the payload-capture and tool-context-replay flags, the response-cache switch and TTL, and the default per-key rate limit.
+
+These overrides are stored in the `gateway_settings` table, layered over the file and environment values at boot, and applied immediately on save (the router is rebuilt in place). Every field is optional; an unset field inherits the boot value, so `AURA_AUTO_ROUTING=on` and a stored `routing.enabled: false` combine to *off*. Listen address, provider keys, connections, admin auth and CORS stay environment-only and are shown read-only.
+
+```bash
+curl -X PUT $AURA/admin/settings -H "Authorization: Bearer $AURA_ADMIN_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"routing": {"enabled": true, "default_mode": "cost"}}'
+# -> {"boot": {...}, "overrides": {...}, "effective": {...}, "environment": {...}, "persisted": true}
+```
+
+Send `{}` to clear all overrides. Tier models this gateway cannot serve are dropped and reported in `warnings`.
+
+
 ## SDKs
 
 Both SDKs pass the model string through unchanged; use `KnownModels.AUTO`, `KnownModels.AUTO_COST` or `KnownModels.AUTO_QUALITY`.

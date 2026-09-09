@@ -14,6 +14,7 @@ pub mod provider;
 pub mod rate_limit;
 pub mod redis;
 pub mod router;
+pub mod settings;
 pub mod state;
 pub mod validation;
 
@@ -45,6 +46,7 @@ pub use router::{
     ProviderEndpointBuilder, Region, RoutingConfig, RoutingDecision, RoutingStrategy,
     RoutingWeights, SmartRouter, SmartRouterBuilder, StrategySelector,
 };
+pub use settings::GatewaySettings;
 pub use state::{AppState, AppStateBuilder};
 pub use validation::{run_fanout, FanoutError, FanoutSelector};
 

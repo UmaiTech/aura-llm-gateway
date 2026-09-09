@@ -211,14 +211,11 @@ pub async fn load_arm_stats(state: &AppState) {
 /// Spawn the periodic rollup when configured (database present, router
 /// configured, interval > 0).
 pub fn spawn_rollup_loop(state: AppState) {
-    let Some(interval_secs) = state
-        .auto_router()
-        .map(|r| r.config().outcome_rollup_interval_secs)
-        .filter(|s| *s > 0)
-    else {
-        return;
-    };
-    if state.db_pool().is_none() {
+    // The interval comes from the boot config; the router itself may be
+    // switched on later from the admin settings, so the loop runs as long
+    // as a database exists and skips ticks while no router is configured.
+    let interval_secs = state.config.routing.auto.outcome_rollup_interval_secs;
+    if interval_secs == 0 || state.db_pool().is_none() {
         return;
     }
     tokio::spawn(async move {
@@ -227,6 +224,9 @@ pub fn spawn_rollup_loop(state: AppState) {
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             ticker.tick().await;
+            if state.auto_router().is_none() {
+                continue;
+            }
             if let Err(e) = run_rollup(&state).await {
                 warn!(error = %e, "routing rollup failed");
             }

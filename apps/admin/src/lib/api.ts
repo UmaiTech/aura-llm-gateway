@@ -22,6 +22,8 @@ import type {
   TokenUsageTimeline,
   EndUserSummary,
   ProviderSummary,
+  GatewaySettingsOverrides,
+  GatewaySettingsResponse,
 } from './types'
 import { useAuthStore } from '@/stores'
 
@@ -165,6 +167,22 @@ export async function getEndUsers(
 // Providers (detailed view)
 export async function getProviders(): Promise<ProviderSummary[]> {
   return fetchApi<ProviderSummary[]>('/admin/providers')
+}
+
+// Gateway settings (admin Settings page). GET returns boot / overrides /
+// effective views; PUT replaces the override document and applies it
+// immediately (send {} to clear).
+export async function getGatewaySettings(): Promise<GatewaySettingsResponse> {
+  return fetchApi<GatewaySettingsResponse>('/admin/settings')
+}
+
+export async function updateGatewaySettings(
+  overrides: GatewaySettingsOverrides
+): Promise<GatewaySettingsResponse> {
+  return fetchApi<GatewaySettingsResponse>('/admin/settings', {
+    method: 'PUT',
+    body: JSON.stringify(overrides),
+  })
 }
 
 // Routing rule CRUD methods removed (#175 / A6) — the backend handlers

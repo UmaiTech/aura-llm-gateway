@@ -1067,83 +1067,41 @@ export function HarnessPage() {
           })()}
 
           {activeTab === 'guardrails' && (
-            <div className="flex-1 p-6 space-y-6">
-              <Card>
+            <div className="flex-1 p-6">
+              <Card className="max-w-2xl mx-auto mt-8">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <ClockLine className="h-4 w-4" />
-                    Execution Limits
+                    <ShieldLine className="h-5 w-5" />
+                    Guardrails — on the roadmap
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Max Tool Calls</label>
-                      <Input type="number" defaultValue="10" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Max Execution Time (s)</label>
-                      <Input type="number" defaultValue="60" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Max Tokens</label>
-                      <Input type="number" defaultValue="8000" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Max Cost ($)</label>
-                      <Input type="number" defaultValue="1.00" step="0.01" />
-                    </div>
-                  </div>
+                <CardContent className="space-y-4 text-sm text-muted-foreground">
+                  <p>
+                    Gateway-enforced execution limits (max tool calls, wall
+                    time, spend per run), loop detection and content
+                    moderation aren&apos;t implemented yet. What exists today
+                    is per request: <code className="text-xs bg-muted px-1 py-0.5 rounded">max_output_tokens</code>,
+                    the auto router&apos;s{' '}
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded">routing.max_cost_usd</code>{' '}
+                    budget, and per-key rate and daily message limits under{' '}
+                    <a href="/keys" className="text-primary hover:underline">
+                      API Keys
+                    </a>.
+                  </p>
+                  <p>
+                    Tracked in the public roadmap. If you want this sooner,
+                    open a feature request on{' '}
+                    <a
+                      href="https://github.com/UmaiTech/aura-llm-gateway/issues"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      GitHub
+                    </a>.
+                  </p>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <ShieldLine className="h-4 w-4" />
-                    Loop Detection
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="rounded border-border" />
-                    <span className="text-sm">Detect repeated tool calls with same parameters</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="rounded border-border" />
-                    <span className="text-sm">Auto-terminate after 3 identical calls</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="rounded border-border" />
-                    <span className="text-sm">Log suspected infinite loops</span>
-                  </label>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <BrainLine className="h-4 w-4" />
-                    Content Safety
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="rounded border-border" />
-                    <span className="text-sm">Enable content moderation</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" className="rounded border-border" />
-                    <span className="text-sm">Block sensitive data in tool outputs</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" className="rounded border-border" />
-                    <span className="text-sm">Require human approval for certain actions</span>
-                  </label>
-                </CardContent>
-              </Card>
-
-              <Button variant="gradient">Save Configuration</Button>
             </div>
           )}
         </div>
