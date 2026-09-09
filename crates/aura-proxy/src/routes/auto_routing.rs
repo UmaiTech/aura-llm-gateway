@@ -290,6 +290,10 @@ pub async fn resolve_auto_model(
     // Organization override (settings.routing.auto): may switch auto on
     // or off for this org and narrows the request's options.
     let org = state.org_auto_routing_override(organization_id).await;
+    // The synthetic marker is opt-in per organization (or free on a
+    // gateway without tenants), so a tenant cannot hide traffic from
+    // stats or rewards by setting a header.
+    let synthetic = synthetic && (organization_id.is_none() || org.allow_synthetic == Some(true));
     let shadow = alias.is_none();
     let shadow_enabled = org
         .shadow_for_pinned_models

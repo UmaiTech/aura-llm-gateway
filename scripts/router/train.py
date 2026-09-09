@@ -346,6 +346,9 @@ def main() -> int:
     def vec(rs):
         return [featurize(f) for f, _, _, _, _ in rs], [TIERS.index(lbl) for _, lbl, _, _, _ in rs]
 
+    if not tr_rows:
+        print("no training rows left after the holdout split; lower --holdout", file=sys.stderr)
+        return 1
     X_all, _ = vec(rows)
     _, mean, scale = standardise(X_all)
 
@@ -378,10 +381,14 @@ def main() -> int:
         metrics["holdout_synthetic"] = evaluate(W, b, std(X_sh), y_sh)
     print(json.dumps({k: v for k, v in metrics.items() if k.startswith(("train", "holdout"))}, indent=2))
 
-    live_acc = (metrics.get("holdout_live") or metrics.get("holdout") or {}).get("accuracy")
-    if args.min_live_accuracy is not None and live_acc is not None and live_acc < args.min_live_accuracy:
-        print(f"live-holdout accuracy {live_acc:.3f} is below --min-live-accuracy {args.min_live_accuracy}; not writing", file=sys.stderr)
-        return 3
+    live_acc = (metrics.get("holdout_live") or {}).get("accuracy")
+    if args.min_live_accuracy is not None:
+        if live_acc is None:
+            print("--min-live-accuracy needs live rows in the holdout (use --holdout-real and a non-zero --holdout); none found, not writing", file=sys.stderr)
+            return 3
+        if live_acc < args.min_live_accuracy:
+            print(f"live-holdout accuracy {live_acc:.3f} is below --min-live-accuracy {args.min_live_accuracy}; not writing", file=sys.stderr)
+            return 3
 
     defaults = {"simple_medium": 0.15, "medium_complex": 0.35, "complex_reasoning": 0.60}
     scores = [expected_score(predict_probs(W, b, x)) for x in Z]

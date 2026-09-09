@@ -224,6 +224,12 @@ pub struct OrgAutoRoutingOverride {
     /// organization (the request's own `max_cost_usd` wins when lower).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_cost_usd: Option<f64>,
+    /// Honour the `x-aura-synthetic` header for this organization's keys.
+    /// Off by default: the header removes traffic from stats, rewards and
+    /// gold sampling, so only the organization that runs synthetic-trace
+    /// batches should be able to set it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_synthetic: Option<bool>,
 }
 
 impl OrgAutoRoutingOverride {

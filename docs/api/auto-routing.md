@@ -123,6 +123,7 @@ Fine-tune a single request with a top-level `routing` object (an Aura extension,
 | `min_tier` | tier | `simple` | Never route below this tier. |
 | `max_tier` | tier | `reasoning` | Never route above this tier (budget guard). |
 | `max_cost_usd` | number | none | Budget for this request. Candidates whose predicted cost (learned cost model) exceeds it are skipped, searching the chosen tier, then above, then below; when nothing fits the budget is ignored and `reason` says so. |
+| `allow_synthetic` | Honour `x-aura-synthetic` for this organization's keys (default false). |
 | `allow` | string[] | all | Only consider models matching one of these patterns. Patterns match the model id or `provider/model`; a trailing `*` is a prefix wildcard. |
 | `deny` | string[] | none | Never consider models matching one of these patterns. |
 | `sticky` | boolean | `true` | Keep the previous turn's model when this request continues a tool loop (has `function_call_output` items and `previous_response_id`). |
@@ -394,8 +395,11 @@ Every request a run makes carries the `x-aura-synthetic: 1` header. The
 gateway records those decisions with `synthetic: true` (also visible in
 `metadata.aura.routing`) and excludes them from `/admin/stats/routing/auto`,
 the outcome rollup (so rewards and Thompson arm statistics never see them),
-savings and live gold sampling. Run synthetic batches under a dedicated
-organization and API key so their spend is attributable.
+savings and live gold sampling. The header is honoured only for keys of
+an organization whose override sets `allow_synthetic: true` (or on a
+gateway without tenants), so run synthetic batches under a dedicated
+organization with that flag and its own API key; their spend stays
+attributable and nobody else can hide traffic from the stats.
 
 Rows land in `routing_gold_pairs` with `source = 'synthetic'`, a `batch_id`,
 a `split` (`train` or `holdout`, chosen per family × level cluster), the

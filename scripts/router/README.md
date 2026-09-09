@@ -50,6 +50,8 @@ tiers. `synth.py` fills those gaps; the design is in
 
 ```bash
 export AURA_GATEWAY=https://gateway AURA_SYNTH_KEY=aura_live_...   # key of a dedicated synthetic org
+# that org needs settings.routing.auto.allow_synthetic: true, or the gateway
+# ignores the x-aura-synthetic header and the run pollutes live stats
 export AURA_ADMIN_KEY=...
 python3 synth.py profile --out profile.json                       # no text leaves the gateway
 python3 synth.py generate --n 500 --profile profile.json --out requests.jsonl --budget-usd 3

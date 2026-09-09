@@ -496,6 +496,14 @@ def cmd_generate(args) -> int:
     known = set()
     if args.known_hashes and os.path.exists(args.known_hashes):
         known = {l.strip() for l in open(args.known_hashes) if l.strip()}
+    if args.append and os.path.exists(args.out):
+        # Near-duplicate detection must see earlier runs too.
+        for line in open(args.out, encoding="utf-8"):
+            if line.strip():
+                prev = json.loads(line)
+                known.add(prev.get("prompt_hash", ""))
+                if prev.get("user_text"):
+                    minhash.near_duplicate(prev["user_text"])
 
     out = open(args.out, "a" if args.append else "w", encoding="utf-8")
     written = 0
@@ -674,6 +682,8 @@ def cmd_label(args) -> int:
     cost_out = open(args.cost_rows, "a" if args.append else "w", encoding="utf-8") if args.cost_rows else None
     labelled = 0
     failures = Counter()
+    judge_model_used = args.judge_model or ""
+    judge_dead_rows = 0
     for row in rows:
         if row["prompt_hash"] in done:
             continue
@@ -729,6 +739,8 @@ def cmd_label(args) -> int:
                 ladder.append({"tier": tier, "model": model, "error": f"judge: {e}"[:200], "cost_usd": cost})
                 continue
             verdict = j.get("verdict")
+            if j.get("judge_model"):
+                judge_model_used = j["judge_model"]
             if verdict in ("a", "b") and swapped:
                 verdict = "b" if verdict == "a" else "a"
             confidence = j.get("confidence")
@@ -745,6 +757,21 @@ def cmd_label(args) -> int:
                 label = tier
                 best = (tier, model, answer, cost, resp, j, verdict)
                 break
+        # A judge that keeps failing (unservable model, bad key) would
+        # otherwise burn the whole budget on answers nobody grades.
+        judged = [l for l in ladder if l.get("model")]
+        if judged and all(l.get("verdict") is None for l in judged):
+            judge_dead_rows += 1
+            if judge_dead_rows >= args.max_judge_failures:
+                print(
+                    f"judge returned no verdict on {judge_dead_rows} rows in a row "
+                    f"(last error: {judged[-1].get('error')}); stopping",
+                    file=sys.stderr,
+                )
+                failures["judge_unavailable"] += 1
+                break
+        else:
+            judge_dead_rows = 0
         if label is None:
             label = reference_tier
         if best is None:
@@ -778,7 +805,7 @@ def cmd_label(args) -> int:
             "tier_a": pair_a["tier"], "model_a": pair_a["model"], "text_a": pair_a["text"], "cost_a": pair_a["cost"], "latency_a_ms": pair_a["latency"],
             "tier_b": reference_tier, "model_b": reference_model, "text_b": ref_answer, "cost_b": ref_cost,
             "latency_b_ms": (ref_resp.get("metadata", {}).get("aura", {}) or {}).get("latency_ms"),
-            "judge_model": args.judge_model or "",
+            "judge_model": judge_model_used,
             "verdict": pair_a["verdict"], "judge_confidence": pair_a["confidence"],
             "language": row.get("language"),
             "rated_level": row.get("rated_level"),
@@ -916,6 +943,7 @@ def main() -> int:
     l.add_argument("--reference-model")
     l.add_argument("--judge-model", help="defaults to the gateway's gold_judge_model")
     l.add_argument("--confidence-floor", type=float, default=0.6)
+    l.add_argument("--max-judge-failures", type=int, default=3, help="stop after this many consecutive rows with no judge verdict")
     l.add_argument("--disagreement-weight", type=float, default=0.5)
     l.add_argument("--holdout", type=float, default=0.2)
     l.add_argument("--budget-usd", type=float, default=50.0)

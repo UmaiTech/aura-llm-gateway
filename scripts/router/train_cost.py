@@ -61,7 +61,7 @@ def rows_from_db(database_url: str, days: int):
     except ImportError:  # pragma: no cover
         sys.exit("reading from the database needs psycopg: pip install 'psycopg[binary]'")
     sql = """
-        SELECT d.features, rl.model_id, rl.output_tokens, rl.input_tokens, rl.cost_usd::float8
+        SELECT d.features, rl.model_id, rl.output_tokens, rl.input_tokens, rl.cost_usd::float8, d.synthetic
         FROM routing_decisions d
         JOIN request_logs rl ON rl.response_id = d.response_id
         WHERE rl.status = 'completed'
@@ -71,8 +71,8 @@ def rows_from_db(database_url: str, days: int):
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (days,))
-            for feats, model, out, inp, cost in cur:
-                yield feats, model, int(out), inp, cost, "db"
+            for feats, model, out, inp, cost, synthetic in cur:
+                yield feats, model, int(out), inp, cost, "synthetic" if synthetic else "db"
 
 
 def _solve(A: list[list[float]], b: list[float]) -> list[float]:
@@ -206,6 +206,9 @@ def main() -> int:
     wts = [args.synthetic_weight if src == "synthetic" else 1.0 for _, _, _, _, _, src in rows]
     Z, mean, scale = standardise(X)
     n_hold = int(len(Z) * args.holdout) if args.holdout > 0 else 0
+    if n_hold >= len(Z):
+        print("no training rows left after the holdout split; lower --holdout", file=sys.stderr)
+        return 1
     sources = {}
     for r in rows:
         sources[r[5]] = sources.get(r[5], 0) + 1
