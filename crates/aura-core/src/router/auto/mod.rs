@@ -981,10 +981,10 @@ mod tests {
             // tight budget only on gpt-5.4-mini.
             Some(match model {
                 "gpt-5.4-mini" => 0.0008,
-                "gemini-3.5-flash" => 0.0015,
-                "claude-sonnet-4-6" => 0.0090,
-                "gpt-5.5" => 0.0100,
-                "gemini-3.1-pro-preview" => 0.0080,
+                "gemini-3.8-flash" => 0.0015,
+                "claude-sonnet-5" => 0.0090,
+                "gpt-5.6-terra" => 0.0100,
+                "gemini-3-pro-preview" => 0.0080,
                 _ => 0.0500,
             })
         }
@@ -1036,9 +1036,9 @@ mod tests {
         let failed = vec![d.selected.clone()];
         let sel = r.next_candidate(&d, None, &oracle(), &failed).unwrap();
         assert_eq!(sel.tier, Tier::Simple);
-        assert_eq!(sel.model, "gpt-5.4-nano");
+        assert_eq!(sel.model, "gemini-3.5-flash");
         AutoRouter::apply_escalation(&mut d, sel, "service_unavailable");
-        assert_eq!(d.selected, "gpt-5.4-nano");
+        assert_eq!(d.selected, "gemini-3.5-flash");
         assert_eq!(d.escalations.len(), 1);
         assert_eq!(d.escalations[0].from_model, "gemini-3.1-flash-lite");
         assert!(d
@@ -1048,8 +1048,8 @@ mod tests {
         // Exhaust the tier: moves up to medium.
         let failed = vec![
             "gemini-3.1-flash-lite".to_string(),
-            "gpt-5.4-nano".to_string(),
-            "claude-haiku-4-5".to_string(),
+            "gemini-3.5-flash".to_string(),
+            "gpt-5.6-luna".to_string(),
         ];
         let sel = r.next_candidate(&d, None, &oracle(), &failed).unwrap();
         assert_eq!(sel.tier, Tier::Medium);
