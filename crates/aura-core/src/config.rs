@@ -103,6 +103,10 @@ pub struct Config {
     /// Feature flags
     #[serde(default)]
     pub features: FeaturesConfig,
+
+    /// Path of the YAML file this config was loaded from, if any.
+    #[serde(skip)]
+    pub config_file: Option<String>,
 }
 
 /// Server configuration
@@ -229,6 +233,7 @@ impl Default for Config {
             admin: AdminConfig::default(),
             routing: RoutingConfig::default(),
             features: FeaturesConfig::default(),
+            config_file: None,
         }
     }
 }
@@ -348,6 +353,31 @@ impl Config {
         Ok(config)
     }
 
+    /// Loads configuration the way the gateway binary does.
+    ///
+    /// When `AURA_CONFIG_FILE` points at a YAML file it is loaded first and
+    /// environment variables are applied on top (`from_file_with_env`);
+    /// otherwise configuration comes from environment variables alone
+    /// (`from_env`). Sections that have no environment override, such as
+    /// `routing`, can only be set through the file.
+    pub fn load() -> Result<Self, ConfigError> {
+        let _ = dotenvy::dotenv();
+        match env::var("AURA_CONFIG_FILE") {
+            Ok(path) if !path.trim().is_empty() => {
+                let mut config = Self::from_file_with_env(path.trim())?;
+                Self::validate_log_level(&config.logging.level)?;
+                if let Ok(port_str) = env::var("AURA_PORT") {
+                    port_str
+                        .parse::<u16>()
+                        .map_err(|_| ConfigError::InvalidPort(port_str))?;
+                }
+                config.config_file = Some(path);
+                Ok(config)
+            }
+            _ => Self::from_env(),
+        }
+    }
+
     /// Applies environment variable overrides to the current configuration
     ///
     /// Environment variables take precedence over file-based configuration.
@@ -455,6 +485,13 @@ impl Config {
         }
 
         // Feature flags
+        // Auto routing kill switch: AURA_AUTO_ROUTING=on|off flips
+        // `routing.auto.enabled` without needing a config file.
+        if let Ok(val) = env::var("AURA_AUTO_ROUTING") {
+            let v = val.trim().to_ascii_lowercase();
+            self.routing.auto.enabled = v == "on" || v == "true" || v == "1" || v == "yes";
+        }
+
         if let Ok(val) = env::var("AURA_PAYLOAD_CAPTURE") {
             let v = val.trim().to_ascii_lowercase();
             self.features.payload_capture = v == "on" || v == "true" || v == "1" || v == "yes";

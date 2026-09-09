@@ -7,9 +7,10 @@ mod routes;
 
 use anyhow::Context;
 use aura_core::{
-    cost::ScrapedPricing, AnthropicProvider, BedrockProvider, CostCalculator, FireworksProvider,
-    GeminiProvider, HuggingFaceProvider, MistralProvider, OllamaProvider, OpenAIProvider, Provider,
-    RateLimiter, RedisPool, ResponseCache, TogetherProvider,
+    cost::ScrapedPricing, AnthropicProvider, AutoDecision, AutoRouter, BedrockProvider,
+    CostCalculator, FireworksProvider, GeminiProvider, HuggingFaceProvider, MistralProvider,
+    OllamaProvider, OpenAIProvider, Provider, RateLimiter, RedisPool, ResponseCache,
+    TogetherProvider,
 };
 use aura_db::{
     ApiKeyUsageRepo, DbPool, ModelPricingRepo, NewApiKeyUsage, NewRequestLog, PoolConfig,
@@ -47,6 +48,10 @@ pub struct AppState {
     /// Top-level env flag for payload capture (AURA_PAYLOAD_CAPTURE=on).
     /// When false the per-org flag is never consulted.
     pub payload_capture_enabled: bool,
+    /// Complexity-based auto router (`model: "auto"`). Present when auto
+    /// routing or shadow scoring is configured and at least one tier has
+    /// a model this gateway can serve.
+    auto_router: Option<Arc<AutoRouter>>,
 }
 
 impl AppState {
@@ -255,6 +260,40 @@ impl AppState {
             }
         }
 
+        // Auto router: keep only tier models this gateway can actually
+        // serve, then decide whether there is anything to route to.
+        let auto_router = {
+            let mut auto_cfg = config.routing.auto.clone();
+            let dropped = auto_cfg.prune_unknown_models(|m| {
+                provider_name_for_catalog_model(&providers, &model_map, m).is_some()
+            });
+            if !dropped.is_empty() {
+                warn!(
+                    dropped = ?dropped,
+                    "Auto routing: dropped tier models this gateway cannot serve"
+                );
+            }
+            let wanted = auto_cfg.enabled || auto_cfg.shadow_for_pinned_models;
+            if wanted && !auto_cfg.has_candidates() {
+                warn!("Auto routing: no tier has a servable model; auto routing disabled");
+                None
+            } else if wanted {
+                info!(
+                    enabled = auto_cfg.enabled,
+                    shadow = auto_cfg.shadow_for_pinned_models,
+                    default_mode = %auto_cfg.default_mode,
+                    simple = ?auto_cfg.tiers.simple,
+                    medium = ?auto_cfg.tiers.medium,
+                    complex = ?auto_cfg.tiers.complex,
+                    reasoning = ?auto_cfg.tiers.reasoning,
+                    "Auto routing configured"
+                );
+                Some(Arc::new(AutoRouter::new(auto_cfg)))
+            } else {
+                None
+            }
+        };
+
         Self {
             config: Arc::new(config),
             providers: Arc::new(providers),
@@ -265,7 +304,26 @@ impl AppState {
             rate_limiter,
             response_cache,
             payload_capture_enabled,
+            auto_router,
         }
+    }
+
+    /// The auto router, when configured (enabled or shadow-only).
+    pub fn auto_router(&self) -> Option<&Arc<AutoRouter>> {
+        self.auto_router.as_ref()
+    }
+
+    /// Cost calculator reference
+    pub fn cost_calculator(&self) -> &CostCalculator {
+        &self.cost_calculator
+    }
+
+    /// Provider name for a model that is explicitly in a provider's
+    /// catalog. Unlike `get_provider`, this never falls through to
+    /// catch-all providers such as Ollama, so a tier model is only
+    /// eligible when the gateway really serves it.
+    pub fn provider_name_for_catalog_model(&self, model: &str) -> Option<String> {
+        provider_name_for_catalog_model(&self.providers, &self.model_map, model)
     }
 
     /// Get database pool reference
@@ -660,6 +718,7 @@ impl AppState {
         request: Option<&aura_types::CreateResponseRequest>,
         compression_metadata: Option<&aura_types::CompressionMetadata>,
         routing_strategy: Option<&str>,
+        auto_decision: Option<&AutoDecision>,
     ) -> aura_types::Response {
         let mut response = self
             .enrich_response(response, request_id, auth_context, request)
@@ -674,6 +733,13 @@ impl AppState {
                     // Add routing strategy if specified
                     if let Some(strategy) = routing_strategy {
                         obj.insert("routing_strategy".to_string(), serde_json::json!(strategy));
+                    }
+
+                    // Add the auto-routing decision (applied or shadow)
+                    if let Some(decision) = auto_decision {
+                        if let Ok(value) = serde_json::to_value(decision) {
+                            obj.insert("routing".to_string(), value);
+                        }
                     }
 
                     // Add compression metadata if present
@@ -1002,6 +1068,25 @@ impl AppState {
 }
 
 /// Extract first user message from request for conversation title
+/// Strict model → provider resolution used by the auto router's
+/// eligibility oracle: exact catalog hit first, then `supports_model` on
+/// every provider except Ollama (whose `supports_model` accepts any
+/// non-empty name).
+fn provider_name_for_catalog_model(
+    providers: &HashMap<String, Arc<dyn Provider>>,
+    model_map: &HashMap<String, String>,
+    model: &str,
+) -> Option<String> {
+    if let Some(name) = model_map.get(model) {
+        return Some(name.clone());
+    }
+    providers
+        .iter()
+        .filter(|(name, _)| name.as_str() != "ollama")
+        .find(|(_, p)| p.supports_model(model))
+        .map(|(name, _)| name.clone())
+}
+
 fn extract_first_user_message(request: &aura_types::CreateResponseRequest) -> Option<String> {
     use aura_types::{ContentPart, InputContent, InputItem, Role};
 
@@ -1083,7 +1168,10 @@ async fn main() -> anyhow::Result<()> {
     init_metrics();
 
     // Load configuration
-    let config = aura_core::Config::from_env().context("Failed to load configuration")?;
+    let config = aura_core::Config::load().context("Failed to load configuration")?;
+    if let Some(path) = &config.config_file {
+        info!(path = %path, "Loaded configuration file (AURA_CONFIG_FILE)");
+    }
 
     info!(
         "Server will listen on {}:{}",

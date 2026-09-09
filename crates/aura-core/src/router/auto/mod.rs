@@ -17,11 +17,13 @@
 //! The whole path is synchronous and allocation-light; the heuristic
 //! classifier runs in well under a millisecond.
 
+pub mod capabilities;
 pub mod config;
 pub mod features;
 pub mod scorer;
 pub mod tiers;
 
+pub use capabilities::{model_supports_tools, model_supports_vision};
 pub use config::{
     AutoRoutingConfig, FeatureWeights, KeywordLists, LlmClassifierConfig, ModeOffsets,
     TierBoundaries, TierModels, TokenThresholds, WithinTierStrategy,

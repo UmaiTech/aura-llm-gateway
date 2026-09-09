@@ -229,6 +229,8 @@ const releases: Release[] = [
       { label: 'Harness payload capture', note: 'Optional per-org full request/response capture, surfaced inline on the harness trace.' },
       { label: 'Auto-updating pricing scraper', note: 'Weekly Vercel cron scrapes each provider’s own pricing page (9 providers incl. Together & Fireworks) into versioned price history, with batch-tier prices and conservative validation.' },
       { label: 'Public pricing page', note: 'aura-llm.dev/pricing — live scraped prices across every provider, filterable, with expandable per-model detail and inferred capability tags.' },
+      { label: 'Auto model routing', note: 'model: "auto" scores each request\'s complexity and dispatches to the cheapest capable model in a tier; auto:cost / auto:quality shift the dial, every response explains the decision, and pinned-model traffic is shadow-scored for savings reporting.' },
+
       { label: 'September 2026 model catalog refresh', note: 'GPT-6 Astra and the GPT-5.6 Sol / Terra / Luna tiers, Claude Fable 5.1, Opus 5, Sonnet 5 and Opus 4.8, and Gemini 3.8 Flash, 3.7 Flash, 3.6 Flash and 3.5 Flash-Lite — routable through the gateway with seed pricing, SDK constants and playground entries.' },
     ],
     issueRefs: ['#123', '#209'],

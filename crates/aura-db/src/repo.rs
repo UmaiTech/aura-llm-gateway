@@ -480,6 +480,22 @@ impl ResponseRepo {
         Ok(row.map(|r| r.get("conversation_id")))
     }
 
+    /// Fetch the model that produced one response, by id.
+    ///
+    /// Used by the auto router to keep a conversation on the same model
+    /// across tool-loop turns.
+    pub async fn find_model_by_id(
+        pool: &DbPool,
+        response_id: &str,
+    ) -> Result<Option<String>, DbError> {
+        let row = sqlx::query("SELECT model_id FROM responses WHERE id = $1")
+            .bind(response_id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(|r| r.get("model_id")))
+    }
+
     /// Fetch just the `output_items` JSON for one response, by id.
     ///
     /// Used by the gateway's response-replay path

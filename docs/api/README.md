@@ -39,6 +39,8 @@ See [Feedback API](./feedback.md) for adaptive few-shot learning documentation.
 
 See [Compression API](./compression.md) for prompt compression and token reduction.
 
+See [Auto Model Routing](./auto-routing.md) for `model: "auto"` complexity-based model selection.
+
 ## Response Enrichment
 
 Aura automatically enriches all responses with:

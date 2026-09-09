@@ -30,6 +30,13 @@ class KnownModels(str, Enum):
     can be passed anywhere a model string is expected.
     """
 
+    # Gateway aliases — the gateway picks the cheapest model expected to
+    # answer well. See docs/api/auto-routing.md.
+    AUTO = "auto"
+    AUTO_COST = "auto:cost"
+    AUTO_BALANCED = "auto:balanced"
+    AUTO_QUALITY = "auto:quality"
+
     # OpenAI (September 2026 line first)
     GPT_6_ASTRA = "gpt-6-astra"
     GPT_5_6_SOL = "gpt-5.6-sol"

@@ -10,6 +10,7 @@ use utoipa::ToSchema;
 use crate::compression::CompressionConfig;
 use crate::consistency::{ConsistencyConfig, ConsistencyMetadata};
 use crate::item::{InputItem, Item};
+use crate::routing::RoutingOptions;
 use crate::validation::{ValidationConfig, ValidationMetadata};
 
 /// Status of a response in the Open Responses API
@@ -481,6 +482,11 @@ pub struct CreateResponseRequest {
     /// Enables prompt compression to reduce token usage
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compression: Option<CompressionConfig>,
+
+    /// Auto-routing options (Aura extension)
+    /// Tunes model selection when `model` is `"auto"` / `"auto:<mode>"`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub routing: Option<RoutingOptions>,
 }
 
 impl CreateResponseRequest {
@@ -502,6 +508,7 @@ impl CreateResponseRequest {
             validation: None,
             consistency: None,
             compression: None,
+            routing: None,
         }
     }
 
@@ -561,6 +568,12 @@ impl CreateResponseRequest {
     /// Set compression configuration
     pub fn with_compression(mut self, compression: CompressionConfig) -> Self {
         self.compression = Some(compression);
+        self
+    }
+
+    /// Set auto-routing options (Aura extension)
+    pub fn with_routing(mut self, routing: RoutingOptions) -> Self {
+        self.routing = Some(routing);
         self
     }
 }

@@ -79,3 +79,62 @@ admin:
   # NOTE: For production, use AURA_ADMIN_KEY environment variable
   # key: "admin-secret-key"
   key: null
+
+# Smart routing. Only read from this file (set AURA_CONFIG_FILE=/path/to/config.yaml);
+# there is no environment-variable form for these settings except the
+# AURA_AUTO_ROUTING=on|off kill switch for `routing.auto.enabled`.
+routing:
+  # Complexity-based auto model routing: `model: "auto"` / `auto:cost` /
+  # `auto:balanced` / `auto:quality`. See docs/api/auto-routing.md.
+  auto:
+    # Master switch for real `auto` requests (default: false).
+    enabled: false
+    # Mode used when neither the alias suffix nor the request sets one.
+    default_mode: balanced          # cost | balanced | quality
+    # Score requests that pin a concrete model too and report the decision
+    # `auto` would have made under metadata.aura.routing with shadow: true.
+    shadow_for_pinned_models: true
+    # Candidate models per tier, in preference order. Models this gateway
+    # cannot serve (no provider key) are dropped at startup.
+    tiers:
+      simple: [gemini-3.1-flash-lite, gemini-3.5-flash, gpt-5.6-luna]
+      medium: [gemini-3.8-flash, gpt-5.4-mini, claude-haiku-4-5]
+      complex: [claude-sonnet-5, gemini-3-pro-preview, gpt-5.6-terra]
+      reasoning: [claude-opus-5, gpt-5.6-sol, claude-fable-5-1]
+    # Complexity score boundaries (inclusive lower bound of the upper tier).
+    boundaries:
+      simple_medium: 0.15
+      medium_complex: 0.35
+      complex_reasoning: 0.60
+    # Score offsets per mode.
+    mode_offsets:
+      cost: -0.10
+      balanced: 0.0
+      quality: 0.15
+    # Heuristic feature weights. Feature values are in [-1, 1].
+    weights:
+      tokens: 0.10
+      code: 0.30
+      reasoning: 0.25
+      technical: 0.25
+      simple: 0.05
+      multi_step: 0.03
+      questions: 0.02
+      tools: 0.15
+      explicit_intent: 0.30
+      continuation: 0.05
+      output_length: 0.05
+    token_thresholds:
+      short: 15        # at or below: strong "simple" signal
+      long: 400        # at or above: strong "complex" signal
+      long_output: 2000
+    # How to pick among the eligible candidates of the chosen tier.
+    within_tier: cheapest           # cheapest | config_order | round_robin
+    # Keep the previous turn's model on tool-loop continuation turns.
+    sticky_tool_loops: true
+    # Requests that carry tools never go below this tier.
+    tools_min_tier: medium
+    # Distinct reasoning markers that force the reasoning tier.
+    reasoning_override_matches: 3
+    # keywords: { code: [...], reasoning: [...], technical: [...], simple: [...],
+    #             intent_quick: [...], intent_deep: [...] }  — override the built-in lists

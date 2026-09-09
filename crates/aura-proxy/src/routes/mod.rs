@@ -2,6 +2,7 @@
 
 pub mod admin;
 pub mod auth;
+pub mod auto_routing;
 pub mod conversations;
 pub mod feedback;
 pub mod health;
