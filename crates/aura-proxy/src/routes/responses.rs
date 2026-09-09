@@ -742,13 +742,23 @@ pub async fn create_response(
                         continue;
                     }
                     error!(request_id = %request_id, error = %e, "Streaming request failed");
+                    // Keep the decision (and any escalations taken) so the
+                    // failure counts in the rollup and stats.
+                    state
+                        .record_routing_decision(
+                            auto_decision.as_ref(),
+                            &request_id,
+                            None,
+                            auth_context.as_ref(),
+                            conversation_id,
+                        )
+                        .await;
                     return Err(ApiError::from_provider_error(&e));
                 }
             }
         };
-        if attempt > 0 {
-            state.record_model_success(&request.model);
-        }
+        // Every successful completion clears the model's failure window.
+        state.record_model_success(&request.model);
         let routing_strategy = match auto_decision.as_ref().filter(|d| !d.shadow) {
             Some(decision) => Some(format!("auto:{}", decision.tier)),
             None => routing_strategy,
@@ -1303,7 +1313,7 @@ pub async fn create_response(
                     }
                 }
             };
-            if attempt > 0 && outcome.is_ok() {
+            if outcome.is_ok() {
                 state.record_model_success(&request.model);
             }
             let provider_name = provider.name().to_string();
