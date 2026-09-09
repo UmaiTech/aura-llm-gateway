@@ -1175,6 +1175,19 @@ pub async fn create_response(
                             "Response served from cache"
                         );
 
+                        // A cache hit is still a decision worth keeping:
+                        // the rollup and stats would otherwise only see
+                        // the requests that reached a provider.
+                        state
+                            .record_routing_decision(
+                                auto_decision.as_ref(),
+                                &request_id,
+                                None,
+                                auth_context.as_ref(),
+                                None,
+                            )
+                            .await;
+
                         return Ok(with_selected_model_header(
                             Json(response).into_response(),
                             auto_decision.as_ref(),

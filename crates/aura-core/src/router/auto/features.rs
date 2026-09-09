@@ -27,6 +27,7 @@ pub enum IntentHint {
 ///
 /// Scores are in `[0, 1]` unless documented otherwise. Counts are raw.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct RequestFeatures {
     /// Estimated input tokens across instructions and all input items.
     pub est_input_tokens: u32,

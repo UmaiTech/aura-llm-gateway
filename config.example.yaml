@@ -153,6 +153,9 @@ routing:
     # cheapest and strongest tiers in the background and have the judge
     # model grade them (two extra completions + one judge call per sample).
     gold_sample_rate: 0.0
+    # Sample pinned-model (shadow) requests too. Off: their prompts would
+    # otherwise be answered by providers the tenant did not choose.
+    gold_sample_shadow: false
     gold_judge_model: claude-sonnet-4-6
     gold_max_text_chars: 4000
     # Learned classifier weights (scripts/router/train.py) for gateways
