@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from enum import Enum
 
+
 class KnownModels(str, Enum):
     """A curated catalog of well-known model IDs.
 

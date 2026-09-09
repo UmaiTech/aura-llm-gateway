@@ -72,6 +72,10 @@ pub struct AutoDecision {
     pub raw_score: f64,
     /// Tier the classifier assigned before clamps.
     pub classified_tier: Tier,
+    /// Score boundaries in force for this decision (inclusive lower bound
+    /// of each upper tier), so clients can draw the score against them.
+    #[serde(default)]
+    pub boundaries: TierBoundaries,
     /// Tier after `min_tier` / `max_tier` / tools floor.
     pub tier: Tier,
     /// Feature contributions that fired.
@@ -218,12 +222,6 @@ impl AutoRouter {
             (min_tier, max_tier)
         };
 
-        if let Some(floor) = self.config.tools_min_tier {
-            if features.tool_count > 0 && tier < floor {
-                hard_filters.push(format!("tools present: floor {}", floor));
-                tier = floor;
-            }
-        }
         if tier < min_tier {
             hard_filters.push(format!("min_tier {}", min_tier));
             tier = min_tier;
@@ -231,6 +229,21 @@ impl AutoRouter {
         if tier > max_tier {
             hard_filters.push(format!("max_tier {}", max_tier));
             tier = max_tier;
+        }
+        // The tools floor is applied last: requests that carry tools never
+        // go below it, even when `max_tier` asks for less (documented).
+        if let Some(floor) = self.config.tools_min_tier {
+            if features.tool_count > 0 && tier < floor {
+                if floor > max_tier {
+                    hard_filters.push(format!(
+                        "tools present: floor {} overrides max_tier {}",
+                        floor, max_tier
+                    ));
+                } else {
+                    hard_filters.push(format!("tools present: floor {}", floor));
+                }
+                tier = floor;
+            }
         }
         if features.has_images {
             hard_filters.push("needs vision".into());
@@ -258,11 +271,13 @@ impl AutoRouter {
             .unwrap_or(self.config.sticky_tool_loops);
         if sticky_enabled && features.is_tool_loop_turn {
             if let Some(prev) = ctx.previous_model {
+                // A previous model that is in no tier list (pinned, or
+                // pruned since) has no known strength: never stick to it.
                 let prev_tier = self.catalog.tier_of(prev);
-                let strong_enough = prev_tier.map(|t| t >= tier).unwrap_or(true);
+                let strong_enough = prev_tier.map(|t| t >= tier).unwrap_or(false);
                 if filtered.is_eligible(prev)
                     && strong_enough
-                    && prev_tier.map(|t| t <= max_tier).unwrap_or(true)
+                    && prev_tier.map(|t| t <= max_tier).unwrap_or(false)
                 {
                     hard_filters.push("sticky tool loop".into());
                     let selected_tier = prev_tier.unwrap_or(tier);
@@ -273,6 +288,7 @@ impl AutoRouter {
                         score: scored.score,
                         raw_score: scored.raw_score,
                         classified_tier: scored.tier,
+                        boundaries: self.config.boundaries,
                         tier: selected_tier,
                         signals: scored.signals,
                         features,
@@ -315,6 +331,7 @@ impl AutoRouter {
             score: scored.score,
             raw_score: scored.raw_score,
             classified_tier: scored.tier,
+            boundaries: self.config.boundaries,
             tier: selection.tier,
             signals: scored.signals,
             features,
@@ -440,6 +457,8 @@ mod tests {
     fn simple_prompt_goes_to_cheapest_simple_model() {
         let r = router();
         let req = CreateResponseRequest::text("auto", "What is the capital of France?");
+        // First call compiles the keyword patterns; time the second.
+        let _ = r.decide(&req, &ctx("auto", None), &oracle()).unwrap();
         let d = r.decide(&req, &ctx("auto", None), &oracle()).unwrap();
         assert_eq!(d.tier, Tier::Simple);
         assert_eq!(d.selected, "gemini-3.1-flash-lite");
@@ -620,6 +639,45 @@ mod tests {
         c.previous_model = Some("gpt-5.5");
         let d = r.decide(&req, &c, &o).unwrap();
         assert_ne!(d.selected, "gpt-5.5");
+    }
+
+    #[test]
+    fn sticky_ignores_a_previous_model_of_unknown_tier() {
+        let r = router();
+        let req = tool_loop_request();
+        // A pinned model that is in no tier list has no known strength.
+        let mut c = ctx("auto", None);
+        c.previous_model = Some("some-unlisted-model");
+        let d = r.decide(&req, &c, &oracle()).unwrap();
+        assert_ne!(d.selected, "some-unlisted-model");
+        assert!(!d.hard_filters.iter().any(|f| f == "sticky tool loop"));
+        assert_eq!(d.boundaries, TierBoundaries::default());
+    }
+
+    #[test]
+    fn tools_floor_wins_over_max_tier() {
+        let r = router();
+        let mut req = CreateResponseRequest::text("auto", "What's the weather?");
+        req.tools = Some(vec![aura_types::Tool::function(
+            aura_types::FunctionDefinition {
+                name: "get_weather".into(),
+                description: None,
+                parameters: None,
+                strict: None,
+            },
+        )]);
+        let opts = RoutingOptions {
+            max_tier: Some(Tier::Simple),
+            ..Default::default()
+        };
+        let d = r
+            .decide(&req, &ctx("auto", Some(&opts)), &oracle())
+            .unwrap();
+        assert_eq!(d.tier, Tier::Medium);
+        assert!(d
+            .hard_filters
+            .iter()
+            .any(|f| f.contains("overrides max_tier simple")));
     }
 
     #[test]
