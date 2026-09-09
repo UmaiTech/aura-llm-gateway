@@ -416,7 +416,7 @@ mod tests {
         }
         fn arm_stats(&self, _tier: Tier, model: &str) -> Option<ArmStats> {
             match model {
-                "gpt-5.4-nano" => Some(ArmStats {
+                "gpt-5.6-luna" => Some(ArmStats {
                     alpha: 200.0,
                     beta: 2.0,
                 }),
@@ -440,12 +440,12 @@ mod tests {
             *wins.entry(sel.model).or_insert(0) += 1;
             assert!(sel.reason.starts_with("thompson sample"));
         }
-        let nano = wins.get("gpt-5.4-nano").copied().unwrap_or(0);
+        let luna = wins.get("gpt-5.6-luna").copied().unwrap_or(0);
         let lite = wins.get("gemini-3.1-flash-lite").copied().unwrap_or(0);
-        assert!(nano > 120, "nano={} wins={:?}", nano, wins);
+        assert!(luna > 120, "luna={} wins={:?}", luna, wins);
         assert!(lite < 10, "lite={} wins={:?}", lite, wins);
         // The unknown arm (Beta(1,1)) is explored sometimes.
-        assert!(wins.get("claude-haiku-4-5").copied().unwrap_or(0) > 0);
+        assert!(wins.get("gemini-3.5-flash").copied().unwrap_or(0) > 0);
     }
 
     #[test]
