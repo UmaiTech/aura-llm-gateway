@@ -387,7 +387,9 @@ mod tests {
             "claude-haiku-4-5"
         ));
         assert!(RoutingOptions::pattern_matches(
-            "GPT-5.5", "openai", "gpt-5.5"
+            "GPT-5.6-Sol",
+            "openai",
+            "gpt-5.6-sol"
         ));
         // Suffix and infix wildcards.
         assert!(RoutingOptions::pattern_matches(
@@ -421,10 +423,10 @@ mod tests {
             deny: vec!["*-preview".into(), "claude-opus-*".into()],
             ..Default::default()
         };
-        assert!(opts.permits("anthropic", "claude-sonnet-4-6"));
-        assert!(!opts.permits("anthropic", "claude-opus-4-7"));
+        assert!(opts.permits("anthropic", "claude-sonnet-5"));
+        assert!(!opts.permits("anthropic", "claude-opus-5"));
         assert!(opts.permits("openai", "gpt-5.4-mini"));
-        assert!(!opts.permits("openai", "gpt-5.5"));
+        assert!(!opts.permits("openai", "gpt-5.6-sol"));
         assert!(!opts.permits("google", "gemini-3-pro-preview"));
 
         // Organization policy narrows what the request may allow.
@@ -446,7 +448,7 @@ mod tests {
             deny: vec!["google/*".into()],
             ..Default::default()
         };
-        assert!(deny_only.permits("openai", "gpt-5.5"));
+        assert!(deny_only.permits("openai", "gpt-5.6-sol"));
         assert!(!deny_only.permits("google", "gemini-3.5-flash"));
     }
 }

@@ -323,14 +323,18 @@ mod tests {
 
     fn oracle(blocked: &[&'static str]) -> Oracle {
         let mut costs = HashMap::new();
-        costs.insert("gemini-3.1-flash-lite", 0.3);
-        costs.insert("gpt-5.4-nano", 0.4);
-        costs.insert("claude-haiku-4-5", 2.0);
-        costs.insert("gemini-3.5-flash", 1.5);
+        // gemini-3-pro-preview is deliberately left unpriced.
+        costs.insert("gemini-3.1-flash-lite", 0.15);
+        costs.insert("gemini-3.5-flash", 0.4);
+        costs.insert("gpt-5.6-luna", 0.5);
+        costs.insert("gemini-3.8-flash", 1.5);
         costs.insert("gpt-5.4-mini", 1.0);
-        costs.insert("claude-sonnet-4-6", 9.0);
-        costs.insert("gpt-5.5", 8.0);
-        costs.insert("claude-opus-4-7", 30.0);
+        costs.insert("claude-haiku-4-5", 2.0);
+        costs.insert("claude-sonnet-5", 4.0);
+        costs.insert("gpt-5.6-terra", 5.0);
+        costs.insert("claude-opus-5", 10.0);
+        costs.insert("gpt-5.6-sol", 8.0);
+        costs.insert("claude-fable-5-1", 20.0);
         Oracle {
             blocked: blocked.to_vec(),
             costs,
@@ -353,23 +357,23 @@ mod tests {
     #[test]
     fn unknown_price_comes_last_but_is_still_usable() {
         let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
-        // Only the unpriced gemini-3.1-pro-preview is eligible in complex.
+        // Only the unpriced gemini-3-pro-preview is eligible in complex.
         let sel = cat
             .select(
                 Tier::Complex,
                 Tier::Complex,
                 Tier::Complex,
-                &oracle(&["claude-sonnet-4-6", "gpt-5.5"]),
+                &oracle(&["claude-sonnet-5", "gpt-5.6-terra"]),
             )
             .unwrap();
-        assert_eq!(sel.model, "gemini-3.1-pro-preview");
+        assert_eq!(sel.model, "gemini-3-pro-preview");
         assert!(sel.reason.contains("no price known"));
     }
 
     #[test]
     fn escalates_up_before_falling_down() {
         let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
-        let blocked = ["gemini-3.5-flash", "gpt-5.4-mini", "claude-sonnet-4-6"];
+        let blocked = ["gemini-3.8-flash", "gpt-5.4-mini", "claude-haiku-4-5"];
         let sel = cat
             .select(
                 Tier::Medium,
@@ -379,7 +383,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(sel.tier, Tier::Complex);
-        assert_eq!(sel.model, "gpt-5.5");
+        assert_eq!(sel.model, "claude-sonnet-5");
         assert!(sel.reason.starts_with("escalated from medium"));
         // All three medium candidates were recorded as ineligible.
         assert_eq!(
@@ -394,7 +398,7 @@ mod tests {
     #[test]
     fn max_tier_caps_escalation_and_falls_back_down() {
         let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
-        let blocked = ["gemini-3.5-flash", "gpt-5.4-mini", "claude-sonnet-4-6"];
+        let blocked = ["gemini-3.8-flash", "gpt-5.4-mini", "claude-haiku-4-5"];
         let sel = cat
             .select(Tier::Medium, Tier::Simple, Tier::Medium, &oracle(&blocked))
             .unwrap();
@@ -408,16 +412,17 @@ mod tests {
         let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
         let all: Vec<&'static str> = vec![
             "gemini-3.1-flash-lite",
-            "gpt-5.4-nano",
-            "claude-haiku-4-5",
             "gemini-3.5-flash",
+            "gpt-5.6-luna",
+            "gemini-3.8-flash",
             "gpt-5.4-mini",
-            "claude-sonnet-4-6",
-            "gpt-5.5",
-            "gemini-3.1-pro-preview",
-            "claude-opus-4-7",
-            "gpt-5.5-pro",
-            "o3-mini",
+            "claude-haiku-4-5",
+            "claude-sonnet-5",
+            "gemini-3-pro-preview",
+            "gpt-5.6-terra",
+            "claude-opus-5",
+            "gpt-5.6-sol",
+            "claude-fable-5-1",
         ];
         assert!(cat
             .select(Tier::Simple, Tier::Simple, Tier::Reasoning, &oracle(&all))
@@ -547,19 +552,22 @@ mod tests {
                 &oracle(&["gemini-3.1-flash-lite"]),
             )
             .unwrap();
-        assert_eq!(sel.model, "gpt-5.4-nano");
+        assert_eq!(sel.model, "gemini-3.5-flash");
     }
 
     #[test]
     fn all_models_is_deduplicated() {
-        let cat = TierCatalog::new(TierModels::default(), WithinTierStrategy::Cheapest);
+        let mut tiers = TierModels::default();
+        // List one model in two tiers; it must appear once.
+        tiers.medium.push("claude-sonnet-5".into());
+        let cat = TierCatalog::new(tiers, WithinTierStrategy::Cheapest);
         let all = cat.all_models();
         assert_eq!(
             all.iter()
-                .filter(|m| m.as_str() == "claude-sonnet-4-6")
+                .filter(|m| m.as_str() == "claude-sonnet-5")
                 .count(),
             1
         );
-        assert_eq!(all.len(), 11);
+        assert_eq!(all.len(), 12);
     }
 }
