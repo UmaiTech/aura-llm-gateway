@@ -279,8 +279,17 @@ fn sample_gamma<R: rand::Rng>(rng: &mut R, shape: f64) -> f64 {
 
 /// Sample from `Beta(alpha, beta)`.
 pub fn sample_beta<R: rand::Rng>(rng: &mut R, alpha: f64, beta: f64) -> f64 {
-    let a = alpha.max(1e-3);
-    let b = beta.max(1e-3);
+    // Shapes come from the database; keep them finite and bounded so the
+    // rejection sampler always terminates.
+    let clamp = |v: f64| {
+        if v.is_finite() {
+            v.clamp(1e-3, 1e6)
+        } else {
+            1.0
+        }
+    };
+    let a = clamp(alpha);
+    let b = clamp(beta);
     let x = sample_gamma(rng, a);
     let y = sample_gamma(rng, b);
     if x + y == 0.0 {
@@ -293,6 +302,20 @@ pub fn sample_beta<R: rand::Rng>(rng: &mut R, alpha: f64, beta: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn beta_sampling_survives_bad_shapes() {
+        let mut rng = rand::thread_rng();
+        for (a, b) in [
+            (f64::INFINITY, 1.0),
+            (1.0, f64::NAN),
+            (1e12, 1e12),
+            (0.0, 0.0),
+        ] {
+            let x = sample_beta(&mut rng, a, b);
+            assert!((0.0..=1.0).contains(&x), "{a} {b} -> {x}");
+        }
+    }
 
     fn base() -> OutcomeInputs {
         OutcomeInputs {

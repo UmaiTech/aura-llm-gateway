@@ -253,6 +253,8 @@ async fn update_organization(
                 }),
             )
         })?;
+    // Routing / capture settings are cached per org; drop the stale copy.
+    state.invalidate_org_settings(org_id).await;
 
     Ok(Json(org))
 }
