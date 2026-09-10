@@ -306,9 +306,6 @@ impl CostCalculator {
             "claude-fable-5".to_string(),
             ModelPricing::new(10.00, 50.00).with_cached(1.00),
         );
-            "claude-fable-5".to_string(),
-            ModelPricing::new(10.00, 50.00).with_cached(1.00),
-        );
 
         // Claude 5 family (2026 — Opus 5 released 2026-07-24)
         pricing.insert(
