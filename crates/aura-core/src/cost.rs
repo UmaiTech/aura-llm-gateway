@@ -93,10 +93,10 @@ impl CostCalculator {
     /// Create a new cost calculator with default pricing data
     /// Pricing last updated: September 2026
     /// Sources:
-    /// - OpenAI: <https://openai.com/api/pricing/>
-    /// - Anthropic: <https://www.anthropic.com/pricing>
+    /// - OpenAI: <https://developers.openai.com/api/docs/pricing>
+    /// - Anthropic: <https://platform.claude.com/docs/en/about-claude/pricing>
     /// - Google: <https://ai.google.dev/gemini-api/docs/pricing>
-    /// - Mistral: <https://mistral.ai/technology/#pricing>
+    /// - Mistral: <https://mistral.ai/pricing/>
     /// - Together AI: <https://docs.together.ai/docs/serverless/models>
     /// - Ollama: local inference, no cost
     /// - HuggingFace Inference Endpoints: <https://huggingface.co/pricing#endpoints>
@@ -263,7 +263,7 @@ impl CostCalculator {
         // o3 reasoning models (2025)
         pricing.insert(
             "o3".to_string(),
-            ModelPricing::new(2.00, 8.00).with_cached(1.00),
+            ModelPricing::new(2.00, 8.00).with_cached(0.50),
         );
         pricing.insert(
             "o3-mini".to_string(),
@@ -274,10 +274,22 @@ impl CostCalculator {
             ModelPricing::new(1.10, 4.40).with_cached(0.55),
         );
 
-        // o4-mini (2025)
+        // o4-mini (2025) — standard pricing $1.10/$4.40 (cached $0.275),
+        // verified against OpenAI's official pricing page (2026-08-07).
+        // Note: $0.55/$2.20 on aggregators is the Batch tier, not standard.
         pricing.insert(
             "o4-mini".to_string(),
-            ModelPricing::new(1.10, 4.40).with_cached(0.55),
+            ModelPricing::new(1.10, 4.40).with_cached(0.275),
+        );
+
+        // Codex models (2026)
+        pricing.insert(
+            "gpt-5.3-codex".to_string(),
+            ModelPricing::new(1.75, 14.00).with_cached(0.175),
+        );
+        pricing.insert(
+            "codex-mini-latest".to_string(),
+            ModelPricing::new(1.50, 6.00).with_cached(0.375),
         );
 
         // =================================================================
@@ -310,7 +322,6 @@ impl CostCalculator {
             "claude-opus-4-8".to_string(),
             ModelPricing::new(5.00, 25.00).with_cached(0.50),
         );
-
         // Claude 4.7 family (2026 — Opus only in this line, no Sonnet 4.7 shipped)
         pricing.insert(
             "claude-opus-4-7-20260416".to_string(),
@@ -331,14 +342,15 @@ impl CostCalculator {
             ModelPricing::new(3.00, 15.00).with_cached(0.30),
         );
 
-        // Claude 4.5 family (2025-2026)
+        // Claude 4.5 family (2025-2026) — Opus 4.5 is on the same $5/$25
+        // rate card as 4.6/4.7/4.8 per official pricing docs (was $15/$75).
         pricing.insert(
             "claude-opus-4-5-20251101".to_string(),
-            ModelPricing::new(15.00, 75.00).with_cached(1.50),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
         );
         pricing.insert(
             "claude-opus-4-5".to_string(),
-            ModelPricing::new(15.00, 75.00).with_cached(1.50),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
         );
         pricing.insert(
             "claude-sonnet-4-5-20251022".to_string(),
@@ -443,25 +455,28 @@ impl CostCalculator {
             "gemini-3-pro-preview".to_string(),
             ModelPricing::new(2.50, 10.00).with_cached(0.625),
         );
+        // 3.1 Pro — context-tiered on Google's page ($4/$18 above 200K
+        // input tokens); we model the <=200K rate.
         pricing.insert(
             "gemini-3.1-pro-preview".to_string(),
-            ModelPricing::new(2.50, 10.00).with_cached(0.625),
+            ModelPricing::new(2.00, 12.00).with_cached(0.20),
         );
         pricing.insert(
             "gemini-3-flash-preview".to_string(),
-            ModelPricing::new(0.15, 0.60).with_cached(0.0375),
+            ModelPricing::new(0.50, 3.00).with_cached(0.05),
         );
+        // 3.5 Flash — corrected Aug 2026 (was $0.20/$0.80 placeholder)
         pricing.insert(
             "gemini-3.5-flash".to_string(),
-            ModelPricing::new(0.20, 0.80).with_cached(0.05),
+            ModelPricing::new(1.50, 9.00).with_cached(0.15),
         );
         pricing.insert(
             "gemini-3.1-flash-lite".to_string(),
-            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
+            ModelPricing::new(0.25, 1.50).with_cached(0.025),
         );
         pricing.insert(
             "gemini-3.1-flash-lite-preview".to_string(),
-            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
+            ModelPricing::new(0.25, 1.50).with_cached(0.025),
         );
 
         // Gemini 2.5 family (GA)
@@ -475,7 +490,7 @@ impl CostCalculator {
         );
         pricing.insert(
             "gemini-2.5-flash-lite".to_string(),
-            ModelPricing::new(0.075, 0.30).with_cached(0.01875),
+            ModelPricing::new(0.10, 0.40).with_cached(0.025),
         );
 
         // Gemini 2.0 family
@@ -513,17 +528,33 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Mistral AI pricing (as of May 2026)
-        // Source: https://mistral.ai/technology/#pricing
+        // Mistral AI pricing (as of August 2026)
+        // Source: https://mistral.ai/pricing/
         // =================================================================
 
+        // Mistral Large 3 (Dec 2025) — 675B MoE, $0.50/$1.50 per official
+        // model card (docs.mistral.ai/models/model-cards/mistral-large-3-25-12).
+        // mistral-large-latest now resolves to Large 3, so it shares this rate.
+        pricing.insert(
+            "mistral-large-2512".to_string(),
+            ModelPricing::new(0.50, 1.50).with_cached(0.05),
+        );
         pricing.insert(
             "mistral-large-latest".to_string(),
-            ModelPricing::new(2.00, 6.00),
+            ModelPricing::new(0.50, 1.50).with_cached(0.05),
         );
         pricing.insert(
             "mistral-large-2411".to_string(),
             ModelPricing::new(2.00, 6.00),
+        );
+        // Magistral reasoning line (2026)
+        pricing.insert(
+            "magistral-medium-latest".to_string(),
+            ModelPricing::new(2.00, 5.00),
+        );
+        pricing.insert(
+            "magistral-small-latest".to_string(),
+            ModelPricing::new(0.50, 1.50),
         );
         pricing.insert(
             "mistral-medium-latest".to_string(),
@@ -552,13 +583,13 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Together AI serverless chat pricing (captured 2026-05-21)
+        // Together AI serverless chat pricing (captured 2026-08-07)
         // Source: https://docs.together.ai/docs/serverless/models
         // =================================================================
 
         pricing.insert(
             "meta-llama/Llama-3.3-70B-Instruct-Turbo".to_string(),
-            ModelPricing::new(0.88, 0.88),
+            ModelPricing::new(1.04, 1.04),
         );
         pricing.insert(
             "meta-llama/Meta-Llama-3-8B-Instruct-Lite".to_string(),
@@ -566,17 +597,31 @@ impl CostCalculator {
         );
         pricing.insert(
             "deepseek-ai/DeepSeek-V4-Pro".to_string(),
-            ModelPricing::new(2.10, 4.40).with_cached(0.20),
+            ModelPricing::new(1.74, 3.48).with_cached(0.20),
         );
         pricing.insert(
-            "Qwen/Qwen3.5-397B-A17B".to_string(),
-            ModelPricing::new(0.60, 3.60),
+            "deepseek-ai/DeepSeek-V4-Flash-0731".to_string(),
+            ModelPricing::new(0.14, 0.28).with_cached(0.03),
+        );
+        pricing.insert(
+            "Qwen/Qwen3.7-Max".to_string(),
+            ModelPricing::new(1.25, 3.75),
+        );
+        pricing.insert(
+            "Qwen/Qwen3.7-Plus".to_string(),
+            ModelPricing::new(0.32, 1.28),
         );
         pricing.insert(
             "Qwen/Qwen3.6-Plus".to_string(),
             ModelPricing::new(0.50, 3.00),
         );
-        pricing.insert("Qwen/Qwen3.5-9B".to_string(), ModelPricing::new(0.10, 0.15));
+        // Qwen3.5-397B-A17B — verified 2026-08-07 via Together serverless catalog
+        // + pricepertoken/typingmind aggregators ($0.60/$3.60, no cached tier).
+        pricing.insert(
+            "Qwen/Qwen3.5-397B-A17B".to_string(),
+            ModelPricing::new(0.60, 3.60),
+        );
+        pricing.insert("Qwen/Qwen3.5-9B".to_string(), ModelPricing::new(0.17, 0.25));
         pricing.insert(
             "Qwen/Qwen2.5-7B-Instruct-Turbo".to_string(),
             ModelPricing::new(0.30, 0.30),
@@ -598,6 +643,14 @@ impl CostCalculator {
             ModelPricing::new(0.05, 0.20),
         );
         pricing.insert(
+            "moonshotai/Kimi-K3".to_string(),
+            ModelPricing::new(3.00, 15.00).with_cached(0.30),
+        );
+        pricing.insert(
+            "moonshotai/Kimi-K2.7-Code".to_string(),
+            ModelPricing::new(0.95, 4.00).with_cached(0.19),
+        );
+        pricing.insert(
             "moonshotai/Kimi-K2.6".to_string(),
             ModelPricing::new(1.20, 4.50).with_cached(0.20),
         );
@@ -605,20 +658,48 @@ impl CostCalculator {
             "moonshotai/Kimi-K2.5".to_string(),
             ModelPricing::new(0.50, 2.80),
         );
+        pricing.insert(
+            "zai-org/GLM-5.2".to_string(),
+            ModelPricing::new(1.40, 4.40).with_cached(0.26),
+        );
         pricing.insert("zai-org/GLM-5.1".to_string(), ModelPricing::new(1.40, 4.40));
         pricing.insert("zai-org/GLM-5".to_string(), ModelPricing::new(1.00, 3.20));
+        pricing.insert(
+            "MiniMaxAI/MiniMax-M3".to_string(),
+            ModelPricing::new(0.30, 1.20).with_cached(0.06),
+        );
+        pricing.insert(
+            "thinkingmachines/Inkling".to_string(),
+            ModelPricing::new(1.00, 4.05).with_cached(0.17),
+        );
+        pricing.insert(
+            "thinkingmachines/Inkling-Small".to_string(),
+            ModelPricing::new(0.50, 1.20),
+        );
+        pricing.insert(
+            "nvidia/nemotron-3-ultra-550b-a55b".to_string(),
+            ModelPricing::new(0.60, 3.60).with_cached(0.20),
+        );
         pricing.insert(
             "essentialai/rnj-1-instruct".to_string(),
             ModelPricing::new(0.15, 0.15),
         );
         pricing.insert(
             "google/gemma-4-31B-it".to_string(),
-            ModelPricing::new(0.20, 0.50),
+            ModelPricing::new(0.39, 0.97),
         );
         pricing.insert(
             "google/gemma-3n-E4B-it".to_string(),
             ModelPricing::new(0.06, 0.12),
         );
+        pricing.insert(
+            "LiquidAI/LFM2.5-8B-A1B".to_string(),
+            ModelPricing::new(0.03, 0.12),
+        );
+        // LFM2-24B-A2B — in together.rs SUPPORTED_MODELS (and Liquid's blog
+        // lists it for Together serverless) but was missing from cost.rs, so
+        // calculate_cost returned None → silent zero cost. $0.03/$0.12 per
+        // Puter/aggregators, same rate card as the LFM2.5 sibling.
         pricing.insert(
             "LiquidAI/LFM2-24B-A2B".to_string(),
             ModelPricing::new(0.03, 0.12),
@@ -667,13 +748,17 @@ impl CostCalculator {
             "llama3.3",
             "llama3.2",
             "llama3.1",
+            "llama4",
             "qwen2.5",
+            "qwen3",
             "mistral",
             "mixtral",
             "phi3",
             "gemma2",
+            "gemma4",
             "codellama",
             "deepseek-r1",
+            "deepseek-v4-flash",
         ] {
             pricing.insert(model.to_string(), ModelPricing::new(0.00, 0.00));
         }
@@ -693,11 +778,39 @@ impl CostCalculator {
         // Prices match Anthropic direct (Bedrock has a small regional surcharge
         // in reality; using Anthropic list prices is a reasonable approximation).
         // Source: https://aws.amazon.com/bedrock/pricing/
+        // Verified 2026-08-07 against AWS model cards (docs.aws.amazon.com/bedrock):
+        // Opus 4.8 / 4.7 ship as direct model IDs (plus us./eu./global. geo
+        // inference profiles); Opus 4.6 requires an inference profile ARN
+        // (anthropic.claude-opus-4-6-v1 direct ID).
         // =================================================================
 
         pricing.insert(
+            "anthropic.claude-opus-5".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "anthropic.claude-opus-4-8".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "us.anthropic.claude-opus-4-8".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "anthropic.claude-opus-4-7".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "anthropic.claude-opus-4-6-v1".to_string(),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
+        );
+        pricing.insert(
+            "anthropic.claude-sonnet-4-6".to_string(),
+            ModelPricing::new(3.00, 15.00).with_cached(0.30),
+        );
+        pricing.insert(
             "anthropic.claude-opus-4-5-20251001-v1:0".to_string(),
-            ModelPricing::new(15.00, 75.00).with_cached(1.50),
+            ModelPricing::new(5.00, 25.00).with_cached(0.50),
         );
         pricing.insert(
             "anthropic.claude-sonnet-4-5-20250929-v1:0".to_string(),
@@ -705,7 +818,7 @@ impl CostCalculator {
         );
         pricing.insert(
             "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
-            ModelPricing::new(0.80, 4.00).with_cached(0.08),
+            ModelPricing::new(1.00, 5.00).with_cached(0.10),
         );
         pricing.insert(
             "anthropic.claude-3-7-sonnet-20250219-v1:0".to_string(),
@@ -956,6 +1069,75 @@ mod tests {
         let calculator = CostCalculator::new();
         let cost = calculator.calculate_cost("unknown-model", 1000, 500, None, None);
         assert!(cost.is_none());
+    }
+
+    #[test]
+    fn test_cost_calculator_claude_opus_4_8() {
+        let calculator = CostCalculator::new();
+        let cost = calculator.calculate_cost("claude-opus-4-8", 10000, 5000, None, None);
+        // (10000/1M * 5.00) + (5000/1M * 25.00) = 0.05 + 0.125 = 0.175
+        assert!(cost.is_some());
+        assert!((cost.unwrap() - 0.175).abs() < 0.00001);
+        // Fable 5 is the new top tier: $10/$50
+        let fable = calculator
+            .get_pricing("claude-fable-5")
+            .expect("fable-5 should be priced");
+        assert_eq!(fable.input_per_million, 10.00);
+        assert_eq!(fable.output_per_million, 50.00);
+        assert_eq!(fable.cached_input_per_million, Some(1.00));
+    }
+
+    #[test]
+    fn test_cost_calculator_gpt_5_3_codex() {
+        let calculator = CostCalculator::new();
+        let cost = calculator.calculate_cost("gpt-5.3-codex", 10000, 5000, None, None);
+        // (10000/1M * 1.75) + (5000/1M * 14.00) = 0.0175 + 0.07 = 0.0875
+        assert!(cost.is_some());
+        assert!((cost.unwrap() - 0.0875).abs() < 0.00001);
+        // codex-mini-latest priced at $1.50/$6.00
+        let mini = calculator
+            .get_pricing("codex-mini-latest")
+            .expect("codex-mini-latest should be priced");
+        assert_eq!(mini.input_per_million, 1.50);
+        assert_eq!(mini.output_per_million, 6.00);
+    }
+
+    #[test]
+    fn test_cost_calculator_gemini_3_5_flash_corrected() {
+        let calculator = CostCalculator::new();
+        let pricing = calculator
+            .get_pricing("gemini-3.5-flash")
+            .expect("gemini-3.5-flash should be priced");
+        // Corrected Aug 2026: was $0.20/$0.80 placeholder, now $1.50/$9.00.
+        assert_eq!(pricing.input_per_million, 1.50);
+        assert_eq!(pricing.output_per_million, 9.00);
+        assert_eq!(pricing.cached_input_per_million, Some(0.15));
+    }
+
+    #[test]
+    fn test_cost_calculator_mistral_large_3() {
+        let calculator = CostCalculator::new();
+        let cost = calculator.calculate_cost("mistral-large-2512", 10000, 5000, None, None);
+        // (10000/1M * 0.50) + (5000/1M * 1.50) = 0.005 + 0.0075 = 0.0125
+        assert!(cost.is_some());
+        assert!((cost.unwrap() - 0.0125).abs() < 0.00001);
+        // magistral-medium reasoning line present
+        let mag = calculator
+            .get_pricing("magistral-medium-latest")
+            .expect("magistral-medium-latest should be priced");
+        assert_eq!(mag.input_per_million, 2.00);
+        assert_eq!(mag.output_per_million, 5.00);
+    }
+
+    #[test]
+    fn test_cost_calculator_together_deepseek_v4_flash() {
+        let calculator = CostCalculator::new();
+        let pricing = calculator
+            .get_pricing("deepseek-ai/DeepSeek-V4-Flash-0731")
+            .expect("DeepSeek-V4-Flash-0731 should be priced");
+        assert_eq!(pricing.input_per_million, 0.14);
+        assert_eq!(pricing.output_per_million, 0.28);
+        assert_eq!(pricing.cached_input_per_million, Some(0.03));
     }
 
     #[test]
