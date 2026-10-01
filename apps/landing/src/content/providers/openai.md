@@ -5,11 +5,14 @@ description: "OpenAI models and capabilities through Aura Gateway"
 
 # OpenAI Provider
 
-Aura provides first-class support for OpenAI's latest models including GPT-6 Astra, the GPT-5.6 Sol / Terra / Luna tiers, the GPT-5.5 and GPT-5.4 families, o-series reasoning models, and legacy GPT-4o models. Catalog last refreshed 2026-09-07.
+Aura provides first-class support for OpenAI's latest models including GPT-6.1 Sol, GPT-6 Sol / Luna, GPT-6 Astra, the GPT-5.6 Sol / Terra / Luna tiers, the GPT-5.5 and GPT-5.4 families, o-series reasoning models, and legacy GPT-4o models. Catalog last refreshed 2026-09-07.
 
 ## Supported Models
 
 ### GPT-6 (Latest — September 2026)
+- **gpt-6.1-sol** - Coding, computer use and professional work at near-Astra capability for a fifth of the price (released 2026-09-29; 1.05M context)
+- **gpt-6-sol** - GPT-6 flagship tier at half the GPT-5.6 Sol price (2026-09-22)
+- **gpt-6-luna** - Cheapest GPT-6 tier for classification, extraction and routing (2026-09-22)
 - **gpt-6-astra** - Flagship for computer use, browsing, software engineering and multi-step professional work
 
 ### GPT-5.6 Series (August 2026)
@@ -46,10 +49,13 @@ Aura provides first-class support for OpenAI's latest models including GPT-6 Ast
 
 ## Pricing
 
-*Prices per 1M tokens (USD), as published 2026-09-07. GPT-5.6 Sol is promotional pricing through 2026-11-21.*
+*Prices per 1M tokens (USD), as published 2026-10-01. GPT-6.1 Sol prompts over 272K input tokens are billed at a surcharge. GPT-5.6 Sol is promotional pricing through 2026-11-21.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| **gpt-6.1-sol** | $2.00 | $10.00 | $0.10 |
+| **gpt-6-sol** | $2.00 | $10.00 | $0.20 |
+| **gpt-6-luna** | $0.10 | $0.50 | $0.01 |
 | **gpt-6-astra** | $10.00 | $50.00 | $1.00 |
 | **gpt-5.6-sol** | $4.00 | $20.00 | $0.40 |
 | **gpt-5.6-terra** | $2.00 | $12.00 | $0.20 |

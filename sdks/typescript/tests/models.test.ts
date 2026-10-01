@@ -10,6 +10,12 @@ describe('KnownModels', () => {
     expect(KnownModels.CLAUDE_FABLE_5_1).toBe('claude-fable-5-1')
     expect(KnownModels.CLAUDE_OPUS_5).toBe('claude-opus-5')
     expect(KnownModels.CLAUDE_SONNET_5).toBe('claude-sonnet-5')
+    // October 2026 catalog refresh
+    expect(KnownModels.GPT_6_1_SOL).toBe('gpt-6.1-sol')
+    expect(KnownModels.GPT_6_SOL).toBe('gpt-6-sol')
+    expect(KnownModels.GPT_6_LUNA).toBe('gpt-6-luna')
+    expect(KnownModels.CLAUDE_OPUS_5_5).toBe('claude-opus-5-5')
+    expect(KnownModels.CLAUDE_SONNET_5_5).toBe('claude-sonnet-5-5')
     expect(KnownModels.GEMINI_3_7_FLASH).toBe('gemini-3.7-flash')
     expect(KnownModels.GEMINI_3_8_FLASH).toBe('gemini-3.8-flash')
     expect(KnownModels.FIREWORKS_GPT_OSS_20B).toBe('accounts/fireworks/models/gpt-oss-20b')

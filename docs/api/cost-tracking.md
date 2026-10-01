@@ -104,6 +104,9 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| gpt-6.1-sol | $2.00 | $10.00 | $0.10 |
+| gpt-6-sol | $2.00 | $10.00 | $0.20 |
+| gpt-6-luna | $0.10 | $0.50 | $0.01 |
 | gpt-6-astra | $10.00 | $50.00 | $1.00 |
 | gpt-5.6-sol | $4.00 | $20.00 | $0.40 |
 | gpt-5.6-terra | $2.00 | $12.00 | $0.20 |
@@ -127,6 +130,8 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 |-------|-------|--------|--------------|
 | claude-fable-5-1 | $10.00 | $50.00 | $0.25 |
 | claude-fable-5 | $10.00 | $50.00 | $1.00 |
+| claude-opus-5-5 | $4.00 | $20.00 | $0.20 |
+| claude-sonnet-5-5 | $2.00 | $10.00 | $0.20 |
 | claude-opus-5 | $5.00 | $25.00 | $0.50 |
 | claude-sonnet-5 | $2.00 | $10.00 | $0.20 |
 | claude-opus-4-8 | $5.00 | $25.00 | $0.50 |

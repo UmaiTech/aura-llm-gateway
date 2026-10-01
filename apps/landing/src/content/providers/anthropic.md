@@ -5,7 +5,7 @@ description: "Claude models and capabilities through Aura Gateway"
 
 # Anthropic Provider
 
-Aura provides comprehensive support for Anthropic's Claude models, including Claude Fable 5.1, the Claude 5 generation (Opus 5, Sonnet 5) and the Claude 4.x line, with 1M-token context windows and adaptive reasoning. Catalog last refreshed 2026-09-07.
+Aura provides comprehensive support for Anthropic's Claude models, including Claude Fable 5.1, the Claude 5 generation (Opus 5.5, Sonnet 5.5, Opus 5, Sonnet 5) and the Claude 4.x line, with 1M-token context windows and adaptive reasoning. Catalog last refreshed 2026-09-07.
 
 ## Supported Models
 
@@ -14,6 +14,10 @@ Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opu
 ### Claude Fable 5.x (Latest — September 2026)
 - **claude-fable-5-1** - Anthropic's most capable widely available model (released 2026-09-01); demanding reasoning, long-running agents, document-heavy work
 - **claude-fable-5** - Previous Fable release, same tier and price
+
+### Claude 5.5 Series (Latest)
+- **claude-opus-5-5** - Current Opus; thinking is always on, effort defaults to `medium`
+- **claude-sonnet-5-5** - Current Sonnet for everyday coding, agent and enterprise work
 
 ### Claude 5 Series (July 2026)
 - **claude-opus-5** - Recommended starting point for most complex workloads
@@ -49,6 +53,8 @@ Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opu
 |-------|-------|--------|--------------|
 | **claude-fable-5-1** | $10.00 | $50.00 | $0.25 |
 | **claude-fable-5** | $10.00 | $50.00 | $1.00 |
+| **claude-opus-5-5** | $4.00 | $20.00 | $0.20 |
+| **claude-sonnet-5-5** | $2.00 | $10.00 | $0.20 |
 | **claude-opus-5** | $5.00 | $25.00 | $0.50 |
 | **claude-sonnet-5** | $2.00 | $10.00 | $0.20 |
 | **claude-opus-4-8** | $5.00 | $25.00 | $0.50 |

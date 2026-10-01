@@ -37,6 +37,9 @@ pub type EventStream = Pin<Box<dyn Stream<Item = Result<StreamEvent, ProviderErr
 ///
 /// Each provider implementation handles the translation between the Open Responses API
 /// format and the provider's native API format.
+// `async_trait` emits `#[must_use]` on the boxed futures it generates, which
+// Rust 1.99's `clippy::double_must_use` flags (Result is already must_use).
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait Provider: Send + Sync {
     /// Get the name of this provider (e.g., "openai", "anthropic", "google")
