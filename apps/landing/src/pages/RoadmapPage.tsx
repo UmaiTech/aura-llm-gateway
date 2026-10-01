@@ -233,6 +233,7 @@ const releases: Release[] = [
       { label: 'Auto router learns from your traffic', note: 'Outcome signals (retries, corrections, feedback) score every decision; Thompson sampling, a learned tier classifier and a learned per-request cost model are trained from the gateway\'s own logs. Per-request budgets (max_cost_usd) and provider-failure escalation with a per-model circuit breaker.' },
       { label: 'Routing inspector in the playground', note: 'Every auto-routed answer shows its tier, score, signals, candidates with predicted cost and the reason it was picked.' },
 
+      { label: 'October 2026 model catalog refresh', note: 'GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna, plus Claude Opus 5.5 and Sonnet 5.5 — routable through the gateway with seed pricing, SDK constants and playground entries.' },
       { label: 'September 2026 model catalog refresh', note: 'GPT-6 Astra and the GPT-5.6 Sol / Terra / Luna tiers, Claude Fable 5.1, Opus 5, Sonnet 5 and Opus 4.8, and Gemini 3.8 Flash, 3.7 Flash, 3.6 Flash and 3.5 Flash-Lite — routable through the gateway with seed pricing, SDK constants and playground entries.' },
     ],
     issueRefs: ['#123', '#209'],

@@ -91,7 +91,7 @@ Errors follow the Open Responses API format:
 ## Supported Models
 
 ### OpenAI ✅
-- `gpt-6-astra`
+- `gpt-6.1-sol`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6-astra`
 - `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`
 - `gpt-5.5-pro`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`
 - `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo` (legacy)
@@ -99,6 +99,7 @@ Errors follow the Open Responses API format:
 
 ### Anthropic ✅
 - `claude-fable-5-1`, `claude-fable-5`
+- `claude-opus-5-5`, `claude-sonnet-5-5`
 - `claude-opus-5`, `claude-sonnet-5`
 - `claude-opus-4-8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`
 - `claude-opus-4-5`, `claude-sonnet-4-5`, `claude-haiku-4-5`
