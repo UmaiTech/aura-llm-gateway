@@ -5,15 +5,18 @@ description: "Gemini models and capabilities through Aura Gateway"
 
 # Google Provider
 
-Aura provides full support for Google's Gemini models, offering industry-leading multimodal capabilities with massive context windows and competitive pricing. Catalog last refreshed 2026-09-07; ids match what Google's `models.list` endpoint serves (the bare `gemini-3-pro` / `gemini-3-flash` ids do not exist upstream).
+Aura provides full support for Google's Gemini models, offering industry-leading multimodal capabilities with massive context windows and competitive pricing. Catalog last refreshed 2026-10-15; ids match what Google's `models.list` endpoint serves (the bare `gemini-3-pro` / `gemini-3-flash` ids do not exist upstream).
 
 ## Supported Models
 
-### Gemini 3.x Flash (Latest)
+### Gemini 4 (Latest)
+- **gemini-4-argon** - Google's most capable model for complex coding, agentic, math and science work (GA 2026-10-13)
+
+### Gemini 3.x Flash
 - **gemini-3.8-flash** - Newest Flash, tuned for long-horizon coding and autonomous agents (GA 2026-09-02); spends more thinking tokens than 3.7
-- **gemini-3.7-flash** - Efficiency-first workhorse for coding and agents (GA 2026-08-13)
+- **gemini-3.7-flash** - Efficiency-first workhorse for coding and agents (GA 2026-08-13). *Legacy: deprecated by Google 2026-10-08; requests are routed to gemini-3.8-flash upstream.*
 - **gemini-3.6-flash** - Previous Flash generation (GA 2026-07-21)
-- **gemini-3.5-flash** - Earlier Flash generation
+- **gemini-3.5-flash** - Earlier Flash generation. *Legacy: deprecated by Google 2026-10-08; requests are routed to gemini-3.6-flash upstream.*
 - **gemini-3.5-flash-lite** - Lowest-cost 3.x option (GA 2026-07-21)
 - **gemini-3.1-flash-lite**, **gemini-3.1-flash-lite-preview**
 
@@ -48,10 +51,11 @@ Gemini 1.5 models have been retired by Google and are no longer routable.
 
 ## Pricing
 
-*Prices per 1M tokens (USD), as published 2026-09-07. Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
+*Prices per 1M tokens (USD), as published 2026-10-15. Gemini 4 Argon is introductory pricing through 2026-11-30; the standard rate from 2026-12-01 is $4.00 / $20.00. Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| **gemini-4-argon** | $2.00 | $10.00 | $0.10 |
 | **gemini-3.8-flash** | $0.75 | $3.75 | $0.075 |
 | **gemini-3.7-flash** | $0.75 | $3.75 | $0.075 |
 | **gemini-3.6-flash** | $0.75 | $3.75 | $0.075 |

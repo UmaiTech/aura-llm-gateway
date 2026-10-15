@@ -234,6 +234,7 @@ const releases: Release[] = [
       { label: 'Routing inspector in the playground', note: 'Every auto-routed answer shows its tier, score, signals, candidates with predicted cost and the reason it was picked.' },
 
       { label: 'September 2026 model catalog refresh', note: 'GPT-6 Astra and the GPT-5.6 Sol / Terra / Luna tiers, Claude Fable 5.1, Opus 5, Sonnet 5 and Opus 4.8, and Gemini 3.8 Flash, 3.7 Flash, 3.6 Flash and 3.5 Flash-Lite — routable through the gateway with seed pricing, SDK constants and playground entries.' },
+      { label: 'October 2026 model catalog refresh', note: 'Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5, and Gemini 4 Argon — routable through the gateway with seed pricing, SDK constants and playground entries. Gemini 3.7 Flash and 3.5 Flash are now legacy upstream.' },
     ],
     issueRefs: ['#123', '#209'],
   },

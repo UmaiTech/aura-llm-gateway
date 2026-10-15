@@ -296,6 +296,9 @@ export const AVAILABLE_MODELS: Model[] = [
   // but the upstream call fails. Haiku 4.5 is the current cheap
   // Anthropic model.
   { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', provider: 'anthropic', tier: 'free' },
   { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', tier: 'beta' },
@@ -317,6 +320,7 @@ export const AVAILABLE_MODELS: Model[] = [
   // the canonical list at any time.
   // 3.8 / 3.7 / 3.6 Flash and 3.5 Flash-Lite added 2026-09-07 from Google's
   // model docs (GA 2026-09-02 / 08-13 / 07-21).
+  { id: 'gemini-4-argon', name: 'Gemini 4 Argon', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'google', tier: 'beta' },
