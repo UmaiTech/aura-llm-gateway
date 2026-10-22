@@ -1,0 +1,53 @@
+{
+  "dark": {
+    "bg": "#0b0d14",
+    "surface": "#11151f",
+    "surface2": "#181d2a",
+    "hover": "#1d2232",
+    "text": "#f4f6fa",
+    "muted": "#a7b0c0",
+    "dim": "#788397",
+    "border": "#293143",
+    "accent": "#b29aff",
+    "accent-soft": "#a78bfa14",
+    "action": "#7540df",
+    "green": "#80dfba",
+    "amber": "#f1ca78",
+    "red": "#f6a0ac",
+    "shadow": "0 24px 70px #0005",
+    "font": "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+    "mono": "'SFMono-Regular',Consolas,'Liberation Mono',monospace"
+  },
+  "light": {
+    "bg": "#f7f8fc",
+    "surface": "#fff",
+    "surface2": "#f0f2f8",
+    "hover": "#e9eaf3",
+    "text": "#171b28",
+    "muted": "#505b70",
+    "dim": "#69758b",
+    "border": "#d5dbe7",
+    "accent": "#6d28d9",
+    "accent-soft": "#6d28d90d",
+    "action": "#6d28d9",
+    "green": "#087a55",
+    "amber": "#956000",
+    "red": "#bc334f",
+    "shadow": "0 24px 70px #17243818"
+  },
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "contentMaxWidth": 1200,
+  "radii": {
+    "control": 7,
+    "panel": 12
+  }
+}
