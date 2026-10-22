@@ -902,6 +902,11 @@ pub struct RoutingDecision {
     #[serde(default)]
     pub synthetic: bool,
     pub created_at: DateTime<Utc>,
+    /// Tier boundaries in force for the decision; `None` on rows recorded
+    /// before the column existed.
+    #[sqlx(default)]
+    #[serde(default)]
+    pub boundaries: Option<serde_json::Value>,
 }
 
 /// New auto-router decision for insertion (upserted on `response_id`)
@@ -932,6 +937,7 @@ pub struct NewRoutingDecision {
     pub decision_latency_us: i32,
     pub escalations: serde_json::Value,
     pub synthetic: bool,
+    pub boundaries: Option<serde_json::Value>,
 }
 
 /// One decision joined with its outcome (`v_routing_outcomes`)
@@ -999,6 +1005,136 @@ pub struct NewRoutingOutcome {
     pub next_model: Option<String>,
     pub reward: f64,
     pub decided_at: DateTime<Utc>,
+}
+
+/// One row of the admin decisions explorer: a decision joined with its
+/// outcome, plus the flags the table filters on.
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingDecisionListItem {
+    pub id: Uuid,
+    pub response_id: String,
+    pub provider_response_id: Option<String>,
+    pub organization_id: Option<Uuid>,
+    pub api_key_id: Option<Uuid>,
+    pub conversation_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub requested_model: String,
+    pub mode: String,
+    pub classifier: String,
+    pub score: f64,
+    pub classified_tier: String,
+    pub tier: String,
+    pub selected_model: String,
+    pub selected_provider: Option<String>,
+    pub reason: String,
+    pub shadow: bool,
+    pub synthetic: bool,
+    /// At least one escalation step was taken.
+    pub escalated: bool,
+    /// The sticky tool-loop rule kept the previous model.
+    pub sticky: bool,
+    pub candidates_count: i32,
+    pub eligible_count: i32,
+    /// Cost model prediction for the selected model, when one was loaded.
+    pub predicted_cost_usd: Option<f64>,
+    pub decision_latency_us: i32,
+    pub status: Option<String>,
+    pub actual_model: Option<String>,
+    pub input_tokens: Option<i32>,
+    pub output_tokens: Option<i32>,
+    pub cost_usd: Option<f64>,
+    pub latency_ms: Option<i32>,
+    pub feedback: Option<String>,
+    /// Outcome signal (`none`, `move_on`, `retry`, `correction`,
+    /// `escalation`); `None` until the rollup scored the decision.
+    pub next_turn: Option<String>,
+    pub reward: Option<f64>,
+    pub estimated_savings_usd: Option<f64>,
+}
+
+/// Which synthetic-trace decisions a listing includes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SyntheticFilter {
+    /// Live traffic only (the default everywhere stats are shown).
+    #[default]
+    Exclude,
+    /// Live and synthetic.
+    Include,
+    /// Synthetic only.
+    Only,
+}
+
+/// Filters for [`crate::RoutingDecisionRepo::list`]. `None` means "any".
+#[derive(Debug, Clone, Default)]
+pub struct RoutingDecisionFilter {
+    pub from: Option<DateTime<Utc>>,
+    pub to: Option<DateTime<Utc>>,
+    pub mode: Option<String>,
+    /// Final tier (after clamps and escalation).
+    pub tier: Option<String>,
+    /// Tier the classifier assigned.
+    pub classified_tier: Option<String>,
+    /// Final tier differs from the classified tier.
+    pub tier_changed: Option<bool>,
+    pub selected_model: Option<String>,
+    pub shadow: Option<bool>,
+    pub synthetic: SyntheticFilter,
+    pub escalated: Option<bool>,
+    pub sticky: Option<bool>,
+    /// Request status; `pending` matches decisions without a request log.
+    pub status: Option<String>,
+    /// Outcome signal; `unscored` matches decisions the rollup has not
+    /// scored yet.
+    pub outcome: Option<String>,
+    pub feedback: Option<String>,
+    pub min_reward: Option<f64>,
+    pub max_reward: Option<f64>,
+    pub organization_id: Option<Uuid>,
+    pub api_key_id: Option<Uuid>,
+    pub min_cost_usd: Option<f64>,
+    pub max_cost_usd: Option<f64>,
+    /// Keyset cursor: only rows strictly older than `(created_at, id)`.
+    pub before: Option<(DateTime<Utc>, Uuid)>,
+}
+
+/// What happened after a decision (`v_routing_outcomes` columns), for the
+/// decision detail view.
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingDecisionOutcome {
+    pub status: Option<String>,
+    pub actual_model: Option<String>,
+    pub actual_provider: Option<String>,
+    pub input_tokens: Option<i32>,
+    pub output_tokens: Option<i32>,
+    pub cost_usd: Option<f64>,
+    pub latency_ms: Option<i32>,
+    pub tool_calls_count: i32,
+    pub incomplete_reason: Option<String>,
+    pub feedback: Option<String>,
+    pub estimated_savings_usd: Option<f64>,
+    pub next_turn: Option<String>,
+    pub next_model: Option<String>,
+    pub reward: Option<f64>,
+    pub outcome_computed_at: Option<DateTime<Utc>>,
+}
+
+/// One time bucket of auto-router activity (live traffic only).
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct RoutingTimelinePoint {
+    pub bucket: DateTime<Utc>,
+    pub applied: i64,
+    pub shadow: i64,
+    pub escalated: i64,
+    pub applied_cost: f64,
+    pub estimated_savings: f64,
+    /// Applied decisions the rollup has scored.
+    pub scored: i64,
+    /// Mean reward of scored applied decisions.
+    pub avg_reward: Option<f64>,
+    pub move_on: i64,
+    pub retry: i64,
+    pub correction: i64,
+    pub escalation: i64,
 }
 
 /// Per-(tier, model) Beta parameters for Thompson sampling

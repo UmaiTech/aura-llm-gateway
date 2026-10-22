@@ -2138,10 +2138,10 @@ impl RoutingDecisionRepo {
                 selected_model, selected_provider, reason, shadow,
                 features, signals, hard_filters, candidates,
                 requested_blended_per_million, selected_blended_per_million, decision_latency_us,
-                escalations, selected_model_final, synthetic
+                escalations, selected_model_final, synthetic, boundaries
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-                    $17, $18, $19, $20, $21, $22, $23, $24, $13, $25)
+                    $17, $18, $19, $20, $21, $22, $23, $24, $13, $25, $26)
             ON CONFLICT (response_id) DO UPDATE SET
                 provider_response_id = COALESCE(EXCLUDED.provider_response_id, routing_decisions.provider_response_id),
                 conversation_id = COALESCE(EXCLUDED.conversation_id, routing_decisions.conversation_id),
@@ -2151,7 +2151,8 @@ impl RoutingDecisionRepo {
                 reason = EXCLUDED.reason,
                 candidates = EXCLUDED.candidates,
                 escalations = EXCLUDED.escalations,
-                selected_model_final = EXCLUDED.selected_model_final
+                selected_model_final = EXCLUDED.selected_model_final,
+                boundaries = COALESCE(EXCLUDED.boundaries, routing_decisions.boundaries)
             "#,
         )
         .bind(&new.response_id)
@@ -2179,6 +2180,7 @@ impl RoutingDecisionRepo {
         .bind(new.decision_latency_us)
         .bind(&new.escalations)
         .bind(new.synthetic)
+        .bind(&new.boundaries)
         .execute(pool)
         .await?;
         Ok(())
@@ -2202,6 +2204,260 @@ impl RoutingDecisionRepo {
         .fetch_optional(pool)
         .await?;
         Ok(row)
+    }
+
+    /// One page of decisions with their outcomes, newest first, matching
+    /// `filter`. Returns at most `limit` rows; pass the last row's
+    /// `(created_at, id)` as `filter.before` for the next page.
+    ///
+    /// Filters are appended only when set so the planner can use
+    /// `idx_routing_decisions_created` (or the tier / org / api-key
+    /// indexes) for the common shapes instead of a generic plan.
+    pub async fn list(
+        pool: &DbPool,
+        filter: &RoutingDecisionFilter,
+        limit: i64,
+    ) -> Result<Vec<RoutingDecisionListItem>, DbError> {
+        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+            r#"
+            SELECT
+                d.id, d.response_id, d.provider_response_id, d.organization_id, d.api_key_id,
+                d.conversation_id, d.created_at, d.requested_model, d.mode, d.classifier,
+                d.score, d.classified_tier, d.tier, d.selected_model, d.selected_provider,
+                d.reason, d.shadow, d.synthetic,
+                (jsonb_typeof(d.escalations) = 'array' AND jsonb_array_length(d.escalations) > 0)
+                    AS escalated,
+                ('sticky tool loop' = ANY(d.hard_filters)) AS sticky,
+                cand.candidates_count,
+                cand.eligible_count,
+                cand.predicted_cost_usd,
+                d.decision_latency_us,
+                rl.status,
+                rl.model_id AS actual_model,
+                rl.input_tokens,
+                rl.output_tokens,
+                rl.cost_usd::FLOAT8 AS cost_usd,
+                rl.latency_ms,
+                fb.feedback,
+                o.next_turn,
+                o.reward,
+                CASE
+                    WHEN d.shadow
+                     AND d.requested_blended_per_million IS NOT NULL
+                     AND d.selected_blended_per_million IS NOT NULL
+                    THEN (COALESCE(rl.input_tokens, 0) + COALESCE(rl.output_tokens, 0))::FLOAT8
+                         * (d.requested_blended_per_million - d.selected_blended_per_million)
+                         / 1000000.0
+                    ELSE NULL
+                END AS estimated_savings_usd
+            FROM routing_decisions d
+            LEFT JOIN request_logs rl ON rl.response_id = d.response_id
+            LEFT JOIN routing_outcomes o ON o.response_id = d.response_id
+            LEFT JOIN LATERAL (
+                SELECT f.feedback
+                FROM feedback_samples f
+                WHERE d.provider_response_id IS NOT NULL
+                  AND f.response_id = d.provider_response_id
+                ORDER BY f.created_at DESC
+                LIMIT 1
+            ) fb ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*)::INT AS candidates_count,
+                    (COUNT(*) FILTER (WHERE (c->>'eligible')::BOOLEAN))::INT AS eligible_count,
+                    MAX((c->>'predicted_cost_usd')::FLOAT8)
+                        FILTER (WHERE c->>'model' = d.selected_model) AS predicted_cost_usd
+                FROM jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(d.candidates) = 'array'
+                         THEN d.candidates ELSE '[]'::jsonb END
+                ) c
+            ) cand ON TRUE
+            WHERE TRUE
+            "#,
+        );
+        let f = filter;
+        match f.synthetic {
+            SyntheticFilter::Exclude => {
+                qb.push(" AND NOT d.synthetic");
+            }
+            SyntheticFilter::Only => {
+                qb.push(" AND d.synthetic");
+            }
+            SyntheticFilter::Include => {}
+        }
+        if let Some(from) = f.from {
+            qb.push(" AND d.created_at >= ").push_bind(from);
+        }
+        if let Some(to) = f.to {
+            qb.push(" AND d.created_at < ").push_bind(to);
+        }
+        if let Some((ts, id)) = f.before {
+            qb.push(" AND (d.created_at, d.id) < (")
+                .push_bind(ts)
+                .push(", ")
+                .push_bind(id)
+                .push(")");
+        }
+        if let Some(mode) = &f.mode {
+            qb.push(" AND d.mode = ").push_bind(mode.clone());
+        }
+        if let Some(tier) = &f.tier {
+            qb.push(" AND d.tier = ").push_bind(tier.clone());
+        }
+        if let Some(tier) = &f.classified_tier {
+            qb.push(" AND d.classified_tier = ").push_bind(tier.clone());
+        }
+        match f.tier_changed {
+            Some(true) => {
+                qb.push(" AND d.classified_tier <> d.tier");
+            }
+            Some(false) => {
+                qb.push(" AND d.classified_tier = d.tier");
+            }
+            None => {}
+        }
+        if let Some(model) = &f.selected_model {
+            qb.push(" AND d.selected_model = ").push_bind(model.clone());
+        }
+        if let Some(shadow) = f.shadow {
+            qb.push(" AND d.shadow = ").push_bind(shadow);
+        }
+        match f.escalated {
+            Some(true) => {
+                qb.push(" AND jsonb_typeof(d.escalations) = 'array' AND jsonb_array_length(d.escalations) > 0");
+            }
+            Some(false) => {
+                qb.push(" AND NOT (jsonb_typeof(d.escalations) = 'array' AND jsonb_array_length(d.escalations) > 0)");
+            }
+            None => {}
+        }
+        match f.sticky {
+            Some(true) => {
+                qb.push(" AND 'sticky tool loop' = ANY(d.hard_filters)");
+            }
+            Some(false) => {
+                qb.push(" AND NOT ('sticky tool loop' = ANY(d.hard_filters))");
+            }
+            None => {}
+        }
+        match f.status.as_deref() {
+            Some("pending") => {
+                qb.push(" AND rl.status IS NULL");
+            }
+            Some(status) => {
+                qb.push(" AND rl.status = ").push_bind(status.to_string());
+            }
+            None => {}
+        }
+        match f.outcome.as_deref() {
+            Some("unscored") => {
+                qb.push(" AND o.response_id IS NULL");
+            }
+            Some(signal) => {
+                qb.push(" AND o.next_turn = ").push_bind(signal.to_string());
+            }
+            None => {}
+        }
+        if let Some(feedback) = &f.feedback {
+            qb.push(" AND fb.feedback = ").push_bind(feedback.clone());
+        }
+        if let Some(v) = f.min_reward {
+            qb.push(" AND o.reward >= ").push_bind(v);
+        }
+        if let Some(v) = f.max_reward {
+            qb.push(" AND o.reward <= ").push_bind(v);
+        }
+        if let Some(org) = f.organization_id {
+            qb.push(" AND d.organization_id = ").push_bind(org);
+        }
+        if let Some(key) = f.api_key_id {
+            qb.push(" AND d.api_key_id = ").push_bind(key);
+        }
+        if let Some(v) = f.min_cost_usd {
+            qb.push(" AND rl.cost_usd::FLOAT8 >= ").push_bind(v);
+        }
+        if let Some(v) = f.max_cost_usd {
+            qb.push(" AND rl.cost_usd::FLOAT8 <= ").push_bind(v);
+        }
+        qb.push(" ORDER BY d.created_at DESC, d.id DESC LIMIT ")
+            .push_bind(limit);
+        let rows = qb
+            .build_query_as::<RoutingDecisionListItem>()
+            .fetch_all(pool)
+            .await?;
+        Ok(rows)
+    }
+
+    /// What happened after a decision: request status / cost / latency,
+    /// feedback, and the scored outcome signal.
+    pub async fn outcome(
+        pool: &DbPool,
+        response_id: &str,
+    ) -> Result<Option<RoutingDecisionOutcome>, DbError> {
+        let row = sqlx::query_as::<_, RoutingDecisionOutcome>(
+            r#"
+            SELECT status, actual_model, actual_provider, input_tokens, output_tokens,
+                   cost_usd::FLOAT8 AS cost_usd, latency_ms, tool_calls_count, incomplete_reason,
+                   feedback, estimated_savings_usd, next_turn, next_model, reward,
+                   outcome_computed_at
+            FROM v_routing_outcomes
+            WHERE response_id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(response_id)
+        .fetch_optional(pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// Live (non-synthetic) auto-router activity since `from`, bucketed by
+    /// `bucket` (`hour` or `day`), oldest first. Empty buckets are omitted.
+    pub async fn timeline(
+        pool: &DbPool,
+        from: chrono::DateTime<chrono::Utc>,
+        bucket: &str,
+    ) -> Result<Vec<RoutingTimelinePoint>, DbError> {
+        let rows = sqlx::query_as::<_, RoutingTimelinePoint>(
+            r#"
+            SELECT
+                date_trunc($2, d.created_at) AS bucket,
+                COUNT(*) FILTER (WHERE NOT d.shadow) AS applied,
+                COUNT(*) FILTER (WHERE d.shadow) AS shadow,
+                COUNT(*) FILTER (
+                    WHERE jsonb_typeof(d.escalations) = 'array'
+                      AND jsonb_array_length(d.escalations) > 0
+                ) AS escalated,
+                COALESCE(SUM(rl.cost_usd) FILTER (WHERE NOT d.shadow), 0)::FLOAT8 AS applied_cost,
+                COALESCE(SUM(
+                    CASE
+                        WHEN d.requested_blended_per_million IS NOT NULL
+                         AND d.selected_blended_per_million IS NOT NULL
+                        THEN (COALESCE(rl.input_tokens, 0) + COALESCE(rl.output_tokens, 0))::FLOAT8
+                             * (d.requested_blended_per_million - d.selected_blended_per_million)
+                             / 1000000.0
+                    END
+                ) FILTER (WHERE d.shadow), 0)::FLOAT8 AS estimated_savings,
+                COUNT(o.reward) FILTER (WHERE NOT d.shadow) AS scored,
+                (AVG(o.reward) FILTER (WHERE NOT d.shadow))::FLOAT8 AS avg_reward,
+                COUNT(*) FILTER (WHERE NOT d.shadow AND o.next_turn = 'move_on') AS move_on,
+                COUNT(*) FILTER (WHERE NOT d.shadow AND o.next_turn = 'retry') AS retry,
+                COUNT(*) FILTER (WHERE NOT d.shadow AND o.next_turn = 'correction') AS correction,
+                COUNT(*) FILTER (WHERE NOT d.shadow AND o.next_turn = 'escalation') AS escalation
+            FROM routing_decisions d
+            LEFT JOIN request_logs rl ON rl.response_id = d.response_id
+            LEFT JOIN routing_outcomes o ON o.response_id = d.response_id
+            WHERE d.created_at >= $1
+              AND NOT d.synthetic
+            GROUP BY 1
+            ORDER BY 1
+            "#,
+        )
+        .bind(from)
+        .bind(bucket)
+        .fetch_all(pool)
+        .await?;
+        Ok(rows)
     }
 
     /// Feature vectors and tiers of recent non-synthetic decisions, newest

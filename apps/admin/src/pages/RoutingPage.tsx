@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { formatNumber, formatCurrency, formatDuration, cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ import {
   Loading3Line,
   Refresh1Line,
   InformationLine,
+  ArrowRightLine,
 } from '@mingcute/react'
 import {
   getAutoRoutingStats,
@@ -18,6 +20,8 @@ import {
   type RoutingStats,
   type TimeRange,
 } from '@/lib/api'
+import { RouterHealth } from '@/components/routing/RouterHealth'
+import { TIER_ORDER as tierOrder, TIER_TONE as tierTone, formatMicros } from '@/components/routing/format'
 
 /**
  * Routing page — read-only stats view.
@@ -28,6 +32,10 @@ import {
  * just to fill the UI — routing is configured today via the gateway's
  * config file + strategy plumbing in aura-core/router, and per-request
  * routing decisions are observable here via v_routing_stats.
+ *
+ * The auto-router section links into the decisions explorer
+ * (/routing/decisions) and is followed by router health panels (reward
+ * and savings trends, Thompson arms, learned models, gold labels).
  *
  * When admin-time rule editing lands, this page gets the rule list +
  * editor back. Tracking issue: #175 (A6 placeholder).
@@ -65,19 +73,6 @@ const strategyDescriptions: Record<string, string> = {
   context_adaptive: 'Route based on request context size',
   sticky_session: 'Keep a conversation on one provider',
   reasoning_depth: 'Route by required reasoning depth',
-}
-
-const tierOrder = ['simple', 'medium', 'complex', 'reasoning']
-const tierTone: Record<string, string> = {
-  simple: 'bg-emerald-500/20 text-emerald-300',
-  medium: 'bg-blue-500/20 text-blue-300',
-  complex: 'bg-violet-500/20 text-violet-300',
-  reasoning: 'bg-pink-500/20 text-pink-300',
-}
-
-function formatMicros(us: number): string {
-  if (us >= 1000) return `${(us / 1000).toFixed(1)} ms`
-  return `${us} µs`
 }
 
 export function RoutingPage() {
@@ -272,6 +267,12 @@ export function RoutingPage() {
               </p>
             </div>
             <div className="flex items-center gap-1">
+              <Link to="/routing/decisions" className="mr-2">
+                <Button size="sm" variant="outline">
+                  Explore decisions
+                  <ArrowRightLine className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
               {(['24h', '7d', 'all'] as TimeRange[]).map((p) => (
                 <Button
                   key={p}
@@ -371,14 +372,16 @@ export function RoutingPage() {
                             className="border-b border-border/20 last:border-0"
                           >
                             <td className="py-2 pr-3">
-                              <span
+                              <Link
+                                to={`/routing/decisions?period=${autoPeriod}&tier=${t.tier}&shadow=${t.shadow}`}
+                                title={`Explore ${t.shadow ? 'shadow' : 'applied'} ${t.tier} decisions`}
                                 className={cn(
-                                  'inline-block rounded px-2 py-0.5 text-xs font-medium',
+                                  'inline-block rounded px-2 py-0.5 text-xs font-medium hover:opacity-80',
                                   tierTone[t.tier] ?? 'bg-muted text-muted-foreground',
                                 )}
                               >
                                 {t.tier}
-                              </span>
+                              </Link>
                             </td>
                             <td className="py-2 pr-3 text-muted-foreground">
                               {t.shadow ? 'shadow' : 'applied'}
@@ -431,12 +434,21 @@ export function RoutingPage() {
 
                 {auto.recent.length > 0 && (
                   <div>
-                    <div className="text-xs text-muted-foreground mb-2">Recent decisions</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-muted-foreground">Recent decisions</div>
+                      <Link
+                        to="/routing/decisions"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        View all →
+                      </Link>
+                    </div>
                     <div className="space-y-1">
                       {auto.recent.slice(0, 10).map((d) => (
-                        <div
+                        <Link
                           key={d.response_id}
-                          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs py-1 border-b border-border/20 last:border-0"
+                          to={`/routing/decisions/${encodeURIComponent(d.response_id)}`}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs py-1 px-1 -mx-1 rounded border-b border-border/20 last:border-0 hover:bg-muted/40"
                         >
                           <span
                             className={cn(
@@ -470,7 +482,7 @@ export function RoutingPage() {
                           <span className="text-muted-foreground truncate max-w-md" title={d.reason}>
                             {d.reason}
                           </span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   </div>
@@ -479,6 +491,8 @@ export function RoutingPage() {
             )}
           </CardContent>
         </Card>
+
+        <RouterHealth />
 
         {/* Per-strategy breakdown */}
         <Card>
