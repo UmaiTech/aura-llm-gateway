@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### Features
+
+- Landing page redesign: hero with Admin app / Playground preview switcher, dedicated admin-app and playground sections with sample previews and a request-detail drawer, and an interactive auto-router walkthrough (deterministic, labelled demo using the gateway's default tiers, boundaries and mode offsets); light and dark themes
+- New brand identity across landing, playground and admin: ring + A mark, outlined Fraunces wordmark and a full favicon family (ICO, PNG, Apple touch, maskable, manifest per app)
+- Shared design tokens and components (`packages/aura-ui`) used by all three apps, with drift tests against the design pack
+
 ## [0.20.0] - 2026-10-22
 
 ### Features

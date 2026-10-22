@@ -1,46 +1,120 @@
+@import '@aura/ui/tokens.css';
+@import '@aura/ui/ui.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Marketing display face: Fraunces SemiBold, self-hosted (SIL OFL 1.1,
+   licence at /fonts/Fraunces-OFL.txt). Only weight 600 is shipped; the
+   landing uses the serif for titles only. */
+@font-face {
+  font-family: Fraunces;
+  src: url('/fonts/Fraunces-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Theme-aware grey ramp for pages still written against the old dark-only
+ * palette: in dark mode it is the token neutrals, in light mode the ramp
+ * inverts so `bg-gray-950 text-gray-100` stays background-on-text.
+ * 950/900/800/500/400/100 are the bg/surface/border/dim/muted/text tokens.
+ */
 @layer base {
+  :root {
+    --gray-50: 15 18 28;
+    --gray-100: 23 27 40;
+    --gray-200: 38 44 60;
+    --gray-300: 58 67 86;
+    --gray-400: 80 91 112;
+    --gray-500: 105 117 139;
+    --gray-600: 150 160 179;
+    --gray-700: 188 196 211;
+    --gray-800: 213 219 231;
+    --gray-900: 255 255 255;
+    --gray-950: 247 248 252;
+  }
+
+  .dark {
+    --gray-50: 251 252 254;
+    --gray-100: 244 246 250;
+    --gray-200: 226 230 238;
+    --gray-300: 201 208 220;
+    --gray-400: 167 176 192;
+    --gray-500: 120 131 151;
+    --gray-600: 79 90 112;
+    --gray-700: 58 67 87;
+    --gray-800: 41 49 67;
+    --gray-900: 17 21 31;
+    --gray-950: 11 13 20;
+  }
+
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 96px;
   }
 
   body {
-    @apply antialiased;
+    @apply antialiased bg-aura-bg text-aura-text;
   }
 
   ::selection {
-    @apply bg-aura-500/30;
+    @apply bg-aura-accent/30;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--aura-accent);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
-           bg-aura-500 text-white
-           hover:bg-aura-400
-           transition-colors duration-200 shadow-lg shadow-aura-500/25
-           hover:shadow-xl hover:shadow-aura-500/30;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-control text-sm font-medium
+           bg-aura-action text-white border border-aura-action
+           hover:brightness-110 transition-[filter] duration-150 whitespace-nowrap;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium
-           bg-gray-800 text-gray-100 border border-gray-700
-           hover:bg-gray-700 hover:border-gray-600
-           transition-colors duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-control text-sm font-medium
+           bg-aura-surface text-aura-text border border-aura-border
+           hover:bg-aura-hover transition-colors duration-150 whitespace-nowrap;
   }
 
   .card {
-    @apply bg-gray-900/50 border border-gray-800 rounded-xl p-6
-           backdrop-blur-sm hover:border-gray-700 transition-colors;
+    @apply bg-aura-surface border border-aura-border rounded-panel p-6
+           hover:border-aura-dim/60 transition-colors;
+  }
+
+  /* Small uppercase mono label above sections. */
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.13em] text-aura-muted;
+  }
+
+  /* Visible "sample data" marker kept next to every illustrative figure. */
+  .sample-tag {
+    @apply inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-aura-dim;
   }
 
   /* `.gradient-text` removed in 2026-05-21 polish pass — replaced
-     with mono-tone headlines + the new `font-display` Fraunces serif.
-     See docs/design-audit/AUDIT.md item L1. If you need an accent on
-     a number/wordmark, use `text-aura-400` directly. */
+     with mono-tone headlines + the `font-display` Fraunces serif.
+     See docs/design-audit/AUDIT.md item L1. */
 }
 
 /* Code block styling */
@@ -50,10 +124,4 @@ pre {
 
 code {
   @apply font-mono text-sm;
-}
-
-/* Glow effects */
-.glow {
-  box-shadow: 0 0 40px rgba(14, 165, 233, 0.15),
-              0 0 80px rgba(99, 102, 241, 0.1);
 }

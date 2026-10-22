@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { BrandMark } from '@aura/ui/brand/Brand.tsx'
 import { useSettingsStore } from '@/stores'
 import {
   Home1Line,
@@ -98,14 +99,10 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b px-4">
           <NavLink to="/" className="flex items-center gap-3">
-            <img
-              src={`${import.meta.env.BASE_URL}favicon.svg`}
-              alt="Aura"
-              className="h-9 w-9 rounded-lg"
-            />
+            <BrandMark size={34} title={sidebarCollapsed ? 'Aura' : undefined} />
             {!sidebarCollapsed && (
               <div className="flex flex-col">
-                <span className="font-semibold text-sm">Aura</span>
+                <span className="font-display font-semibold text-lg leading-none">Aura</span>
                 <span className="text-2xs text-muted-foreground">Gateway</span>
               </div>
             )}

@@ -1,0 +1,248 @@
+/*
+ * Styles for the shared components (Tabs, Drawer, RoutingInspector). Plain
+ * CSS on the design tokens so the components look the same in every app
+ * regardless of its Tailwind config. Import after tokens.css.
+ */
+
+/* ---- Tabs ---------------------------------------------------------------- */
+
+.aui-tabs {
+  display: flex;
+  min-width: 0;
+}
+
+.aui-tabs--underline {
+  gap: 22px;
+  border-bottom: 1px solid var(--aura-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.aui-tabs--underline .aui-tab {
+  padding: 11px 0;
+  margin-bottom: -1px;
+  font-size: 12.5px;
+  color: var(--aura-muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  background: none;
+  cursor: pointer;
+}
+
+.aui-tabs--underline .aui-tab[aria-selected='true'] {
+  color: var(--aura-text);
+  border-bottom-color: var(--aura-accent);
+  font-weight: 500;
+}
+
+.aui-tabs--segmented {
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--aura-border);
+  border-radius: 9px;
+  background: var(--aura-bg);
+}
+
+.aui-tabs--segmented .aui-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--aura-radius-control);
+  font-size: 13px;
+  color: var(--aura-muted);
+  background: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.aui-tabs--segmented .aui-tab[aria-selected='true'] {
+  background: var(--aura-surface-2);
+  color: var(--aura-accent);
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--aura-border);
+}
+
+.aui-tab:hover {
+  color: var(--aura-text);
+}
+
+.aui-tab:focus-visible,
+.aui-icon-button:focus-visible,
+.aui-tabpanel:focus-visible {
+  outline: 2px solid var(--aura-accent);
+  outline-offset: 2px;
+}
+
+/* ---- Drawer -------------------------------------------------------------- */
+
+.aui-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.aui-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  animation: aui-fade 0.15s ease-out;
+}
+
+.aui-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(480px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--aura-surface);
+  color: var(--aura-text);
+  border-left: 1px solid var(--aura-border);
+  box-shadow: var(--aura-shadow);
+  font-family: var(--aura-font-sans);
+  animation: aui-slide 0.18s ease-out;
+  outline: none;
+}
+
+.aui-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--aura-border);
+}
+
+.aui-drawer-titles {
+  min-width: 0;
+}
+
+.aui-drawer-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.aui-drawer-subtitle {
+  margin-top: 4px;
+  font: 11px var(--aura-font-mono);
+  color: var(--aura-dim);
+  overflow-wrap: anywhere;
+}
+
+.aui-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.aui-drawer-foot {
+  padding: 14px 24px;
+  border-top: 1px solid var(--aura-border);
+  font-size: 11px;
+  color: var(--aura-dim);
+}
+
+.aui-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--aura-radius-control);
+  color: var(--aura-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.aui-icon-button:hover {
+  background: var(--aura-hover);
+  color: var(--aura-text);
+}
+
+@keyframes aui-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes aui-slide {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aui-drawer,
+  .aui-drawer-backdrop {
+    animation: none;
+  }
+}
+
+/* ---- Key/value list ------------------------------------------------------ */
+
+.aui-kv {
+  margin: 0;
+}
+
+.aui-kv > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--aura-border);
+}
+
+.aui-kv dt {
+  font-size: 12px;
+  color: var(--aura-muted);
+  flex-shrink: 0;
+}
+
+.aui-kv dd {
+  margin: 0;
+  font: 12px var(--aura-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* ---- Status dot labels --------------------------------------------------- */
+
+.aui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--aura-green);
+}
+
+.aui-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.aui-status--warn {
+  color: var(--aura-amber);
+}
+
+.aui-status--bad {
+  color: var(--aura-red);
+}
+
+.aui-status--neutral {
+  color: var(--aura-muted);
+}

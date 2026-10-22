@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Suspense, ComponentType } from 'react'
 import { useLocation, Link } from 'react-router-dom'
+import { BrandMark } from '@aura/ui/brand/Brand.tsx'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -568,8 +569,8 @@ export function DocsPage() {
               >
                 {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
-              <Link to="/" className="flex items-center gap-2">
-                <img src="/icon-square.svg" alt="Aura Logo" className="h-8 w-8" />
+              <Link to="/" className="flex items-center gap-2" aria-label="Aura home">
+                <BrandMark size={30} />
                 <span className="font-semibold text-lg">Aura Docs</span>
               </Link>
             </div>

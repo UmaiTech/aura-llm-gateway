@@ -1,3 +1,5 @@
+@import '@aura/ui/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,86 +15,80 @@
     font-variation-settings: 'opsz' 32;
   }
 
+  /*
+   * shadcn-style theme variables, mapped onto the Aura design tokens
+   * (packages/aura-ui/src/tokens.css, from the v3 design pack). HSL
+   * triplets because the Tailwind config wraps them in hsl(). `--primary`
+   * is the action violet for filled controls; `--primary-400` (and
+   * `--aura-400`) is the accent for selected/link text, which needs the
+   * lighter shade to stay readable on dark surfaces.
+   */
   :root {
-    /* Light theme - inspired by Vercel/ChatGPT */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --background: 228 45% 98%;
+    --foreground: 226 27% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 226 27% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
+    --popover-foreground: 226 27% 12%;
 
-    /* Primary - vibrant purple/blue gradient colors */
-    --primary: 250 95% 63%;
+    --primary: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
-    --primary-500: 250 95% 63%;
-    --primary-600: 250 95% 55%;
-    --primary-400: 250 95% 70%;
+    --primary-500: 263 70% 50%;
+    --primary-600: 263 70% 44%;
+    --primary-400: 263 70% 50%;
 
-    /* Aura gradient accent */
-    --aura-400: 280 90% 65%;
-    --aura-500: 280 90% 55%;
+    --aura-400: 263 70% 50%;
+    --aura-500: 263 70% 50%;
 
-    /* Secondary - subtle gray */
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --secondary: 225 36% 96%;
+    --secondary-foreground: 226 27% 12%;
+    --muted: 225 36% 96%;
+    --muted-foreground: 219 17% 38%;
+    --accent: 234 29% 93%;
+    --accent-foreground: 226 27% 12%;
 
-    /* Borders and inputs - subtle */
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 250 95% 63%;
+    --border: 220 27% 87%;
+    --input: 220 27% 87%;
+    --ring: 263 70% 50%;
 
-    /* Destructive */
-    --destructive: 0 72% 51%;
+    --destructive: 348 57% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Radius */
     --radius: 0.75rem;
   }
 
   .dark {
-    /* Dark theme - deeper blacks with better contrast */
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 6% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 8% 8%;
-    --popover-foreground: 0 0% 98%;
+    --background: 227 29% 6%;
+    --foreground: 220 37% 97%;
+    --card: 223 29% 9%;
+    --card-foreground: 220 37% 97%;
+    --popover: 223 27% 13%;
+    --popover-foreground: 220 37% 97%;
 
-    /* Primary - same vibrant purple/blue */
-    --primary: 250 95% 63%;
+    --primary: 260 71% 56%;
     --primary-foreground: 0 0% 100%;
-    --primary-500: 250 95% 63%;
-    --primary-600: 250 95% 55%;
-    --primary-400: 250 95% 70%;
+    --primary-500: 260 71% 56%;
+    --primary-600: 260 71% 50%;
+    --primary-400: 254 100% 80%;
 
-    /* Aura gradient accent */
-    --aura-400: 280 90% 65%;
-    --aura-500: 280 90% 55%;
+    --aura-400: 254 100% 80%;
+    --aura-500: 260 71% 56%;
 
-    /* Secondary - slightly lighter than background */
-    --secondary: 240 6% 10%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 6% 10%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 6% 14%;
-    --accent-foreground: 0 0% 98%;
+    --secondary: 223 27% 13%;
+    --secondary-foreground: 220 37% 97%;
+    --muted: 223 27% 13%;
+    --muted-foreground: 218 17% 70%;
+    --accent: 226 27% 15%;
+    --accent-foreground: 220 37% 97%;
 
-    /* Borders - subtle but visible */
-    --border: 240 6% 20%;
-    --input: 240 6% 20%;
-    --ring: 250 95% 63%;
+    --border: 222 24% 21%;
+    --input: 222 24% 21%;
+    --ring: 254 100% 80%;
 
-    /* Destructive */
-    --destructive: 0 63% 31%;
+    --destructive: 352 70% 60%;
     --destructive-foreground: 0 0% 100%;
   }
 }
-
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
@@ -132,34 +128,6 @@
   }
   40% {
     transform: translateY(-4px);
-  }
-}
-
-/* Logo pulse/heartbeat animation */
-.logo-pulse {
-  animation: logo-heartbeat 2s ease-in-out infinite;
-}
-
-@keyframes logo-heartbeat {
-  0%, 100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
-  }
-  14% {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 16px rgba(139, 92, 246, 0.5));
-  }
-  28% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
-  }
-  42% {
-    transform: scale(1.08);
-    filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.4));
-  }
-  56% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
   }
 }
 

@@ -30,6 +30,25 @@ jobs:
       - name: Run doc tests
         run: cargo test --workspace --doc
 
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Dependency-free node:test suites (native TypeScript stripping):
+      # design-token and brand drift checks, the landing auto-router demo,
+      # routing and pricing adapters. Each also runs from its own package
+      # with `npm test`.
+      - name: Run frontend unit tests
+        run: node --test 'packages/aura-ui/src/**/*.test.ts' 'apps/*/src/**/*.test.ts'
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
