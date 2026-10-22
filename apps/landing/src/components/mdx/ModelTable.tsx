@@ -24,7 +24,10 @@ interface Model {
  *     prices/context below are only used until the API responds.
  */
 const FALLBACK_MODELS: Model[] = [
-  // OpenAI — 2026 lineup (refreshed 2026-09-07)
+  // OpenAI — 2026 lineup (refreshed 2026-10-01)
+  { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', provider: 'openai', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-6-sol', name: 'GPT-6 Sol', provider: 'openai', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
+  { id: 'gpt-6-luna', name: 'GPT-6 Luna', provider: 'openai', inputPrice: 0.1, outputPrice: 0.5, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-6-astra', name: 'GPT-6 Astra', provider: 'openai', inputPrice: 10.0, outputPrice: 50.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai', inputPrice: 4.0, outputPrice: 20.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', provider: 'openai', inputPrice: 2.0, outputPrice: 12.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
@@ -38,8 +41,10 @@ const FALLBACK_MODELS: Model[] = [
   { id: 'o3-mini', name: 'o3-mini (reasoning)', provider: 'openai', inputPrice: 1.1, outputPrice: 4.4, contextWindow: 200000, streaming: true, functionCalling: true, vision: false },
   { id: 'gpt-4o', name: 'GPT-4o (legacy)', provider: 'openai', inputPrice: 2.5, outputPrice: 10.0, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini (legacy)', provider: 'openai', inputPrice: 0.15, outputPrice: 0.6, contextWindow: 128000, streaming: true, functionCalling: true, vision: true },
-  // Anthropic — 2026 lineup (refreshed 2026-09-07)
+  // Anthropic — 2026 lineup (refreshed 2026-10-01)
   { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', inputPrice: 10.0, outputPrice: 50.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', provider: 'anthropic', inputPrice: 4.0, outputPrice: 20.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },

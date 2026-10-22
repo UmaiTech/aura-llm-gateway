@@ -272,6 +272,9 @@ export const AVAILABLE_MODELS: Model[] = [
   { id: 'auto:quality', name: 'Auto (quality)', provider: 'aura', tier: 'free', description: 'Prefer stronger models' },
 
   // OpenAI — frontier locked, mini/nano/Luna free
+  { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-6-sol', name: 'GPT-6 Sol', provider: 'openai', tier: 'beta' },
+  { id: 'gpt-6-luna', name: 'GPT-6 Luna', provider: 'openai', tier: 'free' },
   { id: 'gpt-6-astra', name: 'GPT-6 Astra', provider: 'openai', tier: 'beta' },
   { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai', tier: 'beta' },
   { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', provider: 'openai', tier: 'beta' },
@@ -296,6 +299,8 @@ export const AVAILABLE_MODELS: Model[] = [
   // but the upstream call fails. Haiku 4.5 is the current cheap
   // Anthropic model.
   { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', provider: 'anthropic', tier: 'beta' },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', tier: 'beta' },

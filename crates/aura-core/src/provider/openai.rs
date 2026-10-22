@@ -21,11 +21,15 @@ const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
 /// Supported OpenAI models (most recent first)
 ///
-/// Refreshed 2026-09-07 against OpenAI's model release notes and pricing
-/// page. GPT-6 Astra (2026-09-03) and the GPT-5.6 Sol / Terra / Luna tiers
-/// (August 2026) are the current line; `gpt-5.6` is OpenAI's alias for Sol.
+/// Refreshed 2026-10-01 against OpenAI's model release notes and pricing
+/// page. GPT-6.1 Sol (2026-09-29), GPT-6 Sol / Luna (2026-09-22) and GPT-6
+/// Astra (2026-09-03) are the current line; the GPT-5.6 Sol / Terra / Luna
+/// tiers (August 2026) remain; `gpt-5.6` is OpenAI's alias for Sol.
 const SUPPORTED_MODELS: &[&str] = &[
-    // GPT-6 (September 2026)
+    // GPT-6.x (September 2026)
+    "gpt-6.1-sol",
+    "gpt-6-sol",
+    "gpt-6-luna",
     "gpt-6-astra",
     // GPT-5.6 family (August 2026) — Sol (flagship), Terra (default), Luna (cheapest)
     "gpt-5.6-sol",
@@ -1089,6 +1093,9 @@ mod tests {
         assert!(provider.supports_model("gpt-4o"));
         assert!(provider.supports_model("gpt-3.5-turbo"));
         // September 2026 line
+        assert!(provider.supports_model("gpt-6.1-sol"));
+        assert!(provider.supports_model("gpt-6-sol"));
+        assert!(provider.supports_model("gpt-6-luna"));
         assert!(provider.supports_model("gpt-6-astra"));
         assert!(provider.supports_model("gpt-5.6-sol"));
         assert!(provider.supports_model("gpt-5.6-terra"));

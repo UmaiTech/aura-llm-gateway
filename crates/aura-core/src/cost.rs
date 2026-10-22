@@ -110,10 +110,24 @@ impl CostCalculator {
         let mut pricing = HashMap::new();
 
         // =================================================================
-        // OpenAI pricing (as of September 2026)
+        // OpenAI pricing (as of October 2026)
         // =================================================================
 
-        // GPT-6 (September 2026)
+        // GPT-6.x (September 2026). Sol and Luna were launched at half the
+        // GPT-5.6 prices; GPT-6.1 Sol bills cache reads at $0.10 and
+        // prompts over 272K input tokens at a surcharge (not modelled here).
+        pricing.insert(
+            "gpt-6.1-sol".to_string(),
+            ModelPricing::new(2.00, 10.00).with_cached(0.10),
+        );
+        pricing.insert(
+            "gpt-6-sol".to_string(),
+            ModelPricing::new(2.00, 10.00).with_cached(0.20),
+        );
+        pricing.insert(
+            "gpt-6-luna".to_string(),
+            ModelPricing::new(0.10, 0.50).with_cached(0.01),
+        );
         pricing.insert(
             "gpt-6-astra".to_string(),
             ModelPricing::new(10.00, 50.00).with_cached(1.00),
@@ -281,7 +295,7 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Anthropic pricing (as of September 2026)
+        // Anthropic pricing (as of October 2026)
         // =================================================================
 
         // Claude Fable 5.x (2026 — top tier). Fable 5.1 (2026-09-01) bills
@@ -293,6 +307,17 @@ impl CostCalculator {
         pricing.insert(
             "claude-fable-5".to_string(),
             ModelPricing::new(10.00, 50.00).with_cached(1.00),
+        );
+
+        // Claude 5.5 family (2026). Opus 5.5 cache reads $0.20/MTok;
+        // Sonnet 5.5 is priced the same as Sonnet 5.
+        pricing.insert(
+            "claude-opus-5-5".to_string(),
+            ModelPricing::new(4.00, 20.00).with_cached(0.20),
+        );
+        pricing.insert(
+            "claude-sonnet-5-5".to_string(),
+            ModelPricing::new(2.00, 10.00).with_cached(0.20),
         );
 
         // Claude 5 family (2026 — Opus 5 released 2026-07-24)
@@ -949,6 +974,28 @@ mod tests {
         // gpt-6-astra: (1000/1M * 10.00) + (500/1M * 50.00) = 0.01 + 0.025
         let cost = calculator.calculate_cost("gpt-6-astra", 1000, 500, None, None);
         assert!((cost.unwrap() - 0.035).abs() < 0.00001);
+    }
+
+    #[test]
+    fn test_cost_calculator_october_2026_models() {
+        // Every id added in the 2026-10-01 catalog refresh must have a
+        // seed price so cost tracking never silently reports $0 for them.
+        let calculator = CostCalculator::new();
+        for model in [
+            "gpt-6.1-sol",
+            "gpt-6-sol",
+            "gpt-6-luna",
+            "claude-opus-5-5",
+            "claude-sonnet-5-5",
+        ] {
+            assert!(
+                calculator.get_pricing(model).is_some(),
+                "missing seed pricing for {model}"
+            );
+        }
+        // gpt-6-luna: (1000/1M * 0.10) + (500/1M * 0.50) = 0.0001 + 0.00025
+        let cost = calculator.calculate_cost("gpt-6-luna", 1000, 500, None, None);
+        assert!((cost.unwrap() - 0.00035).abs() < 0.00001);
     }
 
     #[test]
