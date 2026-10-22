@@ -91,7 +91,7 @@ Errors follow the Open Responses API format:
 ## Supported Models
 
 ### OpenAI ✅
-- `gpt-6-astra`
+- `gpt-6.1-sol`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6-astra`
 - `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`
 - `gpt-5.5-pro`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`
 - `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo` (legacy)
@@ -99,12 +99,14 @@ Errors follow the Open Responses API format:
 
 ### Anthropic ✅
 - `claude-fable-5-1`, `claude-fable-5`
+- `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`
 - `claude-opus-5`, `claude-sonnet-5`
 - `claude-opus-4-8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`
 - `claude-opus-4-5`, `claude-sonnet-4-5`, `claude-haiku-4-5`
 - `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` (legacy)
 
 ### Google Gemini ✅
+- `gemini-4-argon`
 - `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`
 - `gemini-3.1-pro-preview`, `gemini-3-pro-preview`, `gemini-3-flash-preview`
 - `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`

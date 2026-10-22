@@ -13,7 +13,7 @@
 
 use aura_core::router::auto::{judge_prompt, parse_judge_output, Eligibility};
 use aura_core::{AutoDecision, Provider};
-use aura_db::{NewRoutingGoldPair, RoutingGoldPairRepo};
+use aura_db::{GoldProvenance, NewRoutingGoldPair, RoutingGoldPairRepo};
 use aura_types::{ContentPart, CreateResponseRequest, InputContent, InputItem, Role, Tier};
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -55,6 +55,10 @@ fn last_user_text(request: &CreateResponseRequest) -> Option<String> {
 /// turns only (no tools, images or tool-loop continuations), and only when
 /// the router has two distinct tiers to compare.
 pub fn is_gold_eligible(request: &CreateResponseRequest, decision: &AutoDecision) -> bool {
+    if decision.synthetic {
+        // Synthetic-trace runs label themselves; never sample them.
+        return false;
+    }
     if decision.features.tool_count > 0
         || decision.features.has_images
         || decision.features.has_audio
@@ -197,6 +201,73 @@ fn pick_pair(
 }
 
 /// Answer the prompt with both tiers, grade, and store the pair.
+/// Result of one judge call.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct JudgeOutcome {
+    /// `a`, `b` or `tie`; `None` when the judge failed.
+    pub verdict: Option<String>,
+    pub confidence: Option<f64>,
+    pub rationale: Option<String>,
+    pub error: Option<String>,
+    /// Judge cost in USD when the provider reported usage.
+    pub cost_usd: Option<f64>,
+}
+
+/// Ask the judge model whether answer A or B serves `user_text` better.
+/// Shared by live gold sampling and `POST /admin/routing/judge`, so both
+/// label sets use one definition of "cheap sufficed".
+pub async fn judge_pair(
+    state: &AppState,
+    judge_model: &str,
+    user_text: &str,
+    text_a: &str,
+    text_b: &str,
+    max_chars: usize,
+) -> JudgeOutcome {
+    let mut out = JudgeOutcome::default();
+    let Some(judge) = state.get_provider(judge_model) else {
+        out.error = Some(format!("judge model {} not servable", judge_model));
+        return out;
+    };
+    let mut jreq = CreateResponseRequest::text(
+        judge_model.to_string(),
+        judge_prompt(user_text, text_a, text_b, max_chars),
+    );
+    jreq.temperature = Some(0.0);
+    jreq.max_output_tokens = Some(120);
+    match tokio::time::timeout(CALL_TIMEOUT, judge.complete(jreq)).await {
+        Ok(Ok(resp)) => {
+            out.cost_usd = resp.usage.as_ref().and_then(|u| {
+                u.cost_usd.or_else(|| {
+                    state.cost_calculator().calculate_cost(
+                        judge_model,
+                        u.input_tokens,
+                        u.output_tokens,
+                        u.cached_tokens,
+                        u.reasoning_tokens,
+                    )
+                })
+            });
+            match parse_judge_output(&resp.text()) {
+                Some(j) => {
+                    out.verdict = Some(j.verdict.as_str().to_string());
+                    out.confidence = Some(j.confidence);
+                    out.rationale = j.rationale;
+                }
+                None => {
+                    out.error = Some(format!(
+                        "unparseable judge reply: {}",
+                        resp.text().chars().take(200).collect::<String>()
+                    ))
+                }
+            }
+        }
+        Ok(Err(e)) => out.error = Some(format!("judge failed: {}", e)),
+        Err(_) => out.error = Some("judge timeout".into()),
+    }
+    out
+}
+
 pub async fn collect_gold_pair(
     state: AppState,
     request: CreateResponseRequest,
@@ -229,50 +300,28 @@ pub async fn collect_gold_pair(
         answer_with(&state, provider_b, &model_b, &request, max_chars, tier_b),
     );
 
-    let mut verdict = None;
-    let mut confidence = None;
-    let mut rationale = None;
-    let mut error = None;
-    match (&a.text, &b.text) {
+    let (verdict, confidence, rationale, error) = match (&a.text, &b.text) {
         (Some(text_a), Some(text_b)) => {
-            let judge_model = cfg.gold_judge_model.clone();
-            match state.get_provider(&judge_model) {
-                Some(judge) => {
-                    let mut jreq = CreateResponseRequest::text(
-                        judge_model.clone(),
-                        judge_prompt(&user_text, text_a, text_b, max_chars),
-                    );
-                    jreq.temperature = Some(0.0);
-                    jreq.max_output_tokens = Some(120);
-                    match tokio::time::timeout(CALL_TIMEOUT, judge.complete(jreq)).await {
-                        Ok(Ok(resp)) => match parse_judge_output(&resp.text()) {
-                            Some(j) => {
-                                verdict = Some(j.verdict.as_str().to_string());
-                                confidence = Some(j.confidence);
-                                rationale = j.rationale;
-                            }
-                            None => {
-                                error = Some(format!(
-                                    "unparseable judge reply: {}",
-                                    resp.text().chars().take(200).collect::<String>()
-                                ))
-                            }
-                        },
-                        Ok(Err(e)) => error = Some(format!("judge failed: {}", e)),
-                        Err(_) => error = Some("judge timeout".into()),
-                    }
-                }
-                None => error = Some(format!("judge model {} not servable", judge_model)),
-            }
+            let j = judge_pair(
+                &state,
+                &cfg.gold_judge_model,
+                &user_text,
+                text_a,
+                text_b,
+                max_chars,
+            )
+            .await;
+            (j.verdict, j.confidence, j.rationale, j.error)
         }
         _ => {
-            error = Some(format!(
+            let error = Some(format!(
                 "candidate failed: a={} b={}",
                 a.error.as_deref().unwrap_or("ok"),
                 b.error.as_deref().unwrap_or("ok")
             ));
+            (None, None, None, error)
         }
-    }
+    };
 
     let new = NewRoutingGoldPair {
         response_id: request_id.clone(),
@@ -297,6 +346,7 @@ pub async fn collect_gold_pair(
         judge_confidence: confidence,
         judge_rationale: rationale,
         error: error.clone(),
+        provenance: GoldProvenance::default(),
     };
     match RoutingGoldPairRepo::insert(pool, new).await {
         Ok(id) => info!(
@@ -408,6 +458,11 @@ mod tests {
         )]);
         let d2 = decide(&st, &with_tools);
         assert!(!is_gold_eligible(&with_tools, &d2));
+
+        // Synthetic-trace runs label themselves and are never sampled.
+        let mut synthetic = d.clone();
+        synthetic.synthetic = true;
+        assert!(!is_gold_eligible(&req, &synthetic));
     }
 
     #[tokio::test]

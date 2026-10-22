@@ -37,7 +37,10 @@ class KnownModels(str, Enum):
     AUTO_BALANCED = "auto:balanced"
     AUTO_QUALITY = "auto:quality"
 
-    # OpenAI (September 2026 line first)
+    # OpenAI (newest line first)
+    GPT_6_1_SOL = "gpt-6.1-sol"
+    GPT_6_SOL = "gpt-6-sol"
+    GPT_6_LUNA = "gpt-6-luna"
     GPT_6_ASTRA = "gpt-6-astra"
     GPT_5_6_SOL = "gpt-5.6-sol"
     GPT_5_6_TERRA = "gpt-5.6-terra"
@@ -51,6 +54,9 @@ class KnownModels(str, Enum):
 
     # Anthropic (Claude 5-generation ids carry no date suffix)
     CLAUDE_FABLE_5_1 = "claude-fable-5-1"
+    CLAUDE_OPUS_5_5 = "claude-opus-5-5"
+    CLAUDE_SONNET_5_5 = "claude-sonnet-5-5"
+    CLAUDE_HAIKU_5_5 = "claude-haiku-5-5"
     CLAUDE_OPUS_5 = "claude-opus-5"
     CLAUDE_SONNET_5 = "claude-sonnet-5"
     CLAUDE_OPUS_4_8 = "claude-opus-4-8"
@@ -59,6 +65,7 @@ class KnownModels(str, Enum):
     CLAUDE_HAIKU_4_5 = "claude-haiku-4-5-20251001"
 
     # Google
+    GEMINI_4_ARGON = "gemini-4-argon"
     GEMINI_3_8_FLASH = "gemini-3.8-flash"
     GEMINI_3_7_FLASH = "gemini-3.7-flash"
     GEMINI_3_6_FLASH = "gemini-3.6-flash"

@@ -65,11 +65,11 @@ pub async fn rate_limit_middleware(
     request: Request,
     next: Next,
 ) -> Response {
-    // Check if we have a rate limiter
+    // Check if we have a rate limiter and it is switched on
     let rate_limiter = match state.rate_limiter() {
-        Some(rl) => rl,
-        None => {
-            // No rate limiter configured, skip
+        Some(rl) if state.rate_limit_enabled() => rl,
+        _ => {
+            // No rate limiter configured (or disabled at runtime), skip
             return next.run(request).await;
         }
     };
@@ -102,8 +102,13 @@ pub async fn rate_limit_middleware(
         }
     };
 
-    // Get rate limit from API key (default to 60 RPM if not set)
-    let rate_limit_rpm = auth.api_key.rate_limit_rpm.unwrap_or(60) as u32;
+    // Get rate limit from API key (gateway default if not set)
+    let rate_limit_rpm = auth
+        .api_key
+        .rate_limit_rpm
+        .filter(|v| *v > 0)
+        .map(|v| v as u32)
+        .unwrap_or_else(|| state.default_rate_limit_rpm());
 
     // Check rate limit using API key ID as the key
     let key = auth.api_key.id.to_string();

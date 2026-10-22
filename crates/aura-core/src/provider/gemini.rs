@@ -32,12 +32,17 @@ const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta"
 /// whose `supportedGenerationMethods` includes `generateContent`,
 /// drop anything not returned.
 ///
+/// 2026-10-15 refresh: added `gemini-4-argon` (GA 2026-10-13, id from
+/// Google's Gemini API release notes; not yet checked against models.list).
+///
 /// 2026-09-07 refresh: added `gemini-3.8-flash` (GA 2026-09-02),
 /// `gemini-3.7-flash` (GA 2026-08-13), `gemini-3.6-flash` and
 /// `gemini-3.5-flash-lite` (GA 2026-07-21) from
 /// Google's model docs / release notes. That refresh had no API key on
 /// hand, so re-run the models.list check above before relying on them.
 const SUPPORTED_MODELS: &[&str] = &[
+    // Gemini 4 family
+    "gemini-4-argon",
     // Gemini 3.x family
     "gemini-3.8-flash",
     "gemini-3.7-flash",
@@ -1262,6 +1267,7 @@ mod tests {
         assert!(provider.supports_model("gemini-3.6-flash"));
         assert!(provider.supports_model("gemini-3.7-flash"));
         assert!(provider.supports_model("gemini-3.8-flash"));
+        assert!(provider.supports_model("gemini-4-argon"));
         assert!(provider.supports_model("gemini-pro-latest"));
         assert!(!provider.supports_model("gpt-4"));
         assert!(!provider.supports_model("claude-3-opus"));

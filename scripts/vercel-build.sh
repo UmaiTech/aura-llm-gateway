@@ -17,11 +17,16 @@
 set -euo pipefail
 
 echo "==> Installing root deps (for /api functions)"
-npm install
+# --legacy-peer-deps: better-auth declares ~60 peers, all optional. npm 10's
+# peer-set resolver walks them anyway and crashes with "Cannot read
+# properties of null (reading 'edgesOut')" since vitest 5 was published.
+# Nothing here or in the apps relies on npm auto-installing a peer, so skip
+# peer resolution for every install (apps/chat also depends on better-auth).
+npm install --legacy-peer-deps
 
 for app in landing chat admin; do
   echo "==> Building apps/${app}"
-  (cd "apps/${app}" && npm install && npm run build)
+  (cd "apps/${app}" && npm install --legacy-peer-deps && npm run build)
 done
 
 echo "==> Assembling combined output under apps/landing/dist"

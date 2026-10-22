@@ -151,6 +151,11 @@ pub struct AutoDecision {
     /// can confirm what the gateway applied. Absent when none were sent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<RoutingOptions>,
+    /// Request came from a synthetic-trace run (`x-aura-synthetic`); the
+    /// decision is recorded but excluded from stats, outcome rewards,
+    /// arm statistics and live gold sampling.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub synthetic: bool,
 }
 
 /// Why no model could be selected.
@@ -389,6 +394,7 @@ impl AutoRouter {
                         latency_us: started.elapsed().as_micros() as u64,
                         escalations: Vec::new(),
                         predicted_cost_usd: oracle.predicted_cost_usd(prev),
+                        synthetic: false,
                     });
                 }
             }
@@ -458,6 +464,7 @@ impl AutoRouter {
             latency_us: started.elapsed().as_micros() as u64,
             escalations: Vec::new(),
             predicted_cost_usd,
+            synthetic: false,
         })
     }
 }

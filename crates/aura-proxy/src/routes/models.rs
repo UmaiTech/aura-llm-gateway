@@ -107,11 +107,11 @@ pub struct ListModelsResponse {
 pub async fn list_models(State(state): State<AppState>) -> Json<ListModelsResponse> {
     let catalog = state.model_catalog();
     let router = state.auto_router();
-    let tiers = router.map(|r| r.catalog().tiers().clone());
+    let tiers = router.as_ref().map(|r| r.catalog().tiers().clone());
 
     let mut data: Vec<ModelEntry> = Vec::new();
 
-    if let Some(r) = router.filter(|r| r.is_enabled()) {
+    if let Some(r) = router.as_ref().filter(|r| r.is_enabled()) {
         for (alias, mode) in [
             (AUTO_MODEL_ALIAS.to_string(), None),
             (
