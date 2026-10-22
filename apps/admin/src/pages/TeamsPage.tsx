@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, Stat, StatGrid, ErrorState, SkeletonPage } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
   AddLine,
@@ -13,7 +13,6 @@ import {
   CheckLine,
   CloseLine,
   AiLine,
-  Loading3Line,
   Refresh1Line,
   Building4Line,
 } from '@mingcute/react'
@@ -43,6 +42,7 @@ export function TeamsPage() {
   const [formSlug, setFormSlug] = useState('')
   const [formDescription, setFormDescription] = useState('')
   const [formTokenLimit, setFormTokenLimit] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -110,12 +110,17 @@ export function TeamsPage() {
 
   const fetchData = async () => {
     try {
+      // Teams are the page's content, so a failure there is fatal; the
+      // org list only feeds the create form, so it degrades to empty.
       const [teamsData, orgsData] = await Promise.all([
-        getTeams().catch(() => []),
+        getTeams(),
         getOrganizations().catch(() => []),
       ])
       setTeams(teamsData)
       setOrganizations(orgsData)
+      setError(null)
+    } catch (err) {
+      setError(err)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -175,20 +180,28 @@ export function TeamsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Teams" description="Manage teams and their token budgets" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading teams...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={4} rows={5} />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col">
+        <Header title="Teams" description="Manage teams and their token budgets" />
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="teams" onRetry={handleRefresh} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Teams"
         description="Manage teams and their token budgets"
@@ -210,7 +223,7 @@ export function TeamsPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Filters */}
         <div className="flex gap-4">
           <div className="relative flex-1 max-w-md">
@@ -237,60 +250,12 @@ export function TeamsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Group2Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.teams}</p>
-                  <p className="text-sm text-muted-foreground">Total Teams</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.members}</p>
-                  <p className="text-sm text-muted-foreground">Total Members</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-success/20 rounded-lg">
-                  <FolderLine className="w-5 h-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.projects}</p>
-                  <p className="text-sm text-muted-foreground">Total Projects</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-destructive/20 rounded-lg">
-                  <AiLine className="w-5 h-5 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.overLimit}</p>
-                  <p className="text-sm text-muted-foreground">Over Limit</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Total Teams" value={totals.teams} />
+          <Stat label="Total Members" value={totals.members} />
+          <Stat label="Total Projects" value={totals.projects} />
+          <Stat label="Over Limit" value={totals.overLimit} />
+        </StatGrid>
 
         {/* Teams List */}
         <Card>
@@ -319,8 +284,8 @@ export function TeamsPage() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-500/20 rounded-lg">
-                            <Group2Line className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <div className="p-2 rounded-md border bg-muted text-muted-foreground">
+                            <Group2Line className="w-5 h-5" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -377,7 +342,7 @@ export function TeamsPage() {
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <div
                             className={cn(
-                              'h-full transition-all',
+                              'h-full transition-colors',
                               getUsageColor(team.current_month_tokens, team.monthly_token_limit)
                             )}
                             style={{
@@ -401,7 +366,7 @@ export function TeamsPage() {
 
       {/* Create Team Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -481,7 +446,7 @@ export function TeamsPage() {
 
       {/* Edit Team Modal */}
       {editingTeam && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">

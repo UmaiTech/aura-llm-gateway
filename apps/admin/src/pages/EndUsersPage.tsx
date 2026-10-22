@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, ErrorState, SkeletonPage, Stat, StatGrid } from '@/components/ui'
 import {
   SearchLine,
   User2Line,
   ForbidCircleLine,
   CheckLine,
   CloseLine,
-  ChartBarLine,
-  CoinLine,
   Refresh1Line,
 } from '@mingcute/react'
 import {
@@ -33,7 +31,7 @@ export function EndUsersPage() {
   const [users, setUsers] = useState<EndUserSummary[]>([])
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newUser, setNewUser] = useState({
     organization_id: '',
@@ -175,7 +173,7 @@ export function EndUsersPage() {
       setUsers(usersData)
       setOrganizations(orgsData)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch users')
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -238,10 +236,10 @@ export function EndUsersPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="End Users" description="Track and manage your customers' usage" />
-        <div className="flex-1 flex items-center justify-center">
-          <Refresh1Line className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={4} rows={8} />
         </div>
       </div>
     )
@@ -249,18 +247,17 @@ export function EndUsersPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="End Users" description="Track and manage your customers' usage" />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-destructive">{error}</p>
-          <Button onClick={fetchUsers}>Retry</Button>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="end users" onRetry={fetchUsers} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="End Users"
         description="Track and manage your customers' usage"
@@ -279,7 +276,7 @@ export function EndUsersPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Filters */}
         <div className="flex gap-4 flex-wrap">
           <div className="relative flex-1 max-w-md">
@@ -315,60 +312,12 @@ export function EndUsersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totalUsers}</p>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-destructive/20 rounded-lg">
-                  <ForbidCircleLine className="w-5 h-5 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{blockedUsers}</p>
-                  <p className="text-sm text-muted-foreground">Blocked</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-success/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totalRequests.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Total Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatCurrency(totalCost)}</p>
-                  <p className="text-sm text-muted-foreground">Total Cost</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Total Users" value={totalUsers} />
+          <Stat label="Blocked" value={blockedUsers} />
+          <Stat label="Total Requests" value={totalRequests.toLocaleString()} />
+          <Stat label="Total Cost" value={formatCurrency(totalCost)} />
+        </StatGrid>
 
         {/* Users Table */}
         <Card>
@@ -380,14 +329,14 @@ export function EndUsersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Organization</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Requests</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Tokens</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Cost</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Last Seen</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                    <th className="text-left py-3 px-4 text-sm eyebrow text-muted-foreground">User</th>
+                    <th className="text-left py-3 px-4 text-sm eyebrow text-muted-foreground">Organization</th>
+                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Requests</th>
+                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Tokens</th>
+                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Cost</th>
+                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Last Seen</th>
+                    <th className="text-center py-3 px-4 text-sm eyebrow text-muted-foreground">Status</th>
+                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -458,7 +407,7 @@ export function EndUsersPage() {
 
       {/* User Detail Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -628,7 +577,7 @@ export function EndUsersPage() {
           first /v1/responses request that includes `user: "..."`, so
           this admin path is for manually pre-provisioning. */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">

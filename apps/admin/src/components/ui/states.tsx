@@ -26,6 +26,8 @@ interface ErrorStateProps {
   retrying?: boolean
   /** `banner` sits inline above content; `page` centres in the body. */
   variant?: 'banner' | 'page'
+  /** Override the generated headline, e.g. "Couldn't save settings". */
+  title?: string
   /** Extra actions rendered next to Retry (e.g. a Back link). */
   actions?: React.ReactNode
   className?: string
@@ -37,10 +39,13 @@ export function ErrorState({
   onRetry,
   retrying,
   variant = 'banner',
+  title: titleOverride,
   actions,
   className,
 }: ErrorStateProps) {
-  const { title, hint, detail } = describeError(error, what)
+  const described = describeError(error, what)
+  const { hint, detail } = described
+  const title = titleOverride ?? described.title
 
   return (
     <div

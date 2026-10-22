@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ErrorState, SkeletonPage, EmptyState, Stat, StatGrid } from '@/components/ui'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import {
   ArrowLeftLine,
@@ -9,9 +9,6 @@ import {
   Group2Line,
   Key2Line,
   User2Line,
-  FlashLine,
-  CoinLine,
-  Loading3Line,
   Refresh1Line,
   StorageLine,
 } from '@mingcute/react'
@@ -45,7 +42,7 @@ export function OrganizationDetailPage() {
   const [apiKeys, setApiKeys] = useState<ApiKeySummary[]>([])
   const [endUsers, setEndUsers] = useState<EndUserSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   // Payload capture toggle — reads from the settings returned by the
   // updateOrganization PUT response. Starts as false (unknown) until the
@@ -103,7 +100,7 @@ export function OrganizationDetailPage() {
       setApiKeys(keys)
       setEndUsers(users)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load organization')
+      setError(e)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -190,13 +187,10 @@ export function OrganizationDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
-        <Header title="Organization" description="Loading..." />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading organization...</span>
-          </div>
+      <div className="flex flex-col">
+        <Header title="Organization" />
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={5} rows={5} />
         </div>
       </div>
     )
@@ -204,29 +198,35 @@ export function OrganizationDetailPage() {
 
   if (error || !org) {
     return (
-      <div className="flex flex-col h-full">
-        <Header title="Organization" description="Not found" />
-        <div className="flex-1 flex items-center justify-center p-6">
-          <Card className="max-w-md w-full border-destructive/30 bg-destructive/5">
-            <CardContent className="p-6 space-y-3">
-              <div className="text-sm font-medium text-destructive">
-                {error ? 'Failed to load organization' : 'Organization not found'}
-              </div>
-              {error && <div className="text-sm text-muted-foreground">{error}</div>}
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => navigate('/organizations')}>
-                  <ArrowLeftLine className="h-4 w-4 mr-2" />
-                  Back to list
+      <div className="flex flex-col">
+        <Header title="Organization" />
+        <div className="flex-1 p-4 sm:p-6">
+          {error ? (
+            <ErrorState
+              variant="page"
+              error={error}
+              what="this organization"
+              onRetry={handleRefresh}
+              actions={
+                <Button variant="ghost" size="sm" onClick={() => navigate('/organizations')}>
+                  <ArrowLeftLine className="mr-1.5 h-3.5 w-3.5" />
+                  Back to organizations
                 </Button>
-                {error && (
-                  <Button size="sm" onClick={handleRefresh}>
-                    <Refresh1Line className="h-4 w-4 mr-2" />
-                    Retry
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={Building4Line}
+              title="Organization not found"
+              description="It may have been deleted, or the link is wrong."
+              action={
+                <Button variant="outline" size="sm" onClick={() => navigate('/organizations')}>
+                  <ArrowLeftLine className="mr-1.5 h-3.5 w-3.5" />
+                  Back to organizations
+                </Button>
+              }
+            />
+          )}
         </div>
       </div>
     )
@@ -238,7 +238,7 @@ export function OrganizationDetailPage() {
   // as a placeholder until that join exists in the backend. Showing
   // the team-level token usage we DO have for now.
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title={org.name}
         description={`/${org.slug}`}
@@ -256,86 +256,20 @@ export function OrganizationDetailPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Stat row */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Building4Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">{teams.length}</p>
-                  <p className="text-xs text-muted-foreground">Teams</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Key2Line className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">{apiKeys.length}</p>
-                  <p className="text-xs text-muted-foreground">API Keys</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-success/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {formatNumber(endUsers.length)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">End Users</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-cyan-500/20 rounded-lg">
-                  <FlashLine className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {formatNumber(org.total_requests)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {formatCurrency(org.total_cost)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Total Cost</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Teams" value={teams.length} />
+          <Stat label="API Keys" value={apiKeys.length} />
+          <Stat label="End Users" value={formatNumber(endUsers.length)} />
+          <Stat label="Requests" value={formatNumber(org.total_requests)} />
+          <Stat label="Total Cost" value={formatCurrency(org.total_cost)} />
+        </StatGrid>
 
         {/* Teams in this org */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">Teams</CardTitle>
+            <CardTitle>Teams</CardTitle>
           </CardHeader>
           <CardContent>
             {teams.length === 0 ? (
@@ -350,8 +284,8 @@ export function OrganizationDetailPage() {
                     className="flex items-center justify-between p-3 rounded-md border border-border/40 hover:border-border transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-violet-500/10 rounded">
-                        <Group2Line className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                      <div className="p-2 rounded-md border bg-muted text-muted-foreground">
+                        <Group2Line className="w-4 h-4" />
                       </div>
                       <div>
                         <p className="font-medium text-sm">{team.name}</p>
@@ -381,7 +315,7 @@ export function OrganizationDetailPage() {
         {/* API Keys in this org */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">API Keys</CardTitle>
+            <CardTitle>API Keys</CardTitle>
           </CardHeader>
           <CardContent>
             {apiKeys.length === 0 ? (
@@ -396,8 +330,8 @@ export function OrganizationDetailPage() {
                     className="flex items-center justify-between p-3 rounded-md border border-border/40 hover:border-border transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-500/10 rounded">
-                        <Key2Line className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <div className="p-2 rounded-md border bg-muted text-muted-foreground">
+                        <Key2Line className="w-4 h-4" />
                       </div>
                       <div>
                         <p className="font-medium text-sm">{key.name}</p>
@@ -434,7 +368,7 @@ export function OrganizationDetailPage() {
         {/* End users in this org */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">End Users</CardTitle>
+            <CardTitle>End Users</CardTitle>
           </CardHeader>
           <CardContent>
             {endUsers.length === 0 ? (
@@ -450,8 +384,8 @@ export function OrganizationDetailPage() {
                     className="flex items-center justify-between p-3 rounded-md border border-border/40"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-success/10 rounded">
-                        <User2Line className="w-4 h-4 text-success" />
+                      <div className="p-2 rounded-md border bg-muted text-muted-foreground">
+                        <User2Line className="w-4 h-4" />
                       </div>
                       <div>
                         <p className="font-medium text-sm">{user.name || user.external_id}</p>
@@ -488,7 +422,7 @@ export function OrganizationDetailPage() {
         {/* Settings */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">Settings</CardTitle>
+            <CardTitle>Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Payload capture toggle */}

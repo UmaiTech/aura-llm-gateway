@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, ErrorState, SkeletonPage, Stat, StatGrid, SegmentedControl } from '@/components/ui'
 import { cn, formatCurrency, formatNumber, formatStrategy } from '@/lib/utils'
 import {
   Sparkles2Line,
   ShieldLine,
   AiLine,
   Refresh1Line,
-  Loading3Line,
   FileZipLine,
   InformationLine,
 } from '@mingcute/react'
@@ -41,7 +40,7 @@ export function FeaturesPage() {
   const [stats, setStats] = useState<FeatureStats | null>(null)
   const [cache, setCache] = useState<CacheStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const fetchData = async () => {
@@ -56,7 +55,7 @@ export function FeaturesPage() {
       setStats(featureData)
       setCache(cacheData)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load feature stats')
+      setError(e)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -79,13 +78,10 @@ export function FeaturesPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Features" description="Compression, validation, consistency, caching" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading feature stats...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={3} rows={4} />
         </div>
       </div>
     )
@@ -93,49 +89,23 @@ export function FeaturesPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Features" description="Compression, validation, consistency, caching" />
-        <div className="flex-1 flex items-center justify-center p-6">
-          <Card className="max-w-md w-full border-destructive/30 bg-destructive/5">
-            <CardContent className="p-6 space-y-3">
-              <div className="text-sm font-medium text-destructive">
-                Failed to load feature stats
-              </div>
-              <div className="text-sm text-muted-foreground">{error}</div>
-              <Button size="sm" onClick={handleRefresh}>
-                <Refresh1Line className="h-4 w-4 mr-2" />
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="feature stats" onRetry={handleRefresh} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Features"
         description="Compression, validation, consistency, caching"
         actions={
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-              {TIME_RANGES.map((range) => (
-                <button
-                  key={range.value}
-                  onClick={() => setTimeRange(range.value)}
-                  className={cn(
-                    'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
-                    timeRange === range.value
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {range.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl aria-label="Time range" options={TIME_RANGES} value={timeRange} onChange={setTimeRange} />
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
               <Refresh1Line className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
               Refresh
@@ -144,12 +114,12 @@ export function FeaturesPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Compression deep dive */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileZipLine className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <CardTitle className="flex items-center gap-2">
+              <FileZipLine className="h-4 w-4 text-muted-foreground" />
               Compression
             </CardTitle>
           </CardHeader>
@@ -182,8 +152,8 @@ export function FeaturesPage() {
         {/* Validation deep dive */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldLine className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <CardTitle className="flex items-center gap-2">
+              <ShieldLine className="h-4 w-4 text-muted-foreground" />
               Validation
             </CardTitle>
           </CardHeader>
@@ -215,8 +185,8 @@ export function FeaturesPage() {
         {/* Consistency deep dive */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles2Line className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles2Line className="h-4 w-4 text-muted-foreground" />
               Consistency
             </CardTitle>
           </CardHeader>
@@ -242,8 +212,8 @@ export function FeaturesPage() {
         {/* Caching — read-only, no per-period breakdown today */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AiLine className="h-4 w-4 text-success" />
+            <CardTitle className="flex items-center gap-2">
+              <AiLine className="h-4 w-4 text-muted-foreground" />
               Caching
             </CardTitle>
           </CardHeader>
@@ -256,15 +226,16 @@ export function FeaturesPage() {
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <Stat label="Hit rate" value={`${(cache.hit_rate * 100).toFixed(1)}%`} />
+                <StatGrid columns={4}>
+                  {/* hit_rate is already a percentage (v_cache_stats multiplies by 100). */}
+                  <Stat label="Hit rate" value={`${cache.hit_rate.toFixed(1)}%`} />
                   <Stat label="Cache hits" value={formatNumber(cache.cache_hits)} />
                   <Stat label="Cache misses" value={formatNumber(cache.cache_misses)} />
                   <Stat
                     label="Estimated savings"
                     value={formatCurrency(cache.estimated_savings)}
                   />
-                </div>
+                </StatGrid>
                 <div className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
                   <InformationLine className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
                   <span>
@@ -277,15 +248,6 @@ export function FeaturesPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="p-3 bg-muted/50 rounded-lg">
-      <p className="text-xl font-bold tabular-nums">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   )
 }
@@ -306,24 +268,24 @@ function FeatureSection({
   }
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <StatGrid columns={3}>
         {(stats || []).map((s) => (
           <Stat key={s.label} label={s.label} value={s.value} />
         ))}
-      </div>
+      </StatGrid>
       {breakdown.filter((b) => b.strategy !== 'none').length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-2">By strategy</h4>
-          <div className="space-y-1">
+          <h4 className="eyebrow mb-2">By strategy</h4>
+          <div className="divide-y divide-border/60 border-y">
             {breakdown
               .filter((b) => b.strategy !== 'none')
               .map((b) => (
                 <div
                   key={b.strategy}
-                  className="flex items-center justify-between p-2 rounded border border-border/40 text-sm"
+                  className="flex items-center justify-between py-2 text-sm"
                 >
-                  <Badge variant="secondary">{formatStrategy(b.strategy)}</Badge>
-                  <span className="font-mono tabular-nums">
+                  <span>{formatStrategy(b.strategy)}</span>
+                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
                     {formatNumber(b.request_count)} requests
                   </span>
                 </div>

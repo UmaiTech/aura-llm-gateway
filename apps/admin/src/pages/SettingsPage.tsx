@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, Callout, ErrorState, SkeletonRows, Skeleton } from '@/components/ui'
 import { useSettingsStore } from '@/stores'
 import { getGatewaySettings, updateGatewaySettings } from '@/lib/api'
 import type {
@@ -24,7 +24,6 @@ import {
   ComputerLine,
   CheckLine,
   BalanceLine,
-  Loading3Line,
   Refresh1Line,
 } from '@mingcute/react'
 
@@ -99,8 +98,7 @@ function tiersEqual(a: TierModels, b: TierModels): boolean {
   return TIERS.every((t) => a[t].length === b[t].length && a[t].every((m, i) => m === b[t][i]))
 }
 
-const selectClass =
-  'w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring'
+const selectClass = 'w-full'
 
 function TriSelect({
   value,
@@ -159,7 +157,7 @@ function ReadOnly({ label, value, env }: { label: string; value: React.ReactNode
   )
 }
 
-function StatusPill({ on, label }: { on: boolean; label: string }) {
+function LiveFlag({ on, label }: { on: boolean; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs">
       <span className={cn('h-2 w-2 rounded-full', on ? 'bg-success' : 'bg-muted-foreground/40')} />
@@ -175,21 +173,25 @@ export function SettingsPage() {
   const [data, setData] = useState<GatewaySettingsResponse | null>(null)
   const [draft, setDraft] = useState<GatewaySettingsOverrides>({})
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Load and save failures are kept apart: a failed load means there is
+  // nothing to edit (show a retryable error in place of the form), a
+  // failed save keeps the draft on screen with the error above it.
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [saveError, setSaveError] = useState<unknown>(null)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
-    setError(null)
+    setLoadError(null)
     try {
       const res = await getGatewaySettings()
       setData(res)
       setDraft(prune(res.overrides))
       setWarnings(res.warnings ?? [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load settings')
+      setLoadError(e)
     } finally {
       setLoading(false)
     }
@@ -209,7 +211,7 @@ export function SettingsPage() {
 
   const save = async (overrides: GatewaySettingsOverrides) => {
     setSaving(true)
-    setError(null)
+    setSaveError(null)
     try {
       const res = await updateGatewaySettings(prune(overrides))
       setData(res)
@@ -217,7 +219,7 @@ export function SettingsPage() {
       setWarnings(res.warnings ?? [])
       setSavedAt(Date.now())
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save settings')
+      setSaveError(e)
     } finally {
       setSaving(false)
     }
@@ -276,64 +278,92 @@ export function SettingsPage() {
         title="Settings"
         description="System-wide configuration"
         actions={
-          <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading}>
-            <Refresh1Line className={cn('h-4 w-4', loading && 'animate-spin')} />
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            <Refresh1Line className={cn('mr-1.5 h-3.5 w-3.5', loading && 'animate-spin')} />
+            Reload
           </Button>
         }
       />
 
-      <div className="flex-1 flex">
-        {/* Tabs */}
-        <div className="w-56 border-r bg-card/50 p-4 space-y-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                activeTab === tab.id
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.name}
-            </button>
-          ))}
+      <div className="flex flex-1 flex-col lg:flex-row">
+        {/* Section nav: horizontal scroller on small screens, rail on lg+ */}
+        <nav
+          aria-label="Settings sections"
+          className="border-b bg-card lg:w-56 lg:flex-shrink-0 lg:border-b-0 lg:border-r"
+        >
+          <div className="no-scrollbar flex gap-1 overflow-x-auto px-4 py-2 sm:px-6 lg:sticky lg:top-14 lg:flex-col lg:gap-px lg:overflow-visible lg:p-3">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+                className={cn(
+                  'focus-ring flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
+                  activeTab === tab.id
+                    ? 'bg-accent font-medium text-foreground'
+                    : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+                )}
+              >
+                <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-primary')} />
+                {tab.name}
+              </button>
+            ))}
 
-          {effective && (
-            <div className="mt-6 pt-4 border-t border-border/40 space-y-2 px-1">
-              <p className="text-2xs uppercase tracking-wide text-muted-foreground">Live</p>
-              <StatusPill on={effective.routing.enabled && effective.routing.available} label="Auto routing" />
-              <StatusPill on={effective.features.payload_capture} label="Payload capture" />
-              <StatusPill on={effective.cache.available && effective.cache.enabled} label="Response cache" />
-              <StatusPill on={effective.rate_limit.available && effective.rate_limit.enabled} label="Rate limiting" />
-            </div>
-          )}
-        </div>
+            {effective && (
+              <div className="mt-5 hidden space-y-2 border-t px-2.5 pt-4 lg:block">
+                <p className="eyebrow text-[10px]">Live</p>
+                <LiveFlag on={effective.routing.enabled && effective.routing.available} label="Auto routing" />
+                <LiveFlag on={effective.features.payload_capture} label="Payload capture" />
+                <LiveFlag on={effective.cache.available && effective.cache.enabled} label="Response cache" />
+                <LiveFlag on={effective.rate_limit.available && effective.rate_limit.enabled} label="Rate limiting" />
+              </div>
+            )}
+          </div>
+        </nav>
 
         {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-2xl space-y-6">
-            {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
+        <div className="min-w-0 flex-1 p-4 sm:p-6">
+          <div className="max-w-2xl space-y-5">
+            {loadError != null && activeTab !== 'appearance' && (
+              <ErrorState
+                error={loadError}
+                what="gateway settings"
+                onRetry={() => void load()}
+                retrying={loading}
+                actions={
+                  <Button size="sm" variant="ghost" onClick={() => setActiveTab('appearance')}>
+                    Appearance settings still work
+                  </Button>
+                }
+              />
+            )}
+            {saveError != null && (
+              <ErrorState
+                error={saveError}
+                title="Couldn't save settings"
+                onRetry={() => void save(draft)}
+                retrying={saving}
+              />
             )}
             {warnings.length > 0 && (
-              <div className="p-3 rounded-lg bg-warning/10 text-warning text-sm space-y-1">
-                {warnings.map((w) => (
-                  <p key={w}>{w}</p>
-                ))}
-              </div>
+              <Callout tone="warning" label="Gateway warnings">
+                <ul className="list-disc space-y-1 pl-4">
+                  {warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </Callout>
             )}
             {data && !data.persisted && activeTab !== 'appearance' && (
-              <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+              <Callout tone="note" label="Not persisted">
                 No database is configured, so overrides saved here last until the gateway restarts.
-              </div>
+              </Callout>
             )}
 
-            {loading && !data && (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loading3Line className="h-4 w-4 animate-spin" /> Loading gateway settings...
+            {loading && !data && !loadError && activeTab !== 'appearance' && (
+              <div className="rounded-lg border bg-card p-5" role="status" aria-label="Loading gateway settings">
+                <Skeleton className="mb-4 h-4 w-32" />
+                <SkeletonRows rows={5} />
               </div>
             )}
 
@@ -341,7 +371,7 @@ export function SettingsPage() {
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Gateway</CardTitle>
+                    <CardTitle>Gateway</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ReadOnly label="Version" value={data.environment.version} />
@@ -388,7 +418,7 @@ export function SettingsPage() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Features</CardTitle>
+                    <CardTitle>Features</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Field
@@ -434,7 +464,7 @@ export function SettingsPage() {
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base flex items-center justify-between">
+                    <CardTitle className="flex items-center justify-between">
                       <span>Auto model routing</span>
                       <Badge variant={effective.routing.enabled && effective.routing.available ? 'success' : 'muted'}>
                         {!effective.routing.available
@@ -597,7 +627,7 @@ export function SettingsPage() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base flex items-center justify-between">
+                    <CardTitle className="flex items-center justify-between">
                       <span>Tier candidates</span>
                       <div className="flex items-center gap-2">
                         {tiersCustomized && (
@@ -679,7 +709,7 @@ export function SettingsPage() {
             {activeTab === 'caching' && data && boot && effective && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center justify-between">
+                  <CardTitle className="flex items-center justify-between">
                     <span>Response caching</span>
                     <Badge variant={effective.cache.available ? (effective.cache.enabled ? 'success' : 'muted') : 'warning'}>
                       {!effective.cache.available ? 'needs Redis' : effective.cache.enabled ? 'on' : 'off'}
@@ -724,7 +754,7 @@ export function SettingsPage() {
             {activeTab === 'rate-limiting' && data && boot && effective && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center justify-between">
+                  <CardTitle className="flex items-center justify-between">
                     <span>Rate limiting</span>
                     <Badge
                       variant={
@@ -773,7 +803,7 @@ export function SettingsPage() {
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Admin authentication</CardTitle>
+                    <CardTitle>Admin authentication</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ReadOnly
@@ -805,7 +835,7 @@ export function SettingsPage() {
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">CORS</CardTitle>
+                    <CardTitle>CORS</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ReadOnly
@@ -835,7 +865,7 @@ export function SettingsPage() {
             {activeTab === 'request-features' && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Validation, consistency and compression</CardTitle>
+                  <CardTitle>Validation, consistency and compression</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
                   <p>
@@ -869,7 +899,7 @@ export function SettingsPage() {
             {activeTab === 'appearance' && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Theme</CardTitle>
+                  <CardTitle>Theme</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-3">
@@ -899,9 +929,9 @@ export function SettingsPage() {
             )}
 
             {editable && data && (
-              <div className="flex items-center gap-3">
-                <Button variant="gradient" onClick={() => void save(draft)} disabled={saving || !dirty}>
-                  {saving ? 'Saving...' : 'Save Changes'}
+              <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t bg-background px-4 py-3 sm:-mx-6 sm:px-6">
+                <Button onClick={() => void save(draft)} disabled={saving || !dirty}>
+                  {saving ? 'Saving…' : 'Save changes'}
                 </Button>
                 <Button
                   variant="ghost"

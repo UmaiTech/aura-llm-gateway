@@ -1,19 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, ErrorState, SegmentedControl, SkeletonPage, Stat, StatGrid } from '@/components/ui'
 import { cn, formatNumber, formatCurrency, formatDuration } from '@/lib/utils'
-import { animateStaggered, animateNumber } from '@/lib/animations'
-import {
-  FlashLine,
-  CoinLine,
-  ClockLine,
-  AiLine,
-  ArrowUpLine,
-  ArrowDownLine,
-  Loading3Line,
-  Refresh1Line,
-} from '@mingcute/react'
+import { Refresh1Line } from '@mingcute/react'
 import {
   getInsightsStats,
   getModelCosts,
@@ -53,8 +43,6 @@ const toolColors = [
 
 export function InsightsPage() {
   const navigate = useNavigate()
-  const metricsRef = useRef<HTMLDivElement>(null)
-  const numberRefs = useRef<(HTMLSpanElement | null)[]>([])
 
   // Time range state
   const [timeRange, setTimeRange] = useState<TimeRange>('7d')
@@ -76,6 +64,7 @@ export function InsightsPage() {
 
   // API state
   const [loading, setLoading] = useState(true)
+  const [errors, setErrors] = useState<unknown[]>([])
   const [insightsStats, setInsightsStats] = useState<InsightsStats | null>(null)
   const [modelCosts, setModelCosts] = useState<ModelCostStats[]>([])
   const [toolUsage, setToolUsage] = useState<ToolUsageStats[]>([])
@@ -88,14 +77,23 @@ export function InsightsPage() {
       if (!isRefreshing) {
         setLoading(true)
       }
+      // Each panel degrades independently, but failures are collected so
+      // the page can say what broke instead of showing empty charts.
+      const failed: unknown[] = []
+      const soft = <T,>(p: Promise<T>, fallback: T) =>
+        p.catch((err) => {
+          failed.push(err)
+          return fallback
+        })
       try {
         const [stats, models, tools, heatmap, timeline] = await Promise.all([
-          getInsightsStats(timeRange).catch(() => null),
-          getModelCosts(timeRange).catch(() => []),
-          getToolUsage(timeRange).catch(() => []),
-          getUsageHeatmap(timeRange).catch(() => []),
-          getTokenTimeline(timeRange).catch(() => []),
+          soft(getInsightsStats(timeRange), null),
+          soft(getModelCosts(timeRange), []),
+          soft(getToolUsage(timeRange), []),
+          soft(getUsageHeatmap(timeRange), []),
+          soft(getTokenTimeline(timeRange), []),
         ])
+        setErrors(failed)
 
         setInsightsStats(stats)
         setModelCosts(models)
@@ -110,60 +108,6 @@ export function InsightsPage() {
 
     fetchData()
   }, [timeRange, refreshKey])
-
-  // Build metrics from API data
-  const metrics = insightsStats
-    ? [
-        {
-          title: 'Total Requests',
-          value: insightsStats.total_requests,
-          change: insightsStats.requests_change,
-          icon: FlashLine,
-          format: formatNumber,
-        },
-        {
-          title: 'Total Tokens',
-          value: insightsStats.total_tokens,
-          change: insightsStats.tokens_change,
-          icon: AiLine,
-          format: formatNumber,
-        },
-        {
-          title: 'Total Cost',
-          value: insightsStats.total_cost,
-          change: insightsStats.cost_change,
-          icon: CoinLine,
-          format: formatCurrency,
-        },
-        {
-          title: 'Avg Latency',
-          value: insightsStats.avg_latency,
-          change: insightsStats.latency_change,
-          icon: ClockLine,
-          format: (v: number) => formatDuration(v),
-        },
-        {
-          title: 'Tool Calls',
-          value: insightsStats.tool_calls,
-          change: insightsStats.tool_calls_change,
-          icon: AiLine,
-          format: formatNumber,
-        },
-      ]
-    : []
-
-  useEffect(() => {
-    if (!loading && insightsStats && metricsRef.current) {
-      const cards = metricsRef.current.querySelectorAll('.metric-card')
-      animateStaggered(cards, 'fadeInUp', 60)
-
-      numberRefs.current.forEach((ref, index) => {
-        if (ref && metrics[index]) {
-          animateNumber(ref, metrics[index].value, 1500, metrics[index].format)
-        }
-      })
-    }
-  }, [loading, insightsStats, timeRange])
 
   // Build heatmap grid (6 rows x 7 columns)
   const heatmapGrid = Array.from({ length: 6 }, (_, hourIndex) =>
@@ -204,96 +148,71 @@ export function InsightsPage() {
     return (
       <div className="flex flex-col">
         <Header title="Insights" description="Analytics and usage patterns" />
-        <div className="flex-1 p-6 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading insights...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={5} rows={6} />
         </div>
       </div>
     )
   }
 
+  const allFailed = errors.length >= 5
+
   return (
     <div className="flex flex-col">
       <Header title="Insights" description="Analytics and usage patterns" />
 
-      <div className="flex-1 p-6 space-y-6">
-        {/* Time Range Selector */}
+      <div className="flex-1 space-y-5 p-4 sm:p-6">
         <div className="flex items-center justify-end gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="icon-sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className={cn(
-              'p-2 rounded-lg transition-all hover:bg-muted',
-              isRefreshing && 'opacity-50 cursor-not-allowed'
-            )}
+            aria-label="Refresh data"
             title="Refresh data"
           >
             <Refresh1Line className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
-          </button>
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-            {TIME_RANGES.map((range) => (
-              <button
-                key={range.value}
-                onClick={() => setTimeRange(range.value)}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
-                  timeRange === range.value
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
+          </Button>
+          <SegmentedControl aria-label="Time range" options={TIME_RANGES} value={timeRange} onChange={setTimeRange} />
         </div>
 
-        {/* Metrics Grid */}
-        <div ref={metricsRef} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {metrics.map((metric, index) => (
-            <Card key={metric.title} className="metric-card">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="rounded-lg bg-primary/10 p-2">
-                    <metric.icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <div
-                    className={`flex items-center gap-1 text-xs font-medium ${metric.change > 0 ? 'text-success' : metric.change < 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-                  >
-                    {metric.change !== 0 && (
-                      <>
-                        {metric.change > 0 ? (
-                          <ArrowUpLine className="h-3 w-3" />
-                        ) : (
-                          <ArrowDownLine className="h-3 w-3" />
-                        )}
-                        {Math.abs(metric.change).toFixed(1)}%
-                      </>
-                    )}
-                  </div>
-                </div>
-                <span
-                  ref={(el) => {
-                    numberRefs.current[index] = el
-                  }}
-                  className="text-xl font-bold"
-                >
-                  {metric.format(0)}
-                </span>
-                <p className="text-xs text-muted-foreground mt-1">{metric.title}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {errors.length > 0 && (
+          <ErrorState
+            variant={allFailed ? 'page' : 'banner'}
+            error={errors[0]}
+            what={allFailed ? 'insights' : `${errors.length} of 5 insight panels`}
+            onRetry={handleRefresh}
+            retrying={isRefreshing}
+          />
+        )}
 
+        {insightsStats && (
+          <StatGrid columns={5}>
+            <Stat label="Total requests" value={formatNumber(insightsStats.total_requests)} delta={insightsStats.requests_change} />
+            <Stat label="Total tokens" value={formatNumber(insightsStats.total_tokens)} delta={insightsStats.tokens_change} />
+            <Stat
+              label="Total cost"
+              value={formatCurrency(insightsStats.total_cost)}
+              delta={insightsStats.cost_change}
+              deltaGoodWhen="down"
+            />
+            <Stat
+              label="Avg latency"
+              value={formatDuration(insightsStats.avg_latency)}
+              delta={insightsStats.latency_change}
+              deltaGoodWhen="down"
+            />
+            <Stat label="Tool calls" value={formatNumber(insightsStats.tool_calls)} delta={insightsStats.tool_calls_change} />
+          </StatGrid>
+        )}
+
+        {!allFailed && (<>
         {/* Charts Row */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Token Usage Chart */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-medium">Token Usage Over Time</CardTitle>
+              <CardTitle>Token Usage Over Time</CardTitle>
             </CardHeader>
             <CardContent>
               {tokenTimeline.length > 0 ? (() => {
@@ -344,7 +263,7 @@ export function InsightsPage() {
                                     <span>Input: {formatNumber(point.input_tokens)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded bg-aura-400" />
+                                    <span className="w-2 h-2 rounded bg-primary/40" />
                                     <span>Output: {formatNumber(point.output_tokens)}</span>
                                   </div>
                                   <div className="border-t border-border mt-1 pt-1 font-medium text-foreground">
@@ -360,15 +279,15 @@ export function InsightsPage() {
                           )}>
                             <div
                               className={cn(
-                                'flex-1 bg-primary rounded-t transition-all duration-300',
+                                'flex-1 bg-primary rounded-t transition-colors duration-300',
                                 isHovered && 'bg-primary/80'
                               )}
                               style={{ height: `${inputHeight}%` }}
                             />
                             <div
                               className={cn(
-                                'flex-1 bg-aura-400 rounded-t transition-all duration-300',
-                                isHovered && 'bg-aura-300'
+                                'flex-1 bg-primary/40 rounded-t transition-colors duration-300',
+                                isHovered && 'bg-primary/60'
                               )}
                               style={{ height: `${outputHeight}%` }}
                             />
@@ -383,7 +302,7 @@ export function InsightsPage() {
                       <span className="w-3 h-3 rounded bg-primary" /> Input
                     </span>
                     <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded bg-aura-400" /> Output
+                      <span className="w-3 h-3 rounded bg-primary/40" /> Output
                     </span>
                   </div>
                 </>
@@ -399,7 +318,7 @@ export function InsightsPage() {
           {/* Cost by Model */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-medium">Cost by Model</CardTitle>
+              <CardTitle>Cost by Model</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {modelCosts.length > 0 ? (
@@ -423,7 +342,7 @@ export function InsightsPage() {
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-primary to-aura-400 rounded-full transition-all duration-1000"
+                          className="h-full bg-primary rounded-full transition-colors duration-1000"
                           style={{ width: `${displayWidth}%` }}
                         />
                       </div>
@@ -442,7 +361,7 @@ export function InsightsPage() {
           {/* Tool Usage */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-medium">Tool Usage</CardTitle>
+              <CardTitle>Tool Usage</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {toolUsage.length > 0 ? (
@@ -472,7 +391,7 @@ export function InsightsPage() {
           {/* Usage Heatmap */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-medium">Usage Heatmap</CardTitle>
+              <CardTitle>Usage Heatmap</CardTitle>
             </CardHeader>
             <CardContent>
               {heatmapData.length > 0 ? (
@@ -499,7 +418,7 @@ export function InsightsPage() {
                               <div
                                 key={colIndex}
                                 className={cn(
-                                  'flex-1 h-6 rounded cursor-pointer transition-all relative',
+                                  'flex-1 h-6 rounded cursor-pointer transition-colors relative',
                                   getHeatmapColor(value),
                                   isHovered && 'ring-2 ring-foreground ring-offset-1 ring-offset-background scale-110 z-10',
                                   hoveredCell !== null && !isHovered && 'opacity-50'
@@ -547,6 +466,7 @@ export function InsightsPage() {
             </CardContent>
           </Card>
         </div>
+        </>)}
       </div>
 
       {/* Heatmap cell drill-down modal (C2 in #175). Surfaces the
@@ -573,11 +493,11 @@ export function InsightsPage() {
                 ? 'Medium'
                 : 'High'
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <Card className="w-full max-w-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
+                  <CardTitle>
                     {days[colIndex]} {hours[rowIndex]}–{endHour}
                   </CardTitle>
                   <button
@@ -591,11 +511,11 @@ export function InsightsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-2xl font-bold tabular-nums">{requestCount}</p>
+                    <p className="font-display text-2xl font-medium tracking-tight tabular-nums">{requestCount}</p>
                     <p className="text-xs text-muted-foreground">Requests</p>
                   </div>
                   <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-2xl font-bold">{intensityLabel}</p>
+                    <p className="font-display text-2xl font-medium tracking-tight">{intensityLabel}</p>
                     <p className="text-xs text-muted-foreground">Activity</p>
                   </div>
                 </div>

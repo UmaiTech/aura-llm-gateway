@@ -154,7 +154,7 @@
   }
 
   textarea {
-    @apply rounded-md border border-input bg-card text-sm text-foreground;
+    @apply rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground;
   }
 
   select:hover,

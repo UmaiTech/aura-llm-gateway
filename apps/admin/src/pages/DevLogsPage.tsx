@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, Badge, Input } from '@/components/ui'
+import { Button, Card, CardContent, Badge, Input, ErrorState, SkeletonPage, StatusPill } from '@/components/ui'
 import { cn, formatDuration, formatCurrency, formatRelativeTime, formatNumber } from '@/lib/utils'
 import { animateStaggered, animateExpand, animateCollapse } from '@/lib/animations'
 import {
@@ -15,7 +15,6 @@ import {
   ToolLine,
   BrainLine,
   FileZipLine,
-  Loading3Line,
   Table2Line,
   CodeLine,
   CheckLine,
@@ -54,7 +53,7 @@ export function DevLogsPage() {
 
   const [logs, setLogs] = useState<RecentLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isLive, setIsLive] = useState(false)
@@ -72,7 +71,7 @@ export function DevLogsPage() {
       const data = await getRecentLogs({ limit: 100 })
       setLogs(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load logs')
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -162,16 +161,13 @@ export function DevLogsPage() {
 
   if (loading && logs.length === 0) {
     return (
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col">
         <Header
           title="Dev Logs"
           description="Raw request and response data for debugging"
         />
-        <div className="flex-1 p-6 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading logs...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={0} rows={10} />
         </div>
       </div>
     )
@@ -179,67 +175,66 @@ export function DevLogsPage() {
 
   if (error && logs.length === 0) {
     return (
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col">
         <Header
           title="Dev Logs"
           description="Raw request and response data for debugging"
         />
-        <div className="flex-1 p-6 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-destructive mb-2">{error}</p>
-            <p className="text-sm text-muted-foreground">
-              Make sure the gateway is running and the database is configured.
-            </p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={fetchLogs}>
-              Try Again
-            </Button>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="request logs" onRetry={fetchLogs} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col lg:h-screen">
       <Header
         title="Dev Logs"
         description="Raw request and response data for debugging"
         actions={
           <div className="flex items-center gap-2">
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+            <div className="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5" role="radiogroup" aria-label="View mode">
               <button
                 onClick={() => setViewMode('table')}
+                role="radio"
+                aria-checked={viewMode === 'table'}
                 className={cn(
-                  'p-1.5 rounded-md transition-all',
+                  'focus-ring rounded-[5px] p-1.5 transition-colors',
                   viewMode === 'table'
-                    ? 'bg-background text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-[0_0_0_1px_hsl(var(--border))]'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
-                title="Table View"
+                title="Table view"
+                aria-label="Table view"
               >
                 <Table2Line className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode('json')}
+                role="radio"
+                aria-checked={viewMode === 'json'}
                 className={cn(
-                  'p-1.5 rounded-md transition-all',
+                  'focus-ring rounded-[5px] p-1.5 transition-colors',
                   viewMode === 'json'
-                    ? 'bg-background text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-[0_0_0_1px_hsl(var(--border))]'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
-                title="JSON View"
+                title="JSON view"
+                aria-label="JSON view"
               >
                 <CodeLine className="h-4 w-4" />
               </button>
             </div>
             <Button
-              variant={isLive ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
               onClick={() => setIsLive(!isLive)}
-              className={cn('gap-2', isLive && 'animate-pulse-glow')}
+              className="gap-2"
+              aria-pressed={isLive}
             >
-              <span className={cn('w-2 h-2 rounded-full', isLive ? 'bg-success' : 'bg-muted-foreground')} />
+              <span className={cn('h-2 w-2 rounded-full', isLive ? 'bg-success' : 'bg-muted-foreground/60')} />
               {isLive ? 'Live' : 'Paused'}
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
@@ -250,9 +245,9 @@ export function DevLogsPage() {
         }
       />
 
-      <div className="flex-1 p-6 space-y-4 overflow-hidden flex flex-col">
+      <div className="flex flex-1 flex-col space-y-4 p-4 sm:p-6 lg:overflow-hidden">
         {/* Filters */}
-        <div className="flex items-center gap-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:gap-3">
           <Input
             placeholder="Search by request ID, provider, or model..."
             value={search}
@@ -277,25 +272,25 @@ export function DevLogsPage() {
         </div>
 
         {/* Logs Display */}
-        <Card className="flex-1 overflow-hidden">
-          <CardContent className="p-0 h-full overflow-auto">
+        <Card className="min-h-[24rem] flex-1 overflow-hidden">
+          <CardContent className="h-full overflow-auto p-0 sm:p-0">
             {viewMode === 'table' ? (
               /* Table View */
               <div ref={tableRef}>
                 <table className="w-full">
                   <thead className="sticky top-0 bg-card z-10">
                     <tr className="border-b text-left text-xs text-muted-foreground">
-                      <th className="p-3 font-medium w-8"></th>
-                      <th className="p-3 font-medium">Timestamp</th>
-                      <th className="p-3 font-medium">Request ID</th>
-                      <th className="p-3 font-medium">Provider</th>
-                      <th className="p-3 font-medium">Model</th>
-                      <th className="p-3 font-medium">Routing</th>
-                      <th className="p-3 font-medium">Status</th>
-                      <th className="p-3 font-medium text-center">Features</th>
-                      <th className="p-3 font-medium text-right">Tokens</th>
-                      <th className="p-3 font-medium text-right">Cost</th>
-                      <th className="p-3 font-medium text-right">Latency</th>
+                      <th className="w-8 p-3" aria-label="Expand"></th>
+                      <th className="p-3 eyebrow">Timestamp</th>
+                      <th className="p-3 eyebrow">Request ID</th>
+                      <th className="p-3 eyebrow">Provider</th>
+                      <th className="p-3 eyebrow">Model</th>
+                      <th className="p-3 eyebrow">Routing</th>
+                      <th className="p-3 eyebrow">Status</th>
+                      <th className="p-3 eyebrow text-center">Features</th>
+                      <th className="p-3 eyebrow text-right">Tokens</th>
+                      <th className="p-3 eyebrow text-right">Cost</th>
+                      <th className="p-3 eyebrow text-right">Latency</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm">
@@ -339,9 +334,7 @@ export function DevLogsPage() {
                               </Badge>
                             </td>
                             <td className="p-3">
-                              <Badge variant={log.status === 'completed' ? 'success' : 'destructive'}>
-                                {log.status}
-                              </Badge>
+                              <StatusPill status={log.status} />
                             </td>
                             <td className="p-3">
                               <div className="flex items-center justify-center gap-1">
@@ -386,7 +379,7 @@ export function DevLogsPage() {
                                     <button
                                       onClick={(e) => { e.stopPropagation(); setDetailTab('details') }}
                                       className={cn(
-                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                                         detailTab === 'details'
                                           ? 'bg-background text-foreground shadow-sm'
                                           : 'text-muted-foreground hover:text-foreground'
@@ -397,7 +390,7 @@ export function DevLogsPage() {
                                     <button
                                       onClick={(e) => { e.stopPropagation(); setDetailTab('json') }}
                                       className={cn(
-                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                                         detailTab === 'json'
                                           ? 'bg-background text-foreground shadow-sm'
                                           : 'text-muted-foreground hover:text-foreground'
@@ -437,9 +430,7 @@ export function DevLogsPage() {
                                           </div>
                                           <div className="space-y-1">
                                             <p className="text-muted-foreground">Status</p>
-                                            <Badge variant={log.status === 'completed' ? 'success' : 'destructive'} className="text-xs">
-                                              {log.status}
-                                            </Badge>
+                                            <StatusPill status={log.status} />
                                           </div>
                                         </div>
                                       </div>
@@ -660,9 +651,7 @@ export function DevLogsPage() {
                             expandedId === log.id && 'rotate-180'
                           )}
                         />
-                        <Badge variant={log.status === 'completed' ? 'success' : 'destructive'} className="flex-shrink-0">
-                          {log.status}
-                        </Badge>
+                        <StatusPill status={log.status} className="flex-shrink-0" />
                         <span className="text-xs text-muted-foreground flex-shrink-0">
                           {formatRelativeTime(log.created_at)}
                         </span>

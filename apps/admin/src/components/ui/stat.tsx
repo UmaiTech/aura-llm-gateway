@@ -19,22 +19,27 @@ export function StatGrid({
 }: {
   children: React.ReactNode
   className?: string
-  /** Desktop column count; defaults to the number of children (max 5). */
+  /** Desktop column count; defaults to the number of children (max 6). */
   columns?: 2 | 3 | 4 | 5 | 6
 }) {
-  const count = columns ?? Math.min(React.Children.toArray(children).filter(Boolean).length, 5)
+  const count = columns ?? Math.min(React.Children.toArray(children).filter(Boolean).length, 6)
+  // Hairlines come from each cell's top/left border, with the inner grid
+  // pulled up/left by 1px so the outer edge doesn't double. Unlike a
+  // `gap-px bg-border` grid, a short last row leaves card-coloured
+  // space instead of a grey block.
   return (
-    <div
-      className={cn(
-        'grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border',
-        count === 3 && 'md:grid-cols-3',
-        count === 4 && 'lg:grid-cols-4',
-        count === 5 && 'md:grid-cols-3 xl:grid-cols-5',
-        count === 6 && 'md:grid-cols-3 xl:grid-cols-6',
-        className
-      )}
-    >
-      {children}
+    <div className={cn('overflow-hidden rounded-lg border bg-card', className)}>
+      <div
+        className={cn(
+          '-ml-px -mt-px grid grid-cols-2',
+          count === 3 && 'md:grid-cols-3',
+          count === 4 && 'lg:grid-cols-4',
+          count === 5 && 'md:grid-cols-3 xl:grid-cols-5',
+          count === 6 && 'md:grid-cols-3 xl:grid-cols-6'
+        )}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -70,7 +75,7 @@ export function Stat({
   const good = hasDelta && (deltaGoodWhen === 'up' ? delta! > 0 : delta! < 0)
 
   return (
-    <div className={cn('flex min-w-0 flex-col bg-card p-4 sm:p-5', className)}>
+    <div className={cn('flex min-w-0 flex-col border-l border-t p-4 sm:p-5', className)}>
       <div className="flex items-baseline justify-between gap-2">
         <span
           ref={valueRef}

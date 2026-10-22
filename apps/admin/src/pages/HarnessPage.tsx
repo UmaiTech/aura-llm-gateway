@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, ErrorState, SkeletonPage, StatusPill } from '@/components/ui'
 import { cn, formatDuration, formatCurrency, formatNumber, formatRelativeTime, formatStrategy } from '@/lib/utils'
 import {
   AiLine,
@@ -17,7 +17,6 @@ import {
   ToolLine,
   Package2Line,
   Sparkles2Line,
-  Loading3Line,
   Refresh1Line,
   ShieldLine,
   ArrowDownLine,
@@ -288,6 +287,7 @@ export function HarnessPage() {
 
   // API state
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<unknown>(null)
   const [traces, setTraces] = useState<Trace[]>([])
   const [tools, setTools] = useState<ToolUsageStats[]>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -295,14 +295,18 @@ export function HarnessPage() {
   // Fetch data
   const fetchData = async () => {
     try {
+      // Traces are the page; tool stats only feed the Tools tab.
       const [logs, toolStats] = await Promise.all([
-        getRecentLogs({ limit: 50 }).catch(() => []),
+        getRecentLogs({ limit: 50 }),
         getToolUsage('7d').catch(() => []),
       ])
+      setError(null)
 
       // Convert logs to traces
       setTraces(logs.map(logToTrace))
       setTools(toolStats)
+    } catch (err) {
+      setError(err)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -360,52 +364,54 @@ export function HarnessPage() {
     return matchesSearch && matchesToolFilter && matchesStatus
   })
 
-  if (loading) {
+  if (loading || error != null) {
     return (
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col">
         <Header title="Agentic Harness" description="Debug and tune your AI agent workflows" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading harness data...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          {loading ? (
+            <SkeletonPage stats={4} rows={6} />
+          ) : (
+            <ErrorState variant="page" error={error} what="agent traces" onRetry={handleRefresh} retrying={isRefreshing} />
+          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col lg:h-screen">
       <Header title="Agentic Harness" description="Debug and tune your AI agent workflows" />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Tabs */}
-        <div className="w-48 border-r bg-card/50 p-3 space-y-1">
+      <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden">
+        {/* Tabs: horizontal scroller on small screens, rail on lg+ */}
+        <div className="no-scrollbar flex gap-1 overflow-x-auto border-b bg-card px-4 py-2 lg:w-48 lg:flex-shrink-0 lg:flex-col lg:gap-px lg:overflow-visible lg:border-b-0 lg:border-r lg:p-3">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
               className={cn(
-                'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'focus-ring flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
                 activeTab === tab.id
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                  ? 'bg-accent font-medium text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
               )}
             >
-              <tab.icon className="h-4 w-4" />
+              <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-primary')} />
               {tab.name}
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex min-w-0 flex-1 flex-col lg:flex-row lg:overflow-hidden">
           {activeTab === 'traces' && (
             <>
               {/* Trace List */}
-              <div className="w-[420px] border-r overflow-y-auto p-4 space-y-3">
+              <div className="max-h-[60vh] w-full space-y-3 overflow-y-auto border-b p-4 lg:max-h-none lg:w-[400px] lg:flex-shrink-0 lg:border-b-0 lg:border-r">
                 {/* Summary Stats */}
-                <div className="grid grid-cols-4 gap-2 p-3 bg-muted/30 rounded-lg">
+                <div className="grid grid-cols-4 gap-2 rounded-lg border p-3">
                   <div className="text-center">
                     <p className="text-lg font-semibold">{stats.totalTraces}</p>
                     <p className="text-xs text-muted-foreground">Traces</p>
@@ -480,7 +486,7 @@ export function HarnessPage() {
                       key={trace.id}
                       onClick={() => setSelectedTrace(trace)}
                       className={cn(
-                        'cursor-pointer transition-all hover:border-primary/50',
+                        'cursor-pointer transition-colors hover:border-primary/50',
                         selectedTrace?.id === trace.id && 'ring-2 ring-primary'
                       )}
                     >
@@ -496,9 +502,7 @@ export function HarnessPage() {
                                 {trace.toolCallsCount}
                               </Badge>
                             )}
-                            <Badge variant={trace.status === 'completed' ? 'success' : 'destructive'}>
-                              {trace.status}
-                            </Badge>
+                            <StatusPill status={trace.status} />
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -539,7 +543,7 @@ export function HarnessPage() {
               </div>
 
               {/* Trace Detail */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
                 {selectedTrace ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -586,9 +590,7 @@ export function HarnessPage() {
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Status</p>
-                            <Badge variant={selectedTrace.status === 'completed' ? 'success' : 'destructive'}>
-                              {selectedTrace.status}
-                            </Badge>
+                            <StatusPill status={selectedTrace.status} />
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Created</p>
@@ -603,7 +605,7 @@ export function HarnessPage() {
                       <Card>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2">
-                            <ToolLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            <ToolLine className="h-4 w-4 text-muted-foreground" />
                             Tool Calls ({selectedTrace.toolCallsCount})
                           </CardTitle>
                         </CardHeader>
@@ -654,7 +656,7 @@ export function HarnessPage() {
                             </div>
                             <Card
                               className={cn(
-                                'flex-1 transition-all',
+                                'flex-1 transition-colors',
                                 isToolStep && 'cursor-pointer hover:border-primary/50'
                               )}
                               onClick={() => isToolStep && toggleStep(step.id)}
@@ -835,10 +837,10 @@ export function HarnessPage() {
           )}
 
           {activeTab === 'prompts' && (
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-4 sm:p-6">
               <Card className="max-w-2xl mx-auto mt-8">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
                     <Message1Line className="h-5 w-5" />
                     Prompt Management — on the roadmap
                   </CardTitle>
@@ -873,7 +875,7 @@ export function HarnessPage() {
           )}
 
           {activeTab === 'tools' && (
-            <div className="flex-1 p-6 space-y-4">
+            <div className="flex-1 p-4 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <Input
                   placeholder="Search tools..."
@@ -906,10 +908,10 @@ export function HarnessPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b text-left text-sm text-muted-foreground">
-                          <th className="p-4 font-medium">Tool</th>
-                          <th className="p-4 font-medium text-right">Calls</th>
-                          <th className="p-4 font-medium text-right">Usage %</th>
-                          <th className="p-4 font-medium">Distribution</th>
+                          <th className="p-4 eyebrow">Tool</th>
+                          <th className="p-4 eyebrow text-right">Calls</th>
+                          <th className="p-4 eyebrow text-right">Usage %</th>
+                          <th className="p-4 eyebrow">Distribution</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -934,7 +936,7 @@ export function HarnessPage() {
                             <td className="p-4">
                               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-primary rounded-full transition-all"
+                                  className="h-full bg-primary rounded-full transition-colors"
                                   style={{ width: `${tool.percentage}%` }}
                                 />
                               </div>
@@ -972,7 +974,7 @@ export function HarnessPage() {
             const avgPerTrace =
               tracesWithTool.length > 0 ? totalCalls / tracesWithTool.length : 0
             return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                 <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -992,17 +994,17 @@ export function HarnessPage() {
                   <CardContent className="overflow-y-auto space-y-4">
                     <div className="grid grid-cols-3 gap-4">
                       <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold tabular-nums">{totalCalls}</p>
+                        <p className="font-display text-2xl font-medium tracking-tight tabular-nums">{totalCalls}</p>
                         <p className="text-xs text-muted-foreground">Total Calls</p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold tabular-nums">
+                        <p className="font-display text-2xl font-medium tracking-tight tabular-nums">
                           {tracesWithTool.length}
                         </p>
                         <p className="text-xs text-muted-foreground">Traces Using</p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold tabular-nums">
+                        <p className="font-display text-2xl font-medium tracking-tight tabular-nums">
                           {avgPerTrace.toFixed(1)}
                         </p>
                         <p className="text-xs text-muted-foreground">Avg Calls / Trace</p>
@@ -1067,10 +1069,10 @@ export function HarnessPage() {
           })()}
 
           {activeTab === 'guardrails' && (
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-4 sm:p-6">
               <Card className="max-w-2xl mx-auto mt-8">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
                     <ShieldLine className="h-5 w-5" />
                     Guardrails — on the roadmap
                   </CardTitle>

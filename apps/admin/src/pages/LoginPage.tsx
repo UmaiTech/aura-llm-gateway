@@ -41,31 +41,27 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <img
-            src={`${import.meta.env.BASE_URL}logo-glow.svg`}
-            alt="Aura"
-            className="h-24 w-24 mb-4"
-          />
-          <h1 className="text-2xl font-bold">Aura Gateway</h1>
-          <p className="text-muted-foreground mt-1">Admin Dashboard</p>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-sm">
+        {/* Wordmark — type-led, same lockup as the sidebar and landing nav */}
+        <div className="mb-8 flex items-center gap-3">
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-9 w-9 rounded-lg" />
+          <div>
+            <h1 className="font-display text-2xl font-medium leading-none tracking-tight">Aura</h1>
+            <p className="eyebrow mt-1.5 text-[10px]">LLM Gateway · Admin</p>
+          </div>
         </div>
 
         <Card>
-          <CardHeader className="text-center">
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>
-              Enter your admin key to access the dashboard
-            </CardDescription>
+          <CardHeader>
+            <CardTitle>Sign in</CardTitle>
+            <CardDescription>Enter the gateway's admin key to continue.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label htmlFor="key" className="text-sm font-medium">
-                  Admin Key
+                  Admin key
                 </label>
                 <div className="relative">
                   <Input
@@ -73,42 +69,39 @@ export function LoginPage() {
                     type={showKey ? 'text' : 'password'}
                     value={key}
                     onChange={(e) => setKey(e.target.value)}
-                    placeholder="Enter your admin key"
+                    placeholder="AURA_ADMIN_KEY"
+                    autoComplete="current-password"
                     icon={<Key2Line className="h-4 w-4" />}
-                    className="pr-10"
+                    className="pr-10 font-mono"
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? 'key-error' : undefined}
                   />
                   <button
                     type="button"
                     onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                    aria-label={showKey ? 'Hide key' : 'Show key'}
                   >
-                    {showKey ? (
-                      <EyeCloseLine className="h-4 w-4" />
-                    ) : (
-                      <EyeLine className="h-4 w-4" />
-                    )}
+                    {showKey ? <EyeCloseLine className="h-4 w-4" /> : <EyeLine className="h-4 w-4" />}
                   </button>
                 </div>
+                {error && (
+                  <p id="key-error" className="text-xs text-destructive">
+                    {error}
+                  </p>
+                )}
               </div>
 
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                variant="gradient"
-                loading={loading}
-              >
-                Sign In
+              <Button type="submit" className="w-full" loading={loading}>
+                Sign in
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Set the <code className="text-xs bg-muted px-1 py-0.5 rounded">AURA_ADMIN_KEY</code> environment variable to configure your admin key.
+        <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+          The key is set with the <code className="rounded-sm bg-muted px-1 py-px text-xs text-foreground">AURA_ADMIN_KEY</code>{' '}
+          environment variable on the gateway and is stored only in this browser.
         </p>
       </div>
     </div>

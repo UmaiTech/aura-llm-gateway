@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Stat, StatGrid, ErrorState, SkeletonPage } from '@/components/ui'
 import { cn, formatCurrency, formatNumber } from '@/lib/utils'
 import {
   AddLine,
@@ -14,10 +14,7 @@ import {
   EditLine,
   CheckLine,
   CloseLine,
-  Loading3Line,
   Refresh1Line,
-  CoinLine,
-  FlashLine,
 } from '@mingcute/react'
 import {
   getOrganizations,
@@ -36,6 +33,7 @@ export function OrganizationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingOrg, setEditingOrg] = useState<OrganizationSummary | null>(null)
   const [newOrg, setNewOrg] = useState({ name: '', slug: '' })
+  const [error, setError] = useState<unknown>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -91,8 +89,10 @@ export function OrganizationsPage() {
     try {
       const data = await getOrganizations()
       setOrganizations(data)
-    } catch (error) {
-      console.error('Failed to fetch organizations:', error)
+      setError(null)
+    } catch (err) {
+      // Surface the failure instead of rendering "No organizations found".
+      setError(err)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -126,20 +126,28 @@ export function OrganizationsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Organizations" description="Manage organizations and their settings" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading organizations...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={6} rows={4} />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col">
+        <Header title="Organizations" description="Manage organizations and their settings" />
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="organizations" onRetry={handleRefresh} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Organizations"
         description="Manage organizations and their settings"
@@ -161,7 +169,7 @@ export function OrganizationsPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Search */}
         <div className="relative max-w-md">
           <SearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -174,86 +182,14 @@ export function OrganizationsPage() {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Building4Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.organizations}</p>
-                  <p className="text-xs text-muted-foreground">Organizations</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Group2Line className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.teams}</p>
-                  <p className="text-xs text-muted-foreground">Teams</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-success/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatNumber(totals.endUsers)}</p>
-                  <p className="text-xs text-muted-foreground">End Users</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Key2Line className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.apiKeys}</p>
-                  <p className="text-xs text-muted-foreground">API Keys</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-cyan-500/20 rounded-lg">
-                  <FlashLine className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatNumber(totals.requests)}</p>
-                  <p className="text-xs text-muted-foreground">Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatCurrency(totals.cost)}</p>
-                  <p className="text-xs text-muted-foreground">Total Cost</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Organizations" value={totals.organizations} />
+          <Stat label="Teams" value={totals.teams} />
+          <Stat label="End Users" value={formatNumber(totals.endUsers)} />
+          <Stat label="API Keys" value={totals.apiKeys} />
+          <Stat label="Requests" value={formatNumber(totals.requests)} />
+          <Stat label="Total Cost" value={formatCurrency(totals.cost)} />
+        </StatGrid>
 
         {/* Organizations List */}
         <Card>
@@ -274,17 +210,17 @@ export function OrganizationsPage() {
                 {filteredOrgs.map((org) => (
                   <div
                     key={org.id}
-                    className="flex items-center justify-between p-4 bg-card-alt rounded-lg border border-border/50 hover:border-border transition-colors cursor-pointer"
+                    className="flex cursor-pointer flex-col gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/40 md:flex-row md:items-center md:justify-between"
                     onClick={() => navigate(`/organizations/${org.id}`)}
                     title="Open organization detail"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-violet-500/20 rounded-lg">
-                        <Building4Line className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="hidden rounded-lg border bg-muted p-2.5 text-muted-foreground sm:block">
+                        <Building4Line className="h-5 w-5" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{org.name}</h3>
+                          <h3 className="font-medium">{org.name}</h3>
                         </div>
                         <p className="text-sm text-muted-foreground">/{org.slug}</p>
                         <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
@@ -304,20 +240,20 @@ export function OrganizationsPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                      <div className="text-right">
+                    <div className="flex items-center gap-4 sm:gap-6">
+                      <div className="md:text-right">
                         <p className="font-medium font-mono">{formatNumber(org.total_requests)}</p>
                         <p className="text-xs text-muted-foreground">requests</p>
                       </div>
-                      <div className="text-right">
+                      <div className="md:text-right">
                         <p className="font-medium font-mono">{formatNumber(org.total_tokens)}</p>
                         <p className="text-xs text-muted-foreground">tokens</p>
                       </div>
-                      <div className="text-right">
+                      <div className="md:text-right">
                         <p className="font-medium font-mono">{formatCurrency(org.total_cost)}</p>
                         <p className="text-xs text-muted-foreground">total cost</p>
                       </div>
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="ml-auto flex items-center gap-1 md:ml-0" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -340,7 +276,7 @@ export function OrganizationsPage() {
 
       {/* Create Organization Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -391,7 +327,7 @@ export function OrganizationsPage() {
 
       {/* Edit Organization Modal */}
       {editingOrg && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
