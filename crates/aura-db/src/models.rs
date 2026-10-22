@@ -40,6 +40,18 @@ pub struct ModelPricing {
 
 impl ModelPricing {
     /// Calculate cost for given token counts
+    ///
+    /// Token convention (shared by every provider adapter):
+    /// `input_tokens` is the **whole** prompt, and `cached_tokens` is the
+    /// subset of it that was read from the provider's prompt cache. The
+    /// uncached remainder (`input_tokens - cached_tokens`) bills at the full
+    /// input rate; the cached subset bills at `cached_input_per_million`, or
+    /// at the full input rate when the model has no cached price.
+    ///
+    /// Anthropic/Bedrock cache *writes* are counted inside `input_tokens`
+    /// and bill at 1x here. The providers charge 1.25x for 5-minute writes,
+    /// so the write premium is not modelled (a slight under-estimate on the
+    /// first request of a cached prefix).
     pub fn calculate_cost(
         &self,
         input_tokens: u32,
@@ -47,15 +59,17 @@ impl ModelPricing {
         cached_tokens: Option<u32>,
         reasoning_tokens: Option<u32>,
     ) -> f64 {
-        let input_cost = (input_tokens as f64 / 1_000_000.0) * self.input_per_million;
+        // Clamp so a provider over-reporting cache reads can't go negative.
+        let cached = cached_tokens.unwrap_or(0).min(input_tokens);
+        let uncached = input_tokens - cached;
+
+        let input_cost = (uncached as f64 / 1_000_000.0) * self.input_per_million;
         let output_cost = (output_tokens as f64 / 1_000_000.0) * self.output_per_million;
 
-        let cached_cost = cached_tokens
-            .and_then(|tokens| {
-                self.cached_input_per_million
-                    .map(|rate| (tokens as f64 / 1_000_000.0) * rate)
-            })
-            .unwrap_or(0.0);
+        let cached_rate = self
+            .cached_input_per_million
+            .unwrap_or(self.input_per_million);
+        let cached_cost = (cached as f64 / 1_000_000.0) * cached_rate;
 
         let reasoning_cost = reasoning_tokens
             .and_then(|tokens| {
@@ -1329,4 +1343,48 @@ pub struct NewRouterModel {
     pub kind: String,
     pub weights: serde_json::Value,
     pub metrics: serde_json::Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pricing(input: f64, output: f64, cached: Option<f64>) -> ModelPricing {
+        let now = Utc::now();
+        ModelPricing {
+            id: Uuid::nil(),
+            provider_id: Uuid::nil(),
+            model_id: "m".to_string(),
+            model_name: "m".to_string(),
+            input_per_million: input,
+            output_per_million: output,
+            cached_input_per_million: cached,
+            reasoning_per_million: None,
+            context_window: None,
+            max_output_tokens: None,
+            is_enabled: true,
+            effective_from: now,
+            effective_until: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn cached_tokens_are_a_subset_of_input() {
+        // 500K uncached * 2.50 + 500K cached * 1.25 + 1M output * 10.00
+        let cost = pricing(2.50, 10.00, Some(1.25)).calculate_cost(
+            1_000_000,
+            1_000_000,
+            Some(500_000),
+            None,
+        );
+        assert!((cost - 11.875).abs() < 0.001);
+    }
+
+    #[test]
+    fn cached_tokens_without_cached_rate_bill_at_input_rate() {
+        let cost = pricing(2.50, 10.00, None).calculate_cost(1_000_000, 0, Some(400_000), None);
+        assert!((cost - 2.50).abs() < 0.001);
+    }
 }

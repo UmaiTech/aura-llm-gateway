@@ -3,6 +3,7 @@ import {
   Github,
   ExternalLink,
 } from 'lucide-react'
+import { GithubStars } from './components/GithubStars'
 
 /**
  * Landing page — Stat-Led editorial layout.
@@ -238,7 +239,7 @@ export default function App() {
                 Aura
               </span>
             </a>
-            <div className="flex items-center gap-5 text-sm">
+            <div className="flex items-center gap-3 sm:gap-5 text-sm whitespace-nowrap">
               <a
                 href="https://docs.aura-llm.dev"
                 className="text-gray-400 hover:text-gray-100 transition-colors"
@@ -247,7 +248,7 @@ export default function App() {
               </a>
               <a
                 href="https://roadmap.aura-llm.dev"
-                className="text-gray-400 hover:text-gray-100 transition-colors"
+                className="hidden sm:inline text-gray-400 hover:text-gray-100 transition-colors"
               >
                 Roadmap
               </a>
@@ -270,10 +271,12 @@ export default function App() {
                 href="https://github.com/UmaiTech/aura-llm-gateway"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-gray-100 transition-colors"
+                className="text-gray-400 hover:text-gray-100 transition-colors inline-flex items-center gap-1.5"
                 aria-label="GitHub"
               >
                 <Github className="h-4 w-4" />
+                {/* Hidden at phone width, where the hero CTA carries the count. */}
+                <GithubStars className="hidden sm:inline-flex text-xs" />
               </a>
             </div>
           </div>
@@ -308,6 +311,7 @@ export default function App() {
             >
               <Github className="h-4 w-4" />
               View on GitHub
+              <GithubStars className="ml-1 pl-3 border-l border-gray-600 text-sm text-gray-300" />
             </a>
           </div>
         </section>

@@ -14,6 +14,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument, warn};
 
+use super::cache::{openai_compatible_usage, prompt_cache_key, PromptTokensDetails};
 use super::{EventStream, Provider, ProviderError};
 
 /// OpenAI API base URL
@@ -305,6 +306,7 @@ impl OpenAIProvider {
             tools,
             tool_choice,
             user: request.user.clone(),
+            prompt_cache_key: Some(prompt_cache_key(request)),
             stream_options: if request.stream {
                 Some(StreamOptions {
                     include_usage: true,
@@ -373,9 +375,7 @@ impl OpenAIProvider {
         };
 
         // Build usage
-        let usage = response
-            .usage
-            .map(|u| Usage::new(u.prompt_tokens, u.completion_tokens));
+        let usage = response.usage.map(|u| u.to_usage());
 
         // Extract logprobs and build validation metadata
         let validation = choice.and_then(|c| {
@@ -679,14 +679,7 @@ impl OpenAIStreamTransformer {
                                 Ok(chunk) => {
                                     // Extract usage if present (comes in final chunk before [DONE])
                                     if let Some(usage) = chunk.usage {
-                                        transformer.accumulated_usage = Some(aura_types::Usage {
-                                            input_tokens: usage.prompt_tokens,
-                                            output_tokens: usage.completion_tokens,
-                                            total_tokens: usage.total_tokens,
-                                            cached_tokens: None,
-                                            reasoning_tokens: None,
-                                            cost_usd: None,
-                                        });
+                                        transformer.accumulated_usage = Some(usage.to_usage());
                                     }
 
                                     if let Some(choice) = chunk.choices.first() {
@@ -809,6 +802,10 @@ struct OpenAIRequest {
     tool_choice: Option<OpenAIToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     user: Option<String>,
+    /// Stable cache-routing key so requests sharing a prefix hit the same
+    /// prompt cache (see `cache::prompt_cache_key`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream_options: Option<StreamOptions>,
     /// Whether to return log probabilities
@@ -970,10 +967,23 @@ struct OpenAIToolCallResponse {
 
 #[derive(Debug, Deserialize)]
 struct OpenAIUsage {
+    /// Whole prompt, including cached tokens
     prompt_tokens: u32,
     completion_tokens: u32,
     #[allow(dead_code)]
     total_tokens: u32,
+    #[serde(default)]
+    prompt_tokens_details: Option<PromptTokensDetails>,
+}
+
+impl OpenAIUsage {
+    fn to_usage(&self) -> Usage {
+        openai_compatible_usage(
+            self.prompt_tokens,
+            self.completion_tokens,
+            self.prompt_tokens_details.as_ref(),
+        )
+    }
 }
 
 // Streaming types
@@ -1210,5 +1220,102 @@ mod tests {
         let tool_calls = oai.messages[1].tool_calls.as_ref().unwrap();
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "call_x");
+    }
+    #[test]
+    fn test_request_carries_stable_prompt_cache_key() {
+        let provider = OpenAIProvider::new("test-key");
+        let first = CreateResponseRequest::text("gpt-4o", "Hello").with_instructions("Be brief");
+        let mut second = first.clone();
+        second.input.push(InputItem::Message {
+            role: Role::User,
+            content: InputContent::Text("Follow-up".into()),
+        });
+
+        let a = serde_json::to_value(provider.transform_request(&first)).unwrap();
+        let b = serde_json::to_value(provider.transform_request(&second)).unwrap();
+        let key = a["prompt_cache_key"].as_str().expect("prompt_cache_key");
+        assert!(key.starts_with("aura-"));
+        assert_eq!(a["prompt_cache_key"], b["prompt_cache_key"]);
+    }
+
+    #[tokio::test]
+    async fn test_complete_reports_cached_tokens() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "chatcmpl-1",
+                "created": 0,
+                "model": "gpt-4o",
+                "choices": [{
+                    "message": {"content": "hi"},
+                    "finish_reason": "stop",
+                    "logprobs": null
+                }],
+                "usage": {
+                    "prompt_tokens": 2000,
+                    "completion_tokens": 10,
+                    "total_tokens": 2010,
+                    "prompt_tokens_details": {"cached_tokens": 1792}
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let provider = OpenAIProvider::with_base_url("k", server.uri());
+        let response = provider
+            .complete(CreateResponseRequest::text("gpt-4o", "Hi"))
+            .await
+            .expect("complete");
+        let usage = response.usage.expect("usage");
+        assert_eq!(usage.input_tokens, 2000);
+        assert_eq!(usage.cached_tokens, Some(1792));
+
+        // The request on the wire carried the cache key.
+        let sent: serde_json::Value =
+            serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
+        assert!(sent["prompt_cache_key"].is_string());
+    }
+
+    #[tokio::test]
+    async fn test_stream_final_usage_reports_cached_tokens() {
+        use futures_util::StreamExt;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let sse = concat!(
+            "data: {\"id\":\"c1\",\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"id\":\"c1\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"id\":\"c1\",\"choices\":[],\"usage\":{\"prompt_tokens\":3000,\"completion_tokens\":5,\"total_tokens\":3005,\"prompt_tokens_details\":{\"cached_tokens\":2048}}}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/event-stream")
+                    .set_body_string(sse),
+            )
+            .mount(&server)
+            .await;
+
+        let provider = OpenAIProvider::with_base_url("k", server.uri());
+        let mut stream = provider
+            .complete_stream(CreateResponseRequest::text("gpt-4o", "Hi").with_stream())
+            .await
+            .expect("stream");
+        let mut usage = None;
+        while let Some(event) = stream.next().await {
+            if let Ok(StreamEvent::ResponseCompleted { response }) = event {
+                usage = response.usage;
+            }
+        }
+        let usage = usage.expect("completed usage");
+        assert_eq!(usage.input_tokens, 3000);
+        assert_eq!(usage.cached_tokens, Some(2048));
     }
 }
