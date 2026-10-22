@@ -514,3 +514,87 @@ export interface GatewaySettingsResponse {
   persisted: boolean
   warnings?: string[]
 }
+
+// ---------------------------------------------------------------------------
+// Routing lab (POST /admin/routing/score, POST /admin/routing/lab/run)
+// ---------------------------------------------------------------------------
+
+export type RoutingTier = 'simple' | 'medium' | 'complex' | 'reasoning'
+
+export interface RoutingCandidate {
+  model: string
+  provider?: string | null
+  tier: RoutingTier
+  cost_per_million?: number | null
+  eligible: boolean
+  predicted_cost_usd?: number | null
+}
+
+export interface RoutingEscalation {
+  from_model: string
+  from_tier: RoutingTier
+  to_model: string
+  to_tier: RoutingTier
+  error_code: string
+}
+
+/** The auto router's decision. Mirrors AutoDecision in aura-core. */
+export interface RoutingDecision {
+  requested_model: string
+  mode: RoutingMode
+  classifier: string
+  score: number
+  raw_score: number
+  classified_tier: RoutingTier
+  tier: RoutingTier
+  boundaries?: { simple_medium: number; medium_complex: number; complex_reasoning: number }
+  signals?: Record<string, number>
+  features?: Record<string, unknown>
+  hard_filters?: string[]
+  candidates?: RoutingCandidate[]
+  selected: string
+  selected_provider?: string | null
+  reason: string
+  shadow: boolean
+  latency_us?: number
+  escalations?: RoutingEscalation[]
+  predicted_cost_usd?: number | null
+  synthetic?: boolean
+}
+
+/** Request-level `routing` options on POST /v1/responses. */
+export interface RoutingRequestOptions {
+  mode?: RoutingMode
+  min_tier?: RoutingTier
+  max_tier?: RoutingTier
+  max_cost_usd?: number
+  allow?: string[]
+  deny?: string[]
+  sticky?: boolean
+  classifier?: ClassifierKind
+}
+
+/** A /v1/responses body, loosely typed (the lab builds it client-side). */
+export interface LabResponsesRequest {
+  model: string
+  input: unknown[]
+  instructions?: string
+  max_output_tokens?: number
+  tools?: unknown[]
+  routing?: RoutingRequestOptions
+}
+
+export interface LabRunResult {
+  ok: boolean
+  status: number
+  model: string | null
+  routing: RoutingDecision | null
+  output_text: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  cost_usd: number | null
+  latency_ms: number
+  synthetic: boolean
+  response: Record<string, unknown> | null
+  error: unknown
+}

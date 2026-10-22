@@ -293,14 +293,86 @@ async fn load_tenant_context(pool: &aura_db::DbPool, api_key: &ApiKey) -> Tenant
     tenant
 }
 
+/// How `/admin/*` routes are authenticated: the shared `AURA_ADMIN_KEY`
+/// bearer, or (local dev only) no auth at all with `AURA_ADMIN_NO_AUTH`.
+#[derive(Debug, Clone, Default)]
+pub struct AdminAuthConfig {
+    /// Expected bearer token. Empty means "not configured".
+    pub key: String,
+    /// `AURA_ADMIN_NO_AUTH=1|true`: allow admin routes without a key
+    /// when none is configured.
+    pub no_auth: bool,
+}
+
+impl AdminAuthConfig {
+    /// Read `AURA_ADMIN_KEY` / `AURA_ADMIN_NO_AUTH`.
+    pub fn from_env() -> Self {
+        let no_auth = std::env::var("AURA_ADMIN_NO_AUTH").unwrap_or_default();
+        Self {
+            key: std::env::var("AURA_ADMIN_KEY").unwrap_or_default(),
+            no_auth: no_auth == "1" || no_auth.eq_ignore_ascii_case("true"),
+        }
+    }
+
+    /// Check an `Authorization` header value against the admin key.
+    pub fn check(&self, auth_header: Option<&str>) -> Result<(), AuthError> {
+        // FAIL-CLOSED when AURA_ADMIN_KEY is unset. Previous behavior
+        // (allow everything) was an attractive nuisance — anyone
+        // deploying this repo without reading the env var table
+        // ended up with a wide-open admin panel. The escape hatch
+        // for local dev is AURA_ADMIN_NO_AUTH=1, which makes the
+        // bypass explicit and grep-able.
+        if self.key.is_empty() {
+            if self.no_auth {
+                warn!(
+                    "AURA_ADMIN_NO_AUTH is set — admin routes are unauthenticated. \
+                     This must NEVER be set in production."
+                );
+                return Ok(());
+            }
+            warn!(
+                "Admin route blocked: AURA_ADMIN_KEY is not set on the server. \
+                 Set it to a strong secret, or set AURA_ADMIN_NO_AUTH=1 for local dev."
+            );
+            return Err(AuthError::missing_auth());
+        }
+
+        // Check Bearer token matches admin key
+        match auth_header {
+            Some(h) if h.starts_with("Bearer ") => {
+                if h[7..] == self.key {
+                    return Ok(());
+                }
+                warn!("Invalid admin key provided");
+                Err(AuthError::invalid_key())
+            }
+            _ => {
+                warn!("Admin route missing Authorization header");
+                Err(AuthError::missing_auth())
+            }
+        }
+    }
+}
+
 /// Authentication middleware
 ///
 /// Extracts the API key from the Authorization header, validates it,
 /// and adds the AuthContext to request extensions.
 pub async fn auth_middleware(
     State(state): State<AppState>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, AuthError> {
+    authenticate(state, request, next, &AdminAuthConfig::from_env()).await
+}
+
+/// [`auth_middleware`] with the admin credentials passed in (tests build
+/// the middleware stack with a fixed admin key instead of the env).
+pub(crate) async fn authenticate(
+    state: AppState,
     mut request: Request<Body>,
     next: Next,
+    admin: &AdminAuthConfig,
 ) -> Result<Response, AuthError> {
     let path = request.uri().path();
 
@@ -314,53 +386,16 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     }
 
-    // Admin routes use separate admin key authentication
+    // Admin routes use separate admin key authentication. They never get
+    // an AuthContext, so tenant keys are refused here and per-key limits
+    // (rate limit, org overrides, quotas) never apply to them.
     if path.starts_with("/admin") {
-        // Get admin key from environment
-        let admin_key = std::env::var("AURA_ADMIN_KEY").unwrap_or_default();
-
-        // FAIL-CLOSED when AURA_ADMIN_KEY is unset. Previous behavior
-        // (allow everything) was an attractive nuisance — anyone
-        // deploying this repo without reading the env var table
-        // ended up with a wide-open admin panel. The escape hatch
-        // for local dev is AURA_ADMIN_NO_AUTH=1, which makes the
-        // bypass explicit and grep-able.
-        if admin_key.is_empty() {
-            let no_auth = std::env::var("AURA_ADMIN_NO_AUTH").unwrap_or_default();
-            if no_auth == "1" || no_auth.eq_ignore_ascii_case("true") {
-                warn!(
-                    "AURA_ADMIN_NO_AUTH is set — admin routes are unauthenticated. \
-                     This must NEVER be set in production."
-                );
-                return Ok(next.run(request).await);
-            }
-            warn!(
-                "Admin route blocked: AURA_ADMIN_KEY is not set on the server. \
-                 Set it to a strong secret, or set AURA_ADMIN_NO_AUTH=1 for local dev."
-            );
-            return Err(AuthError::missing_auth());
-        }
-
-        // Check Bearer token matches admin key
         let auth_header = request
             .headers()
             .get(header::AUTHORIZATION)
             .and_then(|h| h.to_str().ok());
-
-        match auth_header {
-            Some(h) if h.starts_with("Bearer ") => {
-                let token = &h[7..];
-                if token == admin_key {
-                    return Ok(next.run(request).await);
-                }
-                warn!("Invalid admin key provided");
-                return Err(AuthError::invalid_key());
-            }
-            _ => {
-                warn!("Admin route missing Authorization header");
-                return Err(AuthError::missing_auth());
-            }
-        }
+        admin.check(auth_header)?;
+        return Ok(next.run(request).await);
     }
 
     // Get Authorization header

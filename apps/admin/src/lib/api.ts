@@ -24,6 +24,9 @@ import type {
   ProviderSummary,
   GatewaySettingsOverrides,
   GatewaySettingsResponse,
+  LabResponsesRequest,
+  LabRunResult,
+  RoutingDecision,
 } from './types'
 import { useAuthStore } from '@/stores'
 
@@ -182,6 +185,28 @@ export async function updateGatewaySettings(
   return fetchApi<GatewaySettingsResponse>('/admin/settings', {
     method: 'PUT',
     body: JSON.stringify(overrides),
+  })
+}
+
+// Routing lab. Dry runs score a request with the auto router and
+// dispatch nothing; live runs go through the full /v1/responses pipeline
+// on the admin path (no tenant rate limits, org overrides or budgets) and
+// really call the provider.
+export async function scoreRoutingRequest(request: LabResponsesRequest): Promise<RoutingDecision> {
+  return fetchApi<RoutingDecision>('/admin/routing/score', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+export async function runRoutingLab(payload: {
+  request: LabResponsesRequest
+  synthetic: boolean
+  label?: string
+}): Promise<LabRunResult> {
+  return fetchApi<LabRunResult>('/admin/routing/lab/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   })
 }
 
