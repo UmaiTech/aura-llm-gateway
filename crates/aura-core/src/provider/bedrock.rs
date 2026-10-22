@@ -318,10 +318,16 @@ impl BedrockProvider {
                 }
             }
         }
+        // System goes as an array of text blocks so it can carry a cache
+        // breakpoint (see `place_cache_breakpoints`).
         let system = if system_parts.is_empty() {
             None
         } else {
-            Some(system_parts.join("\n\n"))
+            Some(vec![BedrockSystemBlock {
+                block_type: "text",
+                text: system_parts.join("\n\n"),
+                cache_control: Some(BedrockCacheControl::ephemeral()),
+            }])
         };
 
         // Transform tools
@@ -336,10 +342,19 @@ impl BedrockProvider {
                             .parameters
                             .clone()
                             .unwrap_or(serde_json::json!({"type":"object","properties":{}})),
+                        cache_control: None,
                     },
                 })
-                .collect()
+                .collect::<Vec<_>>()
         });
+        // With no system prompt, the static-prefix breakpoint goes on the
+        // last tool (tools render before system and messages).
+        let mut tools = tools;
+        if system.is_none() {
+            if let Some(last) = tools.as_mut().and_then(|t| t.last_mut()) {
+                last.cache_control = Some(BedrockCacheControl::ephemeral());
+            }
+        }
 
         // Transform tool_choice
         let tool_choice = request.tool_choice.as_ref().map(|tc| match tc {
@@ -414,7 +429,11 @@ impl BedrockProvider {
             ),
         };
 
-        let usage = Usage::new(response.usage.input_tokens, response.usage.output_tokens);
+        let usage = Usage::new(
+            response.usage.total_input_tokens(),
+            response.usage.output_tokens,
+        )
+        .with_cache_hits(response.usage.cache_read_tokens());
 
         let response_id = format!("resp_bed_{}", uuid::Uuid::new_v4());
 
@@ -474,7 +493,8 @@ impl Provider for BedrockProvider {
 
         let bedrock_request = self.transform_claude_request(&request);
 
-        let body_bytes = serde_json::to_vec(&bedrock_request)
+        let body_bytes = bedrock_request
+            .to_body()
             .map_err(|e| ProviderError::internal(format!("Failed to serialize request: {}", e)))?;
 
         let response = self
@@ -515,7 +535,8 @@ impl Provider for BedrockProvider {
         debug!(model = %model, region = %self.region, "Starting streaming request to AWS Bedrock");
 
         let bedrock_request = self.transform_claude_request(&request);
-        let body_bytes = serde_json::to_vec(&bedrock_request)
+        let body_bytes = bedrock_request
+            .to_body()
             .map_err(|e| ProviderError::internal(format!("Failed to serialize request: {}", e)))?;
 
         let sdk_response = self
@@ -542,6 +563,7 @@ impl Provider for BedrockProvider {
                 accumulated_text: String::new(),
                 accumulated_tool_calls: std::collections::HashMap::new(),
                 input_tokens: 0,
+                cached_tokens: 0,
                 output_tokens: 0,
                 sent_created: false,
                 sent_in_progress: false,
@@ -577,7 +599,8 @@ impl Provider for BedrockProvider {
                                 match serde_json::from_slice::<BedrockStreamEvent>(&bytes) {
                                     Ok(bedrock_event) => match bedrock_event {
                                         BedrockStreamEvent::MessageStart { message } => {
-                                            state.input_tokens = message.usage.input_tokens;
+                                            state.input_tokens = message.usage.total_input_tokens();
+                                            state.cached_tokens = message.usage.cache_read_tokens();
                                             Some((
                                                 Ok(StreamEvent::response_in_progress(
                                                     Response::in_progress(
@@ -719,7 +742,8 @@ impl Provider for BedrockProvider {
                                                 let final_usage = Usage::new(
                                                     state.input_tokens,
                                                     state.output_tokens,
-                                                );
+                                                )
+                                                .with_cache_hits(state.cached_tokens);
                                                 let final_response = Response::builder(
                                                     state.response_id.clone(),
                                                     state.model.clone(),
@@ -812,6 +836,7 @@ struct BedrockStreamState {
     accumulated_text: String,
     accumulated_tool_calls: std::collections::HashMap<usize, PartialToolCall>,
     input_tokens: u32,
+    cached_tokens: u32,
     output_tokens: u32,
     sent_created: bool,
     sent_in_progress: bool,
@@ -838,7 +863,7 @@ struct BedrockClaudeRequest {
     model: String,
     messages: Vec<BedrockMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    system: Option<String>,
+    system: Option<Vec<BedrockSystemBlock>>,
     max_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
@@ -848,6 +873,62 @@ struct BedrockClaudeRequest {
     tools: Option<Vec<BedrockTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<BedrockToolChoice>,
+}
+
+impl BedrockClaudeRequest {
+    /// Serialize the InvokeModel body with prompt-cache breakpoints.
+    ///
+    /// Bedrock's InvokeModel Claude integration rejects Anthropic's top-level
+    /// automatic `cache_control`, so caching uses explicit breakpoints only:
+    /// one on the static prefix (last system block, or last tool — placed in
+    /// `transform_claude_request`) and one here on the last content block of
+    /// the last message, so the next turn reads the conversation so far from
+    /// cache. That is 2 of the 4 allowed breakpoints, both with the default
+    /// 5-minute TTL. Prefixes under the model's minimum (1024-4096 tokens on
+    /// the Claude 4.5 line) silently don't cache.
+    fn to_body(&self) -> Result<Vec<u8>, serde_json::Error> {
+        let mut body = serde_json::to_value(self)?;
+        if let Some(last_block) = body
+            .get_mut("messages")
+            .and_then(|m| m.as_array_mut())
+            .and_then(|m| m.last_mut())
+            .and_then(|m| m.get_mut("content"))
+            .and_then(|c| c.as_array_mut())
+            .and_then(|c| c.last_mut())
+            .and_then(|b| b.as_object_mut())
+        {
+            last_block.insert(
+                "cache_control".to_string(),
+                serde_json::to_value(BedrockCacheControl::ephemeral())?,
+            );
+        }
+        serde_json::to_vec(&body)
+    }
+}
+
+/// Prompt-cache breakpoint (`{"type": "ephemeral"}`, 5-minute TTL)
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct BedrockCacheControl {
+    #[serde(rename = "type")]
+    cache_type: &'static str,
+}
+
+impl BedrockCacheControl {
+    fn ephemeral() -> Self {
+        Self {
+            cache_type: "ephemeral",
+        }
+    }
+}
+
+/// System prompt text block (array form, so it can carry `cache_control`)
+#[derive(Debug, Serialize)]
+struct BedrockSystemBlock {
+    #[serde(rename = "type")]
+    block_type: &'static str,
+    text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<BedrockCacheControl>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -894,6 +975,8 @@ struct BedrockTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     input_schema: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<BedrockCacheControl>,
 }
 
 #[derive(Debug, Serialize)]
@@ -915,8 +998,29 @@ struct BedrockClaudeResponse {
 
 #[derive(Debug, Deserialize)]
 struct BedrockUsage {
+    /// Uncached prompt tokens after the last cache breakpoint
     input_tokens: u32,
+    #[serde(default)]
     output_tokens: u32,
+    /// Prompt tokens written to the cache by this request
+    #[serde(default)]
+    cache_creation_input_tokens: Option<u32>,
+    /// Prompt tokens read from the cache by this request
+    #[serde(default)]
+    cache_read_input_tokens: Option<u32>,
+}
+
+impl BedrockUsage {
+    /// Whole prompt in the gateway convention: uncached + written + read.
+    fn total_input_tokens(&self) -> u32 {
+        self.input_tokens
+            .saturating_add(self.cache_creation_input_tokens.unwrap_or(0))
+            .saturating_add(self.cache_read_input_tokens.unwrap_or(0))
+    }
+
+    fn cache_read_tokens(&self) -> u32 {
+        self.cache_read_input_tokens.unwrap_or(0)
+    }
 }
 
 // Streaming types
@@ -1053,7 +1157,8 @@ mod tests {
 
         let bedrock_req = provider.transform_claude_request(&request);
 
-        assert_eq!(bedrock_req.system, Some("Be concise".to_string()));
+        let system = bedrock_req.system.as_ref().expect("system blocks");
+        assert_eq!(system[0].text, "Be concise");
         assert_eq!(bedrock_req.messages.len(), 1);
     }
 
@@ -1087,6 +1192,8 @@ mod tests {
             usage: BedrockUsage {
                 input_tokens: 12,
                 output_tokens: 8,
+                cache_creation_input_tokens: None,
+                cache_read_input_tokens: None,
             },
         };
 
@@ -1110,6 +1217,8 @@ mod tests {
             usage: BedrockUsage {
                 input_tokens: 100,
                 output_tokens: 4096,
+                cache_creation_input_tokens: None,
+                cache_read_input_tokens: None,
             },
         };
 
@@ -1135,5 +1244,84 @@ mod tests {
         assert!(provider.supports_model("anthropic.claude-sonnet-4-5-20250929-v1:0"));
         assert!(provider.supports_model("meta.llama3-3-70b-instruct-v1:0"));
         assert!(!provider.supports_model("gpt-4"));
+    }
+    #[test]
+    fn test_body_carries_explicit_cache_breakpoints() {
+        let provider = fake_provider();
+        let mut request =
+            CreateResponseRequest::text("anthropic.claude-sonnet-4-5-20250929-v1:0", "Hi")
+                .with_instructions("Be concise")
+                .with_tools(vec![Tool::function(FunctionDefinition::new("a"))]);
+        request.input.push(InputItem::FunctionCallOutput {
+            call_id: "tu_1".into(),
+            output: "ok".into(),
+        });
+
+        let body: serde_json::Value = serde_json::from_slice(
+            &provider
+                .transform_claude_request(&request)
+                .to_body()
+                .unwrap(),
+        )
+        .unwrap();
+        let ephemeral = serde_json::json!({"type": "ephemeral"});
+
+        // No top-level automatic caching on Bedrock InvokeModel
+        assert!(body.get("cache_control").is_none());
+        // Static prefix: last system block
+        assert_eq!(body["system"][0]["cache_control"], ephemeral);
+        assert!(body["tools"][0].get("cache_control").is_none());
+        // Conversation tail: last block of the last message only
+        let messages = body["messages"].as_array().unwrap();
+        assert!(messages[0]["content"][0].get("cache_control").is_none());
+        let last = messages.last().unwrap()["content"].as_array().unwrap();
+        assert_eq!(last.last().unwrap()["cache_control"], ephemeral);
+        assert_eq!(body.to_string().matches("cache_control").count(), 2);
+    }
+
+    #[test]
+    fn test_cache_breakpoint_on_last_tool_without_system() {
+        let provider = fake_provider();
+        let request =
+            CreateResponseRequest::text("anthropic.claude-sonnet-4-5-20250929-v1:0", "Hi")
+                .with_tools(vec![
+                    Tool::function(FunctionDefinition::new("a")),
+                    Tool::function(FunctionDefinition::new("b")),
+                ]);
+        let body: serde_json::Value = serde_json::from_slice(
+            &provider
+                .transform_claude_request(&request)
+                .to_body()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(body.get("system").is_none());
+        assert!(body["tools"][0].get("cache_control").is_none());
+        assert_eq!(
+            body["tools"][1]["cache_control"],
+            serde_json::json!({"type": "ephemeral"})
+        );
+    }
+
+    #[test]
+    fn test_usage_with_cache_read_and_write() {
+        let provider = fake_provider();
+        let raw: BedrockClaudeResponse = serde_json::from_value(serde_json::json!({
+            "content": [{"type": "text", "text": "hi"}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 40,
+                "output_tokens": 8,
+                "cache_creation_input_tokens": 60,
+                "cache_read_input_tokens": 2000
+            }
+        }))
+        .unwrap();
+        let usage = provider
+            .transform_claude_response(raw, "anthropic.claude-sonnet-4-5-20250929-v1:0")
+            .usage
+            .unwrap();
+        assert_eq!(usage.input_tokens, 2100);
+        assert_eq!(usage.cached_tokens, Some(2000));
     }
 }

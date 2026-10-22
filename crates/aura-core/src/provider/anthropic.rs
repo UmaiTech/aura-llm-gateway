@@ -214,10 +214,13 @@ impl AnthropicProvider {
                             "type": "object",
                             "properties": {}
                         })),
+                        cache_control: None,
                     },
                 })
-                .collect()
+                .collect::<Vec<_>>()
         });
+
+        let (system, tools) = Self::place_cache_breakpoints(system, tools);
 
         // Transform tool_choice
         let tool_choice = request.tool_choice.as_ref().map(|tc| match tc {
@@ -244,7 +247,44 @@ impl AnthropicProvider {
             metadata: request.user.as_ref().map(|user_id| AnthropicMetadata {
                 user_id: user_id.clone(),
             }),
+            // Automatic caching: Anthropic places this breakpoint on the last
+            // cacheable block and moves it forward as the conversation grows,
+            // so each turn reads the previous turn's prefix from cache.
+            cache_control: Some(AnthropicCacheControl::ephemeral()),
         }
+    }
+
+    /// Place the explicit prompt-cache breakpoint for the static prefix.
+    ///
+    /// Anthropic renders `tools` -> `system` -> `messages`, so one marker on
+    /// the last system block caches tools and system together. With no system
+    /// prompt, the marker goes on the last tool instead. Together with the
+    /// top-level automatic breakpoint this uses 2 of the 4 allowed slots.
+    ///
+    /// The marker uses the same (default 5-minute) TTL as the top-level
+    /// field; a differing TTL on the last block would be a 400. Prefixes
+    /// below the model's minimum (512 tokens on the 5.x line, 1024-4096 on
+    /// older models) silently don't cache — no error, just no hit.
+    fn place_cache_breakpoints(
+        system: Option<String>,
+        mut tools: Option<Vec<AnthropicTool>>,
+    ) -> (
+        Option<Vec<AnthropicSystemBlock>>,
+        Option<Vec<AnthropicTool>>,
+    ) {
+        let system = system.map(|text| {
+            vec![AnthropicSystemBlock {
+                block_type: "text",
+                text,
+                cache_control: Some(AnthropicCacheControl::ephemeral()),
+            }]
+        });
+        if system.is_none() {
+            if let Some(last) = tools.as_mut().and_then(|t| t.last_mut()) {
+                last.cache_control = Some(AnthropicCacheControl::ephemeral());
+            }
+        }
+        (system, tools)
     }
 
     /// Extract system prompt from instructions and system messages
@@ -388,7 +428,7 @@ impl AnthropicProvider {
         };
 
         // Build usage
-        let usage = Usage::new(response.usage.input_tokens, response.usage.output_tokens);
+        let usage = response.usage.to_usage();
 
         let mut builder = Response::builder(format!("resp_ant_{}", response.id), model)
             .outputs(output)
@@ -534,6 +574,8 @@ struct AnthropicStreamTransformer {
     output_item_added: bool,
     content_part_added: bool,
     input_tokens: u32,
+    cache_creation_input_tokens: u32,
+    cache_read_input_tokens: u32,
     output_tokens: u32,
 }
 
@@ -559,8 +601,21 @@ impl AnthropicStreamTransformer {
             output_item_added: false,
             content_part_added: false,
             input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
             output_tokens: 0,
         }
+    }
+
+    /// Final usage in the gateway convention (`input_tokens` = whole prompt).
+    fn usage(&self) -> Usage {
+        AnthropicUsage {
+            input_tokens: self.input_tokens,
+            output_tokens: self.output_tokens,
+            cache_creation_input_tokens: Some(self.cache_creation_input_tokens),
+            cache_read_input_tokens: Some(self.cache_read_input_tokens),
+        }
+        .to_usage()
     }
 
     fn transform<S>(self, stream: S) -> impl Stream<Item = Result<StreamEvent, ProviderError>>
@@ -647,7 +702,13 @@ impl AnthropicStreamTransformer {
 
         match event {
             AnthropicStreamEvent::MessageStart { message } => {
-                self.input_tokens = message.usage.input_tokens;
+                let usage = message.usage;
+                self.input_tokens = usage.input_tokens;
+                self.cache_creation_input_tokens = usage.cache_creation_input_tokens.unwrap_or(0);
+                self.cache_read_input_tokens = usage.cache_read_input_tokens.unwrap_or(0);
+                if usage.output_tokens > 0 {
+                    self.output_tokens = usage.output_tokens;
+                }
                 None
             }
             AnthropicStreamEvent::ContentBlockStart {
@@ -702,8 +763,21 @@ impl AnthropicStreamTransformer {
             }
             AnthropicStreamEvent::ContentBlockStop { .. } => None,
             AnthropicStreamEvent::MessageDelta { delta, usage } => {
-                if let Some(output_tokens) = usage.as_ref().and_then(|u| u.output_tokens) {
-                    self.output_tokens = output_tokens;
+                if let Some(usage) = usage.as_ref() {
+                    // message_delta usage is cumulative; input/cache counts
+                    // are only present on some API versions.
+                    if let Some(output_tokens) = usage.output_tokens {
+                        self.output_tokens = output_tokens;
+                    }
+                    if let Some(input_tokens) = usage.input_tokens {
+                        self.input_tokens = input_tokens;
+                    }
+                    if let Some(n) = usage.cache_creation_input_tokens {
+                        self.cache_creation_input_tokens = n;
+                    }
+                    if let Some(n) = usage.cache_read_input_tokens {
+                        self.cache_read_input_tokens = n;
+                    }
                 }
 
                 if delta.stop_reason.as_deref() == Some("end_turn")
@@ -733,7 +807,7 @@ impl AnthropicStreamTransformer {
                         )));
                     }
 
-                    let usage = Usage::new(self.input_tokens, self.output_tokens);
+                    let usage = self.usage();
                     let response = Response::builder(self.response_id.clone(), self.model.clone())
                         .outputs(output)
                         .usage(usage)
@@ -760,7 +834,7 @@ struct AnthropicRequest {
     model: String,
     messages: Vec<AnthropicMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    system: Option<String>,
+    system: Option<Vec<AnthropicSystemBlock>>,
     max_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
@@ -774,6 +848,34 @@ struct AnthropicRequest {
     tool_choice: Option<AnthropicToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<AnthropicMetadata>,
+    /// Top-level automatic prompt caching
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<AnthropicCacheControl>,
+}
+
+/// Prompt-cache breakpoint (`{"type": "ephemeral"}`, 5-minute TTL)
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct AnthropicCacheControl {
+    #[serde(rename = "type")]
+    cache_type: &'static str,
+}
+
+impl AnthropicCacheControl {
+    fn ephemeral() -> Self {
+        Self {
+            cache_type: "ephemeral",
+        }
+    }
+}
+
+/// System prompt text block (array form, so it can carry `cache_control`)
+#[derive(Debug, Serialize)]
+struct AnthropicSystemBlock {
+    #[serde(rename = "type")]
+    block_type: &'static str,
+    text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<AnthropicCacheControl>,
 }
 
 #[derive(Debug, Serialize)]
@@ -823,6 +925,8 @@ struct AnthropicTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     input_schema: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<AnthropicCacheControl>,
 }
 
 #[derive(Debug, Serialize)]
@@ -850,8 +954,30 @@ struct AnthropicResponse {
 
 #[derive(Debug, Deserialize)]
 struct AnthropicUsage {
+    /// Uncached prompt tokens after the last cache breakpoint
     input_tokens: u32,
+    #[serde(default)]
     output_tokens: u32,
+    /// Prompt tokens written to the cache by this request
+    #[serde(default)]
+    cache_creation_input_tokens: Option<u32>,
+    /// Prompt tokens read from the cache by this request
+    #[serde(default)]
+    cache_read_input_tokens: Option<u32>,
+}
+
+impl AnthropicUsage {
+    /// Convert to the gateway convention: Anthropic's `input_tokens` excludes
+    /// cache reads and writes, so the whole prompt is the sum of all three and
+    /// `cached_tokens` is the cache-read subset.
+    fn to_usage(&self) -> Usage {
+        let cache_read = self.cache_read_input_tokens.unwrap_or(0);
+        let total_input = self
+            .input_tokens
+            .saturating_add(self.cache_creation_input_tokens.unwrap_or(0))
+            .saturating_add(cache_read);
+        Usage::new(total_input, self.output_tokens).with_cache_hits(cache_read)
+    }
 }
 
 // Streaming types
@@ -907,6 +1033,12 @@ struct AnthropicMessageDelta {
 #[derive(Debug, Deserialize)]
 struct AnthropicDeltaUsage {
     output_tokens: Option<u32>,
+    #[serde(default)]
+    input_tokens: Option<u32>,
+    #[serde(default)]
+    cache_creation_input_tokens: Option<u32>,
+    #[serde(default)]
+    cache_read_input_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -939,7 +1071,9 @@ mod tests {
 
         let anthropic_request = provider.transform_request(&request);
 
-        assert_eq!(anthropic_request.system, Some("Be helpful".to_string()));
+        let system = anthropic_request.system.expect("system blocks");
+        assert_eq!(system.len(), 1);
+        assert_eq!(system[0].text, "Be helpful");
         assert_eq!(anthropic_request.messages.len(), 1);
     }
 
@@ -1050,5 +1184,184 @@ mod tests {
             2,
             "two parallel calls should batch into one assistant message with two tool_use blocks"
         );
+    }
+    #[test]
+    fn test_cache_breakpoints_on_system_and_top_level() {
+        let provider = AnthropicProvider::new("test-key");
+        let request = CreateResponseRequest::text("claude-sonnet-5-5", "Hi")
+            .with_instructions("Be helpful")
+            .with_tools(vec![
+                Tool::function(FunctionDefinition::new("a")),
+                Tool::function(FunctionDefinition::new("b")),
+            ]);
+
+        let body = serde_json::to_value(provider.transform_request(&request)).unwrap();
+
+        // Top-level automatic caching for the conversation tail
+        assert_eq!(
+            body["cache_control"],
+            serde_json::json!({"type": "ephemeral"})
+        );
+        // System is an array of text blocks; the last carries the marker
+        // (tools render before system, so this caches tools + system).
+        assert_eq!(
+            body["system"],
+            serde_json::json!([{
+                "type": "text",
+                "text": "Be helpful",
+                "cache_control": {"type": "ephemeral"}
+            }])
+        );
+        // No extra markers on tools when the system marker covers them
+        for tool in body["tools"].as_array().unwrap() {
+            assert!(tool.get("cache_control").is_none(), "tool = {tool}");
+        }
+        // Messages carry no explicit markers (automatic caching handles them)
+        assert!(!body["messages"].to_string().contains("cache_control"));
+    }
+
+    #[test]
+    fn test_cache_breakpoint_on_last_tool_without_system() {
+        let provider = AnthropicProvider::new("test-key");
+        let request = CreateResponseRequest::text("claude-sonnet-5-5", "Hi").with_tools(vec![
+            Tool::function(FunctionDefinition::new("a")),
+            Tool::function(FunctionDefinition::new("b")),
+        ]);
+
+        let body = serde_json::to_value(provider.transform_request(&request)).unwrap();
+
+        assert!(body.get("system").is_none());
+        let tools = body["tools"].as_array().unwrap();
+        assert!(tools[0].get("cache_control").is_none());
+        assert_eq!(
+            tools[1]["cache_control"],
+            serde_json::json!({"type": "ephemeral"})
+        );
+        assert_eq!(
+            body["cache_control"],
+            serde_json::json!({"type": "ephemeral"})
+        );
+    }
+
+    #[test]
+    fn test_request_serialization_is_deterministic() {
+        // A changed byte in the prefix invalidates the cache, so identical
+        // requests must serialize to identical bytes.
+        let provider = AnthropicProvider::new("test-key");
+        let params = serde_json::json!({
+            "type": "object",
+            "properties": {"z": {"type": "string"}, "a": {"type": "number"}},
+            "required": ["z", "a"]
+        });
+        let request = CreateResponseRequest::text("claude-sonnet-5-5", "Hi")
+            .with_instructions("sys")
+            .with_tools(vec![Tool::function(
+                FunctionDefinition::new("f").with_parameters(params),
+            )]);
+        let a = serde_json::to_string(&provider.transform_request(&request)).unwrap();
+        let b = serde_json::to_string(&provider.transform_request(&request)).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_usage_with_cache_read_and_write() {
+        let provider = AnthropicProvider::new("test-key");
+        let response: AnthropicResponse = serde_json::from_value(serde_json::json!({
+            "id": "msg_1",
+            "content": [{"type": "text", "text": "hi"}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 50,
+                "output_tokens": 20,
+                "cache_creation_input_tokens": 200,
+                "cache_read_input_tokens": 1000
+            }
+        }))
+        .unwrap();
+
+        let usage = provider
+            .transform_response(response, "claude-sonnet-5-5")
+            .usage
+            .unwrap();
+        // Whole prompt = uncached + written + read
+        assert_eq!(usage.input_tokens, 1250);
+        assert_eq!(usage.cached_tokens, Some(1000));
+        assert_eq!(usage.output_tokens, 20);
+        assert_eq!(usage.total_tokens, 1270);
+    }
+
+    #[test]
+    fn test_usage_without_cache_fields() {
+        let provider = AnthropicProvider::new("test-key");
+        let response: AnthropicResponse = serde_json::from_value(serde_json::json!({
+            "id": "msg_1",
+            "content": [],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5}
+        }))
+        .unwrap();
+
+        let usage = provider
+            .transform_response(response, "claude-sonnet-5-5")
+            .usage
+            .unwrap();
+        assert_eq!(usage.input_tokens, 10);
+        assert_eq!(usage.cached_tokens, None);
+    }
+
+    #[test]
+    fn test_stream_usage_includes_cache_reads() {
+        let mut transformer = AnthropicStreamTransformer::new("claude-sonnet-5-5".into());
+        assert!(transformer
+            .process_sse_data(
+                r#"{"type":"message_start","message":{"usage":{"input_tokens":30,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":4000}}}"#,
+            )
+            .is_none());
+        let event = transformer
+            .process_sse_data(
+                r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":42}}"#,
+            )
+            .expect("completed event")
+            .expect("ok");
+
+        let StreamEvent::ResponseCompleted { response, .. } = event else {
+            panic!("expected response.completed, got {event:?}");
+        };
+        let usage = response.usage.expect("usage");
+        assert_eq!(usage.input_tokens, 4030);
+        assert_eq!(usage.cached_tokens, Some(4000));
+        assert_eq!(usage.output_tokens, 42);
+    }
+
+    #[tokio::test]
+    async fn test_wire_request_carries_cache_markers_and_reports_hits() {
+        use wiremock::matchers::{body_partial_json, header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/messages"))
+            .and(header("anthropic-version", "2023-06-01"))
+            .and(body_partial_json(serde_json::json!({
+                "cache_control": {"type": "ephemeral"},
+                "system": [{"type": "text", "text": "Be helpful", "cache_control": {"type": "ephemeral"}}]
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "msg_1",
+                "content": [{"type": "text", "text": "hi"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 600}
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let provider = AnthropicProvider::with_base_url("k", server.uri());
+        let request =
+            CreateResponseRequest::text("claude-sonnet-5-5", "Hi").with_instructions("Be helpful");
+        let response = provider.complete(request).await.expect("complete");
+        let usage = response.usage.expect("usage");
+        assert_eq!(usage.input_tokens, 605);
+        assert_eq!(usage.cached_tokens, Some(600));
     }
 }

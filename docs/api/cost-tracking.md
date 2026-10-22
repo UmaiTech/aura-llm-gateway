@@ -164,14 +164,38 @@ Gemini 4 Argon is introductory pricing through 2026-11-30 ($4.00 / $20.00 from 2
 
 ## Cost Calculation
 
-The cost is calculated as:
+`input_tokens` is always the **whole prompt**. `cached_tokens` is the subset of
+it that the provider served from its prompt cache, so the two are never added
+together:
 
 ```
-cost = (input_tokens / 1M) * input_price
+cost = ((input_tokens - cached_tokens) / 1M) * input_price
+     + (cached_tokens / 1M) * cached_price   (input_price if the model has no cached price)
      + (output_tokens / 1M) * output_price
-     + (cached_tokens / 1M) * cached_price  (if applicable)
      + (reasoning_tokens / 1M) * reasoning_price  (if applicable)
 ```
+
+### Prompt caching
+
+The gateway maximises provider cache hits automatically:
+
+| Provider | What the gateway sends | Where hits are read from |
+|---|---|---|
+| Anthropic | `cache_control` on the last system block (or the last tool when there is no system prompt) plus top-level automatic caching for the conversation tail | `cache_read_input_tokens` / `cache_creation_input_tokens` |
+| Bedrock (Claude) | Explicit `cache_control` on the system block (or last tool) and on the last message block | same as Anthropic |
+| OpenAI | A stable `prompt_cache_key` derived from model + system prompt + tools (+ `user`) | `usage.prompt_tokens_details.cached_tokens` |
+| Gemini | Nothing — implicit caching is automatic | `usageMetadata.cachedContentTokenCount` |
+| Fireworks / Together / Mistral | Nothing | `usage.prompt_tokens_details.cached_tokens` when reported |
+
+For Anthropic and Bedrock, `input_tokens` = uncached + cache-written + cache-read
+tokens. Cache writes are billed at the normal input price; Anthropic charges
+1.25x for 5-minute cache writes, so the first request of a newly cached prefix
+is slightly under-estimated.
+
+Prompts below the provider's minimum cacheable length (for example 512 tokens
+on Claude 5.x models, 1,024 on OpenAI) are never cached. To get hits, keep the
+system prompt and tool list byte-identical between requests and put anything
+that changes per request (timestamps, IDs) in the user message.
 
 ## Example
 
