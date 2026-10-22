@@ -278,8 +278,8 @@ export function EndUsersPage() {
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Filters */}
-        <div className="flex gap-4 flex-wrap">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="relative w-full sm:w-auto sm:min-w-[16rem] sm:max-w-md sm:flex-1">
             <SearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by ID, name, or email..."
