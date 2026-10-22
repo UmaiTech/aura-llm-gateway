@@ -382,7 +382,7 @@ export function KeysPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Organization</label>
                       <select
-                        className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                        className="w-full pl-3 pr-8 py-2 bg-card border border-border rounded-md"
                         value={newKeyOrgId}
                         onChange={(e) => setNewKeyOrgId(e.target.value)}
                       >

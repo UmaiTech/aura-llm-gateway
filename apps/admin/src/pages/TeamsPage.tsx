@@ -238,7 +238,7 @@ export function TeamsPage() {
           <select
             value={orgFilter}
             onChange={(e) => setOrgFilter(e.target.value)}
-            className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+            className="pl-3 pr-8 py-2 bg-card border border-border rounded-md text-sm"
           >
             <option value="all">All Organizations</option>
             {orgNames.map((org) => (
@@ -385,7 +385,7 @@ export function TeamsPage() {
               <div>
                 <label className="text-sm font-medium mb-1 block">Organization</label>
                 <select
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                  className="w-full pl-3 pr-8 py-2 bg-card border border-border rounded-md"
                   value={formOrgId}
                   onChange={(e) => setFormOrgId(e.target.value)}
                 >

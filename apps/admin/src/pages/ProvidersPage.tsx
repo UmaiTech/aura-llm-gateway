@@ -216,7 +216,7 @@ export function ProvidersPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Provider Type</label>
-                  <select className="w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring">
+                  <select className="w-full bg-card pl-3 pr-8 py-2 text-sm focus:ring-2 focus:ring-ring">
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
                     <option value="google">Google AI</option>

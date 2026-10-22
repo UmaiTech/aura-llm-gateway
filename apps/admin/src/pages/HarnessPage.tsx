@@ -453,7 +453,7 @@ export function HarnessPage() {
                     <select
                       value={filterToolCalls}
                       onChange={(e) => setFilterToolCalls(e.target.value as typeof filterToolCalls)}
-                      className="flex-1 text-xs px-2 py-1.5 bg-background border border-border rounded-md"
+                      className="flex-1 text-xs pl-2 pr-8 py-1.5 bg-card border border-border rounded-md"
                     >
                       <option value="all">All Traces</option>
                       <option value="with-tools">With Tool Calls</option>
@@ -462,7 +462,7 @@ export function HarnessPage() {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-                      className="flex-1 text-xs px-2 py-1.5 bg-background border border-border rounded-md"
+                      className="flex-1 text-xs pl-2 pr-8 py-1.5 bg-card border border-border rounded-md"
                     >
                       <option value="all">All Status</option>
                       <option value="completed">Completed</option>

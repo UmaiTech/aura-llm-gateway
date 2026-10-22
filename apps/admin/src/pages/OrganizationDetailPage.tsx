@@ -486,7 +486,7 @@ export function OrganizationDetailPage() {
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Enabled</span>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingEnabled}
                     onChange={(e) => setRoutingEnabled(e.target.value as 'inherit' | 'on' | 'off')}
                   >
@@ -498,7 +498,7 @@ export function OrganizationDetailPage() {
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Shadow-score pinned models</span>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingShadow}
                     onChange={(e) => setRoutingShadow(e.target.value as 'inherit' | 'on' | 'off')}
                   >
@@ -510,7 +510,7 @@ export function OrganizationDetailPage() {
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Default mode</span>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingMode}
                     onChange={(e) =>
                       setRoutingMode(e.target.value as 'inherit' | 'cost' | 'balanced' | 'quality')
@@ -525,7 +525,7 @@ export function OrganizationDetailPage() {
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Classifier</span>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingClassifier}
                     onChange={(e) =>
                       setRoutingClassifier(e.target.value as 'inherit' | 'heuristic' | 'llm' | 'learned')
@@ -540,7 +540,7 @@ export function OrganizationDetailPage() {
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Minimum tier</span>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingMinTier}
                     onChange={(e) => setRoutingMinTier(e.target.value)}
                   >
@@ -554,7 +554,7 @@ export function OrganizationDetailPage() {
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Maximum tier</span>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                    className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingMaxTier}
                     onChange={(e) => setRoutingMaxTier(e.target.value)}
                   >

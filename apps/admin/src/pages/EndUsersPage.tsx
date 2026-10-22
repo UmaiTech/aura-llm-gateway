@@ -291,7 +291,7 @@ export function EndUsersPage() {
           <select
             value={orgFilter}
             onChange={(e) => setOrgFilter(e.target.value)}
-            className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+            className="pl-3 pr-8 py-2 bg-card border border-border rounded-md text-sm"
           >
             <option value="all">All Organizations</option>
             {orgNamesForFilter.map((org) => (
@@ -303,7 +303,7 @@ export function EndUsersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'blocked')}
-            className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+            className="pl-3 pr-8 py-2 bg-card border border-border rounded-md text-sm"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -596,7 +596,7 @@ export function EndUsersPage() {
               <div>
                 <label className="text-sm font-medium mb-1 block">Organization</label>
                 <select
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                  className="w-full pl-3 pr-8 py-2 bg-card border border-border rounded-md"
                   value={newUser.organization_id}
                   onChange={(e) => setNewUser({ ...newUser, organization_id: e.target.value })}
                 >
