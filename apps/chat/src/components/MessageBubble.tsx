@@ -2,7 +2,7 @@ import {
   User, Sparkles, Copy, Check, Wrench, Loader2,
   ChevronDown, Coins, Search, Calculator, Clock, Cloud,
   Zap, Server, Timer, ThumbsUp, ThumbsDown, X, Send, Code2,
-  Gauge, Route
+  Gauge, Route, Database
 } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -511,6 +511,7 @@ interface UsageDisplayProps {
     inputTokens: number
     outputTokens: number
     totalTokens: number
+    cachedTokens?: number
     cost?: number
   }
   aura?: {
@@ -877,6 +878,20 @@ function UsageDisplay({ usage, aura, responseId, rawResponse }: UsageDisplayProp
         <span className="font-medium">{usage.outputTokens.toLocaleString()}</span>
         <span>out</span>
       </span>
+
+      {/* Prompt-cache hits (subset of input tokens, billed at the cached rate) */}
+      {usage.cachedTokens !== undefined && usage.cachedTokens > 0 && (
+        <span
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400"
+          title={`${usage.cachedTokens.toLocaleString()} of ${usage.inputTokens.toLocaleString()} input tokens were read from the provider's prompt cache`}
+        >
+          <Database className="h-3 w-3" />
+          <span>
+            {usage.cachedTokens.toLocaleString()} cached
+            {usage.inputTokens > 0 && ` (${Math.round((usage.cachedTokens / usage.inputTokens) * 100)}%)`}
+          </span>
+        </span>
+      )}
 
       {/* Cost */}
       {usage.cost !== undefined && usage.cost > 0 && (
