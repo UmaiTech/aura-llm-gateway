@@ -52,7 +52,7 @@ def rows_from_file(path: str):
             model = obj.get("model") or obj.get("actual_model")
             out = obj.get("output_tokens")
             if isinstance(feats, dict) and model and out is not None:
-                yield feats, model, int(out), obj.get("input_tokens"), obj.get("cost_usd")
+                yield feats, model, int(out), obj.get("input_tokens"), obj.get("cost_usd"), obj.get("source", "file")
 
 
 def rows_from_db(database_url: str, days: int):
@@ -61,7 +61,7 @@ def rows_from_db(database_url: str, days: int):
     except ImportError:  # pragma: no cover
         sys.exit("reading from the database needs psycopg: pip install 'psycopg[binary]'")
     sql = """
-        SELECT d.features, rl.model_id, rl.output_tokens, rl.input_tokens, rl.cost_usd::float8
+        SELECT d.features, rl.model_id, rl.output_tokens, rl.input_tokens, rl.cost_usd::float8, d.synthetic
         FROM routing_decisions d
         JOIN request_logs rl ON rl.response_id = d.response_id
         WHERE rl.status = 'completed'
@@ -71,8 +71,8 @@ def rows_from_db(database_url: str, days: int):
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (days,))
-            for feats, model, out, inp, cost in cur:
-                yield feats, model, int(out), inp, cost
+            for feats, model, out, inp, cost, synthetic in cur:
+                yield feats, model, int(out), inp, cost, "synthetic" if synthetic else "db"
 
 
 def _solve(A: list[list[float]], b: list[float]) -> list[float]:
@@ -98,7 +98,7 @@ def _solve(A: list[list[float]], b: list[float]) -> list[float]:
     return [M[i][n] / M[i][i] for i in range(n)]
 
 
-def ridge_fit(Z: list[list[float]], y: list[float], l2: float):
+def ridge_fit(Z: list[list[float]], y: list[float], l2: float, w: list[float] | None = None):
     """Closed-form ridge regression; returns (coef, intercept).
 
     Minimises (1/2n) sum (b + w.z - y)^2 + (l2/2) |w|^2 with the intercept
@@ -113,25 +113,28 @@ def ridge_fit(Z: list[list[float]], y: list[float], l2: float):
     """
     n = len(Z)
     d = len(Z[0])
+    w = w or [1.0] * n
     try:
         import numpy as np  # type: ignore
 
         Za = np.asarray(Z, dtype=float)
         ya = np.asarray(y, dtype=float)
+        wa = np.asarray(w, dtype=float)
         X = np.hstack([Za, np.ones((n, 1))])
-        A = X.T @ X / n
+        A = (X * wa[:, None]).T @ X / n
         A[:d, :d] += l2 * np.eye(d)
-        sol = np.linalg.solve(A, X.T @ ya / n)
+        sol = np.linalg.solve(A, (X * wa[:, None]).T @ ya / n)
         return [float(v) for v in sol[:d]], float(sol[d])
     except ImportError:
         pass
 
-    # Gram matrix of [Z | 1] scaled by 1/n, plus ridge on the weight block.
+    # Weighted Gram matrix of [Z | 1] scaled by 1/n, plus ridge on the
+    # weight block (weights scale each row's contribution).
     A = [[0.0] * (d + 1) for _ in range(d + 1)]
     rhs = [0.0] * (d + 1)
-    for z, yi in zip(Z, y):
+    for z, yi, wi in zip(Z, y, w):
         for i in range(d):
-            zi = z[i]
+            zi = z[i] * wi
             if zi == 0.0:
                 continue
             row = A[i]
@@ -139,10 +142,10 @@ def ridge_fit(Z: list[list[float]], y: list[float], l2: float):
                 row[j] += zi * z[j]
             row[d] += zi
             rhs[i] += zi * yi
-        rhs[d] += yi
+        rhs[d] += yi * wi
     for i in range(d):
         A[d][i] = A[i][d]
-    A[d][d] = float(n)
+    A[d][d] = float(sum(w))
     for i in range(d + 1):
         for j in range(d + 1):
             A[i][j] /= n
@@ -180,6 +183,8 @@ def main() -> int:
     ap.add_argument("--push", help="gateway base URL to POST the model to /admin/routing/models")
     ap.add_argument("--admin-key", default=os.environ.get("AURA_ADMIN_KEY", ""))
     ap.add_argument("--activate", action="store_true")
+    ap.add_argument("--synthetic-weight", type=float, default=0.5, help="weight of rows with source=synthetic")
+    ap.add_argument("--no-synthetic", action="store_true", help="ignore rows with source=synthetic")
     args = ap.parse_args()
 
     if args.input:
@@ -189,23 +194,32 @@ def main() -> int:
     else:
         ap.error("give --input or --database-url (or DATABASE_URL)")
 
+    if args.no_synthetic:
+        rows = [r for r in rows if r[5] != "synthetic"]
     if len(rows) < args.min_rows:
         print(f"only {len(rows)} rows (need {args.min_rows})", file=sys.stderr)
         return 1
 
     random.Random(5).shuffle(rows)
-    X = [featurize(f) for f, _, _, _, _ in rows]
-    y = [math.log1p(max(0, out)) for _, _, out, _, _ in rows]
+    X = [featurize(f) for f, _, _, _, _, _ in rows]
+    y = [math.log1p(max(0, out)) for _, _, out, _, _, _ in rows]
+    wts = [args.synthetic_weight if src == "synthetic" else 1.0 for _, _, _, _, _, src in rows]
     Z, mean, scale = standardise(X)
     n_hold = int(len(Z) * args.holdout) if args.holdout > 0 else 0
+    if n_hold >= len(Z):
+        print("no training rows left after the holdout split; lower --holdout", file=sys.stderr)
+        return 1
+    sources = {}
+    for r in rows:
+        sources[r[5]] = sources.get(r[5], 0) + 1
 
     # Global head.
-    gw, gb = ridge_fit(Z[n_hold:], y[n_hold:], args.l2)
+    gw, gb = ridge_fit(Z[n_hold:], y[n_hold:], args.l2, wts[n_hold:])
     metrics = {"global": {"train": evaluate(gw, gb, Z[n_hold:], y[n_hold:]), "holdout": evaluate(gw, gb, Z[:n_hold], y[:n_hold])}}
 
     # Per-model heads.
     by_model: dict[str, list[int]] = defaultdict(list)
-    for i, (_, model, _, _, _) in enumerate(rows):
+    for i, (_, model, _, _, _, _) in enumerate(rows):
         by_model[model].append(i)
     heads = {}
     per_model_metrics = {}
@@ -217,13 +231,15 @@ def main() -> int:
         ho = [i for i in idxs if i < n_hold]
         if len(tr) < MIN_ROWS_PER_MODEL // 2:
             tr, ho = idxs, []
-        w, b = ridge_fit([Z[i] for i in tr], [y[i] for i in tr], args.l2)
+        w, b = ridge_fit([Z[i] for i in tr], [y[i] for i in tr], args.l2, [wts[i] for i in tr])
         heads[model] = {"coef": [round(v, 6) for v in w], "intercept": round(b, 6), "rows": len(tr)}
         per_model_metrics[model] = {
             "train": evaluate(w, b, [Z[i] for i in tr], [y[i] for i in tr]),
             "holdout": evaluate(w, b, [Z[i] for i in ho], [y[i] for i in ho]),
         }
     metrics["per_model"] = per_model_metrics
+    metrics["sources"] = sources
+    metrics["synthetic_weight"] = args.synthetic_weight
 
     # Implied prices from rows that carry cost: cost = (in*pi + out*po)/1e6.
     # Two-parameter least squares per model; falls back to nothing when the

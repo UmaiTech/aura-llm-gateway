@@ -249,11 +249,26 @@ pub async fn llm_classify(
 /// model). Rewrites `request.model` when a real decision is applied.
 ///
 /// Returns `Ok(None)` when auto routing is not involved at all.
+/// Request header that marks a synthetic-trace run (`scripts/router/
+/// synth.py`). Decisions are recorded with `synthetic = true` and left out
+/// of everything that reflects real traffic.
+pub const SYNTHETIC_HEADER: &str = "x-aura-synthetic";
+
+/// Whether the request carries the synthetic-trace marker.
+pub fn is_synthetic_request(headers: &axum::http::HeaderMap) -> bool {
+    headers
+        .get(SYNTHETIC_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| !matches!(v.trim(), "" | "0" | "false" | "off"))
+        .unwrap_or(false)
+}
+
 pub async fn resolve_auto_model(
     state: &AppState,
     request: &mut CreateResponseRequest,
     organization_id: Option<uuid::Uuid>,
     request_id: &str,
+    synthetic: bool,
 ) -> Result<Option<AutoDecision>, (StatusCode, Json<ApiError>)> {
     let alias = parse_auto_model(&request.model);
     let Some(router) = state.auto_router() else {
@@ -275,6 +290,10 @@ pub async fn resolve_auto_model(
     // Organization override (settings.routing.auto): may switch auto on
     // or off for this org and narrows the request's options.
     let org = state.org_auto_routing_override(organization_id).await;
+    // The synthetic marker is opt-in per organization (or free on a
+    // gateway without tenants), so a tenant cannot hide traffic from
+    // stats or rewards by setting a header.
+    let synthetic = synthetic && (organization_id.is_none() || org.allow_synthetic == Some(true));
     let shadow = alias.is_none();
     let shadow_enabled = org
         .shadow_for_pinned_models
@@ -364,6 +383,7 @@ pub async fn resolve_auto_model(
     match router.decide_with_override(request, &ctx, &oracle, override_tier) {
         Ok(mut decision) => {
             decision.shadow = shadow;
+            decision.synthetic = synthetic;
             crate::routes::routing_gold::maybe_collect(
                 state,
                 request,
@@ -642,6 +662,53 @@ mod tests {
             .unwrap()
             .iter()
             .any(|f| f == "min_tier complex"));
+    }
+
+    #[tokio::test]
+    async fn synthetic_header_marks_the_decision() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(chat_completion("llama3.2", "Paris")),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let state = state_with_router(&server.uri(), true).await;
+        let app = crate::routes::responses::router().with_state(state);
+        let body = serde_json::json!({
+            "model": "auto",
+            "input": [{"type": "message", "role": "user", "content": "What is the capital of France?"}]
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/responses")
+                    .header("content-type", "application/json")
+                    .header(SYNTHETIC_HEADER, "1")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(status, StatusCode::OK, "{json}");
+        assert_eq!(json["metadata"]["aura"]["routing"]["synthetic"], true);
+        assert_eq!(json["metadata"]["aura"]["routing"]["shadow"], false);
+
+        let mut plain = axum::http::HeaderMap::new();
+        assert!(!is_synthetic_request(&plain));
+        plain.insert(SYNTHETIC_HEADER, "0".parse().unwrap());
+        assert!(!is_synthetic_request(&plain));
+        plain.insert(SYNTHETIC_HEADER, "true".parse().unwrap());
+        assert!(is_synthetic_request(&plain));
     }
 
     #[tokio::test]
