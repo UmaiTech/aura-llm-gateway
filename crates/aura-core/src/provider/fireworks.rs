@@ -8,6 +8,7 @@
 //! models (GLM, Kimi, DeepSeek, Qwen, gpt-oss) on day zero — a second routing
 //! target alongside Together. See issue #209.
 
+use super::cache::{openai_compatible_usage, PromptTokensDetails};
 use super::{EventStream, Provider, ProviderError};
 use async_trait::async_trait;
 use aura_types::{
@@ -278,9 +279,7 @@ impl FireworksProvider {
             ),
         };
 
-        let usage = response
-            .usage
-            .map(|usage| Usage::new(usage.prompt_tokens, usage.completion_tokens));
+        let usage = response.usage.map(|usage| usage.to_usage());
 
         let mut builder = Response::builder(format!("resp_fw_{}", response.id), model)
             .created_at(response.created)
@@ -566,14 +565,7 @@ impl FireworksStreamTransformer {
                             match serde_json::from_str::<FireworksStreamChunk>(data) {
                                 Ok(chunk) => {
                                     if let Some(usage) = chunk.usage {
-                                        transformer.accumulated_usage = Some(aura_types::Usage {
-                                            input_tokens: usage.prompt_tokens,
-                                            output_tokens: usage.completion_tokens,
-                                            total_tokens: usage.total_tokens,
-                                            cached_tokens: None,
-                                            reasoning_tokens: None,
-                                            cost_usd: None,
-                                        });
+                                        transformer.accumulated_usage = Some(usage.to_usage());
                                     }
 
                                     if let Some(choice) = chunk.choices.first() {
@@ -835,7 +827,21 @@ impl FireworksArguments {
 struct FireworksUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
+    #[allow(dead_code)]
     total_tokens: u32,
+    /// Cached prompt tokens (subset of `prompt_tokens`), when reported
+    #[serde(default)]
+    prompt_tokens_details: Option<PromptTokensDetails>,
+}
+
+impl FireworksUsage {
+    fn to_usage(&self) -> Usage {
+        openai_compatible_usage(
+            self.prompt_tokens,
+            self.completion_tokens,
+            self.prompt_tokens_details.as_ref(),
+        )
+    }
 }
 
 // Streaming types
@@ -984,6 +990,7 @@ mod tests {
                 prompt_tokens: 10,
                 completion_tokens: 2,
                 total_tokens: 12,
+                prompt_tokens_details: None,
             }),
         };
 
@@ -1127,5 +1134,19 @@ mod tests {
         assert_eq!(tool_calls.len(), 2);
         assert_eq!(tool_calls[0].id, "call_a");
         assert_eq!(tool_calls[1].id, "call_b");
+    }
+    #[test]
+    fn test_usage_parses_cached_prompt_tokens() {
+        let usage: FireworksUsage = serde_json::from_value(serde_json::json!({
+            "prompt_tokens": 1200,
+            "completion_tokens": 7,
+            "total_tokens": 1207,
+            "prompt_tokens_details": {"cached_tokens": 1024}
+        }))
+        .unwrap();
+        let usage = usage.to_usage();
+        // prompt_tokens already includes the cached subset
+        assert_eq!(usage.input_tokens, 1200);
+        assert_eq!(usage.cached_tokens, Some(1024));
     }
 }

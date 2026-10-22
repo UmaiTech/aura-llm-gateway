@@ -44,6 +44,10 @@ export function ComparePane({
     (sum, m) => sum + (m.usage?.totalTokens ?? 0),
     0
   )
+  const cachedTokens = pane.messages.reduce<number>(
+    (sum, m) => sum + (m.usage?.cachedTokens ?? 0),
+    0
+  )
 
   return (
     <div className="flex flex-col bg-background min-w-0 min-h-0">
@@ -189,7 +193,9 @@ export function ComparePane({
       <div className="border-t border-border px-3 py-1.5 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
         <span>{pane.messages.length} msg</span>
         <span>
-          {totalTokens.toLocaleString()} tok · ${totalCost.toFixed(4)}
+          {totalTokens.toLocaleString()} tok
+          {cachedTokens > 0 && ` · ${cachedTokens.toLocaleString()} cached`}
+          {` · $${totalCost.toFixed(4)}`}
         </span>
       </div>
     </div>
