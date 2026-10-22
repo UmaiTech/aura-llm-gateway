@@ -160,6 +160,7 @@ export function CompareView() {
               usage?: {
                 input_tokens?: number
                 output_tokens?: number
+                cached_tokens?: number
                 cost_usd?: number
               }
               metadata?: {
@@ -196,6 +197,7 @@ export function CompareView() {
                 outputTokens: response.usage.output_tokens,
                 totalTokens:
                   response.usage.input_tokens + response.usage.output_tokens,
+                cachedTokens: response.usage.cached_tokens,
                 cost:
                   response.usage.cost_usd ??
                   calculateCost(

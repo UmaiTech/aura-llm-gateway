@@ -112,7 +112,8 @@ impl ResponseError {
 /// enrichments like calculated cost.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 pub struct Usage {
-    /// Number of tokens in the input/prompt
+    /// Number of tokens in the input/prompt — the whole prompt, including
+    /// any tokens read from or written to the provider's prompt cache
     pub input_tokens: u32,
     /// Number of tokens in the output/completion
     pub output_tokens: u32,
@@ -121,7 +122,8 @@ pub struct Usage {
     /// Number of tokens used for reasoning (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
-    /// Number of cached tokens (if applicable)
+    /// Number of prompt tokens served from the provider's prompt cache
+    /// (a subset of `input_tokens`, billed at the cached-input rate)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_tokens: Option<u32>,
     /// Calculated cost in USD (Aura enrichment)
@@ -152,6 +154,17 @@ impl Usage {
     /// Create usage with cached tokens
     pub fn with_cached(mut self, cached_tokens: u32) -> Self {
         self.cached_tokens = Some(cached_tokens);
+        self
+    }
+
+    /// Record prompt-cache reads, leaving `cached_tokens` unset on a miss.
+    ///
+    /// `cached_tokens` is the subset of `input_tokens` served from the
+    /// provider's prompt cache; `input_tokens` always counts the whole prompt.
+    pub fn with_cache_hits(mut self, cached_tokens: u32) -> Self {
+        if cached_tokens > 0 {
+            self.cached_tokens = Some(cached_tokens);
+        }
         self
     }
 

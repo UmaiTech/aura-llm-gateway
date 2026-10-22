@@ -836,6 +836,19 @@ pub async fn create_response(
                                 // Log completed response
                                 let usage = response.usage.as_ref();
 
+                                // Token metrics (incl. aura_cached_tokens_total)
+                                // — the non-streaming path records these too.
+                                if let Some(u) = usage {
+                                    metrics::record_tokens(
+                                        &provider_name_clone,
+                                        &request_clone.model,
+                                        u.input_tokens,
+                                        u.output_tokens,
+                                        u.cached_tokens,
+                                        u.reasoning_tokens,
+                                    );
+                                }
+
                                 // Merge response metadata with compression log
                                 let log_metadata = match (
                                     response.metadata.clone(),

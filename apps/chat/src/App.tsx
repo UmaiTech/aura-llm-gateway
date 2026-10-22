@@ -209,6 +209,7 @@ export default function App() {
               input_tokens?: number
               output_tokens?: number
               total_tokens?: number
+              cached_tokens?: number
               cost_usd?: number
             }
             metadata?: { aura?: {
@@ -240,6 +241,7 @@ export default function App() {
               inputTokens: response.usage.input_tokens,
               outputTokens: response.usage.output_tokens,
               totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+              cachedTokens: response.usage.cached_tokens,
               cost: response.usage.cost_usd ?? calculateCost(model, response.usage.input_tokens, response.usage.output_tokens),
             }
             console.log('[Standard Chat] Parsed usage:', usage)
@@ -476,12 +478,13 @@ export default function App() {
                     }
 
                     // Extract usage (gateway enriches with cost_usd)
-                    const responseUsage = event.response.usage as { input_tokens?: number; output_tokens?: number; cost_usd?: number } | undefined
+                    const responseUsage = event.response.usage as { input_tokens?: number; output_tokens?: number; cached_tokens?: number; cost_usd?: number } | undefined
                     if (responseUsage?.input_tokens !== undefined && responseUsage?.output_tokens !== undefined) {
                       usage = {
                         inputTokens: responseUsage.input_tokens,
                         outputTokens: responseUsage.output_tokens,
                         totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
+                        cachedTokens: responseUsage.cached_tokens,
                         cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
                       }
                     }
