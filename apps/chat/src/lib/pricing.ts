@@ -17,6 +17,9 @@ export interface ModelPricing {
 export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // OpenAI — 2026 lineup (refreshed 2026-10-15). Sol is promo-priced
   // through 2026-11-21; 'gpt-5.6' is OpenAI's alias for Sol.
+  'gpt-6.1-sol': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
+  'gpt-6-sol': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
+  'gpt-6-luna': { inputPerMillion: 0.10, outputPerMillion: 0.50 },
   'gpt-6-astra': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
   'gpt-5.6-sol': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
   'gpt-5.6': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
@@ -35,7 +38,7 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   'gpt-4-turbo': { inputPerMillion: 10.00, outputPerMillion: 30.00 },
   'gpt-3.5-turbo': { inputPerMillion: 0.50, outputPerMillion: 1.50 },
 
-  // Anthropic — 2026 lineup (refreshed 2026-09-07)
+  // Anthropic — 2026 lineup (refreshed 2026-10-01)
   'claude-fable-5-1': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
   'claude-fable-5': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
   'claude-opus-5-5': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
