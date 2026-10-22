@@ -2548,3 +2548,42 @@ impl RouterModelRepo {
         Ok(())
     }
 }
+
+// ============================================================================
+// Gateway settings (single-row runtime overrides)
+// ============================================================================
+
+/// Repository for the gateway-wide settings document edited from the
+/// admin app. One row (`id = 1`); see migration 038.
+pub struct GatewaySettingsRepo;
+
+impl GatewaySettingsRepo {
+    /// The stored overrides, or `None` when the row is missing (fresh
+    /// database before the seed insert ran).
+    pub async fn get(pool: &DbPool) -> Result<Option<serde_json::Value>, DbError> {
+        let row = sqlx::query("SELECT settings FROM gateway_settings WHERE id = 1")
+            .fetch_optional(pool)
+            .await?;
+        Ok(row.and_then(|r| r.try_get::<serde_json::Value, _>("settings").ok()))
+    }
+
+    /// Replace the stored overrides and return what was written.
+    pub async fn set(
+        pool: &DbPool,
+        settings: &serde_json::Value,
+    ) -> Result<serde_json::Value, DbError> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO gateway_settings (id, settings, updated_at)
+            VALUES (1, $1, NOW())
+            ON CONFLICT (id) DO UPDATE
+                SET settings = EXCLUDED.settings, updated_at = NOW()
+            RETURNING settings
+            "#,
+        )
+        .bind(settings)
+        .fetch_one(pool)
+        .await?;
+        Ok(row.try_get::<serde_json::Value, _>("settings")?)
+    }
+}

@@ -407,3 +407,110 @@ export interface ProviderSummary {
   created_at: string
   updated_at: string
 }
+
+// ---------------------------------------------------------------------------
+// Gateway settings (GET/PUT /admin/settings)
+// ---------------------------------------------------------------------------
+
+export type RoutingMode = 'cost' | 'balanced' | 'quality'
+export type ClassifierKind = 'heuristic' | 'llm' | 'learned'
+export type WithinTierStrategy =
+  | 'cheapest'
+  | 'config_order'
+  | 'round_robin'
+  | 'thompson'
+  | 'predicted_cost'
+
+export interface TierModels {
+  simple: string[]
+  medium: string[]
+  complex: string[]
+  reasoning: string[]
+}
+
+/** One view (boot or effective) of the runtime-adjustable knobs. */
+export interface RuntimeValues {
+  routing: {
+    available: boolean
+    enabled: boolean
+    shadow_for_pinned_models: boolean
+    default_mode: RoutingMode
+    default_classifier: ClassifierKind
+    within_tier: WithinTierStrategy
+    sticky_tool_loops: boolean
+    tiers: TierModels
+    llm_classifier_model: string
+    gold_sample_rate: number
+    escalation_enabled: boolean
+    boundaries: { simple_medium: number; medium_complex: number; complex_reasoning: number }
+    mode_offsets: { cost: number; balanced: number; quality: number }
+  }
+  features: {
+    payload_capture: boolean
+    replay_tool_context: boolean
+  }
+  cache: {
+    available: boolean
+    enabled: boolean
+    default_ttl_secs: number
+  }
+  rate_limit: {
+    available: boolean
+    enabled: boolean
+    default_rpm: number
+  }
+}
+
+/** The stored override document. Every field optional: absent = inherit boot. */
+export interface GatewaySettingsOverrides {
+  routing?: {
+    enabled?: boolean
+    shadow_for_pinned_models?: boolean
+    default_mode?: RoutingMode
+    default_classifier?: ClassifierKind
+    within_tier?: WithinTierStrategy
+    sticky_tool_loops?: boolean
+    tiers?: TierModels
+    llm_classifier_model?: string
+    gold_sample_rate?: number
+    escalation_enabled?: boolean
+  }
+  features?: {
+    payload_capture?: boolean
+    replay_tool_context?: boolean
+  }
+  cache?: {
+    enabled?: boolean
+    default_ttl_secs?: number
+  }
+  rate_limit?: {
+    enabled?: boolean
+    default_rpm?: number
+  }
+}
+
+export interface EnvironmentInfo {
+  version: string
+  host: string
+  port: number
+  config_file: string | null
+  log_level: string
+  database_connected: boolean
+  redis_connected: boolean
+  admin_auth: 'key' | 'open' | 'blocked'
+  cors_allowed_origins: string[]
+  providers: string[]
+  model_count: number
+  learned_classifier: string | null
+  cost_model: string | null
+  dropped_tier_models: string[]
+}
+
+export interface GatewaySettingsResponse {
+  boot: RuntimeValues
+  overrides: GatewaySettingsOverrides
+  effective: RuntimeValues
+  environment: EnvironmentInfo
+  persisted: boolean
+  warnings?: string[]
+}

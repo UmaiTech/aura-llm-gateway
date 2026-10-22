@@ -150,7 +150,7 @@ fn extract_routing_strategy(headers: &HeaderMap) -> Option<String> {
 /// Default: enabled (env var unset or `1`/`true`). Set
 /// `AURA_REPLAY_TOOL_CONTEXT=false` to disable for safe rollback if
 /// the replay path causes regressions on any provider.
-fn tool_context_replay_enabled() -> bool {
+pub fn tool_context_replay_from_env() -> bool {
     match std::env::var("AURA_REPLAY_TOOL_CONTEXT") {
         Ok(v) => {
             let v = v.trim().to_ascii_lowercase();
@@ -176,10 +176,6 @@ fn tool_context_replay_enabled() -> bool {
 ///
 /// See issue #156 for the full architectural rationale.
 async fn replay_prior_tool_calls(pool: &DbPool, request: &CreateResponseRequest) -> Vec<InputItem> {
-    if !tool_context_replay_enabled() {
-        return Vec::new();
-    }
-
     let Some(prev_id) = request.previous_response_id.as_deref() else {
         return Vec::new();
     };
@@ -610,9 +606,10 @@ pub async fn create_response(
     // tool pairing on the second roundtrip. Issue #156.
     //
     // Best-effort: errors are logged inside the helper, never raised.
-    // Gated on AURA_REPLAY_TOOL_CONTEXT (defaults on).
+    // Gated on AURA_REPLAY_TOOL_CONTEXT (defaults on) or the runtime
+    // setting edited from the admin app.
     let mut request = request;
-    if let Some(pool) = state.db_pool() {
+    if let (Some(pool), true) = (state.db_pool(), state.replay_tool_context_enabled()) {
         let synthesized = replay_prior_tool_calls(pool, &request).await;
         if !synthesized.is_empty() {
             let mut new_input = synthesized;
@@ -770,7 +767,7 @@ pub async fn create_response(
         // request inside the hot event loop.
         let org_id_for_stream = auth_context.as_ref().and_then(|a| a.tenant.organization_id);
         let captured_request_body: Option<serde_json::Value> = {
-            let env_on = state.payload_capture_enabled;
+            let env_on = state.payload_capture_enabled();
             if env_on {
                 serde_json::to_value(&request).ok().map(cap_payload)
             } else {
@@ -1175,6 +1172,7 @@ pub async fn create_response(
 
         // Check cache first (if caching is enabled and request is cacheable)
         let cache_enabled = state.response_cache().is_some()
+            && state.cache_enabled()
             && !bypass_cache
             && !cache::ResponseCache::should_skip_cache(&request);
 
@@ -1449,7 +1447,10 @@ pub async fn create_response(
         // Cache the response if applicable
         if cache_enabled && cache::ResponseCache::should_cache_response(&response) {
             if let Some(cache) = state.response_cache() {
-                match cache.set(&request, &response, None).await {
+                match cache
+                    .set(&request, &response, Some(state.cache_ttl_secs()))
+                    .await
+                {
                     Ok(cache_key) => {
                         debug!(cache_key = %cache_key, "Response cached");
                     }
@@ -1804,13 +1805,13 @@ mod tests {
 
         // unset → default on
         std::env::remove_var("AURA_REPLAY_TOOL_CONTEXT");
-        assert!(tool_context_replay_enabled());
+        assert!(tool_context_replay_from_env());
 
         // explicit on
         for v in ["1", "true", "TRUE", "yes", "on"] {
             std::env::set_var("AURA_REPLAY_TOOL_CONTEXT", v);
             assert!(
-                tool_context_replay_enabled(),
+                tool_context_replay_from_env(),
                 "expected {v:?} to be parsed as enabled"
             );
         }
@@ -1819,7 +1820,7 @@ mod tests {
         for v in ["0", "false", "FALSE", "no", "off"] {
             std::env::set_var("AURA_REPLAY_TOOL_CONTEXT", v);
             assert!(
-                !tool_context_replay_enabled(),
+                !tool_context_replay_from_env(),
                 "expected {v:?} to be parsed as disabled"
             );
         }

@@ -22,6 +22,11 @@ use crate::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        // Gateway-wide runtime settings (admin app Settings page)
+        .route(
+            "/admin/settings",
+            get(super::admin_settings::get_settings).put(super::admin_settings::put_settings),
+        )
         // Dashboard stats
         .route("/admin/stats/overview", get(get_overview_stats))
         .route("/admin/stats/dynamic", get(get_dynamic_stats))

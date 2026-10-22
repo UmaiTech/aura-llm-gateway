@@ -297,6 +297,21 @@ routing:
 
 Feature `weights`, `token_thresholds` and every `keywords` list are configurable too; see `config.example.yaml` for the full block. Tier models the gateway cannot serve are dropped at startup with a warning.
 
+### Runtime settings from the admin app
+
+A small set of `routing.auto` values can also be changed while the gateway runs, from the admin app's **Settings** page (`GET` / `PUT /admin/settings`, admin key required): `enabled`, `shadow_for_pinned_models`, `default_mode`, `default_classifier`, `within_tier`, `sticky_tool_loops`, the four tier lists, `llm_classifier.model`, `gold_sample_rate` and `escalation.enabled`, plus the payload-capture and tool-context-replay flags, the response-cache switch and TTL, and the default per-key rate limit.
+
+These overrides are stored in the `gateway_settings` table, layered over the file and environment values at boot, and applied immediately on save (the router is rebuilt in place). Every field is optional; an unset field inherits the boot value, so `AURA_AUTO_ROUTING=on` and a stored `routing.enabled: false` combine to *off*. Listen address, provider keys, connections, admin auth and CORS stay environment-only and are shown read-only.
+
+```bash
+curl -X PUT $AURA/admin/settings -H "Authorization: Bearer $AURA_ADMIN_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"routing": {"enabled": true, "default_mode": "cost"}}'
+# -> {"boot": {...}, "overrides": {...}, "effective": {...}, "environment": {...}, "persisted": true}
+```
+
+Send `{}` to clear all overrides. Tier models this gateway cannot serve are dropped and reported in `warnings`.
+
 ## Decision log
 
 Every decision, applied or shadow, is stored in the `routing_decisions` table (numeric features only, never prompt text) and joined with what actually happened in the `v_routing_outcomes` view: request status, tokens, cost, latency, explicit feedback, and for shadow rows an `estimated_savings_usd` computed from the pinned model's and the auto-selected model's blended prices at this request's token counts.
