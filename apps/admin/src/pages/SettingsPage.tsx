@@ -289,7 +289,7 @@ export function SettingsPage() {
         {/* Section nav: horizontal scroller on small screens, rail on lg+ */}
         <nav
           aria-label="Settings sections"
-          className="border-b bg-card lg:w-56 lg:flex-shrink-0 lg:border-b-0 lg:border-r"
+          className="border-b bg-card lg:w-56 lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:bg-transparent"
         >
           <div className="no-scrollbar flex gap-1 overflow-x-auto px-4 py-2 sm:px-6 lg:sticky lg:top-14 lg:flex-col lg:gap-px lg:overflow-visible lg:p-3">
             {tabs.map((tab) => (

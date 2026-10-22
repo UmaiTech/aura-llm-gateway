@@ -329,14 +329,14 @@ export function EndUsersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm eyebrow text-muted-foreground">User</th>
-                    <th className="text-left py-3 px-4 text-sm eyebrow text-muted-foreground">Organization</th>
-                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Requests</th>
-                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Tokens</th>
-                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Cost</th>
-                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Last Seen</th>
-                    <th className="text-center py-3 px-4 text-sm eyebrow text-muted-foreground">Status</th>
-                    <th className="text-right py-3 px-4 text-sm eyebrow text-muted-foreground">Actions</th>
+                    <th className="text-left py-3 px-4 eyebrow">User</th>
+                    <th className="text-left py-3 px-4 eyebrow">Organization</th>
+                    <th className="text-right py-3 px-4 eyebrow">Requests</th>
+                    <th className="text-right py-3 px-4 eyebrow">Tokens</th>
+                    <th className="text-right py-3 px-4 eyebrow">Cost</th>
+                    <th className="text-right py-3 px-4 eyebrow">Last Seen</th>
+                    <th className="text-center py-3 px-4 eyebrow">Status</th>
+                    <th className="text-right py-3 px-4 eyebrow">Actions</th>
                   </tr>
                 </thead>
                 <tbody>

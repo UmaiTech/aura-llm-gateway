@@ -385,7 +385,7 @@ export function HarnessPage() {
 
       <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden">
         {/* Tabs: horizontal scroller on small screens, rail on lg+ */}
-        <div className="no-scrollbar flex gap-1 overflow-x-auto border-b bg-card px-4 py-2 lg:w-48 lg:flex-shrink-0 lg:flex-col lg:gap-px lg:overflow-visible lg:border-b-0 lg:border-r lg:p-3">
+        <div className="no-scrollbar flex gap-1 overflow-x-auto border-b bg-card px-4 py-2 lg:bg-transparent lg:w-48 lg:flex-shrink-0 lg:flex-col lg:gap-px lg:overflow-visible lg:border-b-0 lg:border-r lg:p-3">
           {tabs.map((tab) => (
             <button
               key={tab.id}

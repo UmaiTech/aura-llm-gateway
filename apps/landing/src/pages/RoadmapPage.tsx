@@ -222,6 +222,7 @@ const releases: Release[] = [
       { label: 'Compression / validation / consistency events in harness timeline' },
       { label: 'Per-tool drill-down drawer in harness' },
       { label: 'Organization detail page with team + key + cost breakdown' },
+      { label: 'Admin app design refresh', note: 'The admin dashboard now shares the landing page’s look in light and dark mode, works on phones, and explains failed requests with a retry instead of showing empty pages. The request-volume chart now reads correctly at low traffic.' },
       { label: 'TypeScript SDK', note: 'aura-llm on npm — universal fetch, AsyncIterable streaming, typed errors; matches the Python feature set.' },
       { label: 'Fireworks AI provider', note: 'OpenAI-compatible adapter for Fireworks’ serverless open-weight catalog (GLM, Kimi, DeepSeek, Qwen, gpt-oss) — a second day-zero routing target alongside Together. Pricing auto-refreshes from the scraped price history.' },
       { label: 'Distributed tracing', note: 'OpenTelemetry, end-to-end spans' },
