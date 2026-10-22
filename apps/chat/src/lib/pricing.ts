@@ -15,7 +15,7 @@ export interface ModelPricing {
 // Hardcoded reference prices — fallback only. Kept current-ish by hand; the
 // live values from /api/pricing take precedence once loaded.
 export const FALLBACK_PRICING: Record<string, ModelPricing> = {
-  // OpenAI — 2026 lineup (refreshed 2026-10-01). Sol is promo-priced
+  // OpenAI — 2026 lineup (refreshed 2026-10-15). Sol is promo-priced
   // through 2026-11-21; 'gpt-5.6' is OpenAI's alias for Sol.
   'gpt-6.1-sol': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'gpt-6-sol': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
@@ -43,6 +43,7 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   'claude-fable-5': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
   'claude-opus-5-5': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
   'claude-sonnet-5-5': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
+  'claude-haiku-5-5': { inputPerMillion: 0.10, outputPerMillion: 0.50 },
   'claude-opus-5': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
   'claude-sonnet-5': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'claude-opus-4-8': { inputPerMillion: 5.00, outputPerMillion: 25.00 },
@@ -62,6 +63,8 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // when Google publishes 3.x GA pricing.
   // 3.6/3.7/3.8 Flash are Google's introductory price through 2026-12-31
   // ($1.50 / $7.50 standard from 2027-01-01).
+  // Gemini 4 Argon: introductory price through 2026-11-30 ($4 / $20 from 2026-12-01).
+  'gemini-4-argon': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'gemini-3.8-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.7-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.6-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },

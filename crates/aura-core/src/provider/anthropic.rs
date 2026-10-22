@@ -23,15 +23,16 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 
 /// Supported Claude models (most recent first)
 ///
-/// Refreshed 2026-10-01. Claude 5-generation ids carry no date suffix
+/// Refreshed 2026-10-15. Claude 5-generation ids carry no date suffix
 /// (`claude-opus-5`, never `claude-opus-5-2026MMDD`).
 const SUPPORTED_MODELS: &[&str] = &[
     // Claude Fable 5.x (2026 — top tier; Fable 5.1 released 2026-09-01)
     "claude-fable-5-1",
     "claude-fable-5",
-    // Claude 5.5 (2026 — Opus 5.5 and Sonnet 5.5)
+    // Claude 5.5 (2026 — Opus 5.5 2026-09-22, Sonnet 5.5 2026-09-28, Haiku 5.5 2026-10-07)
     "claude-opus-5-5",
     "claude-sonnet-5-5",
+    "claude-haiku-5-5",
     // Claude 5 (2026 — Opus 5 released 2026-07-24)
     "claude-opus-5",
     "claude-sonnet-5",
@@ -963,10 +964,12 @@ mod tests {
         let provider = AnthropicProvider::new("test-key");
         assert!(provider.supports_model("claude-3-5-sonnet-20241022"));
         assert!(provider.supports_model("claude-3-opus-20240229"));
-        // September 2026 line
-        assert!(provider.supports_model("claude-fable-5-1"));
+        // October 2026 line
         assert!(provider.supports_model("claude-opus-5-5"));
         assert!(provider.supports_model("claude-sonnet-5-5"));
+        assert!(provider.supports_model("claude-haiku-5-5"));
+        // September 2026 line
+        assert!(provider.supports_model("claude-fable-5-1"));
         assert!(provider.supports_model("claude-opus-5"));
         assert!(provider.supports_model("claude-sonnet-5"));
         assert!(provider.supports_model("claude-opus-4-8"));

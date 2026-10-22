@@ -24,7 +24,7 @@ interface Model {
  *     prices/context below are only used until the API responds.
  */
 const FALLBACK_MODELS: Model[] = [
-  // OpenAI — 2026 lineup (refreshed 2026-10-01)
+  // OpenAI — 2026 lineup (refreshed 2026-10-15)
   { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', provider: 'openai', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-6-sol', name: 'GPT-6 Sol', provider: 'openai', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
   { id: 'gpt-6-luna', name: 'GPT-6 Luna', provider: 'openai', inputPrice: 0.1, outputPrice: 0.5, contextWindow: 1050000, streaming: true, functionCalling: true, vision: true },
@@ -45,6 +45,7 @@ const FALLBACK_MODELS: Model[] = [
   { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', inputPrice: 10.0, outputPrice: 50.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', provider: 'anthropic', inputPrice: 4.0, outputPrice: 20.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
+  { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', provider: 'anthropic', inputPrice: 0.1, outputPrice: 0.5, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', inputPrice: 5.0, outputPrice: 25.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
@@ -56,6 +57,7 @@ const FALLBACK_MODELS: Model[] = [
   { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', inputPrice: 1.0, outputPrice: 5.0, contextWindow: 200000, streaming: true, functionCalling: true, vision: true },
   // Google — ids match the gateway's SUPPORTED_MODELS (the old bare
   // 'gemini-3-pro' / 'gemini-3-flash' ids do not exist upstream).
+  { id: 'gemini-4-argon', name: 'Gemini 4 Argon', provider: 'google', inputPrice: 2.0, outputPrice: 10.0, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },
   { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'google', inputPrice: 0.75, outputPrice: 3.75, contextWindow: 1000000, streaming: true, functionCalling: true, vision: true },

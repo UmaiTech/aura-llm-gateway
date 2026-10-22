@@ -5,13 +5,18 @@ description: "Claude models and capabilities through Aura Gateway"
 
 # Anthropic Provider
 
-Aura provides comprehensive support for Anthropic's Claude models, including Claude Fable 5.1, the Claude 5 generation (Opus 5.5, Sonnet 5.5, Opus 5, Sonnet 5) and the Claude 4.x line, with 1M-token context windows and adaptive reasoning. Catalog last refreshed 2026-09-07.
+Aura provides comprehensive support for Anthropic's Claude models, including Claude Fable 5.1, the Claude 5.5 line (Opus 5.5, Sonnet 5.5, Haiku 5.5), the Claude 5 generation (Opus 5, Sonnet 5) and the Claude 4.x line, with 1M-token context windows and adaptive reasoning. Catalog last refreshed 2026-10-15.
 
 ## Supported Models
 
 Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opus-5-2026MMDD`).
 
-### Claude Fable 5.x (Latest — September 2026)
+### Claude 5.5 Series (Latest — September/October 2026)
+- **claude-opus-5-5** - Current Opus (released 2026-09-22); Opus 5-level work at a lower price, 1M context
+- **claude-sonnet-5-5** - Current Sonnet (released 2026-09-28); faster, lower-cost complement to Opus 5.5
+- **claude-haiku-5-5** - Current Haiku (released 2026-10-07); cheapest and fastest small model, 1M context
+
+### Claude Fable 5.x (September 2026)
 - **claude-fable-5-1** - Anthropic's most capable widely available model (released 2026-09-01); demanding reasoning, long-running agents, document-heavy work
 - **claude-fable-5** - Previous Fable release, same tier and price
 
@@ -47,7 +52,7 @@ Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opu
 
 ## Pricing
 
-*Prices per 1M tokens (USD), Anthropic first-party rates as of 2026-09-07*
+*Prices per 1M tokens (USD), Anthropic first-party rates as of 2026-10-15. Haiku 5.5 is $0.10 / $0.50 for prompts up to 100K tokens and $0.50 / $2.50 above that; the table shows the standard tier.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
@@ -55,6 +60,7 @@ Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opu
 | **claude-fable-5** | $10.00 | $50.00 | $1.00 |
 | **claude-opus-5-5** | $4.00 | $20.00 | $0.20 |
 | **claude-sonnet-5-5** | $2.00 | $10.00 | $0.20 |
+| **claude-haiku-5-5** | $0.10 | $0.50 | $0.01 |
 | **claude-opus-5** | $5.00 | $25.00 | $0.50 |
 | **claude-sonnet-5** | $2.00 | $10.00 | $0.20 |
 | **claude-opus-4-8** | $5.00 | $25.00 | $0.50 |
