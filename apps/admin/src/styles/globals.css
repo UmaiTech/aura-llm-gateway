@@ -5,58 +5,78 @@
 /*
  * Admin theme tokens.
  *
- * Shares the visual language of the landing page and playground
- * (docs/design-audit/design.md): achromatic near-black / paper
- * canvas, hairline rules instead of shadows, Fraunces display +
- * Inter body + JetBrains Mono labels, and a single violet accent
- * used sparingly (active nav, focus, links, primary chart series).
+ * Values come from the Aura design pack v3
+ * (docs/design/aura-pack-v3/handoff/design-tokens.json on
+ * claude/aura-redesign-v3), so the admin, landing and playground
+ * share one palette:
+ *
+ *   pack token   -> admin token
+ *   bg           -> --background
+ *   surface      -> --card, --popover
+ *   surface2     -> --muted, --secondary
+ *   hover        -> --accent
+ *   text / muted -> --foreground / --muted-foreground
+ *   border       -> --border, --input
+ *   accent       -> --primary, --ring  (links, active nav, focus, charts)
+ *   action       -> --action           (primary buttons, toggles)
+ *   green/amber/red -> --success / --warning / --destructive
+ *   shadow       -> --shadow-panel     (raised surfaces only)
  *
  * Tokens stay as bare HSL triplets so existing `bg-card`,
- * `text-muted-foreground`, `bg-primary/10` etc. keep working.
- * Status colours are tuned per theme so text set in them clears
- * WCAG AA on the card surface (the light-mode success/warning
- * shades are deliberately darker than the dark-mode ones).
+ * `text-muted-foreground`, `bg-primary/10` etc. keep working. Every
+ * text colour here clears WCAG AA (4.5:1) on --card and --background
+ * in its theme.
  */
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 9%;
+    --background: 228 45.5% 97.8%;      /* #f7f8fc */
+    --foreground: 226 27% 12.4%;        /* #171b28 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card: 0 0% 100%;                  /* #ffffff */
+    --card-foreground: 226 27% 12.4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
+    --popover-foreground: 226 27% 12.4%;
 
-    --primary: 252 75% 57%;
+    --primary: 263 70% 50.4%;           /* #6d28d9 accent */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 95%;
-    --secondary-foreground: 0 0% 9%;
+    --action: 263 70% 50.4%;            /* #6d28d9 */
+    --action-foreground: 0 0% 100%;
 
-    --muted: 0 0% 95.5%;
-    --muted-foreground: 0 0% 38%;
+    --secondary: 225 36.4% 95.7%;       /* #f0f2f8 surface2 */
+    --secondary-foreground: 226 27% 12.4%;
 
-    --accent: 0 0% 94%;
-    --accent-foreground: 0 0% 9%;
+    --muted: 225 36.4% 95.7%;
+    --muted-foreground: 219 16.7% 37.6%; /* #505b70 */
 
-    --destructive: 0 70% 45%;
+    --dim: 219 13.9% 47.8%;             /* #69758b — non-text only */
+
+    --accent: 234 29.4% 93.3%;          /* #e9eaf3 hover */
+    --accent-foreground: 226 27% 12.4%;
+
+    --destructive: 348 57.3% 46.9%;     /* #bc334f */
     --destructive-foreground: 0 0% 100%;
 
-    --success: 145 63% 29%;
+    --success: 161 87.7% 25.5%;         /* #087a55 */
     --success-foreground: 0 0% 100%;
 
-    --warning: 32 92% 36%;
+    --warning: 39 100% 29.2%;           /* #956000 */
     --warning-foreground: 0 0% 100%;
 
-    --info: 210 80% 42%;
+    --info: 212 75% 40%;
     --info-foreground: 0 0% 100%;
 
-    --border: 0 0% 89%;
-    --input: 0 0% 84%;
-    --ring: 252 75% 57%;
+    --border: 220 27.3% 87.1%;          /* #d5dbe7 */
+    --input: 220 27.3% 87.1%;
+    --ring: 263 70% 50.4%;
 
-    --radius: 0.5rem;
+    --shadow-panel: 0 24px 70px #17243818;
+
+    --radius-control: 7px;
+    --radius-panel: 12px;
+    /* Legacy alias (tailwind `rounded-lg`). */
+    --radius: var(--radius-panel);
 
     --sidebar-width: 248px;
     --sidebar-width-collapsed: 64px;
@@ -69,42 +89,49 @@
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 95%;
+    --background: 227 29% 6.1%;         /* #0b0d14 */
+    --foreground: 220 37.5% 96.9%;      /* #f4f6fa */
 
-    --card: 0 0% 9.5%;
-    --card-foreground: 0 0% 95%;
+    --card: 223 29.2% 9.4%;             /* #11151f */
+    --card-foreground: 220 37.5% 96.9%;
 
-    --popover: 0 0% 11%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 223 29.2% 9.4%;
+    --popover-foreground: 220 37.5% 96.9%;
 
-    --primary: 252 90% 72%;
-    --primary-foreground: 0 0% 7%;
+    --primary: 254 100% 80.2%;          /* #b29aff accent */
+    --primary-foreground: 227 29% 6.1%;
 
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 95%;
+    --action: 260 71.3% 56.3%;          /* #7540df */
+    --action-foreground: 0 0% 100%;
 
-    --muted: 0 0% 13%;
-    --muted-foreground: 0 0% 64%;
+    --secondary: 223 27.3% 12.9%;       /* #181d2a surface2 */
+    --secondary-foreground: 220 37.5% 96.9%;
 
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 95%;
+    --muted: 223 27.3% 12.9%;
+    --muted-foreground: 218 16.6% 70.4%; /* #a7b0c0 */
 
-    --destructive: 0 75% 64%;
-    --destructive-foreground: 0 0% 7%;
+    --dim: 219 13% 53.1%;               /* #788397 — non-text only */
 
-    --success: 145 55% 52%;
-    --success-foreground: 0 0% 7%;
+    --accent: 226 26.6% 15.5%;          /* #1d2232 hover */
+    --accent-foreground: 220 37.5% 96.9%;
 
-    --warning: 38 90% 58%;
-    --warning-foreground: 0 0% 7%;
+    --destructive: 352 82.7% 79.6%;     /* #f6a0ac */
+    --destructive-foreground: 227 29% 6.1%;
 
-    --info: 210 85% 66%;
-    --info-foreground: 0 0% 7%;
+    --success: 157 59.7% 68.8%;         /* #80dfba */
+    --success-foreground: 227 29% 6.1%;
 
-    --border: 0 0% 17%;
-    --input: 0 0% 22%;
-    --ring: 252 90% 72%;
+    --warning: 41 81.2% 70.8%;          /* #f1ca78 */
+    --warning-foreground: 227 29% 6.1%;
+
+    --info: 212 85% 72%;
+    --info-foreground: 227 29% 6.1%;
+
+    --border: 222 24.1% 21.2%;          /* #293143 */
+    --input: 222 24.1% 21.2%;
+    --ring: 254 100% 80.2%;
+
+    --shadow-panel: 0 24px 70px #0005;
 
     color-scheme: dark;
   }
@@ -174,7 +201,7 @@
   }
 
   input[type='checkbox'] {
-    accent-color: hsl(var(--primary));
+    accent-color: hsl(var(--action));
   }
 
   code,
@@ -214,7 +241,7 @@
   /* Mono small-caps label: section eyebrows, stat labels, table
      headers. The one place caps are allowed (design.md §2). */
   .eyebrow {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground;
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground;
   }
 
   /* Kept for compat; now a solid surface (no blur, audit S1/L14). */

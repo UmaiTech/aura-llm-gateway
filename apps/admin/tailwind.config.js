@@ -71,6 +71,11 @@ export default {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
         },
+        action: {
+          DEFAULT: 'hsl(var(--action))',
+          foreground: 'hsl(var(--action-foreground))',
+        },
+        dim: 'hsl(var(--dim))',
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
@@ -78,7 +83,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'IBM Plex Sans', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
+        // System mono stack from the design pack (design-tokens.json `mono`).
+        mono: ['SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', 'ui-monospace', 'monospace'],
         // Display serif for page titles (Dashboard, Organizations,
         // etc.). See docs/design-audit/REDESIGN.md for the rationale.
         display: ['Fraunces', 'Georgia', 'serif'],
@@ -87,18 +93,20 @@ export default {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        // Pack radii: panels 12px, controls 7px.
+        lg: 'var(--radius-panel)',
+        md: 'var(--radius-control)',
+        sm: '4px',
       },
       boxShadow: {
-        // Separation comes from hairline rules, not lift (design.md §5).
-        // These names are kept so existing classes resolve, but they
-        // now render as a 1px ring / soft overlay shadow only.
+        // Raised surfaces only (dialogs, drawers, popovers): the pack's
+        // panel shadow. In-page cards stay flat with a hairline border.
+        'panel': 'var(--shadow-panel)',
+        // Legacy names kept so existing classes resolve.
         'glow': '0 0 0 1px hsl(var(--primary) / 0.35)',
         'glow-lg': '0 0 0 1px hsl(var(--primary) / 0.5)',
         'premium': '0 0 0 1px hsl(var(--border))',
-        'premium-lg': '0 8px 24px -8px rgb(0 0 0 / 0.25), 0 0 0 1px hsl(var(--border))',
+        'premium-lg': 'var(--shadow-panel)',
       },
       keyframes: {
         'fade-in': {

@@ -255,7 +255,7 @@ export function InsightsPage() {
                           {/* Tooltip */}
                           {isHovered && (
                             <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                              <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs whitespace-nowrap">
+                              <div className="bg-popover border border-border rounded-lg shadow-panel px-3 py-2 text-xs whitespace-nowrap">
                                 <div className="font-medium mb-1">{label.full}</div>
                                 <div className="space-y-0.5 text-muted-foreground">
                                   <div className="flex items-center gap-2">
@@ -429,7 +429,7 @@ export function InsightsPage() {
                               >
                                 {isHovered && (
                                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                                    <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs whitespace-nowrap">
+                                    <div className="bg-popover border border-border rounded-lg shadow-panel px-3 py-2 text-xs whitespace-nowrap">
                                       <div className="font-medium mb-1">{days[colIndex]}</div>
                                       <div className="text-muted-foreground space-y-0.5">
                                         <div>{hours[rowIndex]} - {endHour}</div>
@@ -494,7 +494,7 @@ export function InsightsPage() {
                 : 'High'
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md">
+            <Card className="shadow-panel w-full max-w-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>

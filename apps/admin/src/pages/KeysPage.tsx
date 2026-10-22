@@ -341,7 +341,7 @@ export function KeysPage() {
         {/* Create Key Dialog */}
         {showCreateDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md animate-scale-in">
+            <Card className="shadow-panel w-full max-w-md animate-scale-in">
               <CardHeader>
                 <CardTitle>Create API Key</CardTitle>
               </CardHeader>

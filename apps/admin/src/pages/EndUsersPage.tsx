@@ -408,7 +408,7 @@ export function EndUsersPage() {
       {/* User Detail Modal */}
       {selectedUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-lg">
+          <Card className="shadow-panel w-full max-w-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>User Details</CardTitle>
@@ -578,7 +578,7 @@ export function EndUsersPage() {
           this admin path is for manually pre-provisioning. */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="shadow-panel w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Create End User</CardTitle>

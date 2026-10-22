@@ -7,11 +7,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary action: ink-on-paper fill, not a brand-colour slab.
-        // Matches the monochrome landing CTA (design.md §6) and keeps
-        // the violet accent for focus/active/link moments only.
+        // Primary action uses the design pack's dedicated `action`
+        // violet; the lighter `primary` accent is for links, focus,
+        // active nav and charts.
         default:
-          'bg-foreground text-background hover:bg-foreground/85',
+          'bg-action text-action-foreground hover:bg-action/90',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
@@ -22,7 +22,7 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
         // Legacy name kept for compat; renders as the primary button.
         gradient:
-          'bg-foreground text-background hover:bg-foreground/85',
+          'bg-action text-action-foreground hover:bg-action/90',
       },
       size: {
         default: 'h-9 px-3.5',

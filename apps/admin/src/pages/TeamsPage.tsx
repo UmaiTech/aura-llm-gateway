@@ -367,7 +367,7 @@ export function TeamsPage() {
       {/* Create Team Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="shadow-panel w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Create Team</CardTitle>
@@ -447,7 +447,7 @@ export function TeamsPage() {
       {/* Edit Team Modal */}
       {editingTeam && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="shadow-panel w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Edit Team</CardTitle>

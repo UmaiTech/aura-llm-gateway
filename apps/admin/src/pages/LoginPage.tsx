@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BrandMark } from '@/components/layout'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
 import { useAuthStore } from '@/stores'
 import { Key2Line, EyeLine, EyeCloseLine } from '@mingcute/react'
@@ -45,7 +46,7 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Wordmark — type-led, same lockup as the sidebar and landing nav */}
         <div className="mb-8 flex items-center gap-3">
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-9 w-9 rounded-lg" />
+          <BrandMark className="h-9 w-9" />
           <div>
             <h1 className="font-display text-2xl font-medium leading-none tracking-tight">Aura</h1>
             <p className="eyebrow mt-1.5 text-[10px]">LLM Gateway · Admin</p>

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/stores'
+import { BrandMark } from './BrandMark'
 import {
   Home1Line,
   ChartBarLine,
@@ -130,7 +131,7 @@ export function Sidebar() {
         aria-label="Primary"
         className={cn(
           'fixed left-0 top-0 z-50 flex h-[100dvh] w-[248px] flex-col border-r bg-card transition-[transform,width] duration-200 ease-out',
-          mobileNavOpen ? 'translate-x-0' : '-translate-x-full',
+          mobileNavOpen ? 'translate-x-0 shadow-panel lg:shadow-none' : '-translate-x-full',
           'lg:translate-x-0',
           sidebarCollapsed ? 'lg:w-16' : 'lg:w-[248px]'
         )}
@@ -138,11 +139,7 @@ export function Sidebar() {
         {/* Wordmark */}
         <div className={cn('flex h-14 flex-shrink-0 items-center border-b px-4', collapsed ? 'justify-center px-0' : 'justify-between')}>
           <NavLink to="/" className="flex items-center gap-2.5 focus-ring rounded-md">
-            <img
-              src={`${import.meta.env.BASE_URL}favicon.svg`}
-              alt=""
-              className="h-7 w-7 rounded-md"
-            />
+            <BrandMark className="h-8 w-8" />
             {!collapsed && (
               <span className="flex items-baseline gap-1.5">
                 <span className="font-display text-[17px] font-medium tracking-tight">Aura</span>

@@ -209,7 +209,7 @@ export function ProvidersPage() {
         {/* Add Provider Dialog */}
         {showAddDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md animate-scale-in">
+            <Card className="shadow-panel w-full max-w-md animate-scale-in">
               <CardHeader>
                 <CardTitle>Add Provider</CardTitle>
               </CardHeader>

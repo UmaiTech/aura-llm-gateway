@@ -975,7 +975,7 @@ export function HarnessPage() {
               tracesWithTool.length > 0 ? totalCalls / tracesWithTool.length : 0
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <Card className="shadow-panel w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
