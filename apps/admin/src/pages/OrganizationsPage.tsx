@@ -179,7 +179,7 @@ export function OrganizationsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Building4Line className="w-5 h-5 text-violet-400" />
+                  <Building4Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.organizations}</p>
@@ -192,7 +192,7 @@ export function OrganizationsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Group2Line className="w-5 h-5 text-blue-400" />
+                  <Group2Line className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.teams}</p>
@@ -204,8 +204,8 @@ export function OrganizationsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-green-400" />
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <User2Line className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{formatNumber(totals.endUsers)}</p>
@@ -218,7 +218,7 @@ export function OrganizationsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Key2Line className="w-5 h-5 text-orange-400" />
+                  <Key2Line className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.apiKeys}</p>
@@ -231,7 +231,7 @@ export function OrganizationsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-cyan-500/20 rounded-lg">
-                  <FlashLine className="w-5 h-5 text-cyan-400" />
+                  <FlashLine className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{formatNumber(totals.requests)}</p>
@@ -244,7 +244,7 @@ export function OrganizationsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-400" />
+                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{formatCurrency(totals.cost)}</p>
@@ -280,7 +280,7 @@ export function OrganizationsPage() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-violet-500/20 rounded-lg">
-                        <Building4Line className="w-6 h-6 text-violet-400" />
+                        <Building4Line className="w-6 h-6 text-violet-600 dark:text-violet-400" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -326,7 +326,7 @@ export function OrganizationsPage() {
                           <EditLine className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(org)}>
-                          <DeleteLine className="w-4 h-4 text-red-400" />
+                          <DeleteLine className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
                     </div>
@@ -352,7 +352,7 @@ export function OrganizationsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formError && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                   {formError}
                 </div>
               )}

@@ -71,9 +71,13 @@ export default {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
         },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Inter', 'IBM Plex Sans', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
         // Display serif for page titles (Dashboard, Organizations,
         // etc.). See docs/design-audit/REDESIGN.md for the rationale.
@@ -88,10 +92,13 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
-        'glow': '0 0 20px rgba(139, 92, 246, 0.3)',
-        'glow-lg': '0 0 40px rgba(139, 92, 246, 0.4)',
-        'premium': '0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.1)',
-        'premium-lg': '0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 24px rgba(0, 0, 0, 0.15)',
+        // Separation comes from hairline rules, not lift (design.md §5).
+        // These names are kept so existing classes resolve, but they
+        // now render as a 1px ring / soft overlay shadow only.
+        'glow': '0 0 0 1px hsl(var(--primary) / 0.35)',
+        'glow-lg': '0 0 0 1px hsl(var(--primary) / 0.5)',
+        'premium': '0 0 0 1px hsl(var(--border))',
+        'premium-lg': '0 8px 24px -8px rgb(0 0 0 / 0.25), 0 0 0 1px hsl(var(--border))',
       },
       keyframes: {
         'fade-in': {
@@ -115,8 +122,8 @@ export default {
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)' },
-          '50%': { boxShadow: '0 0 40px rgba(139, 92, 246, 0.5)' },
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.6' },
         },
         'shimmer': {
           '0%': { backgroundPosition: '-200% 0' },

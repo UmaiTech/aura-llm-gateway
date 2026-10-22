@@ -31,10 +31,10 @@ function JsonHighlight({ data }: { data: unknown }) {
 
   // Simple syntax highlighting
   const highlighted = json
-    .replace(/"([^"]+)":/g, '<span class="text-purple-400">"$1"</span>:')
-    .replace(/: "([^"]*)"/g, ': <span class="text-green-400">"$1"</span>')
-    .replace(/: (\d+\.?\d*)/g, ': <span class="text-cyan-400">$1</span>')
-    .replace(/: (true|false)/g, ': <span class="text-yellow-400">$1</span>')
+    .replace(/"([^"]+)":/g, '<span class="text-purple-600 dark:text-purple-400">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="text-success">"$1"</span>')
+    .replace(/: (\d+\.?\d*)/g, ': <span class="text-cyan-600 dark:text-cyan-400">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="text-warning">$1</span>')
     .replace(/: (null)/g, ': <span class="text-gray-500">$1</span>')
 
   return (
@@ -346,22 +346,22 @@ export function DevLogsPage() {
                             <td className="p-3">
                               <div className="flex items-center justify-center gap-1">
                                 {log.cache_hit && (
-                                  <span title="Cache Hit" className="p-1 rounded bg-green-500/20 text-green-400">
+                                  <span title="Cache Hit" className="p-1 rounded bg-success/20 text-success">
                                     <DirectionsLine className="h-3 w-3" />
                                   </span>
                                 )}
                                 {log.has_tool_calls && (
-                                  <span title={`Tool Calls: ${log.tools_used?.join(', ') || 'unknown'}`} className="p-1 rounded bg-blue-500/20 text-blue-400">
+                                  <span title={`Tool Calls: ${log.tools_used?.join(', ') || 'unknown'}`} className="p-1 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400">
                                     <ToolLine className="h-3 w-3" />
                                   </span>
                                 )}
                                 {log.has_reasoning && (
-                                  <span title="Reasoning" className="p-1 rounded bg-violet-500/20 text-violet-400">
+                                  <span title="Reasoning" className="p-1 rounded bg-violet-500/20 text-violet-600 dark:text-violet-400">
                                     <BrainLine className="h-3 w-3" />
                                   </span>
                                 )}
                                 {log.compressed && (
-                                  <span title="Compressed" className="p-1 rounded bg-orange-500/20 text-orange-400">
+                                  <span title="Compressed" className="p-1 rounded bg-orange-500/20 text-orange-600 dark:text-orange-400">
                                     <FileZipLine className="h-3 w-3" />
                                   </span>
                                 )}
@@ -476,7 +476,7 @@ export function DevLogsPage() {
                                           </div>
                                           <div className="space-y-1">
                                             <p className="text-muted-foreground">Cache</p>
-                                            <p className={cn('font-medium', log.cache_hit ? 'text-green-400' : 'text-muted-foreground')}>
+                                            <p className={cn('font-medium', log.cache_hit ? 'text-success' : 'text-muted-foreground')}>
                                               {log.cache_hit ? 'Hit' : 'Miss'}
                                             </p>
                                           </div>
@@ -487,12 +487,12 @@ export function DevLogsPage() {
                                       {log.has_tool_calls && (
                                         <div className="p-4 border-b border-border/50">
                                           <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                                            <ToolLine className="h-4 w-4 text-blue-400" />
+                                            <ToolLine className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                             Tool Calls ({log.tool_calls_count})
                                           </h4>
                                           <div className="flex flex-wrap gap-2">
                                             {log.tools_used?.map((tool, idx) => (
-                                              <Badge key={idx} variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                              <Badge key={idx} variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
                                                 {tool}
                                               </Badge>
                                             ))}
@@ -559,7 +559,7 @@ export function DevLogsPage() {
                                         >
                                           {copiedId === `json-${log.id}` ? (
                                             <>
-                                              <CheckLine className="h-3 w-3 text-green-400" />
+                                              <CheckLine className="h-3 w-3 text-success" />
                                               Copied!
                                             </>
                                           ) : (
@@ -589,7 +589,7 @@ export function DevLogsPage() {
                                     >
                                       {copiedId === `resp-${log.id}` ? (
                                         <>
-                                          <CheckLine className="h-3 w-3 text-green-400" />
+                                          <CheckLine className="h-3 w-3 text-success" />
                                           Copied!
                                         </>
                                       ) : (
@@ -611,7 +611,7 @@ export function DevLogsPage() {
                                       >
                                         {copiedId === `conv-${log.id}` ? (
                                           <>
-                                            <CheckLine className="h-3 w-3 text-green-400" />
+                                            <CheckLine className="h-3 w-3 text-success" />
                                             Copied!
                                           </>
                                         ) : (
@@ -693,7 +693,7 @@ export function DevLogsPage() {
                             >
                               {copiedId === `json-${log.id}` ? (
                                 <>
-                                  <CheckLine className="h-3 w-3 text-green-400" />
+                                  <CheckLine className="h-3 w-3 text-success" />
                                   Copied!
                                 </>
                               ) : (

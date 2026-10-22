@@ -2,82 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Admin theme tokens.
+ *
+ * Shares the visual language of the landing page and playground
+ * (docs/design-audit/design.md): achromatic near-black / paper
+ * canvas, hairline rules instead of shadows, Fraunces display +
+ * Inter body + JetBrains Mono labels, and a single violet accent
+ * used sparingly (active nav, focus, links, primary chart series).
+ *
+ * Tokens stay as bare HSL triplets so existing `bg-card`,
+ * `text-muted-foreground`, `bg-primary/10` etc. keep working.
+ * Status colours are tuned per theme so text set in them clears
+ * WCAG AA on the card surface (the light-mode success/warning
+ * shades are deliberately darker than the dark-mode ones).
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --background: 0 0% 98%;
+    --foreground: 0 0% 9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 0 0% 9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
+    --popover-foreground: 0 0% 9%;
 
-    --primary: 250 95% 63%;
+    --primary: 252 75% 57%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 0 0% 95.5%;
+    --muted-foreground: 0 0% 38%;
 
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 9%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 70% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 145 63% 29%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 32 92% 36%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 250 95% 63%;
+    --info: 210 80% 42%;
+    --info-foreground: 0 0% 100%;
 
-    --radius: 0.75rem;
+    --border: 0 0% 89%;
+    --input: 0 0% 84%;
+    --ring: 252 75% 57%;
 
-    --sidebar-width: 260px;
-    --sidebar-width-collapsed: 72px;
+    --radius: 0.5rem;
+
+    --sidebar-width: 248px;
+    --sidebar-width-collapsed: 64px;
+
+    --motion-fast: 120ms;
+    --motion-base: 200ms;
+    --motion-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+    color-scheme: light;
   }
 
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
 
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 9.5%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 250 95% 63%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 252 90% 72%;
+    --primary-foreground: 0 0% 7%;
 
-    --secondary: 240 6% 10%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 240 6% 10%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 64%;
 
-    --accent: 240 6% 10%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 95%;
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 75% 64%;
+    --destructive-foreground: 0 0% 7%;
 
-    --success: 142 70% 45%;
-    --success-foreground: 0 0% 100%;
+    --success: 145 55% 52%;
+    --success-foreground: 0 0% 7%;
 
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 38 90% 58%;
+    --warning-foreground: 0 0% 7%;
 
-    --border: 240 6% 15%;
-    --input: 240 6% 15%;
-    --ring: 250 95% 63%;
+    --info: 210 85% 66%;
+    --info-foreground: 0 0% 7%;
+
+    --border: 0 0% 17%;
+    --input: 0 0% 22%;
+    --ring: 252 90% 72%;
+
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -86,9 +126,65 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  ::selection {
+    @apply bg-primary/25 text-foreground;
+  }
+
+  /* Native form controls get the same frame as <Input>, so the
+     many hand-rolled <select>/<textarea> elements across pages
+     read as one family without touching every call site. Utility
+     classes on the element still win (utilities > base). */
+  select {
+    @apply h-9 rounded-md border border-input bg-card pl-3 pr-8 text-sm text-foreground;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 14px;
+    transition: border-color var(--motion-base) var(--motion-ease);
+  }
+
+  textarea {
+    @apply rounded-md border border-input bg-card text-sm text-foreground;
+  }
+
+  select:hover,
+  textarea:hover {
+    @apply border-muted-foreground/40;
+  }
+
+  select:focus-visible,
+  textarea:focus-visible,
+  input[type='checkbox']:focus-visible {
+    @apply outline-none ring-2 ring-ring/60 ring-offset-1 ring-offset-background;
+  }
+
+  select:disabled,
+  textarea:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  input[type='checkbox'] {
+    accent-color: hsl(var(--primary));
+  }
+
+  code,
+  kbd,
+  pre {
+    @apply font-mono;
+  }
+
+  kbd {
+    @apply rounded-sm border px-1.5 py-px text-[11px] text-muted-foreground;
   }
 
   /* Custom scrollbar */
@@ -108,7 +204,6 @@
     @apply bg-muted-foreground/30;
   }
 
-  /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
@@ -116,59 +211,41 @@
 }
 
 @layer components {
-  /* Glass effect */
+  /* Mono small-caps label: section eyebrows, stat labels, table
+     headers. The one place caps are allowed (design.md §2). */
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground;
+  }
+
+  /* Kept for compat; now a solid surface (no blur, audit S1/L14). */
   .glass {
-    @apply bg-background/80 backdrop-blur-xl;
+    @apply bg-background;
   }
 
   .glass-card {
-    @apply bg-card/50 backdrop-blur-xl border border-border/50;
+    @apply bg-card border border-border;
   }
 
-  /* Focus ring */
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
   }
 
-  /* `.gradient-text` and `.gradient-bg` removed in 2026-05-21
-     polish pass. Use `font-display` Fraunces + a single accent
-     colour for emphasis. See docs/design-audit/AUDIT.md item L1. */
-
-  /* `.stats-card` removed in 2026-05-21 polish pass — dashboard
-     stats now use a flat hairline-rule grid (see DashboardPage).
-     Reinstate if some other page wants the old style. */
-
-  /* Sidebar styles */
-  .sidebar-item {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150;
-    @apply text-muted-foreground hover:text-foreground hover:bg-accent;
-  }
-
-  .sidebar-item.active {
-    @apply bg-primary/10 text-primary;
-  }
-
-  .sidebar-item.active::before {
-    @apply absolute left-0 h-6 w-1 rounded-r-full bg-primary;
-    content: '';
-  }
-
-  /* Table styles */
+  /* Table styles (used by <Table> in components/ui/table.tsx) */
   .table-header {
-    @apply sticky top-0 z-10 bg-card/95 backdrop-blur-sm;
+    @apply sticky top-0 z-10 bg-card;
   }
 
   .table-row {
-    @apply border-b border-border/50 transition-colors hover:bg-muted/50;
+    @apply border-b border-border/60 transition-colors hover:bg-muted/40;
   }
 
   .table-row.selected {
     @apply bg-primary/5;
   }
 
-  /* Badge variants */
+  /* Badge variants (legacy class API) */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
   }
 
   .badge-success {
@@ -187,14 +264,15 @@
     @apply bg-muted text-muted-foreground;
   }
 
-  /* Shimmer loading effect */
+  /* Skeleton shimmer — a flat pulse of the muted surface. Reduced
+     motion collapses it to a static block via the guard above. */
   .shimmer {
-    @apply relative overflow-hidden;
-    background: linear-gradient(
+    @apply relative overflow-hidden rounded-md bg-muted;
+    background-image: linear-gradient(
       90deg,
-      hsl(var(--muted)) 0%,
-      hsl(var(--muted-foreground) / 0.1) 50%,
-      hsl(var(--muted)) 100%
+      transparent 0%,
+      hsl(var(--foreground) / 0.04) 50%,
+      transparent 100%
     );
     background-size: 200% 100%;
     @apply animate-shimmer;
@@ -202,7 +280,6 @@
 }
 
 @layer utilities {
-  /* Hide scrollbar but keep functionality */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -212,7 +289,6 @@
     scrollbar-width: none;
   }
 
-  /* Text balance for headings */
   .text-balance {
     text-wrap: balance;
   }

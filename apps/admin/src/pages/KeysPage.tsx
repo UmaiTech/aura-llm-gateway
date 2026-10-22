@@ -179,7 +179,7 @@ export function KeysPage() {
       <div className="flex flex-col h-full">
         <Header title="API Keys" description="Manage your gateway API keys" />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error}</p>
+          <p className="text-destructive">{error}</p>
           <Button onClick={fetchKeys}>Retry</Button>
         </div>
       </div>
@@ -338,10 +338,10 @@ export function KeysPage() {
                         <div
                           className={`h-full transition-all ${
                             (key.usage_percentage || 0) > 90
-                              ? 'bg-red-500'
+                              ? 'bg-destructive'
                               : (key.usage_percentage || 0) > 75
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500'
+                              ? 'bg-warning'
+                              : 'bg-success'
                           }`}
                           style={{ width: `${Math.min(key.usage_percentage || 0, 100)}%` }}
                         />
@@ -390,7 +390,7 @@ export function KeysPage() {
                 ) : (
                   <>
                     {formError && (
-                      <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                      <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                         {formError}
                       </div>
                     )}

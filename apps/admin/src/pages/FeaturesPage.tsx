@@ -149,7 +149,7 @@ export function FeaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <FileZipLine className="h-4 w-4 text-purple-400" />
+              <FileZipLine className="h-4 w-4 text-purple-600 dark:text-purple-400" />
               Compression
             </CardTitle>
           </CardHeader>
@@ -183,7 +183,7 @@ export function FeaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldLine className="h-4 w-4 text-blue-400" />
+              <ShieldLine className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               Validation
             </CardTitle>
           </CardHeader>
@@ -216,7 +216,7 @@ export function FeaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles2Line className="h-4 w-4 text-amber-400" />
+              <Sparkles2Line className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               Consistency
             </CardTitle>
           </CardHeader>
@@ -243,7 +243,7 @@ export function FeaturesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <AiLine className="h-4 w-4 text-green-400" />
+              <AiLine className="h-4 w-4 text-success" />
               Caching
             </CardTitle>
           </CardHeader>

@@ -61,10 +61,10 @@ export function ProvidersPage() {
 
   const getProviderColor = (name: string) => {
     const normalizedName = name.toLowerCase()
-    if (normalizedName.includes('openai')) return 'bg-emerald-500/10 text-emerald-500'
-    if (normalizedName.includes('anthropic')) return 'bg-orange-500/10 text-orange-500'
-    if (normalizedName.includes('google')) return 'bg-blue-500/10 text-blue-500'
-    return 'bg-violet-500/10 text-violet-500'
+    if (normalizedName.includes('openai')) return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500'
+    if (normalizedName.includes('anthropic')) return 'bg-orange-500/10 text-orange-600 dark:text-orange-500'
+    if (normalizedName.includes('google')) return 'bg-blue-500/10 text-blue-600 dark:text-blue-500'
+    return 'bg-violet-500/10 text-violet-600 dark:text-violet-500'
   }
 
   const formatCurrency = (amount: number) => {
@@ -112,7 +112,7 @@ export function ProvidersPage() {
       <div className="flex flex-col h-full">
         <Header title="Providers" description="Configure and monitor LLM providers" />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error}</p>
+          <p className="text-destructive">{error}</p>
           <Button onClick={fetchProviders}>Retry</Button>
         </div>
       </div>
@@ -145,7 +145,7 @@ export function ProvidersPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <ServerLine className="w-5 h-5 text-violet-400" />
+                  <ServerLine className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{enabledCount}/{providers.length}</p>
@@ -157,8 +157,8 @@ export function ProvidersPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-green-400" />
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <ChartBarLine className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totalRequests24h.toLocaleString()}</p>
@@ -171,7 +171,7 @@ export function ProvidersPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-400" />
+                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{formatCurrency(totalCost24h)}</p>
@@ -184,7 +184,7 @@ export function ProvidersPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <TimeLine className="w-5 h-5 text-blue-400" />
+                  <TimeLine className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{formatDuration(avgLatency)}</p>
@@ -225,7 +225,7 @@ export function ProvidersPage() {
                         <div className="flex gap-6 text-sm">
                           <div>
                             <span className="text-muted-foreground">Success Rate:</span>{' '}
-                            <span className={`font-mono ${provider.success_rate >= 99 ? 'text-green-400' : provider.success_rate >= 95 ? 'text-yellow-400' : 'text-red-400'}`}>
+                            <span className={`font-mono ${provider.success_rate >= 99 ? 'text-success' : provider.success_rate >= 95 ? 'text-warning' : 'text-destructive'}`}>
                               {provider.success_rate.toFixed(1)}%
                             </span>
                           </div>

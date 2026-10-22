@@ -252,7 +252,7 @@ export function EndUsersPage() {
       <div className="flex flex-col h-full">
         <Header title="End Users" description="Track and manage your customers' usage" />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error}</p>
+          <p className="text-destructive">{error}</p>
           <Button onClick={fetchUsers}>Retry</Button>
         </div>
       </div>
@@ -320,7 +320,7 @@ export function EndUsersPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-violet-400" />
+                  <User2Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totalUsers}</p>
@@ -332,8 +332,8 @@ export function EndUsersPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-500/20 rounded-lg">
-                  <ForbidCircleLine className="w-5 h-5 text-red-400" />
+                <div className="p-2 bg-destructive/20 rounded-lg">
+                  <ForbidCircleLine className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{blockedUsers}</p>
@@ -345,8 +345,8 @@ export function EndUsersPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-green-400" />
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <ChartBarLine className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totalRequests.toLocaleString()}</p>
@@ -359,7 +359,7 @@ export function EndUsersPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-400" />
+                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{formatCurrency(totalCost)}</p>
@@ -414,11 +414,11 @@ export function EndUsersPage() {
                       </td>
                       <td className="py-3 px-4 text-center">
                         {user.is_blocked ? (
-                          <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                          <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
                             Blocked
                           </Badge>
                         ) : (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                          <Badge className="bg-success/20 text-success border-success/30 text-xs">
                             Active
                           </Badge>
                         )}
@@ -433,9 +433,9 @@ export function EndUsersPage() {
                           }}
                         >
                           {user.is_blocked ? (
-                            <CheckLine className="w-4 h-4 text-green-400" />
+                            <CheckLine className="w-4 h-4 text-success" />
                           ) : (
-                            <ForbidCircleLine className="w-4 h-4 text-red-400" />
+                            <ForbidCircleLine className="w-4 h-4 text-destructive" />
                           )}
                         </Button>
                       </td>
@@ -471,7 +471,7 @@ export function EndUsersPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="p-4 bg-violet-500/20 rounded-full">
-                  <User2Line className="w-8 h-8 text-violet-400" />
+                  <User2Line className="w-8 h-8 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold">{selectedUser.name || 'Anonymous User'}</h3>
@@ -490,9 +490,9 @@ export function EndUsersPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
                   {selectedUser.is_blocked ? (
-                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Blocked</Badge>
+                    <Badge className="bg-destructive/20 text-destructive border-destructive/30">Blocked</Badge>
                   ) : (
-                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                    <Badge className="bg-success/20 text-success border-success/30">Active</Badge>
                   )}
                 </div>
               </div>
@@ -573,10 +573,10 @@ export function EndUsersPage() {
                     className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                   {metadataError && (
-                    <p className="text-xs text-red-400 mt-1">{metadataError}</p>
+                    <p className="text-xs text-destructive mt-1">{metadataError}</p>
                   )}
                   {editSuccess && (
-                    <p className="text-xs text-green-400 mt-1">Saved.</p>
+                    <p className="text-xs text-success mt-1">Saved.</p>
                   )}
                 </div>
                 <div className="flex justify-end">
@@ -597,7 +597,7 @@ export function EndUsersPage() {
                   onClick={() => handleDelete(selectedUser)}
                   title="Permanently delete this user"
                 >
-                  <DeleteLine className="w-4 h-4 mr-2 text-red-400" />
+                  <DeleteLine className="w-4 h-4 mr-2 text-destructive" />
                   Delete
                 </Button>
                 <Button
@@ -640,7 +640,7 @@ export function EndUsersPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formError && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                   {formError}
                 </div>
               )}

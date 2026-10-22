@@ -69,10 +69,10 @@ const strategyDescriptions: Record<string, string> = {
 
 const tierOrder = ['simple', 'medium', 'complex', 'reasoning']
 const tierTone: Record<string, string> = {
-  simple: 'bg-emerald-500/20 text-emerald-300',
-  medium: 'bg-blue-500/20 text-blue-300',
-  complex: 'bg-violet-500/20 text-violet-300',
-  reasoning: 'bg-pink-500/20 text-pink-300',
+  simple: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+  medium: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+  complex: 'bg-violet-500/20 text-violet-700 dark:text-violet-300',
+  reasoning: 'bg-pink-500/20 text-pink-700 dark:text-pink-300',
 }
 
 function formatMicros(us: number): string {
@@ -189,7 +189,7 @@ export function RoutingPage() {
         {/* Heads-up that this is observation only, not configuration. */}
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4 flex items-start gap-3">
-            <InformationLine className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+            <InformationLine className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-muted-foreground">
               Routing strategies are configured in <code className="text-foreground">aura.yaml</code> on the
               gateway. This page surfaces observed per-strategy usage from{' '}
@@ -205,7 +205,7 @@ export function RoutingPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <DirectionsLine className="w-5 h-5 text-violet-400" />
+                  <DirectionsLine className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">{stats.length}</p>
@@ -218,7 +218,7 @@ export function RoutingPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-blue-400" />
+                  <ChartBarLine className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">
@@ -232,8 +232,8 @@ export function RoutingPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-green-400" />
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <CoinLine className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">
@@ -247,8 +247,8 @@ export function RoutingPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <TimeLine className="w-5 h-5 text-yellow-400" />
+                <div className="p-2 bg-warning/20 rounded-lg">
+                  <TimeLine className="w-5 h-5 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">
@@ -322,7 +322,7 @@ export function RoutingPage() {
                     <div
                       className={cn(
                         'text-xl font-semibold tabular-nums',
-                        auto.summary.estimated_savings > 0 && 'text-emerald-400',
+                        auto.summary.estimated_savings > 0 && 'text-emerald-600 dark:text-emerald-400',
                       )}
                     >
                       {formatCurrency(auto.summary.estimated_savings)}
@@ -412,7 +412,7 @@ export function RoutingPage() {
                               className={cn(
                                 'py-2 pr-3 text-right tabular-nums',
                                 t.avg_reward != null && t.avg_reward < 0 && 'text-destructive/80',
-                                t.avg_reward != null && t.avg_reward > 0.5 && 'text-emerald-400',
+                                t.avg_reward != null && t.avg_reward > 0.5 && 'text-emerald-600 dark:text-emerald-400',
                               )}
                             >
                               {t.avg_reward != null ? `${t.avg_reward >= 0 ? '+' : ''}${t.avg_reward.toFixed(2)}` : '—'}
@@ -456,14 +456,14 @@ export function RoutingPage() {
                           {d.status && (
                             <span
                               className={cn(
-                                d.status === 'completed' ? 'text-emerald-400' : 'text-destructive/80',
+                                d.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive/80',
                               )}
                             >
                               {d.status}
                             </span>
                           )}
                           {d.shadow && d.estimated_savings_usd != null && (
-                            <span className="tabular-nums text-emerald-400">
+                            <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
                               saves {formatCurrency(d.estimated_savings_usd)}
                             </span>
                           )}

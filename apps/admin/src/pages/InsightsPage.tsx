@@ -42,13 +42,13 @@ const hours = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00']
 // Color palette for tool usage
 const toolColors = [
   'bg-blue-500',
-  'bg-green-500',
+  'bg-success',
   'bg-cyan-500',
   'bg-orange-500',
   'bg-purple-500',
   'bg-pink-500',
-  'bg-yellow-500',
-  'bg-red-500',
+  'bg-warning',
+  'bg-destructive',
 ]
 
 export function InsightsPage() {

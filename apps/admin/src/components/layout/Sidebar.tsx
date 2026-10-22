@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/stores'
@@ -14,6 +15,7 @@ import {
   GithubLine,
   ArrowLeftLine,
   ArrowRightLine,
+  CloseLine,
   Building4Line,
   Group2Line,
   User2Line,
@@ -83,79 +85,113 @@ const externalLinks = [
   },
 ]
 
+function isActivePath(pathname: string, href: string) {
+  if (href === '/') return pathname === '/'
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+/**
+ * App navigation. On `lg+` it's a fixed rail (collapsible to icons);
+ * below `lg` it becomes an off-canvas drawer opened from the header's
+ * menu button, with a scrim that closes it.
+ */
 export function Sidebar() {
   const location = useLocation()
-  const { sidebarCollapsed, toggleSidebar } = useSettingsStore()
+  const { sidebarCollapsed, toggleSidebar, mobileNavOpen, setMobileNavOpen } = useSettingsStore()
+
+  // Close the drawer whenever the route changes (tap a link → navigate).
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [location.pathname, setMobileNavOpen])
+
+  // Escape closes the drawer.
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMobileNavOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileNavOpen, setMobileNavOpen])
+
+  // Collapsed icon rail only applies on desktop; the drawer is always full width.
+  const collapsed = sidebarCollapsed && !mobileNavOpen
 
   return (
-    <aside
-      className={cn(
-        'fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-300',
-        sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'
-      )}
-    >
-      <div className="flex h-full flex-col">
-        {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b px-4">
-          <NavLink to="/" className="flex items-center gap-3">
+    <>
+      <div
+        aria-hidden
+        onClick={() => setMobileNavOpen(false)}
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 transition-opacity lg:hidden',
+          mobileNavOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        )}
+      />
+      <aside
+        id="app-sidebar"
+        aria-label="Primary"
+        className={cn(
+          'fixed left-0 top-0 z-50 flex h-[100dvh] w-[248px] flex-col border-r bg-card transition-[transform,width] duration-200 ease-out',
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full',
+          'lg:translate-x-0',
+          sidebarCollapsed ? 'lg:w-16' : 'lg:w-[248px]'
+        )}
+      >
+        {/* Wordmark */}
+        <div className={cn('flex h-14 flex-shrink-0 items-center border-b px-4', collapsed ? 'justify-center px-0' : 'justify-between')}>
+          <NavLink to="/" className="flex items-center gap-2.5 focus-ring rounded-md">
             <img
               src={`${import.meta.env.BASE_URL}favicon.svg`}
-              alt="Aura"
-              className="h-9 w-9 rounded-lg"
+              alt=""
+              className="h-7 w-7 rounded-md"
             />
-            {!sidebarCollapsed && (
-              <div className="flex flex-col">
-                <span className="font-semibold text-sm">Aura</span>
-                <span className="text-2xs text-muted-foreground">Gateway</span>
-              </div>
+            {!collapsed && (
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-display text-[17px] font-medium tracking-tight">Aura</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">admin</span>
+              </span>
             )}
           </NavLink>
-          <button
-            onClick={toggleSidebar}
-            className={cn(
-              'rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors',
-              sidebarCollapsed && 'absolute right-2'
-            )}
-          >
-            {sidebarCollapsed ? (
-              <ArrowRightLine className="h-4 w-4" />
-            ) : (
-              <ArrowLeftLine className="h-4 w-4" />
-            )}
-          </button>
+          {!collapsed && (
+            <button
+              onClick={() => (mobileNavOpen ? setMobileNavOpen(false) : toggleSidebar())}
+              className="focus-ring rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label={mobileNavOpen ? 'Close navigation' : 'Collapse sidebar'}
+            >
+              {mobileNavOpen ? <CloseLine className="h-4 w-4" /> : <ArrowLeftLine className="h-4 w-4" />}
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-3">
+        <nav className={cn('flex-1 overflow-y-auto py-4', collapsed ? 'px-2' : 'px-3')}>
           {navigation.map((group) => (
-            <div key={group.label} className="mb-6">
-              {!sidebarCollapsed && (
-                <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {group.label}
-                </h3>
+            <div key={group.label} className="mb-5 last:mb-0">
+              {collapsed ? (
+                <div className="mx-auto mb-2 h-px w-6 bg-border" aria-hidden />
+              ) : (
+                <h3 className="eyebrow mb-1.5 px-2.5 text-[10px]">{group.label}</h3>
               )}
-              <ul className="space-y-1">
+              <ul className="space-y-px">
                 {group.items.map((item) => {
-                  const isActive = location.pathname === item.href
-                  // Editorial nav item: hanging left rule + accent
-                  // text on active. No filled background, no rounded
-                  // tile. Hover gets a faint rule colour so it still
-                  // signals interactivity.
+                  const isActive = isActivePath(location.pathname, item.href)
                   return (
                     <li key={item.name}>
                       <NavLink
                         to={item.href}
+                        aria-current={isActive ? 'page' : undefined}
                         className={cn(
-                          'flex items-center gap-3 pl-3 pr-3 py-2 text-sm transition-colors border-l-2',
+                          'focus-ring relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
                           isActive
-                            ? 'border-aura-400 text-foreground font-medium'
-                            : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
-                          sidebarCollapsed && 'justify-center px-0 border-l-0'
+                            ? 'bg-accent text-foreground font-medium'
+                            : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                          collapsed && 'justify-center px-0 py-2'
                         )}
-                        title={sidebarCollapsed ? item.name : undefined}
+                        title={collapsed ? item.name : undefined}
                       >
-                        <item.icon className="h-4 w-4 flex-shrink-0" />
-                        {!sidebarCollapsed && <span>{item.name}</span>}
+                        {isActive && (
+                          <span aria-hidden className="absolute -left-3 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                        )}
+                        <item.icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                        {!collapsed && <span className="truncate">{item.name}</span>}
                       </NavLink>
                     </li>
                   )
@@ -165,9 +201,9 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* External Links */}
-        <div className="border-t p-3">
-          <ul className="space-y-1">
+        {/* External links + collapse toggle */}
+        <div className={cn('flex-shrink-0 border-t py-3', collapsed ? 'px-2' : 'px-3')}>
+          <ul className="space-y-px">
             {externalLinks.map((item) => (
               <li key={item.name}>
                 <a
@@ -175,26 +211,38 @@ export function Sidebar() {
                   target={item.external ? '_blank' : undefined}
                   rel={item.external ? 'noopener noreferrer' : undefined}
                   className={cn(
-                    'flex items-center gap-3 pl-3 pr-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground border-l-2 border-transparent hover:border-border',
-                    sidebarCollapsed && 'justify-center px-0 border-l-0'
+                    'focus-ring flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground',
+                    collapsed && 'justify-center px-0 py-2'
                   )}
-                  title={sidebarCollapsed ? item.name : undefined}
+                  title={collapsed ? item.name : undefined}
                 >
                   <item.icon className="h-4 w-4 flex-shrink-0" />
-                  {!sidebarCollapsed && (
+                  {!collapsed && (
                     <>
                       <span>{item.name}</span>
                       {item.external && (
-                        <span className="ml-auto text-muted-foreground/50">↗</span>
+                        <span className="ml-auto font-mono text-[11px] text-muted-foreground/60" aria-hidden>↗</span>
                       )}
                     </>
                   )}
                 </a>
               </li>
             ))}
+            {collapsed && (
+              <li>
+                <button
+                  onClick={toggleSidebar}
+                  className="focus-ring flex w-full items-center justify-center rounded-md py-2 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                  aria-label="Expand sidebar"
+                  title="Expand sidebar"
+                >
+                  <ArrowRightLine className="h-4 w-4" />
+                </button>
+              </li>
+            )}
           </ul>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   )
 }

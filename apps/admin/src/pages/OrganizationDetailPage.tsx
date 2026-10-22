@@ -263,7 +263,7 @@ export function OrganizationDetailPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Building4Line className="w-5 h-5 text-violet-400" />
+                  <Building4Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">{teams.length}</p>
@@ -276,7 +276,7 @@ export function OrganizationDetailPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Key2Line className="w-5 h-5 text-orange-400" />
+                  <Key2Line className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">{apiKeys.length}</p>
@@ -288,8 +288,8 @@ export function OrganizationDetailPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-green-400" />
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <User2Line className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">
@@ -304,7 +304,7 @@ export function OrganizationDetailPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-cyan-500/20 rounded-lg">
-                  <FlashLine className="w-5 h-5 text-cyan-400" />
+                  <FlashLine className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">
@@ -319,7 +319,7 @@ export function OrganizationDetailPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-400" />
+                  <CoinLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold tabular-nums">
@@ -351,7 +351,7 @@ export function OrganizationDetailPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-violet-500/10 rounded">
-                        <Group2Line className="w-4 h-4 text-violet-400" />
+                        <Group2Line className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                       </div>
                       <div>
                         <p className="font-medium text-sm">{team.name}</p>
@@ -397,7 +397,7 @@ export function OrganizationDetailPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-orange-500/10 rounded">
-                        <Key2Line className="w-4 h-4 text-orange-400" />
+                        <Key2Line className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                       </div>
                       <div>
                         <p className="font-medium text-sm">{key.name}</p>
@@ -450,8 +450,8 @@ export function OrganizationDetailPage() {
                     className="flex items-center justify-between p-3 rounded-md border border-border/40"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-500/10 rounded">
-                        <User2Line className="w-4 h-4 text-green-400" />
+                      <div className="p-2 bg-success/10 rounded">
+                        <User2Line className="w-4 h-4 text-success" />
                       </div>
                       <div>
                         <p className="font-medium text-sm">{user.name || user.external_id}</p>
@@ -495,7 +495,7 @@ export function OrganizationDetailPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="p-2 bg-blue-500/10 rounded mt-0.5">
-                  <StorageLine className="w-4 h-4 text-blue-400" />
+                  <StorageLine className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">Capture request / response payloads</p>

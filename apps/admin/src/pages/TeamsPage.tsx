@@ -150,9 +150,9 @@ export function TeamsPage() {
   const getUsageColor = (current: number, limit: number | null) => {
     if (!limit) return 'bg-primary'
     const percent = (current / limit) * 100
-    if (percent >= 100) return 'bg-red-500'
-    if (percent >= 80) return 'bg-yellow-500'
-    return 'bg-green-500'
+    if (percent >= 100) return 'bg-destructive'
+    if (percent >= 80) return 'bg-warning'
+    return 'bg-success'
   }
 
   const isOverLimit = (current: number, limit: number | null) => {
@@ -242,7 +242,7 @@ export function TeamsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Group2Line className="w-5 h-5 text-violet-400" />
+                  <Group2Line className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.teams}</p>
@@ -255,7 +255,7 @@ export function TeamsPage() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-blue-400" />
+                  <User2Line className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.members}</p>
@@ -267,8 +267,8 @@ export function TeamsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <FolderLine className="w-5 h-5 text-green-400" />
+                <div className="p-2 bg-success/20 rounded-lg">
+                  <FolderLine className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.projects}</p>
@@ -280,8 +280,8 @@ export function TeamsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-500/20 rounded-lg">
-                  <AiLine className="w-5 h-5 text-red-400" />
+                <div className="p-2 bg-destructive/20 rounded-lg">
+                  <AiLine className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">{totals.overLimit}</p>
@@ -320,13 +320,13 @@ export function TeamsPage() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-blue-500/20 rounded-lg">
-                            <Group2Line className="w-5 h-5 text-blue-400" />
+                            <Group2Line className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold">{team.name}</h3>
                               {overLimit && (
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                                <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
                                   Over Limit
                                 </Badge>
                               )}
@@ -345,7 +345,7 @@ export function TeamsPage() {
                             <EditLine className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(team)}>
-                            <DeleteLine className="w-4 h-4 text-red-400" />
+                            <DeleteLine className="w-4 h-4 text-destructive" />
                           </Button>
                         </div>
                       </div>
@@ -369,7 +369,7 @@ export function TeamsPage() {
                       <div>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-muted-foreground">Token Usage</span>
-                          <span className={cn(overLimit && 'text-red-400')}>
+                          <span className={cn(overLimit && 'text-destructive')}>
                             {formatTokens(team.current_month_tokens)} /{' '}
                             {team.monthly_token_limit ? formatTokens(team.monthly_token_limit) : 'Unlimited'}
                           </span>
@@ -413,7 +413,7 @@ export function TeamsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formError && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                   {formError}
                 </div>
               )}

@@ -238,24 +238,24 @@ function logToTrace(log: RecentLog): Trace {
 function StepIcon({ type }: { type: TraceStep['type'] }) {
   switch (type) {
     case 'user':
-      return <User2Line className="h-4 w-4 text-blue-400" />
+      return <User2Line className="h-4 w-4 text-blue-600 dark:text-blue-400" />
     case 'reasoning':
-      return <BrainLine className="h-4 w-4 text-purple-400" />
+      return <BrainLine className="h-4 w-4 text-purple-600 dark:text-purple-400" />
     case 'compression':
       // Reuse FileZip glyph isn't imported here — use AI line as a
       // visually distinct icon. Color = same purple family as compression
       // chip on Dashboard.
-      return <AiLine className="h-4 w-4 text-purple-300" />
+      return <AiLine className="h-4 w-4 text-purple-700 dark:text-purple-300" />
     case 'validation':
-      return <ShieldLine className="h-4 w-4 text-blue-300" />
+      return <ShieldLine className="h-4 w-4 text-blue-700 dark:text-blue-300" />
     case 'consistency':
       // Sparkles2 is already used for the assistant; pick Information so
       // the trace doesn't get confused with the final model response.
-      return <InformationLine className="h-4 w-4 text-amber-400" />
+      return <InformationLine className="h-4 w-4 text-amber-600 dark:text-amber-400" />
     case 'tool_call':
-      return <ToolLine className="h-4 w-4 text-orange-400" />
+      return <ToolLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
     case 'tool_result':
-      return <Package2Line className="h-4 w-4 text-green-400" />
+      return <Package2Line className="h-4 w-4 text-success" />
     case 'assistant':
       return <Sparkles2Line className="h-4 w-4 text-primary" />
   }
@@ -411,11 +411,11 @@ export function HarnessPage() {
                     <p className="text-xs text-muted-foreground">Traces</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-orange-400">{stats.withToolCalls}</p>
+                    <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">{stats.withToolCalls}</p>
                     <p className="text-xs text-muted-foreground">With Tools</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-green-400">{stats.successRate}%</p>
+                    <p className="text-lg font-semibold text-success">{stats.successRate}%</p>
                     <p className="text-xs text-muted-foreground">Success</p>
                   </div>
                   <div className="text-center">
@@ -491,7 +491,7 @@ export function HarnessPage() {
                           </code>
                           <div className="flex items-center gap-2">
                             {trace.hasToolCalls && (
-                              <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
+                              <Badge variant="outline" className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 text-xs">
                                 <ToolLine className="h-3 w-3 mr-1" />
                                 {trace.toolCallsCount}
                               </Badge>
@@ -603,7 +603,7 @@ export function HarnessPage() {
                       <Card>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2">
-                            <ToolLine className="h-4 w-4 text-orange-400" />
+                            <ToolLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                             Tool Calls ({selectedTrace.toolCallsCount})
                           </CardTitle>
                         </CardHeader>
@@ -614,7 +614,7 @@ export function HarnessPage() {
                                 key={idx}
                                 className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg"
                               >
-                                <ToolLine className="h-4 w-4 text-orange-400" />
+                                <ToolLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                                 <span className="font-mono text-sm">{tool}</span>
                               </div>
                             ))}
@@ -638,7 +638,7 @@ export function HarnessPage() {
                               <div className={cn(
                                 'w-8 h-8 rounded-full flex items-center justify-center',
                                 step.type === 'tool_call' ? 'bg-orange-500/20' :
-                                step.type === 'tool_result' ? 'bg-green-500/20' :
+                                step.type === 'tool_result' ? 'bg-success/20' :
                                 step.type === 'reasoning' ? 'bg-purple-500/20' :
                                 step.type === 'compression' ? 'bg-purple-500/10' :
                                 step.type === 'validation' ? 'bg-blue-500/10' :
@@ -666,12 +666,12 @@ export function HarnessPage() {
                                       variant="secondary"
                                       className={cn(
                                         'capitalize',
-                                        step.type === 'tool_call' && 'bg-orange-500/20 text-orange-400',
-                                        step.type === 'tool_result' && 'bg-green-500/20 text-green-400',
-                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-400',
-                                        step.type === 'compression' && 'bg-purple-500/10 text-purple-300',
-                                        step.type === 'validation' && 'bg-blue-500/10 text-blue-300',
-                                        step.type === 'consistency' && 'bg-amber-500/20 text-amber-400',
+                                        step.type === 'tool_call' && 'bg-orange-500/20 text-orange-600 dark:text-orange-400',
+                                        step.type === 'tool_result' && 'bg-success/20 text-success',
+                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
+                                        step.type === 'compression' && 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
+                                        step.type === 'validation' && 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+                                        step.type === 'consistency' && 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
                                       )}
                                     >
                                       {step.type.replace('_', ' ')}
@@ -977,7 +977,7 @@ export function HarnessPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <ToolLine className="h-5 w-5 text-orange-400" />
+                        <ToolLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                         <CardTitle className="font-mono">{selectedTool}()</CardTitle>
                       </div>
                       <Button
