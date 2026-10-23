@@ -196,6 +196,45 @@ jobs:
           git commit -m "chore: sync SDK versions to ${NEW_VERSION}"
           git push origin "$PR_BRANCH"
 
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # release-plz only credits commits that touch a Rust crate, so frontend,
+      # docs and CI work never reaches its CHANGELOG section, and it knows
+      # nothing about the public roadmap, whose test (roadmap.test.ts) fails
+      # until roadmap.ts lists the new release. This step fills in the missing
+      # CHANGELOG entries and moves the release into roadmap.ts (RELEASES,
+      # merged-unreleased items, tagged flags, RECONCILED), so release PRs
+      # arrive green. It reruns every time release-plz rebuilds the PR.
+      - name: Sync CHANGELOG and roadmap with the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(gh pr list --state open --label release --json number --jq '.[0].number' || echo "")
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open release PR found — nothing to sync"
+            exit 0
+          fi
+          PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+          git fetch origin "$PR_BRANCH" main --tags
+          git checkout -B "$PR_BRANCH" "origin/$PR_BRANCH"
+
+          node scripts/release/sync-release-cli.ts
+
+          if git diff --quiet; then
+            echo "CHANGELOG and roadmap already in sync"
+            exit 0
+          fi
+          VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')
+          git config user.name "Marcus Elwin"
+          git config user.email "marcus@elwin.com"
+          git add CHANGELOG.md apps/landing/src/lib/roadmap.ts apps/landing/src/pages/RoadmapPage.tsx
+          git commit -m "chore: sync changelog and roadmap for v${VERSION}"
+          git push origin "$PR_BRANCH"
+
   # Release unpublished packages (creates GitHub releases, publishes to crates.io).
   # IMPORTANT: Must use PAT so that tags created here trigger build-release workflow.
   # Tags created with GITHUB_TOKEN do NOT trigger other workflows (GitHub security limitation).

@@ -30,8 +30,7 @@ import {
  * roadmap.test.ts checks them against CHANGELOG.md. This page only renders.
  *
  * Latest shipped: v0.21.1 (2026-10-23)
- * In progress: nothing tagged in-progress and nothing merged-unreleased;
- *   v0.21.1 shipped the streaming fixes and the local-only admin notice.
+ * (kept current by scripts/release/sync-release-cli.ts on release PRs)
  */
 
 const FILTERS: { id: StatusFilter; label: string }[] = [
