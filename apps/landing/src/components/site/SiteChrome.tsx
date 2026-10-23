@@ -99,7 +99,11 @@ export function SiteFooter() {
     <footer className="border-t border-aura-border">
       <div className="mx-auto flex max-w-content flex-col gap-3 px-4 py-6 text-xs text-aura-dim sm:flex-row sm:items-center sm:justify-between sm:px-8">
         <span>
-          Made with love in Stockholm by{' '}
+          Made with{' '}
+          <span role="img" aria-label="love" className="text-aura-red">
+            ♥
+          </span>{' '}
+          in Stockholm by{' '}
           <a href="https://umai-tech.com" target="_blank" rel="noopener noreferrer" className="hover:text-aura-text transition-colors">
             Umai Technologies
           </a>
