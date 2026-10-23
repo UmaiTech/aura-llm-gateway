@@ -33,6 +33,7 @@ import {
   ApiPlayground,
   ModelTable,
 } from '../components/mdx'
+import { reloadForStaleChunk } from '../lib/staleChunk'
 
 // All MD files from src/content, as raw strings at build time.
 const mdModules = import.meta.glob('../content/**/*.md', {
@@ -122,7 +123,10 @@ function MDXContent({ path }: { path: string }) {
         setError(null)
       })
       .catch(() => {
-        if (!cancelled) setError('This page failed to load. Reload to try again.')
+        if (cancelled) return
+        // Usually a tab from before the last deploy asking for a chunk that is gone.
+        if (reloadForStaleChunk()) return
+        setError('This page failed to load. Reload to try again.')
       })
     return () => {
       cancelled = true
