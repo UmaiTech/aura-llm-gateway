@@ -261,15 +261,18 @@ export const AGENT_SYSTEM_PROMPTS = {
 import type { Model } from './types'
 
 export const AVAILABLE_MODELS: Model[] = [
-  // Aura — gateway aliases. The gateway scores each request's complexity
-  // and dispatches to the cheapest capable model in a tier; the response
-  // reports the concrete model and metadata.aura.routing explains why.
+  // Aura — gateway aliases. The gateway scores each request's complexity,
+  // maps it to a tier, applies constraints and picks an eligible model in
+  // that tier; the response reports the concrete model and
+  // metadata.aura.routing explains why. Used until the gateway's runtime
+  // catalog (GET /v1/models, lib/catalog.ts) answers, which then decides
+  // which aliases are offered.
   // Free: only free-tier models can be reached through it on the hosted
   // playground once per-org tier lists land, and the gateway prices the
   // actual model that answered.
-  { id: 'auto', name: 'Auto (balanced)', provider: 'aura', tier: 'free', description: 'Gateway picks the cheapest capable model per request' },
-  { id: 'auto:cost', name: 'Auto (cost)', provider: 'aura', tier: 'free', description: 'Prefer cheaper models' },
-  { id: 'auto:quality', name: 'Auto (quality)', provider: 'aura', tier: 'free', description: 'Prefer stronger models' },
+  { id: 'auto', name: 'Auto · balanced', provider: 'aura', tier: 'free', mode: 'balanced', description: 'Neutral: scores complexity, picks a tier, then an eligible model in it' },
+  { id: 'auto:cost', name: 'Auto · cost', provider: 'aura', tier: 'free', mode: 'cost', description: 'Shifts the score toward cheaper tiers; hard requests still move up' },
+  { id: 'auto:quality', name: 'Auto · quality', provider: 'aura', tier: 'free', mode: 'quality', description: 'Shifts the score toward stronger tiers for borderline requests' },
 
   // OpenAI — frontier locked, mini/nano/Luna free
   { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', provider: 'openai', tier: 'beta' },

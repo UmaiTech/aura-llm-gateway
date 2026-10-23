@@ -1,4 +1,5 @@
 @import '@aura/ui/tokens.css';
+@import '@aura/ui/ui.css';
 
 @tailwind base;
 @tailwind components;

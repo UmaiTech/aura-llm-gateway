@@ -1,11 +1,14 @@
 import { ArrowRight } from 'lucide-react'
 import { Drawer } from '@aura/ui/ui/Drawer.tsx'
+import { RoutingInspector } from '@aura/ui/routing/RoutingInspector.tsx'
+import { fromResponseDecision } from '@aura/ui/routing/decision.ts'
 import {
   SAMPLE_HEALTH,
   SAMPLE_HOURLY,
   SAMPLE_LABEL,
   SAMPLE_METRICS,
   SAMPLE_REQUESTS,
+  rawExchange,
   type HealthStatus,
   type SampleRequest,
 } from './sampleData'
@@ -197,7 +200,39 @@ export function RequestDrawer({ req, onClose }: { req: SampleRequest | null; onC
       closeLabel="Close request detail"
       footer={`${SAMPLE_LABEL}. In the admin app this drawer opens from Request logs.`}
     >
-      {req && <RequestDetail req={req} />}
+      {req?.routing?.selected ? (
+        // Auto-routed sample: the same inspector the playground and the
+        // admin app use.
+        <RoutingInspector
+          view={fromResponseDecision(
+            { ...req.routing, selected: req.routing.selected },
+            { model: req.model, provider: req.provider },
+          )}
+          raw={rawExchange(req).response}
+          overviewExtra={
+            <>
+              <div>
+                <dt>Status</dt>
+                <dd>{req.status}</dd>
+              </div>
+              <div>
+                <dt>Tokens in / out</dt>
+                <dd>
+                  {req.inputTokens.toLocaleString('en-US')} / {req.outputTokens.toLocaleString('en-US')}
+                </dd>
+              </div>
+              <div>
+                <dt>Cost · duration</dt>
+                <dd>
+                  {req.cost} · {req.duration}
+                </dd>
+              </div>
+            </>
+          }
+        />
+      ) : (
+        req && <RequestDetail req={req} />
+      )}
     </Drawer>
   )
 }

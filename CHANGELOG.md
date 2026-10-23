@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 - Landing page redesign: hero with Admin app / Playground preview switcher, dedicated admin-app and playground sections with sample previews and a request-detail drawer, and an interactive auto-router walkthrough (deterministic, labelled demo using the gateway's default tiers, boundaries and mode offsets); light and dark themes
 - New brand identity across landing, playground and admin: ring + A mark, outlined Fraunces wordmark and a full favicon family (ICO, PNG, Apple touch, maskable, manifest per app)
 - Shared design tokens and components (`packages/aura-ui`) used by all three apps, with drift tests against the design pack
+- One routing inspector in the playground, the admin app and the landing previews: the model that answered next to every response, applied vs shadow kept apart (a shadow pick is labelled hypothetical), classified → final tier against the returned boundaries, constraints, candidates with nullable list/predicted costs, escalations and raw JSON; a drawer on small screens
+- Playground: auto aliases come from the gateway's `GET /v1/models` catalog (hidden with an actionable notice when auto routing is off), mode descriptions match the router's semantics, the budget input validates inline and says it is a predicted-cost constraint, the LLM classifier discloses that it sends a message excerpt, and unsent drafts survive theme, settings and compare-mode changes
+- Playground links from the landing (`?model=&prompt=&inspect=routing`) prefill a draft (never auto-sent) and open the routing inspector on the answer
+- Admin Routing: recent decisions open the shared inspector (`GET /admin/routing/decisions/{id}`); shadow rows say which model answered and label estimated savings as counterfactual
 
 ## [0.20.0] - 2026-10-22
 

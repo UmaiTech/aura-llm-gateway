@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Header } from '@/components/layout'
+import { RoutingDecisionDrawer } from '@/components/routing/RoutingDecisionDrawer'
+import type { RoutingOutcome } from '@/lib/types'
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { formatNumber, formatCurrency, formatDuration, cn } from '@/lib/utils'
 import {
@@ -87,6 +89,7 @@ export function RoutingPage() {
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inspecting, setInspecting] = useState<RoutingOutcome | null>(null)
 
   const fetchData = async () => {
     setError(null)
@@ -447,9 +450,16 @@ export function RoutingPage() {
                             {d.tier}
                           </span>
                           <span className="text-muted-foreground">{d.shadow ? 'shadow' : d.mode}</span>
-                          <span className="font-mono">
-                            {d.requested_model} → {d.selected_model}
-                          </span>
+                          {d.shadow ? (
+                            // Shadow: the pinned model answered; the pick is hypothetical.
+                            <span className="font-mono">
+                              {d.requested_model} answered · auto would pick {d.selected_model}
+                            </span>
+                          ) : (
+                            <span className="font-mono">
+                              {d.requested_model} → {d.actual_model ?? d.selected_model}
+                            </span>
+                          )}
                           <span className="tabular-nums text-muted-foreground">
                             score {d.score.toFixed(2)}
                           </span>
@@ -463,13 +473,21 @@ export function RoutingPage() {
                             </span>
                           )}
                           {d.shadow && d.estimated_savings_usd != null && (
-                            <span className="tabular-nums text-emerald-400">
-                              saves {formatCurrency(d.estimated_savings_usd)}
+                            <span className="tabular-nums text-muted-foreground" title="Counterfactual estimate, not realised spend">
+                              est. saving if applied {formatCurrency(d.estimated_savings_usd)}
                             </span>
                           )}
                           <span className="text-muted-foreground truncate max-w-md" title={d.reason}>
                             {d.reason}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setInspecting(d)}
+                            className="ml-auto text-brand hover:underline"
+                            aria-label={`Inspect routing decision ${d.response_id}`}
+                          >
+                            Inspect
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -555,6 +573,7 @@ export function RoutingPage() {
           </CardContent>
         </Card>
       </div>
+      <RoutingDecisionDrawer outcome={inspecting} onClose={() => setInspecting(null)} />
     </div>
   )
 }
