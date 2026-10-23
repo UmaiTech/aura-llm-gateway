@@ -328,12 +328,13 @@ Releases before v0.14 live in `LEGACY_MILESTONES` and render in a collapsed arch
 
 **When you ship a user-facing feature to main**: add a `merged-unreleased` item with the PR as evidence, at the top of the `ROADMAP` list.
 
-**When you cut a release** (e.g. v0.21.0):
+**When you cut a release** (e.g. v0.21.0): the release workflow does the roadmap side automatically. After release-plz opens or rebuilds the release PR, the "Sync CHANGELOG and roadmap" step in `.github/workflows/release-plz.yml` runs `scripts/release/sync-release-cli.ts` and pushes the result to the PR. The script:
 
-1. Add the version to the top of `RELEASES` with its CHANGELOG date and `tagged: true` once the `v0.21.0` tag exists.
-2. Turn its `merged-unreleased` items into `released('0.21.0', {...})` items (keep the PR evidence).
-3. Update `RECONCILED` (date and main commit you checked against) and the `Latest shipped` / `In progress` lines in the docstring at the top of `RoadmapPage.tsx`.
-4. Run `npm test` in `apps/landing`: it checks that the newest release on the page is the newest CHANGELOG release.
+1. Adds the version to the top of `RELEASES` with its CHANGELOG date, and sets `tagged: true` on every release whose `v<version>` tag exists.
+2. Turns every `merged-unreleased` item into a `released('<version>', {...})` item (evidence kept; `UNRELEASED` becomes the CHANGELOG link).
+3. Updates `RECONCILED` and the `Latest shipped` line in the `RoadmapPage.tsx` docstring.
+
+It only understands the current layout of `roadmap.ts` (one release per line in `RELEASES`; top-level `ROADMAP` items opened by `  {` and closed by `  },` on their own lines). Keep that layout, or update the script and its test (`scripts/release/sync-release.test.ts`) with it. If a release PR still fails, run `node scripts/release/sync-release-cli.ts` from the repo root on its branch (with tags fetched), then `npm test` in `apps/landing`. Writing good roadmap titles and descriptions is still on you: add the `merged-unreleased` item when the feature merges.
 
 **When you write a new release note in `CHANGELOG.md`**: cross-reference the roadmap. Anything material in the changelog should also appear (in shorter form) in the roadmap. The changelog is the granular log; the roadmap is the editorial summary.
 
@@ -345,15 +346,11 @@ Releases before v0.14 live in `LEGACY_MILESTONES` and render in a collapsed arch
 
 `docs/api/auto-routing.md` is the canonical auto-routing reference; `apps/landing/src/content/api/auto-routing.md` is the shorter public guide built from it (mapping in `CANONICAL_SOURCES`, `apps/landing/src/lib/docsNav.ts`). `docsSources.test.ts` fails when a section present in both differs or the guide uses an identifier the reference lacks: change the canonical file first, then carry the change into the guide. Entry-path cards and sidebar links on the docs site are checked by `docsNav.test.ts` (every link and `#anchor` must resolve to a content file and heading).
 
-### Auto-generated CHANGELOG is incomplete — review it on every release PR
+### Auto-generated CHANGELOG: release-plz drops non-crate commits
 
-`release-plz` generates each release PR's `CHANGELOG.md` section by attributing commits to Rust crates based on file paths. Two consequences you have to work around manually:
+`release-plz` generates each release PR's `CHANGELOG.md` section by attributing commits to Rust crates based on file paths, so anything that touches only `apps/`, `sdks/`, `.github/`, `CLAUDE.md` or another non-`crates/` path never reaches its entry (we hit this for v0.11.0–v0.13.0). `release-plz.toml` also has `changelog_include = ["aura-types", "aura-db", "aura-core"]` on `aura-proxy` so all Rust crates' commits aggregate into the workspace `CHANGELOG.md`. Don't remove that.
 
-1. **Frontend-only commits get dropped.** Anything that touches only `apps/admin/`, `apps/landing/`, `apps/chat/`, `sdks/`, `.github/`, `CLAUDE.md`, or any other non-`crates/` path is **not attributed to any crate** and never reaches the auto-generated entry. We hit this for v0.11.0–v0.13.0 where most work was frontend.
-
-2. **Per-crate filtering even between Rust crates.** `release-plz.toml` has `changelog_include = ["aura-types", "aura-db", "aura-core"]` on `aura-proxy` so all Rust crates' commits aggregate into the workspace `CHANGELOG.md`. Don't remove that — the workspace will silently de-attribute again.
-
-**Rule**: every release PR (`chore: release vX.Y.Z`) needs a manual changelog review before merge. If the section is short, look at the actual commits in the range with `git log vPREV..HEAD --oneline` and add bullets for the user-facing items the auto-generator missed. Match the existing tone (one line per change, link the PR).
+The release workflow's "Sync CHANGELOG and roadmap" step fills the gap: `scripts/release/sync-release-cli.ts` adds a bullet for every conventional commit since the previous tag that the section doesn't already mention (by PR number or text), grouped like `cliff.toml`. Still skim the section before merging a release PR: the bullets are commit subjects, and a release note sometimes deserves a better sentence.
 
 ### Vercel Serverless Functions (`/api/*.ts`)
 

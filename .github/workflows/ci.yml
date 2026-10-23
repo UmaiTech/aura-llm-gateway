@@ -44,10 +44,10 @@ jobs:
 
       # Dependency-free node:test suites (native TypeScript stripping):
       # design-token and brand drift checks, the landing auto-router demo,
-      # routing and pricing adapters. Each also runs from its own package
-      # with `npm test`.
+      # routing and pricing adapters, and the release PR sync script. Each
+      # also runs from its own package with `npm test`.
       - name: Run frontend unit tests
-        run: node --test 'packages/aura-ui/src/**/*.test.ts' 'apps/*/src/**/*.test.ts'
+        run: node --test 'packages/aura-ui/src/**/*.test.ts' 'apps/*/src/**/*.test.ts' 'scripts/**/*.test.ts'
 
   fmt:
     name: Format
