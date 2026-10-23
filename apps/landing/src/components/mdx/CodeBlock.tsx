@@ -30,24 +30,26 @@ export function CodeBlock({
   }
 
   return (
-    <div className="my-4 rounded-lg overflow-hidden bg-[#0f172a] border border-gray-800">
+    <div className="my-4 max-w-full rounded-panel overflow-hidden bg-[#0f172a] border border-aura-border">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900/50 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/10">
         <div className="flex items-center gap-2">
           {title && (
-            <span className="text-sm text-gray-400 font-mono">{title}</span>
+            <span className="text-sm text-slate-300 font-mono">{title}</span>
           )}
           {!title && language && (
-            <span className="text-xs text-gray-500 font-mono uppercase">{language}</span>
+            <span className="text-xs text-slate-400 font-mono uppercase">{language}</span>
           )}
         </div>
         <button
+          type="button"
+          aria-label={copied ? 'Copied' : 'Copy code'}
           onClick={handleCopy}
           className={clsx(
             'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
             copied
-              ? 'text-green-400 bg-green-500/10'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              ? 'text-emerald-300 bg-emerald-500/10'
+              : 'text-slate-300 hover:text-white hover:bg-white/10'
           )}
         >
           {copied ? (
@@ -100,7 +102,7 @@ interface InlineCodeProps {
 
 export function InlineCode({ children }: InlineCodeProps) {
   return (
-    <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+    <code className="text-aura-accent bg-aura-surface-2 px-1.5 py-0.5 rounded text-sm font-mono [overflow-wrap:anywhere]">
       {children}
     </code>
   )

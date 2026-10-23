@@ -30,6 +30,14 @@ const searchIndex: SearchItem[] = [
   { title: 'Streaming', path: '/docs/api/streaming', section: 'API Reference', description: 'Server-Sent Events and real-time responses' },
   { title: 'Cost Tracking', path: '/docs/api/cost-tracking', section: 'API Reference', description: 'Real-time cost calculation and pricing' },
   { title: 'Rate Limiting', path: '/docs/api/rate-limiting', section: 'API Reference', description: 'Rate limits, headers, and retry strategies' },
+  { title: 'Tool Roundtrips', path: '/docs/api/tool-roundtrips', section: 'API Reference', description: 'Replaying prior tool calls across providers' },
+  { title: 'Smart Routing', path: '/docs/api/routing', section: 'API Reference', description: 'Routing strategies, health tracking and fallbacks' },
+  { title: 'Auto Model Routing', path: '/docs/api/auto-routing', section: 'API Reference', description: 'model: "auto" — tiers, modes, constraints and the routing decision' },
+  { title: 'Prompt Compression', path: '/docs/api/compression', section: 'API Reference', description: 'TOON, YAML, AISP and JSON compression' },
+  { title: 'Response Validation', path: '/docs/api/validation', section: 'API Reference', description: 'logprobs, best_of_n, self_consistency, confidence_threshold' },
+  { title: 'Response Consistency', path: '/docs/api/consistency', section: 'API Reference', description: 'Style profiles and cross-model normalization' },
+  { title: 'Response Caching', path: '/docs/api/caching', section: 'API Reference', description: 'TTL-based response caching with Redis' },
+  { title: 'Prometheus Metrics', path: '/docs/api/metrics', section: 'API Reference', description: 'Observability via the /metrics endpoint' },
   { title: 'Error Reference', path: '/docs/api/errors', section: 'API Reference', description: 'Error codes and troubleshooting' },
   { title: 'Admin API', path: '/docs/api/admin', section: 'API Reference', description: 'Manage keys, orgs, and credentials' },
   { title: 'Changelog', path: '/docs/api/changelog', section: 'API Reference', description: 'API changes and version history' },
@@ -56,6 +64,7 @@ const searchIndex: SearchItem[] = [
   { title: 'Anthropic', path: '/docs/providers/anthropic', section: 'Providers', description: 'Claude Opus, Sonnet, Haiku models' },
   { title: 'Google', path: '/docs/providers/google', section: 'Providers', description: 'Gemini 2.5, 2.0, 1.5 models' },
   { title: 'Mistral', path: '/docs/providers/mistral', section: 'Providers', description: 'Mistral Large, Codestral, Ministral edge models' },
+  { title: 'Together AI', path: '/docs/providers/together', section: 'Providers', description: 'Open-weight models on Together AI' },
   { title: 'Ollama', path: '/docs/providers/ollama', section: 'Providers', description: 'Local LLM inference, $0 cost' },
   { title: 'HuggingFace', path: '/docs/providers/huggingface', section: 'Providers', description: 'TGI Inference Endpoints for any HF model' },
   { title: 'AWS Bedrock', path: '/docs/providers/bedrock', section: 'Providers', description: 'Claude on Bedrock with IAM auth' },
@@ -104,12 +113,13 @@ export function SearchModal({ isOpen, onClose }: SearchProps) {
     setSelectedIndex(0)
   }, [results])
 
-  // Focus input when modal opens
+  // Focus the input on open; give focus back to the opener on close.
   useEffect(() => {
-    if (isOpen) {
-      setQuery('')
-      setTimeout(() => inputRef.current?.focus(), 0)
-    }
+    if (!isOpen) return
+    const opener = document.activeElement as HTMLElement | null
+    setQuery('')
+    setTimeout(() => inputRef.current?.focus(), 0)
+    return () => opener?.focus?.({ preventScroll: true })
   }, [isOpen])
 
   // Keyboard navigation
@@ -133,85 +143,79 @@ export function SearchModal({ isOpen, onClose }: SearchProps) {
       case 'Escape':
         onClose()
         break
+      case 'Tab':
+        // The input is the dialog's only tab stop; keep focus inside.
+        e.preventDefault()
+        break
     }
   }, [results, selectedIndex, navigate, onClose])
 
   if (!isOpen) return null
 
+  const activeId = results[selectedIndex] ? `search-result-${selectedIndex}` : undefined
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
-      {/* Modal */}
-      <div className="relative min-h-screen flex items-start justify-center pt-[15vh] px-4">
-        <div className="relative w-full max-w-xl bg-gray-900 rounded-xl shadow-2xl border border-gray-800 overflow-hidden">
-          {/* Search input */}
-          <div className="flex items-center px-4 border-b border-gray-800">
-            <SearchIcon className="h-5 w-5 text-gray-500" />
+      <div className="relative flex min-h-screen items-start justify-center px-4 pt-[12vh]">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search documentation"
+          className="relative w-full max-w-xl overflow-hidden rounded-panel border border-aura-border bg-aura-surface shadow-2xl"
+        >
+          <div className="flex items-center border-b border-aura-border px-4">
+            <SearchIcon className="h-5 w-5 text-aura-dim" aria-hidden />
             <input
               ref={inputRef}
               type="text"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="search-results"
+              aria-activedescendant={activeId}
+              aria-label="Search documentation"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Search documentation..."
-              className="flex-1 px-4 py-4 bg-transparent text-white placeholder-gray-500 focus:outline-none"
+              placeholder="Search documentation…"
+              className="flex-1 bg-transparent px-4 py-4 text-aura-text placeholder:text-aura-dim focus:outline-none"
             />
-            <kbd className="hidden sm:inline-flex items-center px-2 py-1 text-xs text-gray-500 bg-gray-800 rounded">
-              ESC
-            </kbd>
+            <kbd className="hidden items-center rounded bg-aura-surface-2 px-2 py-1 font-mono text-xs text-aura-dim sm:inline-flex">ESC</kbd>
           </div>
 
-          {/* Results */}
           <div className="max-h-[60vh] overflow-y-auto">
             {results.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-500">
-                No results found for "{query}"
-              </div>
+              <div className="px-4 py-8 text-center text-sm text-aura-dim">No results for “{query}”</div>
             ) : (
-              <ul className="py-2">
+              <ul id="search-results" role="listbox" aria-label="Results" className="py-2">
                 {results.map((result, index) => (
-                  <li key={result.item.path}>
+                  <li key={result.item.path} id={`search-result-${index}`} role="option" aria-selected={index === selectedIndex}>
                     <button
+                      type="button"
+                      tabIndex={-1}
                       onClick={() => {
                         navigate(result.item.path)
                         onClose()
                       }}
                       onMouseEnter={() => setSelectedIndex(index)}
                       className={clsx(
-                        'w-full flex items-start gap-3 px-4 py-3 text-left transition-colors',
-                        index === selectedIndex
-                          ? 'bg-aura-500/10'
-                          : 'hover:bg-gray-800/50'
+                        'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors',
+                        index === selectedIndex ? 'bg-aura-accent/10' : 'hover:bg-aura-hover',
                       )}
                     >
-                      <FileText className={clsx(
-                        'h-5 w-5 mt-0.5 flex-shrink-0',
-                        index === selectedIndex ? 'text-aura-400' : 'text-gray-500'
-                      )} />
-                      <div className="flex-1 min-w-0">
-                        <div className={clsx(
-                          'font-medium',
-                          index === selectedIndex ? 'text-white' : 'text-gray-300'
-                        )}>
+                      <FileText
+                        className={clsx('mt-0.5 h-5 w-5 flex-shrink-0', index === selectedIndex ? 'text-aura-accent' : 'text-aura-dim')}
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className={clsx('font-medium', index === selectedIndex ? 'text-aura-text' : 'text-aura-muted')}>
                           {result.item.title}
                         </div>
-                        {result.item.description && (
-                          <div className="text-sm text-gray-500 truncate">
-                            {result.item.description}
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-600 mt-0.5">
-                          {result.item.section}
-                        </div>
+                        {result.item.description && <div className="truncate text-sm text-aura-dim">{result.item.description}</div>}
+                        <div className="mt-0.5 text-xs text-aura-dim">{result.item.section}</div>
                       </div>
-                      {index === selectedIndex && (
-                        <ArrowRight className="h-4 w-4 text-aura-400 mt-1" />
-                      )}
+                      {index === selectedIndex && <ArrowRight className="mt-1 h-4 w-4 text-aura-accent" aria-hidden />}
                     </button>
                   </li>
                 ))}
@@ -219,20 +223,16 @@ export function SearchModal({ isOpen, onClose }: SearchProps) {
             )}
           </div>
 
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-between text-xs text-gray-500">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded">↑</kbd>
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded">↓</kbd>
-                <span>to navigate</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded">↵</kbd>
-                <span>to select</span>
-              </span>
-            </div>
-            <span>Powered by Fuse.js</span>
+          <div className="flex items-center gap-4 border-t border-aura-border px-4 py-3 text-xs text-aura-dim">
+            <span className="flex items-center gap-1">
+              <kbd className="rounded bg-aura-surface-2 px-1.5 py-0.5">↑</kbd>
+              <kbd className="rounded bg-aura-surface-2 px-1.5 py-0.5">↓</kbd>
+              <span>to navigate</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded bg-aura-surface-2 px-1.5 py-0.5">↵</kbd>
+              <span>to open</span>
+            </span>
           </div>
         </div>
       </div>
@@ -244,12 +244,15 @@ export function SearchModal({ isOpen, onClose }: SearchProps) {
 export function SearchButton({ onClick }: { onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg transition-colors"
+      aria-label="Search documentation"
+      aria-keyshortcuts="Control+K Meta+K"
+      className="flex h-9 items-center gap-2 rounded-control border border-aura-border bg-aura-surface px-2.5 text-sm text-aura-muted transition-colors hover:bg-aura-hover hover:text-aura-text sm:w-56 sm:px-3"
     >
-      <SearchIcon className="h-4 w-4" />
-      <span className="hidden sm:inline">Search</span>
-      <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-xs text-gray-500 bg-gray-900 rounded ml-2">
+      <SearchIcon className="h-4 w-4" aria-hidden />
+      <span className="hidden sm:inline">Search docs</span>
+      <kbd className="ml-auto hidden items-center rounded bg-aura-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-aura-dim sm:inline-flex">
         ⌘K
       </kbd>
     </button>

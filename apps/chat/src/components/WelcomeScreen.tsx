@@ -1,3 +1,4 @@
+import { BrandMark } from '@aura/ui/brand/Brand.tsx'
 import type { Model } from '../lib/types'
 
 interface WelcomeScreenProps {
@@ -42,7 +43,7 @@ export function WelcomeScreen({ model, onSendMessage }: WelcomeScreenProps) {
       {/* Hero — left-aligned, no centered logo block */}
       <header className="mb-12">
         <div className="flex items-center gap-3 mb-6">
-          <img src="/logo.svg" alt="Aura" className="h-10 w-10" />
+          <BrandMark size={40} />
           <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Aura Playground
           </span>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createThrottledSetter } from '@/lib/streamFlush'
+import { createThrottledSetter } from '../lib/streamFlush'
 import { Plus, Send, StopCircle, ArrowLeft } from 'lucide-react'
 import { AuraAPI } from '../lib/api'
 import { calculateCost } from '../lib/pricing'

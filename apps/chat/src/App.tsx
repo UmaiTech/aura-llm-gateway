@@ -8,9 +8,12 @@ import { Header } from './components/Header'
 import { useChatStore } from './stores/chatStore'
 import { generateId } from './lib/utils'
 import { AuraAPI } from './lib/api'
-import { AVAILABLE_MODELS, BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
+import { BUILT_IN_TOOLS, executeTool, AGENT_SYSTEM_PROMPTS } from './lib/agent'
 import { calculateCost } from './lib/pricing'
-import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata, CompressionMetadata, ConsistencyMetadataResponse, ValidationMetadataResponse, RoutingDecisionMetadata } from './lib/types'
+import { parseCompletedResponse } from './lib/responseMetadata'
+import { isAutoModel } from './lib/types'
+import { useRuntimeModels } from './hooks/useRuntimeModels'
+import type { Model, Message, ToolInvocation, MessageUsage, AuraMetadata } from './lib/types'
 
 // In production the chat hits same-origin /api/proxy (a serverless
 // function that holds the per-user gateway API key).
@@ -24,7 +27,11 @@ const API_BASE = import.meta.env.VITE_PROXY_BASE_URL || '/api/proxy'
 const API_KEY = '' // Frontend never holds the API key; session cookie is the credential
 
 export default function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Start with the sidebar closed on small screens, where it overlays
+  // the conversation.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.matchMedia('(min-width: 1024px)').matches,
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // When the user taps a beta-locked model in the picker, store it so
@@ -69,6 +76,9 @@ export default function App() {
     compareMode,
   } = useChatStore()
 
+  // Picker models: auto aliases follow the gateway's runtime catalog.
+  const { models: availableModels, catalog } = useRuntimeModels()
+
   // Get configs from store
   const validationConfig = getValidationConfig()
   const consistencyConfig = useChatStore.getState().getConsistencyConfig()
@@ -99,9 +109,9 @@ export default function App() {
   // handles the (impossible-but-typecheckable) case of zero free
   // models in the list.
   const selectedModel =
-    AVAILABLE_MODELS.find((m) => m.id === model && m.tier !== 'beta') ??
-    AVAILABLE_MODELS.find((m) => m.tier !== 'beta') ??
-    AVAILABLE_MODELS[0]
+    availableModels.find((m) => m.id === model && m.tier !== 'beta') ??
+    availableModels.find((m) => m.tier !== 'beta') ??
+    availableModels[0]
 
   // If the stored model id was beta-locked, write the freed-up
   // selection back to the store so the picker label, the API client
@@ -111,9 +121,41 @@ export default function App() {
   // tooltip still says the locked one) confuses users.
   useEffect(() => {
     if (model !== selectedModel.id) {
+      // Say why when the gateway turned auto routing off under us.
+      if (catalog && !catalog.autoEnabled && isAutoModel(model)) {
+        setError(
+          `Auto routing is turned off on this gateway, so "${model}" isn't available. ` +
+            `Switched to ${selectedModel.name}; pick another model to continue.`,
+        )
+      }
       setModel(selectedModel.id)
     }
-  }, [model, selectedModel.id, setModel])
+  }, [model, selectedModel.id, selectedModel.name, setModel, catalog])
+
+  // Links from the landing page (`?model=auto&prompt=…&inspect=routing`)
+  // prefill a fresh draft — never send it — and remember to open the
+  // routing inspector on the answer. The parameters are dropped from the
+  // URL straight away so a reload or a shared link can't replay them.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const linkedModel = params.get('model')
+    const prompt = params.get('prompt')
+    const inspect = params.get('inspect')
+    if (!linkedModel && !prompt && !inspect) return
+    const store = useChatStore.getState()
+    const known = availableModels.find((m) => m.id === linkedModel && m.tier !== 'beta')
+    if (known) store.setModel(known.id)
+    if (prompt) {
+      if ((store.getCurrentConversation()?.messages.length ?? 0) > 0) store.createConversation()
+      store.setDraft(prompt.slice(0, 4000))
+    }
+    if (inspect === 'routing') store.setInspectRoutingAfter(Date.now())
+    for (const key of ['model', 'prompt', 'inspect']) params.delete(key)
+    const query = params.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`)
+    // Once, on first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleModelChange = useCallback(
     (newModel: Model) => {
@@ -204,75 +246,14 @@ export default function App() {
           contentSink.set(fullContent)
         } else if (event.type === 'response.completed') {
           contentSink.flush()
-          // Extract usage and metadata from completed response (gateway enriches with cost_usd and aura metadata)
-          const response = event.response as {
-            id?: string
-            usage?: {
-              input_tokens?: number
-              output_tokens?: number
-              total_tokens?: number
-              cached_tokens?: number
-              cost_usd?: number
-            }
-            metadata?: { aura?: {
-              provider?: string
-              gateway_version?: string
-              latency_ms?: number
-              request_id?: string
-              compression?: CompressionMetadata
-              consistency?: ConsistencyMetadataResponse
-              validation?: ValidationMetadataResponse
-              routing_strategy?: string
-              routing?: RoutingDecisionMetadata
-            } }
-          }
+          // Usage, the model that answered and Aura metadata (cost,
+          // provider, strategy outcomes, auto-routing decision).
+          const completed = parseCompletedResponse(event.response, (i, o) => calculateCost(model, i, o))
+          responseId = completed.responseId
+          usage = completed.usage
+          const { aura, model: answeredBy } = completed
 
-          console.log('[Standard Chat] Raw event.response:', response)
-          console.log('[Standard Chat] Response keys:', Object.keys(response || {}))
-          console.log('[Standard Chat] Usage property:', response?.usage)
-          console.log('[Standard Chat] Full event:', event)
-
-          // Store response ID for conversation threading
-          responseId = response?.id
-
-          // Parse usage with better null checks
-          if (response?.usage &&
-              typeof response.usage.input_tokens === 'number' &&
-              typeof response.usage.output_tokens === 'number') {
-            usage = {
-              inputTokens: response.usage.input_tokens,
-              outputTokens: response.usage.output_tokens,
-              totalTokens: response.usage.input_tokens + response.usage.output_tokens,
-              cachedTokens: response.usage.cached_tokens,
-              cost: response.usage.cost_usd ?? calculateCost(model, response.usage.input_tokens, response.usage.output_tokens),
-            }
-            console.log('[Standard Chat] Parsed usage:', usage)
-          } else {
-            console.warn('[Standard Chat] No valid usage data in response:', response?.usage)
-          }
-
-          // Extract Aura metadata
-          const auraMetadata = response?.metadata?.aura
-          const aura = auraMetadata ? {
-            provider: auraMetadata.provider || 'unknown',
-            gatewayVersion: auraMetadata.gateway_version || '',
-            latencyMs: auraMetadata.latency_ms,
-            requestId: auraMetadata.request_id,
-            compression: auraMetadata.compression,
-            consistency: auraMetadata.consistency,
-            validation: auraMetadata.validation,
-            routingStrategy: auraMetadata.routing_strategy,
-            routing: auraMetadata.routing,
-          } : undefined
-
-          console.log('[Standard Chat] Response completed:', {
-            responseId,
-            usage,
-            aura,
-            fullResponse: response
-          })
-
-          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, rawResponse: event.response })
+          updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, model: answeredBy, rawResponse: event.response })
         } else if (event.type === 'response.failed' || event.type === 'error') {
           const errorMessage =
             event.error?.message ||
@@ -406,6 +387,7 @@ export default function App() {
         let usage: MessageUsage | undefined
         let aura: AuraMetadata | undefined
         let responseId: string | undefined
+        let answeredBy: string | undefined
         let rawResponse: unknown
 
         try {
@@ -483,49 +465,15 @@ export default function App() {
                       }
                     }
 
-                    // Extract usage (gateway enriches with cost_usd)
-                    const responseUsage = event.response.usage as { input_tokens?: number; output_tokens?: number; cached_tokens?: number; cost_usd?: number } | undefined
-                    if (responseUsage?.input_tokens !== undefined && responseUsage?.output_tokens !== undefined) {
-                      usage = {
-                        inputTokens: responseUsage.input_tokens,
-                        outputTokens: responseUsage.output_tokens,
-                        totalTokens: responseUsage.input_tokens + responseUsage.output_tokens,
-                        cachedTokens: responseUsage.cached_tokens,
-                        cost: responseUsage.cost_usd ?? calculateCost(model, responseUsage.input_tokens, responseUsage.output_tokens),
-                      }
-                    }
-
-                    // Extract Aura metadata. Includes compression /
-                    // consistency / validation outcomes that the
-                    // MessageBubble footer renders as chips so users
-                    // can see whether the strategies they picked did
-                    // anything on this response.
-                    const metadata = event.response.metadata as {
-                      aura?: {
-                        provider?: string
-                        gateway_version?: string
-                        latency_ms?: number
-                        request_id?: string
-                        compression?: CompressionMetadata
-                        consistency?: ConsistencyMetadataResponse
-                        validation?: ValidationMetadataResponse
-                        routing_strategy?: string
-                        routing?: RoutingDecisionMetadata
-                      }
-                    } | undefined
-                    if (metadata?.aura) {
-                      aura = {
-                        provider: metadata.aura.provider || 'unknown',
-                        gatewayVersion: metadata.aura.gateway_version || '',
-                        latencyMs: metadata.aura.latency_ms,
-                        requestId: metadata.aura.request_id,
-                        compression: metadata.aura.compression,
-                        consistency: metadata.aura.consistency,
-                        validation: metadata.aura.validation,
-                        routingStrategy: metadata.aura.routing_strategy,
-                        routing: metadata.aura.routing,
-                      }
-                    }
+                    // Usage (gateway enriches with cost_usd), the model
+                    // that answered and Aura metadata. Includes the
+                    // compression / consistency / validation outcomes the
+                    // MessageBubble footer renders as chips, and the
+                    // auto-routing decision for the inspector.
+                    const completed = parseCompletedResponse(event.response, (i, o) => calculateCost(model, i, o))
+                    usage = completed.usage ?? usage
+                    aura = completed.aura ?? aura
+                    answeredBy = completed.model ?? answeredBy
 
                     // Capture raw response for debugging
                     rawResponse = event.response
@@ -540,7 +488,7 @@ export default function App() {
           reader.releaseLock()
         }
 
-        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, rawResponse })
+        updateMessage(assistantMessageId, { isStreaming: false, usage, aura, responseId, model: answeredBy, rawResponse })
 
         // No tool calls - we're done
         if (toolCalls.length === 0) {
@@ -719,7 +667,7 @@ export default function App() {
             onSendMessage={handleSendMessage}
             onStopGeneration={handleStopGeneration}
             model={selectedModel}
-            models={AVAILABLE_MODELS}
+            models={availableModels}
             onModelChange={handleModelChange}
             onLockedModelClick={(m) => setLockedModelPrompt(m)}
             routingStrategy={routingStrategy}

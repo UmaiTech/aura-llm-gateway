@@ -12,7 +12,7 @@ appVersion: "0.4.1"
 home: https://aura-llm.dev
 sources:
   - https://github.com/UmaiTech/aura-llm-gateway
-icon: https://aura-llm.dev/icon-square.svg
+icon: https://aura-llm.dev/android-chrome-512x512.png
 keywords:
   - llm
   - ai

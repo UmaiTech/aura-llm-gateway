@@ -459,3 +459,11 @@ client = AuraClient(api_key="...")
 response = client.responses.create(model=KnownModels.AUTO, input="What is the capital of France?")
 print(response.model, response.metadata["aura"]["routing"]["tier"])
 ```
+
+```typescript
+import { AuraClient, KnownModels } from 'aura-llm'
+
+const client = new AuraClient({ apiKey: '...' })
+const response = await client.responses.create({ model: KnownModels.AUTO, input: 'What is the capital of France?' })
+console.log(response.model, response.metadata?.aura?.routing?.tier)
+```

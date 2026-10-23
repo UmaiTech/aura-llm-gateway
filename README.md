@@ -18,7 +18,10 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/UmaiTech/aura-llm-gateway/pulls)
 
 <p align="center">
-  <img src="assets/logo-horizontal.svg" alt="Aura LLM Gateway" height="140"/>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/aura-wordmark-dark.svg"/>
+    <img src="assets/brand/aura-wordmark-light.svg" alt="Aura LLM Gateway" height="72"/>
+  </picture>
 </p>
 
 A high-performance, production-ready LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
