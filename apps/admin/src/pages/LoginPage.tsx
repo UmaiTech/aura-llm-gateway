@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
+import { Button, Callout, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
 import { useAuthStore } from '@/stores'
 import { Wordmark } from '@aura/ui/brand/Brand.tsx'
 import { Key2Line, EyeLine, EyeCloseLine } from '@mingcute/react'
@@ -49,6 +49,16 @@ export function LoginPage() {
           <Wordmark size={40} className="text-foreground" />
           <p className="eyebrow mt-3 text-[10px]">LLM Gateway · Admin</p>
         </div>
+
+        <Callout tone="note" label="Local only for now" className="mb-4">
+          The admin app runs on your machine against your own gateway. A hosted version is coming soon.{' '}
+          <a
+            href="https://aura-llm.dev/docs/deployment#run-the-admin-app-locally"
+            className="text-brand hover:underline"
+          >
+            Run it locally
+          </a>
+        </Callout>
 
         <Card>
           <CardHeader>

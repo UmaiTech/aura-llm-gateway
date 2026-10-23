@@ -196,6 +196,11 @@ export function RoutingPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Link to="/routing/lab">
+                <Button size="sm" variant="ghost">
+                  Test in the lab
+                </Button>
+              </Link>
               <Link to="/routing/decisions">
                 <Button size="sm" variant="outline">
                   Explore decisions
