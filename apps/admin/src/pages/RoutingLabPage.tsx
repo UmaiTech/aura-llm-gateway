@@ -10,6 +10,8 @@ import type {
   RoutingTier,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { RoutingInspector } from '@aura/ui/routing/RoutingInspector.tsx'
+import { fromResponseDecision } from '@aura/ui/routing/decision.ts'
 import { CheckLine, DownloadLine, FlashLine, ShieldLine } from '@mingcute/react'
 
 /**
@@ -159,14 +161,13 @@ const KIND_STYLE: Record<Kind, string> = {
   custom: 'bg-muted text-muted-foreground',
 }
 
-const TIER_STYLE: Record<RoutingTier, { chip: string; bar: string }> = {
-  simple: { chip: 'bg-emerald-500/10 text-emerald-500', bar: 'bg-emerald-400' },
-  medium: { chip: 'bg-sky-500/10 text-sky-500', bar: 'bg-sky-400' },
-  complex: { chip: 'bg-violet-500/10 text-violet-500', bar: 'bg-violet-400' },
-  reasoning: { chip: 'bg-rose-500/10 text-rose-500', bar: 'bg-rose-400' },
+const TIER_STYLE: Record<RoutingTier, { chip: string }> = {
+  simple: { chip: 'bg-emerald-500/10 text-emerald-500' },
+  medium: { chip: 'bg-sky-500/10 text-sky-500' },
+  complex: { chip: 'bg-violet-500/10 text-violet-500' },
+  reasoning: { chip: 'bg-rose-500/10 text-rose-500' },
 }
 const TIERS: RoutingTier[] = ['simple', 'medium', 'complex', 'reasoning']
-const DEFAULT_BOUNDARIES = { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.6 }
 
 const AUTO_LANES = ['auto', 'auto:cost', 'auto:quality'] as const
 const isAutoLane = (lane: string) => lane === 'auto' || lane.startsWith('auto:')
@@ -262,135 +263,6 @@ const cellKey = (promptId: string, lane: string) => `${promptId}|${lane}`
 
 function TierChip({ tier }: { tier: RoutingTier }) {
   return <span className={cn('px-1.5 py-0.5 rounded text-2xs font-medium', TIER_STYLE[tier]?.chip)}>{tier}</span>
-}
-
-function ScoreBar({ d }: { d: RoutingDecision }) {
-  const b = d.boundaries ?? DEFAULT_BOUNDARIES
-  const bands = [
-    { tier: 'simple' as const, from: 0, to: b.simple_medium },
-    { tier: 'medium' as const, from: b.simple_medium, to: b.medium_complex },
-    { tier: 'complex' as const, from: b.medium_complex, to: b.complex_reasoning },
-    { tier: 'reasoning' as const, from: b.complex_reasoning, to: 1 },
-  ]
-  const score = Math.min(1, Math.max(0, d.score))
-  return (
-    <div>
-      <div className="relative h-2 w-full rounded overflow-hidden flex">
-        {bands.map((band) => (
-          <div
-            key={band.tier}
-            className={cn('h-full opacity-30', TIER_STYLE[band.tier].bar)}
-            style={{ width: `${(band.to - band.from) * 100}%` }}
-          />
-        ))}
-        <div className="absolute top-0 h-full w-0.5 bg-foreground" style={{ left: `calc(${score * 100}% - 1px)` }} />
-      </div>
-      <div className="flex justify-between text-2xs text-muted-foreground mt-0.5">
-        {bands.map((band) => (
-          <span key={band.tier} className={cn(band.tier === d.tier && 'font-medium text-foreground')}>
-            {band.tier}
-            {band.tier === d.classified_tier && band.tier !== d.tier && ' (classified)'}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function DecisionDetail({ d }: { d: RoutingDecision }) {
-  const signals = Object.entries(d.signals ?? {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-  const candidates = d.candidates ?? []
-  const hasPredicted = candidates.some((c) => c.predicted_cost_usd != null)
-  return (
-    <div className="space-y-3 text-xs">
-      <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-        <span>
-          score <span className="font-medium text-foreground">{d.score.toFixed(3)}</span>
-          {d.raw_score !== d.score && <> (raw {d.raw_score.toFixed(3)})</>}
-        </span>
-        <span>· mode {d.mode}</span>
-        <span>· {d.classifier}</span>
-        {d.latency_us !== undefined && <span>· decided in {d.latency_us} µs</span>}
-        {d.shadow && <Badge variant="warning">shadow · auto would pick {d.selected}</Badge>}
-        {d.synthetic && <Badge variant="muted">synthetic</Badge>}
-      </div>
-      <ScoreBar d={d} />
-      {signals.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {signals.map(([name, value]) => (
-            <span
-              key={name}
-              className={cn(
-                'px-1.5 py-0.5 rounded font-mono',
-                value > 0 ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
-              )}
-            >
-              {name} {value > 0 ? '+' : ''}
-              {value.toFixed(2)}
-            </span>
-          ))}
-        </div>
-      )}
-      {d.hard_filters && d.hard_filters.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {d.hard_filters.map((f, i) => (
-            <span key={i} className="px-1.5 py-0.5 rounded bg-muted font-mono">
-              {f}
-            </span>
-          ))}
-        </div>
-      )}
-      {candidates.length > 0 && (
-        <table className="w-full text-left">
-          <thead className="text-muted-foreground">
-            <tr>
-              <th className="font-normal pr-3 py-0.5">candidate</th>
-              <th className="font-normal pr-3 py-0.5">tier</th>
-              <th className="font-normal pr-3 py-0.5">provider</th>
-              <th className="font-normal pr-3 py-0.5 text-right">$/1M</th>
-              {hasPredicted && <th className="font-normal pr-3 py-0.5 text-right">predicted</th>}
-              <th className="font-normal py-0.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {candidates.map((c) => {
-              const selected = c.model === d.selected
-              return (
-                <tr
-                  key={`${c.tier}:${c.model}`}
-                  className={cn(selected && 'font-medium', !c.eligible && 'text-muted-foreground/60 line-through')}
-                >
-                  <td className="pr-3 py-0.5 font-mono">
-                    {selected && '▸ '}
-                    {c.model}
-                  </td>
-                  <td className="pr-3 py-0.5">{c.tier}</td>
-                  <td className="pr-3 py-0.5">{c.provider ?? '—'}</td>
-                  <td className="pr-3 py-0.5 text-right font-mono">
-                    {c.cost_per_million != null ? c.cost_per_million.toFixed(2) : '—'}
-                  </td>
-                  {hasPredicted && <td className="pr-3 py-0.5 text-right font-mono">{usd(c.predicted_cost_usd)}</td>}
-                  <td className="py-0.5 text-muted-foreground">{c.eligible ? '' : 'ineligible'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      )}
-      {d.escalations && d.escalations.length > 0 && (
-        <ul className="font-mono space-y-0.5">
-          {d.escalations.map((e, i) => (
-            <li key={i}>
-              escalated {e.from_model} ({e.from_tier}) → {e.to_model} ({e.to_tier}) after {e.error_code}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="text-muted-foreground">
-        <span className="text-foreground">reason:</span> {d.reason}
-      </p>
-    </div>
-  )
 }
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -957,7 +829,14 @@ export function RoutingLabPage() {
                 </div>
               )}
               {(selectedCell.live?.routing ?? selectedCell.dry) && (
-                <DecisionDetail d={(selectedCell.live?.routing ?? selectedCell.dry) as RoutingDecision} />
+                <RoutingInspector
+                  key={selected ?? undefined}
+                  view={fromResponseDecision((selectedCell.live?.routing ?? selectedCell.dry) as RoutingDecision, {
+                    model: selectedCell.live?.model,
+                  })}
+                  raw={selectedCell.live?.response ?? selectedCell.dry}
+                  initialTab="routing"
+                />
               )}
               {selectedCell.live?.ok && (
                 <div>
