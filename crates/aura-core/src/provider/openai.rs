@@ -299,7 +299,7 @@ impl OpenAIProvider {
         OpenAIRequest {
             model: request.model.clone(),
             messages,
-            max_tokens: request.max_output_tokens,
+            max_completion_tokens: request.max_output_tokens,
             temperature: request.temperature,
             top_p: request.top_p,
             stream: Some(request.stream),
@@ -793,8 +793,10 @@ impl OpenAIStreamTransformer {
 struct OpenAIRequest {
     model: String,
     messages: Vec<OpenAIMessage>,
+    /// Output token cap. Chat Completions deprecated `max_tokens`, and
+    /// reasoning models (o-series, gpt-5.x) reject it with a 400.
     #[serde(skip_serializing_if = "Option::is_none")]
-    max_tokens: Option<u32>,
+    max_completion_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1283,6 +1285,16 @@ mod tests {
         let sent: serde_json::Value =
             serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
         assert!(sent["prompt_cache_key"].is_string());
+    }
+
+    #[test]
+    fn test_output_cap_is_sent_as_max_completion_tokens() {
+        let provider = OpenAIProvider::new("test-key");
+        let mut request = CreateResponseRequest::text("gpt-5.6-luna", "Hi");
+        request.max_output_tokens = Some(512);
+        let sent = serde_json::to_value(provider.transform_request(&request)).unwrap();
+        assert_eq!(sent["max_completion_tokens"], 512);
+        assert!(sent.get("max_tokens").is_none());
     }
 
     #[tokio::test]
