@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: Fraunces; src: url(../../apps/landing/public/fonts/Fraunces-SemiBold.ttf); font-weight: 600; }
+:root {
+  --bg: #0b0d14; --surface: #11151f; --surface2: #181d2a; --text: #f4f6fa; --muted: #a7b0c0; --dim: #788397;
+  --border: #293143; --accent: #b29aff; --action: #7540df; --green: #80dfba; --amber: #f1ca78;
+  --glow: rgba(117, 64, 223, .28); --mark: url(../../assets/brand/aura-mark-violet.svg);
+}
+body.light {
+  --bg: #f7f8fc; --surface: #fff; --surface2: #f0f2f8; --text: #171b28; --muted: #505b70; --dim: #69758b;
+  --border: #d5dbe7; --accent: #6d28d9; --action: #6d28d9; --green: #087a55; --amber: #956000;
+  --glow: rgba(109, 40, 217, .12); --mark: url(../../assets/brand/aura-mark-ink.svg);
+}
+* { box-sizing: border-box; margin: 0; }
+body { width: 1280px; height: 440px; background: transparent; color: var(--text); font-family: Inter, sans-serif; overflow: hidden; }
+.frame { position: relative; width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
+  background:
+    radial-gradient(640px 360px at 88% 18%, var(--glow), transparent 70%),
+    radial-gradient(520px 300px at 8% 110%, var(--glow), transparent 70%),
+    var(--bg); }
+.grid { position: absolute; inset: 0; opacity: .5;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px; mask-image: radial-gradient(700px 400px at 78% 40%, #000 0%, transparent 75%); }
+.left { position: absolute; left: 64px; top: 56px; width: 600px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand i { width: 46px; height: 46px; background: var(--mark) center / contain no-repeat; }
+.brand b { font: 600 38px Fraunces; letter-spacing: -.5px; }
+.brand span { font: 500 13px ui-monospace, 'DejaVu Sans Mono', monospace; letter-spacing: 3px; color: var(--dim); margin-left: 6px; margin-top: 8px; }
+h1 { font: 600 50px/1.04 Fraunces; letter-spacing: -1.2px; margin-top: 30px; }
+h1 em { font-style: normal; color: var(--accent); }
+p { font-size: 17px; line-height: 1.55; color: var(--muted); margin-top: 20px; width: 560px; }
+.chips { position: absolute; right: 56px; bottom: 56px; justify-content: flex-end; width: 600px; display: flex; gap: 8px; }
+.chip { font: 500 12.5px Inter; color: var(--muted); padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+.chip.k { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.card { position: absolute; right: 56px; top: 64px; width: 540px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+  box-shadow: 0 24px 70px rgba(0,0,0,.35); overflow: hidden; }
+body.light .card { box-shadow: 0 24px 70px rgba(23,36,56,.12); }
+.bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); font: 500 13px ui-monospace, 'DejaVu Sans Mono', monospace; color: var(--muted); }
+.bar .m { color: var(--green); font-weight: 700; }
+.bar .s { margin-left: auto; color: var(--green); }
+pre { font: 13.5px/1.65 ui-monospace, 'DejaVu Sans Mono', monospace; padding: 14px 18px; color: var(--text); white-space: pre; }
+.k1 { color: var(--accent); } .str { color: var(--green); } .c { color: var(--dim); }
+.decision { border-top: 1px solid var(--border); background: var(--surface2); padding: 14px 18px; }
+.row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.tier { font: 600 12px ui-monospace, monospace; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 3px 8px; border-radius: 6px; }
+.model { font: 600 14px ui-monospace, 'DejaVu Sans Mono', monospace; }
+.prov { color: var(--dim); }
+.stats { display: flex; justify-content: space-between; white-space: nowrap; margin-top: 12px; font: 12px ui-monospace, 'DejaVu Sans Mono', monospace; color: var(--muted); }
+.stats b { color: var(--text); font-weight: 600; }
+.stats .usd b { color: var(--green); }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="grid"></div>
+  <div class="left">
+    <div class="brand"><i></i><b>Aura</b><span>LLM GATEWAY</span></div>
+    <h1>One gateway.<br>Every request, <em>understood.</em></h1>
+    <p>A Rust gateway for agentic workflows. One Open Responses API for every provider, with auto-routing, cost tracking and a playground that shows where each request went.</p>
+  </div>
+  <div class="chips">
+    <span class="chip k">Open Responses API</span><span class="chip">9 providers</span><span class="chip">Auto-routing</span><span class="chip">Self-hosted</span><span class="chip">MIT</span>
+  </div>
+  <div class="card">
+    <div class="bar"><span class="m">POST</span> /v1/responses <span class="s">200 · stream</span></div>
+<pre>{
+  <span class="k1">"model"</span>: <span class="str">"auto"</span>,
+  <span class="k1">"input"</span>: <span class="str">"Lua for an atomic Redis token bucket?"</span>,
+  <span class="k1">"routing"</span>: { <span class="k1">"mode"</span>: <span class="str">"balanced"</span> }
+}</pre>
+    <div class="decision">
+      <div class="row"><span class="c" style="font-family:ui-monospace,monospace;font-size:13px">routed →</span><span class="tier">complex · 0.71</span><span class="model">gemini-2.5-pro</span><span class="prov">Google</span></div>
+      <div class="stats"><span>decision <b>184 µs</b></span><span>latency <b>1.8 s</b></span><span>tokens <b>412 → 368</b></span><span class="usd">cost <b>$0.0042</b></span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,10 +1,25 @@
-# Aura LLM Gateway
+<p align="center">
+  <a href="https://aura-llm.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme/banner-dark.webp"/>
+      <img src="assets/readme/banner-light.webp" alt="Aura: one gateway, every request understood. A Rust gateway for agentic workflows with one Open Responses API for every provider, auto-routing, cost tracking and a playground." width="100%"/>
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://aura-llm.dev"><b>Website</b></a> ·
+  <a href="https://playground.aura-llm.dev"><b>Playground</b></a> ·
+  <a href="https://docs.aura-llm.dev"><b>Docs</b></a> ·
+  <a href="https://roadmap.aura-llm.dev"><b>Roadmap</b></a> ·
+  <a href="CHANGELOG.md"><b>Changelog</b></a>
+</p>
 
 [![CI](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/ci.yml)
 [![Python SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/python-sdk.yml)
 [![TypeScript SDK](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/sdk-typescript.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/sdk-typescript.yml)
 [![Helm Chart](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/helm-chart.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/helm-chart.yml)
-[![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
+[![Security](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/UmaiTech/aura-llm-gateway/actions/workflows/security.yml)
 [![Release](https://img.shields.io/github/v/release/UmaiTech/aura-llm-gateway?include_prereleases&label=release)](https://github.com/UmaiTech/aura-llm-gateway/releases)
 [![PyPI](https://img.shields.io/pypi/v/aura-llm?label=pypi%3A%20aura-llm)](https://pypi.org/project/aura-llm/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/aura-llm?label=pypi%20downloads)](https://pypi.org/project/aura-llm/)
@@ -17,14 +32,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/UmaiTech/aura-llm-gateway)](https://github.com/UmaiTech/aura-llm-gateway/commits/main)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/UmaiTech/aura-llm-gateway/pulls)
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/aura-wordmark-dark.svg"/>
-    <img src="assets/brand/aura-wordmark-light.svg" alt="Aura LLM Gateway" height="72"/>
-  </picture>
-</p>
-
-A high-performance, production-ready LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
+A high-performance LLM proxy gateway built in Rust that implements the [Open Responses API](https://www.openresponses.org/specification) specification for agentic workflows.
 
 > [!WARNING]
 > **Pre-1.0 software.** Aura is under active development. Public APIs, the
@@ -32,6 +40,69 @@ A high-performance, production-ready LLM proxy gateway built in Rust that implem
 > minor releases (`0.x` → `0.y`) without a formal deprecation cycle. Pin to
 > exact versions in production and review the [CHANGELOG](CHANGELOG.md)
 > before upgrading. The API will stabilize at `1.0`.
+
+## Try it in a minute
+
+Run the gateway with one provider key. Without `DATABASE_URL` it starts in development mode with no API keys required:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e AURA_MASTER_KEY="$(openssl rand -hex 32)" \
+  -e OPENAI_API_KEY="sk-..." \
+  ghcr.io/umaitech/aura-llm-gateway:latest
+```
+
+Then send an Open Responses request:
+
+```bash
+curl http://localhost:8080/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.4-mini",
+    "input": [{"type": "message", "role": "user", "content": "Say hello from Aura"}]
+  }'
+```
+
+Or use an SDK: `pip install aura-llm` / `npm install aura-llm` (see [SDKs](#sdks)). For Postgres, Redis and multi-tenant API keys, see [Quick Start](#quick-start) and [Deployment with Docker](docs/deployment/docker.md).
+
+## See it
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://aura-llm.dev"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/landing-dark.jpg"/>
+        <img src="assets/readme/landing-light.jpg" alt="The aura-llm.dev landing page"/>
+      </picture></a>
+      <p><b>Website</b>: product overview, docs, pricing and roadmap at <a href="https://aura-llm.dev">aura-llm.dev</a>.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://playground.aura-llm.dev"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/playground-dark.jpg"/>
+        <img src="assets/readme/playground-light.jpg" alt="The chat playground showing an answer routed by auto to gemini-2.5-pro, with latency, tokens and cost"/>
+      </picture></a>
+      <p><b>Playground</b>: chat with any model or <code>auto</code>, and see the provider, routing tier, latency, tokens and cost of every answer.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/admin-dark.jpg"/>
+        <img src="assets/readme/admin-light.jpg" alt="The admin dashboard with request volume, spend, latency and provider health"/>
+      </picture>
+      <p><b>Admin app</b>: traffic, spend, latency and provider health for your gateway. Runs locally against your own deployment.</p>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/routing-lab-dark.jpg"/>
+        <img src="assets/readme/routing-lab-light.jpg" alt="The routing lab comparing auto, auto:cost and auto:quality decisions for a set of prompts"/>
+      </picture>
+      <p><b>Routing lab</b>: dry-run prompt suites through <code>auto</code>, <code>auto:cost</code> and <code>auto:quality</code> to see which tier and model each one gets before you switch traffic.</p>
+    </td>
+  </tr>
+</table>
+
+<sub>Screenshots use sample data, not a real workspace. They follow your GitHub light/dark theme. Regenerate them with <a href="scripts/readme-screenshots/capture.mjs"><code>scripts/readme-screenshots</code></a>.</sub>
 
 ## Overview
 

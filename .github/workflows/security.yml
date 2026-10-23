@@ -14,6 +14,17 @@ on:
       - 'deny.toml'
       - '.cargo/audit.toml'
       - '.github/workflows/security.yml'
+  # Re-run on main when those files land, so the README badge (which shows
+  # the latest run on main) reflects the merged state instead of waiting a
+  # week for the next scheduled run.
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
+      - 'deny.toml'
+      - '.cargo/audit.toml'
+      - '.github/workflows/security.yml'
 
 # Read-only token: findings fail the job instead of opening issues.
 permissions:
