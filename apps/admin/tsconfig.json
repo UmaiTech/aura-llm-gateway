@@ -45,6 +45,7 @@
     }
   ],
   "exclude": [
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "../../packages/aura-ui/src/**/*.test.ts"
   ]
 }

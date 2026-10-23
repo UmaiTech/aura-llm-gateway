@@ -53,7 +53,7 @@ export function OrgFilter() {
         value={selectedOrgId ?? ''}
         onChange={handleChange}
         disabled={loading || !!error}
-        className="h-9 rounded-lg border border-input bg-background px-3 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-9 border border-input bg-card pl-3 pr-8 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         aria-label="Filter by organization"
       >
         <option value="">All organizations</option>

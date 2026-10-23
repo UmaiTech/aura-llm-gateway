@@ -6,6 +6,9 @@ type Theme = 'light' | 'dark' | 'system'
 interface SettingsState {
   theme: Theme
   sidebarCollapsed: boolean
+  /** Off-canvas nav drawer on narrow screens. Not persisted. */
+  mobileNavOpen: boolean
+  setMobileNavOpen: (open: boolean) => void
   setTheme: (theme: Theme) => void
   toggleSidebar: () => void
   setSidebarCollapsed: (collapsed: boolean) => void
@@ -16,6 +19,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       theme: 'dark',
       sidebarCollapsed: false,
+      mobileNavOpen: false,
+      setMobileNavOpen: (open: boolean) => set({ mobileNavOpen: open }),
       setTheme: (theme: Theme) => {
         set({ theme })
         // Apply theme to document
@@ -35,6 +40,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'aura-admin-settings',
+      partialize: (state) => ({ theme: state.theme, sidebarCollapsed: state.sidebarCollapsed }),
     }
   )
 )

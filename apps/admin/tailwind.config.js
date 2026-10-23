@@ -73,27 +73,41 @@ export default {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
         },
+        action: {
+          DEFAULT: 'hsl(var(--action))',
+          foreground: 'hsl(var(--action-foreground))',
+        },
+        dim: 'hsl(var(--dim))',
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
-        // Display serif for page titles (Dashboard, Organizations,
-        // etc.). See docs/design-audit/REDESIGN.md for the rationale.
-        display: ['Fraunces', 'Georgia', 'serif'],
+        // Font stacks come from packages/aura-ui/src/tokens.css so every
+        // app uses the same faces.
+        sans: ['var(--aura-font-sans)'],
+        mono: ['var(--aura-font-mono)'],
+        display: ['var(--aura-font-display)'],
       },
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        // Pack radii: panels 12px, controls 7px.
+        lg: 'var(--radius-panel)',
+        md: 'var(--radius-control)',
+        sm: '4px',
       },
       boxShadow: {
-        'glow': '0 0 20px rgba(139, 92, 246, 0.3)',
-        'glow-lg': '0 0 40px rgba(139, 92, 246, 0.4)',
-        'premium': '0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.1)',
-        'premium-lg': '0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 24px rgba(0, 0, 0, 0.15)',
+        // Raised surfaces only (dialogs, drawers, popovers): the pack's
+        // panel shadow. In-page cards stay flat with a hairline border.
+        'panel': 'var(--shadow-panel)',
+        // Legacy names kept so existing classes resolve.
+        'glow': '0 0 0 1px hsl(var(--primary) / 0.35)',
+        'glow-lg': '0 0 0 1px hsl(var(--primary) / 0.5)',
+        'premium': '0 0 0 1px hsl(var(--border))',
+        'premium-lg': 'var(--shadow-panel)',
       },
       keyframes: {
         'fade-in': {
@@ -117,8 +131,8 @@ export default {
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)' },
-          '50%': { boxShadow: '0 0 40px rgba(139, 92, 246, 0.5)' },
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.6' },
         },
         'shimmer': {
           '0%': { backgroundPosition: '-200% 0' },
