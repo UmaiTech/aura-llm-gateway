@@ -84,6 +84,8 @@ deploy/charts/*/*.tgz
 # Node modules (for dashboard when added)
 node_modules/
 dist/
+# The design pack's prototype is a committed reference build, not output.
+!docs/design/aura-pack-v3/prototype/dist/
 .turbo/
 
 # Lock files for tools
