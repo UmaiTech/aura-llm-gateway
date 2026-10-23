@@ -1,22 +1,25 @@
-import { useState, useEffect, useMemo, Suspense, ComponentType } from 'react'
+import { useState, useEffect, useMemo, useRef, Suspense, type ComponentType } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { BrandMark } from '@aura/ui/brand/Brand.tsx'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import mermaid from 'mermaid'
-import {
-  // Sidebar icons are no longer rendered (audit D1), but the icon
-  // import list is kept because the docSections data structure still
-  // includes `icon:` entries — they're tolerated, just unused.
-  BookOpen, Zap, Server, Code2, Settings,
-  ChevronLeft, Menu, X, ExternalLink, DollarSign, Layers, Users, Shield,
-  Wrench, ArrowRightLeft, Package, Plug, KeyRound, History, FlaskConical, Home, Rocket
-} from 'lucide-react'
+import { ArrowRight, ExternalLink, Github, Menu, PencilLine } from 'lucide-react'
+import { BrandMark, Wordmark } from '@aura/ui/brand/Brand.tsx'
+import { Drawer } from '@aura/ui/ui/Drawer.tsx'
 import { SearchModal, SearchButton, useSearchShortcut } from '../components/Search'
+import { ThemeToggle } from '../components/site/SiteChrome'
+import { proseComponents } from '../components/docs/Prose'
+import { OnThisPage, useArticleHeadings } from '../components/docs/OnThisPage'
+import { LINKS } from '../lib/links'
+import {
+  CANONICAL_SOURCES,
+  CONTENT_DIR,
+  DOC_SECTIONS,
+  ENTRY_PATHS,
+  REPO_URL,
+  routeForContentFile,
+} from '../lib/docsNav'
 
-// Import MDX components for use in MDX files
+// MDX components available inside .mdx docs
 import {
   Callout,
   CodeBlock,
@@ -31,24 +34,21 @@ import {
   ModelTable,
 } from '../components/mdx'
 
-// Import all MD files from src/content at build time using Vite's glob
+// All MD files from src/content, as raw strings at build time.
 const mdModules = import.meta.glob('../content/**/*.md', {
-  as: 'raw',
-  eager: true
+  query: '?raw',
+  import: 'default',
+  eager: true,
 }) as Record<string, unknown>
 
-// Import all MDX files as lazy components
+// All MDX files as lazy components.
 const mdxModules = import.meta.glob('../content/**/*.mdx') as Record<
   string,
   () => Promise<{ default: ComponentType }>
 >
 
-// Remove frontmatter from markdown content
 function removeFrontmatter(content: unknown): string {
-  // Handle case where content might not be a string (e.g., module object)
   if (typeof content !== 'string') {
-    console.warn('Content is not a string:', typeof content, content)
-    // Try to extract string from module-like object
     if (content && typeof content === 'object' && 'default' in content) {
       return removeFrontmatter((content as { default: unknown }).default)
     }
@@ -57,415 +57,31 @@ function removeFrontmatter(content: unknown): string {
   return content.replace(/^---\n[\s\S]*?\n---\n/, '')
 }
 
-// Map file paths to doc paths
-function getDocPath(filePath: string): string {
-  const match = filePath.match(/content\/(.+)\.(md|mdx)$/)
-  if (!match) return ''
+/** Route -> repository path of the file it is rendered from. */
+const sourceFiles: Record<string, string> = {}
+const repoPath = (globKey: string) => `${CONTENT_DIR}/${globKey.replace('../content/', '')}`
 
-  const path = match[1]
-  if (path === 'index') return '/docs'
-  if (path === 'api/index') return '/docs/api'
-  if (path.endsWith('/index')) {
-    return `/docs/${path.replace('/index', '')}`
-  }
-  return `/docs/${path}`
-}
-
-// Create content map from imported MD modules
 const docContentFromFiles: Record<string, string> = {}
 for (const [filePath, content] of Object.entries(mdModules)) {
-  const docPath = getDocPath(filePath)
-  if (docPath) {
-    docContentFromFiles[docPath] = removeFrontmatter(content)
+  const route = routeForContentFile(filePath)
+  if (route) {
+    docContentFromFiles[route] = removeFrontmatter(content)
+    sourceFiles[route] = repoPath(filePath)
   }
 }
 
-// Create MDX component map
+// MDX wins over MD when both exist for a route.
 const mdxComponents: Record<string, () => Promise<{ default: ComponentType }>> = {}
 for (const [filePath, loader] of Object.entries(mdxModules)) {
-  const docPath = getDocPath(filePath)
-  if (docPath) {
-    mdxComponents[docPath] = loader
+  const route = routeForContentFile(filePath)
+  if (route) {
+    mdxComponents[route] = loader
+    sourceFiles[route] = repoPath(filePath)
   }
 }
 
-// Documentation structure with icons
-const docSections = [
-  {
-    title: 'Getting Started',
-    items: [
-      { title: 'Introduction', path: '/docs', icon: BookOpen },
-      { title: 'Quickstart', path: '/docs/quickstart', icon: Zap },
-      { title: 'Configuration', path: '/docs/configuration', icon: Settings },
-      { title: 'Deployment', path: '/docs/deployment', icon: Server },
-    ],
-  },
-  {
-    title: 'API Reference',
-    items: [
-      { title: 'Overview', path: '/docs/api', icon: Code2 },
-      { title: 'Swagger UI', path: 'https://api.aura-llm.dev/swagger-ui/', icon: ExternalLink, external: true },
-      { title: 'Authentication', path: '/docs/api/authentication', icon: Server },
-      { title: 'Create Response', path: '/docs/api/create-response', icon: Server },
-      { title: 'Conversations', path: '/docs/api/conversations', icon: BookOpen },
-      { title: 'Streaming', path: '/docs/api/streaming', icon: Zap },
-      { title: 'Cost Tracking', path: '/docs/api/cost-tracking', icon: DollarSign },
-      { title: 'Rate Limiting', path: '/docs/api/rate-limiting', icon: Shield },
-      { title: 'Smart Routing', path: '/docs/api/routing', icon: ArrowRightLeft },
-      { title: 'Auto Model Routing', path: '/docs/api/auto-routing', icon: ArrowRightLeft },
-      { title: 'Prompt Compression', path: '/docs/api/compression', icon: Package },
-      { title: 'Response Validation', path: '/docs/api/validation', icon: Shield },
-      { title: 'Response Consistency', path: '/docs/api/consistency', icon: Layers },
-      { title: 'Response Caching', path: '/docs/api/caching', icon: Server },
-      { title: 'Error Reference', path: '/docs/api/errors', icon: Code2 },
-      { title: 'Admin API', path: '/docs/api/admin', icon: KeyRound },
-      { title: 'Changelog', path: '/docs/api/changelog', icon: History },
-    ],
-  },
-  {
-    title: 'Guides',
-    items: [
-      { title: 'Using Existing SDKs', path: '/docs/guides/existing-sdks', icon: Plug },
-      { title: 'Tool Calling', path: '/docs/guides/tool-calling', icon: Wrench },
-      { title: 'Testing & Sandbox', path: '/docs/guides/testing', icon: FlaskConical },
-      { title: 'Migration Guide', path: '/docs/guides/migration', icon: ArrowRightLeft },
-    ],
-  },
-  {
-    title: 'SDKs',
-    items: [
-      { title: 'Python', path: '/docs/sdks/python', icon: Package },
-      { title: 'TypeScript', path: '/docs/sdks/typescript', icon: Package },
-    ],
-  },
-  {
-    title: 'Multi-Tenancy',
-    items: [
-      { title: 'Organizations & End-Users', path: '/docs/organizations', icon: Users },
-      { title: 'Provider Credentials', path: '/docs/credentials', icon: Shield },
-    ],
-  },
-  {
-    title: 'Architecture',
-    items: [
-      { title: 'Overview', path: '/docs/architecture', icon: Layers },
-    ],
-  },
-  {
-    title: 'Providers',
-    items: [
-      { title: 'OpenAI', path: '/docs/providers/openai', icon: Server },
-      { title: 'Anthropic', path: '/docs/providers/anthropic', icon: Server },
-      { title: 'Google', path: '/docs/providers/google', icon: Server },
-      { title: 'Mistral', path: '/docs/providers/mistral', icon: Server },
-      { title: 'Ollama', path: '/docs/providers/ollama', icon: Server },
-      { title: 'HuggingFace', path: '/docs/providers/huggingface', icon: Server },
-      { title: 'AWS Bedrock', path: '/docs/providers/bedrock', icon: Server },
-    ],
-  },
-  {
-    title: 'Concepts',
-    items: [
-      { title: 'Open Responses API', path: '/docs/concepts/open-responses', icon: BookOpen },
-    ],
-  },
-  {
-    title: 'Project',
-    items: [
-      { title: 'Roadmap', path: '/roadmap', icon: Rocket, standalone: true },
-    ],
-  },
-]
-
-// Fallback content for docs not yet created as MD files
-const fallbackContent: Record<string, string> = {
-  '/docs': `# Introduction
-
-Aura is a high-performance LLM gateway built with Rust. It provides a unified API
-for multiple LLM providers with built-in cost tracking, observability, and support
-for agentic workflows.
-
-## Features
-
-- **Unified API** for OpenAI, Anthropic, and Google models
-- **Real-time cost calculation** per request
-- **Open Responses API** specification support
-- **Streaming** with Server-Sent Events
-- **Tool/function calling** support
-- **Request enrichment** with provider and latency metadata
-
-## Architecture
-
-Aura is organized into modular Rust crates:
-
-- \`aura-types\` - Shared type definitions (Open Responses API)
-- \`aura-core\` - Core business logic (providers, routing, caching)
-- \`aura-proxy\` - Main server binary (Axum routes, middleware)
-- \`aura-db\` - Database models and queries (SQLx)
-`,
-}
-
-// Mermaid component
-function MermaidDiagram({ chart }: { chart: string }) {
-  const [svg, setSvg] = useState<string>('')
-  const [error, setError] = useState<string>('')
-
-  useEffect(() => {
-    let cancelled = false
-
-    const renderDiagram = async () => {
-      try {
-        // Monochrome editorial Mermaid theme — no aura/primary purple
-        // sweep (audit D4). Single accent (aura-400) reserved for
-        // primary nodes; everything else is greyscale that matches
-        // the rest of the docs surface.
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'base',
-          themeVariables: {
-            primaryColor: '#1f2937',         // node fill (grey-800)
-            primaryTextColor: '#e5e7eb',     // node text
-            primaryBorderColor: '#38bdf8',   // single accent on borders
-            lineColor: '#6b7280',            // edges (grey-500)
-            secondaryColor: '#111827',       // secondary nodes (grey-900)
-            tertiaryColor: '#0f172a',        // background bands
-            background: '#0a0a0a',           // page bg matches dark mode
-            mainBkg: '#1f2937',
-            secondBkg: '#111827',
-            textColor: '#e5e7eb',
-            fontSize: '14px',
-            fontFamily: 'Inter, sans-serif',
-          },
-          securityLevel: 'loose',
-          flowchart: {
-            useMaxWidth: true,
-            htmlLabels: true,
-            curve: 'basis',
-          },
-        })
-
-        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        const { svg: renderedSvg } = await mermaid.render(id, chart)
-
-        if (!cancelled) {
-          setSvg(renderedSvg)
-          setError('')
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Mermaid rendering error:', err)
-          setError(err instanceof Error ? err.message : 'Failed to render diagram')
-        }
-      }
-    }
-
-    if (chart) {
-      renderDiagram()
-    }
-
-    return () => {
-      cancelled = true
-    }
-  }, [chart])
-
-  if (error) {
-    return (
-      <div className="my-6 p-4 bg-red-900/20 border border-red-800 rounded text-red-400 text-sm">
-        <strong>Mermaid rendering error:</strong> {error}
-      </div>
-    )
-  }
-
-  if (!svg) {
-    return (
-      <div className="my-6 flex justify-center">
-        <div className="text-gray-500 text-sm">Loading diagram...</div>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className="my-6 flex justify-center overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  )
-}
-
-// Markdown components for custom styling
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const markdownComponents: any = {
-  // Doc prose uses Fraunces for h1/h2 (editorial-minimal direction
-  // per docs/design-audit/REDESIGN.md item D3). h3+ stay in Inter so
-  // the body hierarchy doesn't get muddied.
-  h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="font-display text-4xl font-semibold tracking-tight mb-6 text-white">
-      {children}
-    </h1>
-  ),
-  h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="font-display text-2xl font-semibold tracking-tight mt-10 mb-4 text-white">
-      {children}
-    </h2>
-  ),
-  h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-lg font-semibold mt-7 mb-3 text-white">{children}</h3>
-  ),
-  h4: ({ children }: { children?: React.ReactNode }) => (
-    <h4 className="text-base font-semibold mt-5 mb-2 text-white">{children}</h4>
-  ),
-  p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
-  ),
-  ul: ({ children }: { children?: React.ReactNode }) => (
-    <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">{children}</ul>
-  ),
-  ol: ({ children }: { children?: React.ReactNode }) => (
-    <ol className="list-decimal list-inside space-y-2 text-gray-300 mb-4">{children}</ol>
-  ),
-  li: ({ children }: { children?: React.ReactNode }) => (
-    <li className="text-gray-300">{children}</li>
-  ),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  code: ({ inline, className, children, ...props }: any) => {
-    const match = /language-(\w+)/.exec(className || '')
-    const language = match ? match[1] : ''
-
-    const codeString = Array.isArray(children)
-      ? children.join('')
-      : String(children || '').replace(/\n$/, '')
-
-    if (language === 'mermaid') {
-      return <MermaidDiagram chart={codeString} />
-    }
-
-    if (inline || !className) {
-      return <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>{children}</code>
-    }
-
-    return (
-      <SyntaxHighlighter
-        language={language || 'text'}
-        style={vscDarkPlus}
-        customStyle={{
-          margin: '0 0 1rem 0',
-          borderRadius: '0.5rem',
-          fontSize: '0.875rem',
-          background: '#0f172a',
-          padding: '1rem'
-        }}
-        showLineNumbers={false}
-      >
-        {codeString}
-      </SyntaxHighlighter>
-    )
-  },
-  pre: ({ children }: { children?: React.ReactNode }) => (
-    <div className="mb-4">{children}</div>
-  ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
-    // Use Link for internal navigation, regular anchor for external
-    if (href?.startsWith('/') || href?.startsWith('#')) {
-      return (
-        <Link to={href} className="text-aura-400 hover:text-aura-300 underline">
-          {children}
-        </Link>
-      )
-    }
-    return (
-      <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
-    )
-  },
-  table: ({ children }: { children?: React.ReactNode }) => (
-    <div className="overflow-x-auto mb-4">
-      <table className="min-w-full divide-y divide-gray-800">{children}</table>
-    </div>
-  ),
-  th: ({ children }: { children?: React.ReactNode }) => (
-    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-300 bg-gray-900">{children}</th>
-  ),
-  td: ({ children }: { children?: React.ReactNode }) => (
-    <td className="px-4 py-2 text-sm text-gray-400 border-t border-gray-800">{children}</td>
-  ),
-  blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="border-l-4 border-aura-500 pl-4 italic text-gray-400 mb-4">{children}</blockquote>
-  ),
-  strong: ({ children }: { children?: React.ReactNode }) => (
-    <strong className="font-semibold text-white">{children}</strong>
-  ),
-}
-
-// MDX wrapper components - these are passed to MDX files
 const mdxWrapperComponents = {
-  // Standard HTML elements with styling
-  // Doc prose uses Fraunces for h1/h2 (editorial-minimal direction
-  // per docs/design-audit/REDESIGN.md item D3). h3+ stay in Inter so
-  // the body hierarchy doesn't get muddied.
-  h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="font-display text-4xl font-semibold tracking-tight mb-6 text-white">
-      {children}
-    </h1>
-  ),
-  h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="font-display text-2xl font-semibold tracking-tight mt-10 mb-4 text-white">
-      {children}
-    </h2>
-  ),
-  h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-lg font-semibold mt-7 mb-3 text-white">{children}</h3>
-  ),
-  h4: ({ children }: { children?: React.ReactNode }) => (
-    <h4 className="text-base font-semibold mt-5 mb-2 text-white">{children}</h4>
-  ),
-  p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
-  ),
-  ul: ({ children }: { children?: React.ReactNode }) => (
-    <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">{children}</ul>
-  ),
-  ol: ({ children }: { children?: React.ReactNode }) => (
-    <ol className="list-decimal list-inside space-y-2 text-gray-300 mb-4">{children}</ol>
-  ),
-  li: ({ children }: { children?: React.ReactNode }) => (
-    <li className="text-gray-300">{children}</li>
-  ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
-    if (href?.startsWith('/') || href?.startsWith('#')) {
-      return (
-        <Link to={href} className="text-aura-400 hover:text-aura-300 underline">
-          {children}
-        </Link>
-      )
-    }
-    return (
-      <a href={href} className="text-aura-400 hover:text-aura-300 underline" target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
-    )
-  },
-  table: ({ children }: { children?: React.ReactNode }) => (
-    <div className="overflow-x-auto mb-4">
-      <table className="min-w-full divide-y divide-gray-800">{children}</table>
-    </div>
-  ),
-  th: ({ children }: { children?: React.ReactNode }) => (
-    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-300 bg-gray-900">{children}</th>
-  ),
-  td: ({ children }: { children?: React.ReactNode }) => (
-    <td className="px-4 py-2 text-sm text-gray-400 border-t border-gray-800">{children}</td>
-  ),
-  blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="border-l-4 border-aura-500 pl-4 italic text-gray-400 mb-4">{children}</blockquote>
-  ),
-  code: ({ children }: { children?: React.ReactNode }) => (
-    <code className="text-aura-400 bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
-  ),
-  pre: ({ children }: { children?: React.ReactNode }) => (
-    <div className="mb-4">{children}</div>
-  ),
-  // Custom MDX components
+  ...proseComponents,
   Callout,
   CodeBlock,
   CodeTabs,
@@ -479,11 +95,10 @@ const mdxWrapperComponents = {
   ModelTable,
 }
 
-// Loading component for MDX
 function MDXLoading() {
   return (
     <div className="flex items-center justify-center py-12">
-      <div className="animate-pulse text-gray-500">Loading documentation...</div>
+      <div className="text-sm text-aura-dim motion-safe:animate-pulse">Loading documentation…</div>
     </div>
   )
 }
@@ -491,221 +106,328 @@ function MDXLoading() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MDXComponentType = ComponentType<{ components?: Record<string, ComponentType<any>> }>
 
-// MDX Content renderer
 function MDXContent({ path }: { path: string }) {
   const [Component, setComponent] = useState<MDXComponentType | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const loader = mdxComponents[path]
-    if (loader) {
-      loader()
-        .then((mod) => {
-          setComponent(() => mod.default)
-          setError(null)
-        })
-        .catch((err) => {
-          console.error('Failed to load MDX:', err)
-          setError('Failed to load documentation')
-        })
+    if (!loader) return
+    let cancelled = false
+    setComponent(null)
+    loader()
+      .then((mod) => {
+        if (cancelled) return
+        setComponent(() => mod.default)
+        setError(null)
+      })
+      .catch(() => {
+        if (!cancelled) setError('This page failed to load. Reload to try again.')
+      })
+    return () => {
+      cancelled = true
     }
   }, [path])
 
   if (error) {
-    return (
-      <div className="p-4 bg-red-900/20 border border-red-800 rounded text-red-400">
-        {error}
-      </div>
-    )
+    return <div className="rounded-control border border-aura-red/40 bg-aura-red/10 p-4 text-sm text-aura-red">{error}</div>
   }
-
-  if (!Component) {
-    return <MDXLoading />
-  }
-
+  if (!Component) return <MDXLoading />
   return <Component components={mdxWrapperComponents} />
+}
+
+/** Markdown before the first `## ` heading, and the rest. */
+function splitIntro(markdown: string): [string, string] {
+  const at = markdown.search(/^## /m)
+  return at < 0 ? [markdown, ''] : [markdown.slice(0, at), markdown.slice(at)]
+}
+
+const hasContent = (path: string) => Boolean(docContentFromFiles[path] || mdxComponents[path])
+
+function sectionFor(path: string) {
+  return DOC_SECTIONS.find((s) => s.items.some((i) => i.path === path))
+}
+
+/** Sidebar contents; used in the desktop column and the mobile drawer. */
+function DocsNav({ currentPath, onNavigate }: { currentPath: string; onNavigate?: () => void }) {
+  return (
+    <nav aria-label="Documentation" className="space-y-6 text-[13px]">
+      {DOC_SECTIONS.map((section) => (
+        <div key={section.title}>
+          <h2 className="eyebrow mb-2 px-3">{section.title}</h2>
+          <ul className="space-y-px">
+            {section.items.map((item) => {
+              if (item.external) {
+                return (
+                  <li key={item.path}>
+                    <a
+                      href={item.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between gap-2 rounded-control px-3 py-1.5 text-aura-muted transition-colors hover:bg-aura-hover hover:text-aura-text"
+                    >
+                      <span>{item.title}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  </li>
+                )
+              }
+              const isActive = currentPath === item.path
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    onClick={onNavigate}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`block rounded-control px-3 py-1.5 transition-colors ${
+                      isActive
+                        ? 'bg-aura-accent/10 font-medium text-aura-accent'
+                        : 'text-aura-muted hover:bg-aura-hover hover:text-aura-text'
+                    }`}
+                  >
+                    {item.title}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+/** Task-oriented ways into the docs, shown on the docs index. */
+function EntryPaths() {
+  return (
+    <section aria-labelledby="entry-paths" className="mb-4 mt-8">
+      <h2 id="entry-paths" data-toc-skip className="mb-4 text-2xl font-semibold tracking-tight text-aura-text">
+        Find your way in
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {ENTRY_PATHS.map((path) => (
+          <section
+            key={path.id}
+            aria-labelledby={`entry-${path.id}`}
+            className="rounded-panel border border-aura-border bg-aura-surface p-5"
+          >
+            <h3 id={`entry-${path.id}`} data-toc-skip className="text-base font-semibold text-aura-text">
+              {path.title}
+            </h3>
+            <p className="mt-1 text-[13px] leading-relaxed text-aura-muted">{path.summary}</p>
+            <ul className="mt-3 space-y-1 text-[13px]">
+              {path.links.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    to={link.href}
+                    className="group inline-flex items-center gap-1.5 text-aura-accent hover:underline underline-offset-2"
+                  >
+                    {link.label}
+                    <ArrowRight className="h-3 w-3 transition-transform motion-safe:group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ArticleMeta({ path }: { path: string }) {
+  const source = sourceFiles[path]
+  const canonical = CANONICAL_SOURCES[path]
+  if (!source) return null
+  return (
+    <footer className="mt-14 border-t border-aura-border pt-5 text-xs text-aura-dim">
+      <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <dt>Page source</dt>
+        <dd className="min-w-0 font-mono [overflow-wrap:anywhere]">
+          <a href={`${REPO_URL}/blob/main/${source}`} target="_blank" rel="noopener noreferrer" className="hover:text-aura-text">
+            {source}
+          </a>
+        </dd>
+        {canonical && (
+          <>
+            <dt>Canonical reference</dt>
+            <dd className="min-w-0 font-mono [overflow-wrap:anywhere]">
+              <a href={`${REPO_URL}/blob/main/${canonical}`} target="_blank" rel="noopener noreferrer" className="hover:text-aura-text">
+                {canonical}
+              </a>
+            </dd>
+          </>
+        )}
+      </dl>
+      <a
+        href={`${REPO_URL}/edit/main/${source}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 inline-flex items-center gap-1.5 text-aura-accent hover:underline underline-offset-2"
+      >
+        <PencilLine className="h-3.5 w-3.5" aria-hidden />
+        Edit this page on GitHub
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
+    </footer>
+  )
 }
 
 export function DocsPage() {
   const location = useLocation()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const articleRef = useRef<HTMLElement>(null)
 
-  // Global keyboard shortcut for search
   useSearchShortcut(() => setSearchOpen(true))
 
-  const currentPath = location.pathname
-
-  // Check if we have MDX content for this path
+  const currentPath = location.pathname.replace(/\/$/, '') || '/docs'
   const hasMdxContent = mdxComponents[currentPath] !== undefined
+  const found = hasContent(currentPath)
+  const markdown = useMemo(() => (hasMdxContent ? null : docContentFromFiles[currentPath] ?? null), [currentPath, hasMdxContent])
+  const section = sectionFor(currentPath)
+  const pageTitle = section?.items.find((i) => i.path === currentPath)?.title
 
-  // Get markdown content from MD files or fallback
-  const currentContent = useMemo(() => {
-    if (hasMdxContent) return null
-    return docContentFromFiles[currentPath] || fallbackContent[currentPath] || fallbackContent['/docs']
-  }, [currentPath, hasMdxContent])
-
-  // Check if path has any content
-  const hasContent = (path: string) => {
-    return docContentFromFiles[path] || fallbackContent[path] || mdxComponents[path]
-  }
-
+  // New page: start at the top unless the URL targets a heading.
   useEffect(() => {
-    console.log('Available MD files:', Object.keys(docContentFromFiles))
-    console.log('Available MDX files:', Object.keys(mdxComponents))
-    console.log('Current path:', currentPath)
+    if (!location.hash) window.scrollTo(0, 0)
+    setNavOpen(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath])
 
+  useEffect(() => {
+    document.title = pageTitle && currentPath !== '/docs' ? `${pageTitle} · Aura Docs` : 'Aura Docs'
+  }, [pageTitle, currentPath])
+
+  const headings = useArticleHeadings(articleRef, currentPath, location.hash)
+
   return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Top Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950/80 backdrop-blur-lg border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 rounded-lg hover:bg-gray-800"
-              >
-                {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-              <Link to="/" className="flex items-center gap-2" aria-label="Aura home">
-                <BrandMark size={30} />
-                <span className="font-semibold text-lg">Aura Docs</span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-4">
-              <SearchButton onClick={() => setSearchOpen(true)} />
-              <a
-                href="https://playground.aura-llm.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1"
-              >
-                Playground
-                <ExternalLink className="h-3.5 w-3.5" />
+    <div className="min-h-screen bg-aura-bg text-aura-text">
+      <a
+        href="#docs-article"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-control focus:bg-aura-surface focus:px-3 focus:py-2 focus:text-sm"
+      >
+        Skip to content
+      </a>
+      <header className="sticky top-0 z-40 border-b border-aura-border bg-aura-bg/95 backdrop-blur supports-[backdrop-filter]:bg-aura-bg/85">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setNavOpen(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-control text-aura-muted hover:bg-aura-hover hover:text-aura-text lg:hidden"
+              aria-label="Open documentation menu"
+              aria-expanded={navOpen}
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </button>
+            <a href="/" className="flex shrink-0 items-center text-aura-text" aria-label="Aura home">
+              <Wordmark size={30} title="" className="hidden sm:block" />
+              <BrandMark size={28} className="sm:hidden" />
+            </a>
+            <Link
+              to="/docs"
+              className="ml-1 border-l border-aura-border pl-3 text-sm font-medium text-aura-muted hover:text-aura-text"
+            >
+              Docs
+            </Link>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <SearchButton onClick={() => setSearchOpen(true)} />
+            <nav aria-label="Site" className="hidden items-center gap-5 text-[13px] text-aura-muted md:flex">
+              <a href={LINKS.pricing} className="hover:text-aura-text">
+                Pricing
               </a>
-            </div>
+              <a href={LINKS.roadmap} className="hover:text-aura-text">
+                Roadmap
+              </a>
+            </nav>
+            <a
+              href={LINKS.github}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden h-9 w-9 items-center justify-center rounded-control text-aura-muted hover:bg-aura-hover hover:text-aura-text sm:inline-flex"
+              aria-label="Aura on GitHub"
+            >
+              <Github className="h-4 w-4" aria-hidden />
+            </a>
+            <ThemeToggle />
+            <a href={LINKS.playground} className="btn-secondary hidden !px-3 !py-2 text-[13px] lg:inline-flex">
+              Open playground
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </a>
           </div>
         </div>
-      </nav>
+      </header>
 
-      <div className="flex pt-16">
-        {/* Sidebar */}
-        <aside
-          className={`
-            fixed lg:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64
-            bg-gray-950 border-r border-gray-800 overflow-y-auto
-            transform transition-transform duration-200 lg:transform-none
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          `}
-        >
-          <nav className="p-4 space-y-6">
-            {docSections.map((section) => (
-              <div key={section.title}>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  {section.title}
-                </h3>
-                <ul className="space-y-1">
-                  {section.items.map((item) => {
-                    const isActive = currentPath === item.path
-                    const isStandalone = 'standalone' in item && item.standalone
-                    const itemHasContent = isStandalone || hasContent(item.path)
-                    const isExternal = 'external' in item && item.external
-
-                    // Sidebar = typographic table of contents. No
-                    // per-item icons (audit D1). Active state shown
-                    // by a left border-rule + accent text rather than
-                    // a filled background tile.
-                    if (isExternal) {
-                      return (
-                        <li key={item.path}>
-                          <a
-                            href={item.path}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded text-sm transition-colors text-gray-400 hover:text-white"
-                          >
-                            <span>{item.title}</span>
-                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                          </a>
-                        </li>
-                      )
-                    }
-
-                    return (
-                      <li key={item.path}>
-                        <Link
-                          to={item.path}
-                          onClick={() => setSidebarOpen(false)}
-                          className={`
-                            flex items-center gap-2 pl-3 pr-3 py-1.5 text-sm transition-colors border-l-2
-                            ${isActive
-                              ? 'border-aura-400 text-aura-400'
-                              : itemHasContent
-                                ? 'border-transparent text-gray-400 hover:text-white hover:border-gray-600'
-                                : 'border-transparent text-gray-600 hover:text-gray-400 hover:border-gray-700'
-                            }
-                          `}
-                        >
-                          {item.title}
-                        </Link>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            ))}
-          </nav>
+      <div className="mx-auto flex max-w-[1440px] px-4 sm:px-6">
+        <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-60 shrink-0 overflow-y-auto border-r border-aura-border py-8 pr-4 lg:block">
+          <DocsNav currentPath={currentPath} />
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 lg:pl-8">
-          <div className="max-w-3xl mx-auto">
-            {/* Navigation breadcrumb */}
-            <div className="flex items-center gap-4 mb-6 text-sm">
-              <button
-                onClick={() => window.history.back()}
-                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
-              <Link
-                to="/"
-                className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors"
-              >
-                <Home className="h-4 w-4" />
-                Home
-              </Link>
-            </div>
-            <div className="prose prose-invert prose-gray max-w-none">
-              {hasMdxContent ? (
-                <Suspense fallback={<MDXLoading />}>
-                  <MDXContent path={currentPath} />
-                </Suspense>
+        <main id="docs-article" tabIndex={-1} className="min-w-0 flex-1 py-8 focus:outline-none lg:px-10 xl:px-14">
+          <div className="mx-auto flex max-w-[1060px] gap-12">
+            <article ref={articleRef} className="min-w-0 max-w-[74ch] flex-1">
+              <p className="eyebrow mb-4">
+                <Link to="/docs" className="hover:text-aura-text">
+                  Docs
+                </Link>
+                {section && currentPath !== '/docs' && (
+                  <>
+                    <span aria-hidden className="mx-2">/</span>
+                    <span>{section.title}</span>
+                  </>
+                )}
+              </p>
+
+              {!found ? (
+                <div>
+                  <h1 className="mb-4 font-display text-[2.15rem] font-semibold text-aura-text">Page not found</h1>
+                  <p className="mb-6 text-aura-muted">
+                    There is no documentation at <code className="font-mono text-aura-accent">{currentPath}</code>. Search the docs
+                    or start from one of the paths below.
+                  </p>
+                  <EntryPaths />
+                </div>
               ) : (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents}
-                >
-                  {currentContent || ''}
-                </ReactMarkdown>
+                <>
+                  {hasMdxContent ? (
+                    <Suspense fallback={<MDXLoading />}>
+                      <MDXContent path={currentPath} />
+                    </Suspense>
+                  ) : currentPath === '/docs' ? (
+                    // Index: title and intro, then the entry paths, then the rest.
+                    <>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={proseComponents}>
+                        {splitIntro(markdown || '')[0]}
+                      </ReactMarkdown>
+                      <EntryPaths />
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={proseComponents}>
+                        {splitIntro(markdown || '')[1]}
+                      </ReactMarkdown>
+                    </>
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={proseComponents}>
+                      {markdown || ''}
+                    </ReactMarkdown>
+                  )}
+                  <ArticleMeta path={currentPath} />
+                </>
               )}
-            </div>
+            </article>
+
+            <aside className="sticky top-24 hidden max-h-[calc(100vh-7rem)] w-52 shrink-0 self-start overflow-y-auto xl:block">
+              <OnThisPage entries={headings} />
+            </aside>
           </div>
         </main>
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <Drawer open={navOpen} onClose={() => setNavOpen(false)} title="Documentation" closeLabel="Close documentation menu">
+        <DocsNav currentPath={currentPath} onNavigate={() => setNavOpen(false)} />
+      </Drawer>
 
-      {/* Search Modal */}
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )
