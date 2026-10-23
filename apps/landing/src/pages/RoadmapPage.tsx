@@ -29,7 +29,7 @@ import {
  * (released / merged-unreleased / in-progress / planned / considering);
  * roadmap.test.ts checks them against CHANGELOG.md. This page only renders.
  *
- * Latest shipped: v0.21.1 (2026-10-23)
+ * Latest shipped: v0.21.2 (2026-10-23)
  * (kept current by scripts/release/sync-release-cli.ts on release PRs)
  */
 
