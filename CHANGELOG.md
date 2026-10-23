@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Docs: Start / Route / Operate / Learn & evaluate entry paths, on-page contents, a mobile navigation drawer, edit-on-GitHub links and light/dark themes; `docs/api/auto-routing.md` is the canonical source with a drift test against the landing guide
 - Roadmap reconciled with the changelog and release tags (latest v0.20.0): released work by version with evidence links, merged-but-unreleased work shown separately, proposals marked as such with no dates, and tests that keep it consistent
 - Pricing page: one cross-provider table with a workload estimator (requests, input/output tokens, cached share) in the selected currency, provider and capability filters, and side-by-side comparison of up to three models; unknown prices are never treated as free, workloads that exceed a model's context or output limit are flagged, and stale data and failed provider scrapes are shown separately
+- Admin: organization routing limits validate inline (minimum above maximum tier, invalid budget) instead of being dropped, the LLM classifier discloses that it sends a user-text excerpt, the budget is labelled a predicted-cost constraint rather than a spend cap, the copy explains that requests can only narrow organization limits, and shadow savings on the Routing page are labelled counterfactual
 
 ## [0.20.0] - 2026-10-22
 

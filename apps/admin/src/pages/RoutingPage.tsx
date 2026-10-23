@@ -321,14 +321,12 @@ export function RoutingPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Est. savings (shadow)</div>
-                    <div
-                      className={cn(
-                        'text-xl font-semibold tabular-nums',
-                        auto.summary.estimated_savings > 0 && 'text-emerald-400',
-                      )}
-                    >
+                    <div className="text-xs text-muted-foreground" title="What shadow-scored requests would have cost less had auto been applied. An estimate, not realised spend.">
+                      Est. savings if applied (shadow)
+                    </div>
+                    <div className="text-xl font-semibold tabular-nums">
                       {formatCurrency(auto.summary.estimated_savings)}
+                      <span className="ml-1.5 text-2xs font-normal text-muted-foreground">counterfactual</span>
                     </div>
                   </div>
                   <div>
@@ -350,7 +348,7 @@ export function RoutingPage() {
                         <th className="text-right py-2 pr-3 font-medium">Completed</th>
                         <th className="text-right py-2 pr-3 font-medium">Avg latency</th>
                         <th className="text-right py-2 pr-3 font-medium">Cost</th>
-                        <th className="text-right py-2 pr-3 font-medium">Est. savings</th>
+                        <th className="text-right py-2 pr-3 font-medium" title="Shadow rows only: counterfactual estimate">Est. savings (counterfactual)</th>
                         <th className="text-right py-2 pr-3 font-medium">Feedback</th>
                         <th className="text-right py-2 pr-3 font-medium" title="Mean reward from outcome signals (move on / retry / correction / escalation), −1 to +1">
                           Reward
