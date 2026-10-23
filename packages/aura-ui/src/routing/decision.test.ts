@@ -102,6 +102,20 @@ test('hard filters split into options/policy and request shape', () => {
   assert.deepEqual(v.shapeFilters, ['tools present: floor medium', 'needs tools'])
 })
 
+test('applied options: echoed options are listed, nulls dropped, stored rows have none', () => {
+  const v = fromResponseDecision({
+    ...applied,
+    options: { min_tier: 'medium', sticky: false, max_cost_usd: 5, deny: ['qwen*', 'x'], classifier: null },
+  })
+  assert.deepEqual(v.appliedOptions, [
+    { key: 'min_tier', value: 'medium' },
+    { key: 'sticky', value: 'false' },
+    { key: 'max_cost_usd', value: '5' },
+    { key: 'deny', value: 'qwen*, x' },
+  ])
+  assert.deepEqual(fromResponseDecision(applied).appliedOptions, [])
+})
+
 test('candidates: nullable prices stay null, eligibility and pick are marked', () => {
   const v = fromResponseDecision(applied)
   assert.equal(v.candidates.length, 3)

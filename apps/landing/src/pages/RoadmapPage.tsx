@@ -30,9 +30,10 @@ import {
  * roadmap.test.ts checks them against CHANGELOG.md. This page only renders.
  *
  * Latest shipped: v0.21.0 (2026-10-23)
- * In progress: nothing tagged in-progress and nothing merged-unreleased;
- *   v0.21.0 shipped prompt caching, the v3 redesign, the admin design
- *   refresh, the routing decisions explorer and the routing lab.
+ * In progress: nothing tagged in-progress; merged-unreleased holds the
+ *   streaming fixes (#235). v0.21.0 shipped prompt caching, the v3
+ *   redesign, the admin design refresh, the routing decisions explorer
+ *   and the routing lab.
  */
 
 const FILTERS: { id: StatusFilter; label: string }[] = [

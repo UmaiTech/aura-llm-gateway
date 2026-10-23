@@ -146,6 +146,11 @@ pub struct AutoDecision {
     /// model is loaded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predicted_cost_usd: Option<f64>,
+    /// The routing options in force for this decision: the request's own
+    /// `routing` merged with any organization override. Echoed so callers
+    /// can confirm what the gateway applied. Absent when none were sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<RoutingOptions>,
     /// Request came from a synthetic-trace run (`x-aura-synthetic`); the
     /// decision is recorded but excluded from stats, outcome rewards,
     /// arm statistics and live gold sampling.
@@ -363,6 +368,7 @@ impl AutoRouter {
                     let selected_tier = prev_tier.unwrap_or(tier);
                     return Ok(AutoDecision {
                         requested_model: ctx.requested_model.to_string(),
+                        options: ctx.options.cloned(),
                         mode,
                         classifier: classifier.clone(),
                         score: scored.score,
@@ -439,6 +445,7 @@ impl AutoRouter {
 
         Ok(AutoDecision {
             requested_model: ctx.requested_model.to_string(),
+            options: ctx.options.cloned(),
             mode,
             classifier: classifier.clone(),
             score: scored.score,

@@ -190,7 +190,7 @@ function RoutingDetail({ view }: { view: RoutingView }) {
 
       <section>
         <h3 className="aui-ri-h">Constraints</h3>
-        {view.optionFilters.length === 0 && view.shapeFilters.length === 0 ? (
+        {view.optionFilters.length === 0 && view.shapeFilters.length === 0 && view.appliedOptions.length === 0 ? (
           <p className="aui-ri-sub">None applied.</p>
         ) : (
           <dl className="aui-kv">
@@ -204,6 +204,12 @@ function RoutingDetail({ view }: { view: RoutingView }) {
               <div>
                 <dt>Request shape</dt>
                 <dd>{view.shapeFilters.join(' · ')}</dd>
+              </div>
+            )}
+            {view.appliedOptions.length > 0 && (
+              <div>
+                <dt>Applied options</dt>
+                <dd>{view.appliedOptions.map((o) => `${o.key}=${o.value}`).join(' · ')}</dd>
               </div>
             )}
           </dl>

@@ -83,7 +83,7 @@ export interface Release {
 }
 
 export const RELEASES: Release[] = [
-  { version: '0.21.0', date: '2026-10-23', tagged: false },
+  { version: '0.21.0', date: '2026-10-23', tagged: true },
   { version: '0.20.0', date: '2026-10-22', tagged: true },
   { version: '0.19.0', date: '2026-10-22', tagged: true },
   { version: '0.18.0', date: '2026-09-09', tagged: true },
@@ -107,7 +107,15 @@ function released(
 
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
-  // (none: everything merged so far shipped in v0.21.0)
+  {
+    id: 'streaming-fixes',
+    title: 'Streaming fixes for Gemini and long answers',
+    status: 'merged-unreleased',
+    area: 'gateway',
+    description:
+      'Streamed Gemini answers no longer lose words, text cut mid-character by the network is no longer dropped by any provider, long code answers no longer stall the playground, and every routing decision now echoes the options it applied.',
+    evidenceLinks: [pr(235)],
+  },
 
   // ── Released ─────────────────────────────────────────────────────────
   released('0.21.0', {

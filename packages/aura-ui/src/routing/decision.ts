@@ -71,6 +71,8 @@ export interface ResponseRoutingDecision {
   escalations?: RawEscalation[] | null
   predicted_cost_usd?: number | null
   synthetic?: boolean
+  /** Routing options the gateway applied: the request's `routing` merged with any org override. */
+  options?: object | null
 }
 
 /**
@@ -154,6 +156,8 @@ export interface RoutingView {
   optionFilters: string[]
   /** Constraints from the request's shape (tools, vision, context...). */
   shapeFilters: string[]
+  /** Routing options the gateway echoed back as applied (response decisions only). */
+  appliedOptions: Array<{ key: string; value: string }>
   candidates: CandidateView[]
   hasPredictedCosts: boolean
   predictedCostUsd: number | null
@@ -249,6 +253,14 @@ interface Common {
   synthetic: unknown
   boundaries: TierBoundaries | null
   boundariesSource: RoutingView['boundariesSource']
+  appliedOptions: unknown
+}
+
+function optionsOf(v: unknown): Array<{ key: string; value: string }> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return []
+  return Object.entries(v as Record<string, unknown>)
+    .filter(([, x]) => x !== null && x !== undefined)
+    .map(([key, x]) => ({ key, value: Array.isArray(x) ? x.join(', ') : String(x) }))
 }
 
 function build(c: Common, answer: AnswerContext): RoutingView {
@@ -289,6 +301,7 @@ function build(c: Common, answer: AnswerContext): RoutingView {
     reason: c.reason,
     optionFilters: filters.filter(isOptionFilter),
     shapeFilters: filters.filter((f) => !isOptionFilter(f)),
+    appliedOptions: optionsOf(c.appliedOptions),
     candidates,
     hasPredictedCosts: candidates.some((x) => x.predictedCostUsd !== null),
     predictedCostUsd: num(c.predictedCostUsd) ?? pickedPrediction,
@@ -327,6 +340,7 @@ export function fromResponseDecision(d: ResponseRoutingDecision, answer: AnswerC
       boundaries: recorded ? (d.boundaries as TierBoundaries) : null,
       // Gateways before boundaries were reported: show the defaults, and say so.
       boundariesSource: recorded ? 'decision' : 'default',
+      appliedOptions: d.options,
     },
     answer,
   )
@@ -358,6 +372,7 @@ export function fromStoredDecision(d: StoredRoutingDecision, answer: AnswerConte
       synthetic: d.synthetic,
       boundaries: inForce ?? recorded,
       boundariesSource: inForce ? (d.boundaries_source ?? 'recorded') : recorded ? 'recorded' : 'default',
+      appliedOptions: null,
     },
     {
       model: answer.model ?? d.outcome?.actual_model ?? null,
