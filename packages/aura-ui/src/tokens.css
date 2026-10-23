@@ -1,0 +1,84 @@
+/*
+ * Aura design tokens — the single source for colour, type, radius and
+ * spacing across apps/landing, apps/chat and apps/admin.
+ *
+ * Values come from docs/design/aura-pack-v3/handoff/design-tokens.json;
+ * `tokens.test.ts` fails if they drift. Colours are stored as RGB
+ * triplets so Tailwind can apply opacity (`rgb(var(--aura-rgb-bg) / 0.5)`),
+ * with ready-to-use `--aura-*` colour aliases for plain CSS.
+ *
+ * Theme switching follows the apps' existing class strategy: `.dark` on
+ * <html> selects the dark palette; anything else gets the light one.
+ */
+
+:root {
+  --aura-rgb-bg: 247 248 252;
+  --aura-rgb-surface: 255 255 255;
+  --aura-rgb-surface-2: 240 242 248;
+  --aura-rgb-hover: 233 234 243;
+  --aura-rgb-text: 23 27 40;
+  --aura-rgb-muted: 80 91 112;
+  --aura-rgb-dim: 105 117 139;
+  --aura-rgb-border: 213 219 231;
+  --aura-rgb-accent: 109 40 217;
+  --aura-rgb-action: 109 40 217;
+  --aura-rgb-green: 8 122 85;
+  --aura-rgb-amber: 149 96 0;
+  --aura-rgb-red: 188 51 79;
+  --aura-accent-soft: #6d28d90d;
+  --aura-shadow: 0 24px 70px #17243818;
+  color-scheme: light;
+}
+
+.dark {
+  --aura-rgb-bg: 11 13 20;
+  --aura-rgb-surface: 17 21 31;
+  --aura-rgb-surface-2: 24 29 42;
+  --aura-rgb-hover: 29 34 50;
+  --aura-rgb-text: 244 246 250;
+  --aura-rgb-muted: 167 176 192;
+  --aura-rgb-dim: 120 131 151;
+  --aura-rgb-border: 41 49 67;
+  --aura-rgb-accent: 178 154 255;
+  --aura-rgb-action: 117 64 223;
+  --aura-rgb-green: 128 223 186;
+  --aura-rgb-amber: 241 202 120;
+  --aura-rgb-red: 246 160 172;
+  --aura-accent-soft: #a78bfa14;
+  --aura-shadow: 0 24px 70px #0005;
+  color-scheme: dark;
+}
+
+:root {
+  --aura-bg: rgb(var(--aura-rgb-bg));
+  --aura-surface: rgb(var(--aura-rgb-surface));
+  --aura-surface-2: rgb(var(--aura-rgb-surface-2));
+  --aura-hover: rgb(var(--aura-rgb-hover));
+  --aura-text: rgb(var(--aura-rgb-text));
+  --aura-muted: rgb(var(--aura-rgb-muted));
+  --aura-dim: rgb(var(--aura-rgb-dim));
+  --aura-border: rgb(var(--aura-rgb-border));
+  --aura-accent: rgb(var(--aura-rgb-accent));
+  --aura-action: rgb(var(--aura-rgb-action));
+  --aura-green: rgb(var(--aura-rgb-green));
+  --aura-amber: rgb(var(--aura-rgb-amber));
+  --aura-red: rgb(var(--aura-rgb-red));
+
+  /* Marketing titles use the serif; operations use sans + tabular mono. */
+  --aura-font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --aura-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --aura-font-display: Fraunces, Georgia, serif;
+
+  --aura-radius-control: 7px;
+  --aura-radius-panel: 12px;
+  --aura-content-max: 1200px;
+
+  --aura-space-1: 4px;
+  --aura-space-2: 8px;
+  --aura-space-3: 12px;
+  --aura-space-4: 16px;
+  --aura-space-5: 24px;
+  --aura-space-6: 32px;
+  --aura-space-7: 48px;
+  --aura-space-8: 64px;
+}

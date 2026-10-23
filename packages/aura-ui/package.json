@@ -1,0 +1,10 @@
+{
+  "name": "@aura/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared design tokens, brand marks and the routing inspector for apps/landing, apps/chat and apps/admin. Consumed as source through each app's `@aura/ui` alias; there is no build step.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  }
+}

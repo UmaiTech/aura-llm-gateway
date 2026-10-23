@@ -1,0 +1,16 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const context=vm.createContext({});vm.runInContext(fs.readFileSync('dist/auto-router.js','utf8'),context);const sim=context.simulateAuto;
+assert.equal(sim().tier,'simple');
+assert.equal(sim({mode:'quality'}).tier,'medium');
+assert.equal(sim({scenario:'tools',mode:'cost'}).tier,'medium');
+assert.equal(sim({scenario:'proof'}).tier,'reasoning');
+assert.equal(sim({scenario:'code',mode:'quality'}).tier,'reasoning');
+assert.equal(sim({min:'complex'}).tier,'complex');
+assert.equal(sim({scenario:'proof',max:'medium'}).tier,'medium');
+assert.equal(sim({scenario:'tools',max:'simple'}).error,'no_eligible_model');
+assert.equal(sim({providers:{OpenAI:false,Google:false,Anthropic:false}}).error,'no_eligible_model');
+assert.equal(sim({providers:{OpenAI:true,Google:false,Anthropic:false}}).selected,'gpt-5.6-luna');
+assert.equal(sim({shadow:true}).actual_model,'gpt-5.4-mini');
+assert.equal(sim({shadow:true}).selected,'gemini-3.1-flash-lite');
+assert.equal(sim({min:'reasoning',max:'simple'}).error,'no_eligible_model');
+console.log('13 auto-router fixture checks passed');

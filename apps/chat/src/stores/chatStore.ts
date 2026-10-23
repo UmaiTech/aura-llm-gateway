@@ -53,6 +53,14 @@ interface ChatState {
   // rationale. Ephemeral: not persisted; clears on toggle-off.
   compareMode: boolean
 
+  // Unsent composer text. Kept here (in memory, not persisted) so it
+  // survives the composer remounting on theme, settings or compare-mode
+  // changes, and so a landing-page sample link can prefill it.
+  draft: string
+  // Set by a `?inspect=routing` link: open the routing inspector on the
+  // first auto-routed response that completes after this time (ms).
+  inspectRoutingAfter: number | null
+
   // Actions
   createConversation: () => string
   selectConversation: (id: string) => void
@@ -93,6 +101,9 @@ interface ChatState {
   // Compare mode actions
   setCompareMode: (enabled: boolean) => void
 
+  setDraft: (draft: string) => void
+  setInspectRoutingAfter: (since: number | null) => void
+
   // Computed
   getCurrentConversation: () => Conversation | null
 }
@@ -122,6 +133,11 @@ export const useChatStore = create<ChatState>()(
       consistencyApplyCalibration: false,
       compressionStrategy: 'none',
       autoRouting: DEFAULT_AUTO_ROUTING_SETTINGS,
+      draft: '',
+      inspectRoutingAfter: null,
+
+      setDraft: (draft) => set({ draft }),
+      setInspectRoutingAfter: (inspectRoutingAfter) => set({ inspectRoutingAfter }),
 
       // Conversation actions
       createConversation: () => {

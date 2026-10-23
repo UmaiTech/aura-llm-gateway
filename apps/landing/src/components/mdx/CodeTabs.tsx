@@ -28,23 +28,26 @@ export function CodeTabs({ children, defaultTab = 0 }: CodeTabsProps) {
   }
 
   return (
-    <div className="my-6 rounded-lg overflow-hidden border border-gray-800 bg-[#0f172a]">
+    <div className="my-6 max-w-full rounded-panel overflow-hidden border border-aura-border bg-[#0f172a]">
       {/* Tab headers */}
-      <div className="flex border-b border-gray-800 bg-gray-900/50">
+      <div className="flex overflow-x-auto border-b border-white/10 bg-white/5" role="tablist" aria-label="Code samples">
         {tabs.map((tab, index) => (
           <button
             key={index}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === index}
             onClick={() => setActiveTab(index)}
             className={clsx(
-              'px-4 py-2 text-sm font-medium transition-colors relative',
+              'px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap',
               activeTab === index
-                ? 'text-aura-400'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-violet-300'
+                : 'text-slate-400 hover:text-white'
             )}
           >
             {tab.props.label}
             {activeTab === index && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-aura-500" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-400" />
             )}
           </button>
         ))}

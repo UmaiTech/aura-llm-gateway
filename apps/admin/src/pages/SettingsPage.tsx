@@ -563,7 +563,7 @@ export function SettingsPage() {
                       <Field
                         label="LLM classifier model"
                         overridden={draft.routing?.llm_classifier_model !== undefined}
-                        hint="Used when the classifier is llm."
+                        hint="Used when the classifier is llm. Each classified request sends an excerpt of its user text to this model (an extra model call)."
                       >
                         <Input
                           value={draft.routing?.llm_classifier_model ?? ''}

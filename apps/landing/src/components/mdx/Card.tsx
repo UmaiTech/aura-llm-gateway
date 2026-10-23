@@ -13,19 +13,19 @@ export function Card({ title, children, icon: Icon, href }: CardProps) {
   const content = (
     <div
       className={clsx(
-        'p-5 rounded-lg border border-gray-800 bg-gray-900/50',
-        href && 'hover:border-aura-500/50 hover:bg-gray-800/50 transition-colors cursor-pointer'
+        'p-5 rounded-panel border border-aura-border bg-aura-surface',
+        href && 'hover:border-aura-accent/50 hover:bg-aura-hover transition-colors cursor-pointer'
       )}
     >
       <div className="flex items-start gap-3">
         {Icon && (
-          <div className="p-2 rounded-lg bg-aura-500/10">
-            <Icon className="h-5 w-5 text-aura-400" />
+          <div className="p-2 rounded-control bg-aura-accent/10">
+            <Icon className="h-5 w-5 text-aura-accent" aria-hidden />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
-          <div className="text-gray-400 text-sm [&>p]:mb-0">
+          <h3 className="text-base font-semibold text-aura-text mb-1">{title}</h3>
+          <div className="text-aura-muted text-sm [&>p]:mb-0">
             {children}
           </div>
         </div>

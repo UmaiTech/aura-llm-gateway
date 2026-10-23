@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
 import { useAuthStore } from '@/stores'
+import { Wordmark } from '@aura/ui/brand/Brand.tsx'
 import { Key2Line, EyeLine, EyeCloseLine } from '@mingcute/react'
 
 export function LoginPage() {
@@ -45,12 +46,8 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <img
-            src={`${import.meta.env.BASE_URL}logo-glow.svg`}
-            alt="Aura"
-            className="h-24 w-24 mb-4"
-          />
-          <h1 className="text-2xl font-bold">Aura Gateway</h1>
+          <Wordmark size={48} className="mb-4 text-foreground" />
+          <h1 className="text-2xl font-semibold">Aura Gateway</h1>
           <p className="text-muted-foreground mt-1">Admin Dashboard</p>
         </div>
 

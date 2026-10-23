@@ -29,6 +29,7 @@ import type {
   RoutingDecision,
 } from './types'
 import { useAuthStore } from '@/stores'
+import type { StoredRoutingDecision } from '@aura/ui/routing/decision.ts'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
@@ -114,6 +115,11 @@ export async function getRoutingStats(): Promise<RoutingStats[]> {
 
 export async function getAutoRoutingStats(period: TimeRange = '24h'): Promise<AutoRoutingStats> {
   return fetchApi<AutoRoutingStats>(`/admin/stats/routing/auto?period=${period}`)
+}
+
+/** One stored auto-router decision (404 when none was recorded). */
+export async function getRoutingDecision(responseId: string): Promise<StoredRoutingDecision> {
+  return fetchApi<StoredRoutingDecision>(`/admin/routing/decisions/${encodeURIComponent(responseId)}`)
 }
 
 // Timelines

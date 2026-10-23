@@ -4,7 +4,7 @@ import { cn } from '../lib/utils'
 import type { Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity, AutoRoutingSettings, AutoRoutingTier } from '../lib/types'
 import { useQuotaStore } from '../stores/quotaStore'
 import { ROUTING_STRATEGIES, VALIDATION_STRATEGIES, CONSISTENCY_STRATEGIES, COMPRESSION_STRATEGIES, AUTO_ROUTING_TIERS, AUTO_ROUTING_CLASSIFIERS, isAutoModel } from '../lib/types'
-import { DEFAULT_CONSTITUTIONAL_PRINCIPLES } from '../stores/chatStore'
+import { DEFAULT_CONSTITUTIONAL_PRINCIPLES, useChatStore } from '../stores/chatStore'
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>
@@ -74,8 +74,13 @@ export function ChatInput({
   autoRouting,
   onAutoRoutingChange,
 }: ChatInputProps) {
-  const [input, setInput] = useState('')
+  // The draft lives in the store so it survives remounts (theme,
+  // settings, compare mode) and can be prefilled from a sample link.
+  const input = useChatStore((s) => s.draft)
+  const setInput = useChatStore((s) => s.setDraft)
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false)
+  const [budgetText, setBudgetText] = useState(() => (autoRouting.maxCostUsd !== null ? String(autoRouting.maxCostUsd) : ''))
+  const [budgetError, setBudgetError] = useState<string | null>(null)
   const [activeDropdown, setActiveDropdown] = useState<'routing' | 'validation' | 'consistency' | 'compression' | 'auto' | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -158,8 +163,12 @@ export function ChatInput({
   // Auto router: the model alias carries the mode; everything else is
   // sent as the request's `routing` object.
   const autoActive = isAutoModel(model.id)
-  const autoMode = model.id === 'auto:cost' ? 'cost' : model.id === 'auto:quality' ? 'quality' : 'balanced'
+  const autoMode = model.mode ?? (model.id.startsWith('auto:') ? model.id.slice(5) : 'balanced')
   const autoModels = models.filter((m) => isAutoModel(m.id))
+  // Prefer the explicit alias for a mode; plain `auto` covers the
+  // gateway's default mode.
+  const aliasFor = (mode: string) =>
+    autoModels.find((m) => m.id === `auto:${mode}`) ?? autoModels.find((m) => m.id === 'auto' && (m.mode ?? 'balanced') === mode)
   const autoTweaks =
     (autoRouting.minTier ? 1 : 0) +
     (autoRouting.maxTier ? 1 : 0) +
@@ -182,14 +191,15 @@ export function ChatInput({
                 onClick={() => setActiveDropdown(activeDropdown === 'auto' ? null : 'auto')}
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors",
-                  "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  "bg-primary-400/10 text-primary-400 border border-primary-400/30 hover:bg-primary-400/15"
                 )}
                 title="Auto router options"
+                aria-expanded={activeDropdown === 'auto'}
               >
                 <Wand2 className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Auto · {autoMode}</span>
                 {autoTweaks > 0 && (
-                  <span className="px-1 rounded bg-emerald-500/20 text-[10px] font-semibold">{autoTweaks}</span>
+                  <span className="px-1 rounded bg-primary-400/20 text-[10px] font-semibold" aria-label={`${autoTweaks} options set`}>{autoTweaks}</span>
                 )}
                 <ChevronDown className={cn("h-3 w-3", activeDropdown === 'auto' && "rotate-180")} />
               </button>
@@ -199,7 +209,11 @@ export function ChatInput({
                     <div className="flex items-center justify-between border-b border-border pb-1.5">
                       <span className="font-medium text-muted-foreground uppercase tracking-wider">Auto router</span>
                       <button
-                        onClick={() => onAutoRoutingChange({ minTier: null, maxTier: null, classifier: null, maxCostUsd: null, sticky: true })}
+                        onClick={() => {
+                          onAutoRoutingChange({ minTier: null, maxTier: null, classifier: null, maxCostUsd: null, sticky: true })
+                          setBudgetText('')
+                          setBudgetError(null)
+                        }}
                         className="text-muted-foreground hover:text-foreground"
                         title="Reset to gateway defaults"
                       >
@@ -212,16 +226,18 @@ export function ChatInput({
                       <div className="text-muted-foreground mb-1">Mode</div>
                       <div className="grid grid-cols-3 gap-1">
                         {(['cost', 'balanced', 'quality'] as const).map((mode) => {
-                          const target = autoModels.find((m) => m.id === (mode === 'balanced' ? 'auto' : `auto:${mode}`))
+                          const target = aliasFor(mode)
                           return (
                             <button
                               key={mode}
                               disabled={!target}
+                              aria-pressed={autoMode === mode}
                               onClick={() => target && onModelChange(target)}
+                              title={target ? target.description : 'Not offered by this gateway'}
                               className={cn(
-                                "px-2 py-1 rounded-lg border transition-colors capitalize",
+                                "px-2 py-1 rounded-lg border transition-colors capitalize disabled:opacity-40",
                                 autoMode === mode
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  ? "bg-primary-400/10 text-primary-400 border-primary-400/40 font-medium"
                                   : "border-transparent hover:bg-secondary text-muted-foreground"
                               )}
                             >
@@ -230,7 +246,7 @@ export function ChatInput({
                           )
                         })}
                       </div>
-                      <div className="text-muted-foreground mt-1">Shifts the complexity score before it maps to a tier.</div>
+                      <div className="text-muted-foreground mt-1">Shifts the complexity score before it maps to a tier. Not "cheapest" or "fastest model anywhere".</div>
                     </div>
 
                     {/* Tier clamps */}
@@ -287,24 +303,50 @@ export function ChatInput({
                           {AUTO_ROUTING_CLASSIFIERS.find((c) => c.id === autoRouting.classifier)?.description}
                         </div>
                       )}
+                      {autoRouting.classifier === 'llm' && (
+                        <div className="mt-1 text-warning">
+                          Sends an excerpt of your message to the gateway's classifier model, an extra model call.
+                        </div>
+                      )}
                     </label>
 
                     {/* Budget */}
                     <label className="block">
-                      <div className="text-muted-foreground mb-1">Max cost per request (USD)</div>
+                      <div className="text-muted-foreground mb-1">Max predicted cost per request (USD)</div>
                       <input
                         type="number"
                         min={0}
                         step={0.001}
                         placeholder="no budget"
-                        value={autoRouting.maxCostUsd ?? ''}
+                        value={budgetText}
+                        aria-invalid={budgetError !== null}
+                        aria-describedby="auto-budget-help"
                         onChange={(e) => {
-                          const v = e.target.value === '' ? null : Number(e.target.value)
-                          onAutoRoutingChange({ maxCostUsd: v !== null && Number.isFinite(v) && v > 0 ? v : null })
+                          const text = e.target.value
+                          setBudgetText(text)
+                          const v = text.trim() === '' ? null : Number(text)
+                          if (v === null) {
+                            setBudgetError(null)
+                            onAutoRoutingChange({ maxCostUsd: null })
+                          } else if (!Number.isFinite(v) || v <= 0) {
+                            // Don't silently drop it: say why it isn't sent.
+                            setBudgetError('Enter an amount above 0, or leave empty for no budget.')
+                            onAutoRoutingChange({ maxCostUsd: null })
+                          } else {
+                            setBudgetError(null)
+                            onAutoRoutingChange({ maxCostUsd: v })
+                          }
                         }}
-                        className="w-full h-7 rounded-md border border-input bg-background px-1.5 font-mono"
+                        className={cn(
+                          "w-full h-7 rounded-md border bg-background px-1.5 font-mono",
+                          budgetError ? "border-destructive" : "border-input",
+                        )}
                       />
-                      <div className="text-muted-foreground mt-1">Needs an active cost model; candidates predicted above this are skipped.</div>
+                      {budgetError && <div className="text-destructive mt-1" role="alert">{budgetError}</div>}
+                      <div id="auto-budget-help" className="text-muted-foreground mt-1">
+                        A selection constraint on predicted cost, not a hard spend cap. Needs the gateway's learned cost
+                        model (otherwise list prices); if nothing fits, the budget is ignored and the reason says so.
+                      </div>
                     </label>
 
                     {/* Sticky */}
@@ -317,12 +359,17 @@ export function ChatInput({
                         type="checkbox"
                         checked={autoRouting.sticky}
                         onChange={(e) => onAutoRoutingChange({ sticky: e.target.checked })}
-                        className="h-4 w-4 accent-emerald-500"
+                        className="h-4 w-4 accent-[hsl(var(--primary))]"
                       />
                     </label>
 
-                    <div className="text-muted-foreground border-t border-border pt-2">
-                      Every answer gets an <span className="text-emerald-400">auto · tier · model</span> chip; click it to see the score, candidates and reason. Pinned models still show a <span className="text-amber-400">shadow</span> chip with what auto would have done.
+                    <div className="text-muted-foreground border-t border-border pt-2 space-y-1">
+                      <p>Your organization's routing limits still apply: these options can narrow them, never loosen them.</p>
+                      <p>
+                        Each answer shows the model that replied and an <span className="text-primary-400">Auto · tier</span> chip;
+                        open it for the score, constraints, candidates and reason. Pinned models may show a{' '}
+                        <span className="text-warning">Shadow</span> chip with what auto would have picked.
+                      </p>
                     </div>
                   </div>
                 </div>
