@@ -34,7 +34,9 @@ class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public details?: unknown
+    public details?: unknown,
+    /** Path that was requested, e.g. `/admin/settings`. */
+    public endpoint?: string
   ) {
     super(message)
     this.name = 'ApiError'
@@ -52,21 +54,35 @@ function getAuthHeaders(): Record<string, string> {
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...options?.headers,
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+        ...options?.headers,
+      },
+    })
+  } catch (err) {
+    // fetch only rejects on network failure (gateway down, DNS,
+    // CORS). Status 0 lets the UI say "can't reach the gateway"
+    // instead of echoing the browser's "Failed to fetch".
+    throw new ApiError(
+      err instanceof Error ? err.message : 'Network request failed',
+      0,
+      err,
+      endpoint
+    )
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }))
     throw new ApiError(
       error.error || `API error: ${response.status}`,
       response.status,
-      error
+      error,
+      endpoint
     )
   }
 
@@ -227,7 +243,7 @@ export async function checkApiHealth(): Promise<boolean> {
 }
 
 // Export types for convenience
-export type { ApiError }
+export { ApiError, API_BASE_URL }
 export * from './types'
 
 // ---------------------------------------------------------------------------

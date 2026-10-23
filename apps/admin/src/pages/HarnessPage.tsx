@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input, ErrorState, SkeletonPage, StatusPill } from '@/components/ui'
 import { cn, formatDuration, formatCurrency, formatNumber, formatRelativeTime, formatStrategy } from '@/lib/utils'
 import {
   AiLine,
@@ -17,7 +17,6 @@ import {
   ToolLine,
   Package2Line,
   Sparkles2Line,
-  Loading3Line,
   Refresh1Line,
   ShieldLine,
   ArrowDownLine,
@@ -238,26 +237,26 @@ function logToTrace(log: RecentLog): Trace {
 function StepIcon({ type }: { type: TraceStep['type'] }) {
   switch (type) {
     case 'user':
-      return <User2Line className="h-4 w-4 text-blue-400" />
+      return <User2Line className="h-4 w-4 text-blue-600 dark:text-blue-400" />
     case 'reasoning':
-      return <BrainLine className="h-4 w-4 text-purple-400" />
+      return <BrainLine className="h-4 w-4 text-purple-600 dark:text-purple-400" />
     case 'compression':
       // Reuse FileZip glyph isn't imported here — use AI line as a
       // visually distinct icon. Color = same purple family as compression
       // chip on Dashboard.
-      return <AiLine className="h-4 w-4 text-purple-300" />
+      return <AiLine className="h-4 w-4 text-purple-700 dark:text-purple-300" />
     case 'validation':
-      return <ShieldLine className="h-4 w-4 text-blue-300" />
+      return <ShieldLine className="h-4 w-4 text-blue-700 dark:text-blue-300" />
     case 'consistency':
       // Sparkles2 is already used for the assistant; pick Information so
       // the trace doesn't get confused with the final model response.
-      return <InformationLine className="h-4 w-4 text-amber-400" />
+      return <InformationLine className="h-4 w-4 text-amber-600 dark:text-amber-400" />
     case 'tool_call':
-      return <ToolLine className="h-4 w-4 text-orange-400" />
+      return <ToolLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
     case 'tool_result':
-      return <Package2Line className="h-4 w-4 text-green-400" />
+      return <Package2Line className="h-4 w-4 text-success" />
     case 'assistant':
-      return <Sparkles2Line className="h-4 w-4 text-primary" />
+      return <Sparkles2Line className="h-4 w-4 text-brand" />
   }
 }
 
@@ -288,6 +287,7 @@ export function HarnessPage() {
 
   // API state
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<unknown>(null)
   const [traces, setTraces] = useState<Trace[]>([])
   const [tools, setTools] = useState<ToolUsageStats[]>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -295,14 +295,18 @@ export function HarnessPage() {
   // Fetch data
   const fetchData = async () => {
     try {
+      // Traces are the page; tool stats only feed the Tools tab.
       const [logs, toolStats] = await Promise.all([
-        getRecentLogs({ limit: 50 }).catch(() => []),
+        getRecentLogs({ limit: 50 }),
         getToolUsage('7d').catch(() => []),
       ])
+      setError(null)
 
       // Convert logs to traces
       setTraces(logs.map(logToTrace))
       setTools(toolStats)
+    } catch (err) {
+      setError(err)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -360,62 +364,64 @@ export function HarnessPage() {
     return matchesSearch && matchesToolFilter && matchesStatus
   })
 
-  if (loading) {
+  if (loading || error != null) {
     return (
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col">
         <Header title="Agentic Harness" description="Debug and tune your AI agent workflows" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading harness data...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          {loading ? (
+            <SkeletonPage stats={4} rows={6} />
+          ) : (
+            <ErrorState variant="page" error={error} what="agent traces" onRetry={handleRefresh} retrying={isRefreshing} />
+          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col lg:h-screen">
       <Header title="Agentic Harness" description="Debug and tune your AI agent workflows" />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Tabs */}
-        <div className="w-48 border-r bg-card/50 p-3 space-y-1">
+      <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden">
+        {/* Tabs: horizontal scroller on small screens, rail on lg+ */}
+        <div className="no-scrollbar flex gap-1 overflow-x-auto border-b bg-card px-4 py-2 lg:bg-transparent lg:w-48 lg:flex-shrink-0 lg:flex-col lg:gap-px lg:overflow-visible lg:border-b-0 lg:border-r lg:p-3">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
               className={cn(
-                'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'focus-ring flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
                 activeTab === tab.id
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                  ? 'bg-accent font-medium text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
               )}
             >
-              <tab.icon className="h-4 w-4" />
+              <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-brand')} />
               {tab.name}
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex min-w-0 flex-1 flex-col lg:flex-row lg:overflow-hidden">
           {activeTab === 'traces' && (
             <>
               {/* Trace List */}
-              <div className="w-[420px] border-r overflow-y-auto p-4 space-y-3">
+              <div className="max-h-[60vh] w-full space-y-3 overflow-y-auto border-b p-4 lg:max-h-none lg:w-[400px] lg:flex-shrink-0 lg:border-b-0 lg:border-r">
                 {/* Summary Stats */}
-                <div className="grid grid-cols-4 gap-2 p-3 bg-muted/30 rounded-lg">
+                <div className="grid grid-cols-4 gap-2 rounded-lg border p-3">
                   <div className="text-center">
                     <p className="text-lg font-semibold">{stats.totalTraces}</p>
                     <p className="text-xs text-muted-foreground">Traces</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-orange-400">{stats.withToolCalls}</p>
+                    <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">{stats.withToolCalls}</p>
                     <p className="text-xs text-muted-foreground">With Tools</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-green-400">{stats.successRate}%</p>
+                    <p className="text-lg font-semibold text-success">{stats.successRate}%</p>
                     <p className="text-xs text-muted-foreground">Success</p>
                   </div>
                   <div className="text-center">
@@ -447,7 +453,7 @@ export function HarnessPage() {
                     <select
                       value={filterToolCalls}
                       onChange={(e) => setFilterToolCalls(e.target.value as typeof filterToolCalls)}
-                      className="flex-1 text-xs px-2 py-1.5 bg-background border border-border rounded-md"
+                      className="flex-1 text-xs pl-2 pr-8 py-1.5 bg-card border border-border rounded-md"
                     >
                       <option value="all">All Traces</option>
                       <option value="with-tools">With Tool Calls</option>
@@ -456,7 +462,7 @@ export function HarnessPage() {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-                      className="flex-1 text-xs px-2 py-1.5 bg-background border border-border rounded-md"
+                      className="flex-1 text-xs pl-2 pr-8 py-1.5 bg-card border border-border rounded-md"
                     >
                       <option value="all">All Status</option>
                       <option value="completed">Completed</option>
@@ -480,8 +486,8 @@ export function HarnessPage() {
                       key={trace.id}
                       onClick={() => setSelectedTrace(trace)}
                       className={cn(
-                        'cursor-pointer transition-all hover:border-primary/50',
-                        selectedTrace?.id === trace.id && 'ring-2 ring-primary'
+                        'cursor-pointer transition-colors hover:border-brand/50',
+                        selectedTrace?.id === trace.id && 'ring-2 ring-brand'
                       )}
                     >
                       <CardContent className="p-4">
@@ -491,14 +497,12 @@ export function HarnessPage() {
                           </code>
                           <div className="flex items-center gap-2">
                             {trace.hasToolCalls && (
-                              <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
+                              <Badge variant="outline" className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 text-xs">
                                 <ToolLine className="h-3 w-3 mr-1" />
                                 {trace.toolCallsCount}
                               </Badge>
                             )}
-                            <Badge variant={trace.status === 'completed' ? 'success' : 'destructive'}>
-                              {trace.status}
-                            </Badge>
+                            <StatusPill status={trace.status} />
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -539,7 +543,7 @@ export function HarnessPage() {
               </div>
 
               {/* Trace Detail */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
                 {selectedTrace ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -586,9 +590,7 @@ export function HarnessPage() {
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Status</p>
-                            <Badge variant={selectedTrace.status === 'completed' ? 'success' : 'destructive'}>
-                              {selectedTrace.status}
-                            </Badge>
+                            <StatusPill status={selectedTrace.status} />
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Created</p>
@@ -603,7 +605,7 @@ export function HarnessPage() {
                       <Card>
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2">
-                            <ToolLine className="h-4 w-4 text-orange-400" />
+                            <ToolLine className="h-4 w-4 text-muted-foreground" />
                             Tool Calls ({selectedTrace.toolCallsCount})
                           </CardTitle>
                         </CardHeader>
@@ -614,7 +616,7 @@ export function HarnessPage() {
                                 key={idx}
                                 className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-lg"
                               >
-                                <ToolLine className="h-4 w-4 text-orange-400" />
+                                <ToolLine className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                                 <span className="font-mono text-sm">{tool}</span>
                               </div>
                             ))}
@@ -638,13 +640,13 @@ export function HarnessPage() {
                               <div className={cn(
                                 'w-8 h-8 rounded-full flex items-center justify-center',
                                 step.type === 'tool_call' ? 'bg-orange-500/20' :
-                                step.type === 'tool_result' ? 'bg-green-500/20' :
+                                step.type === 'tool_result' ? 'bg-success/20' :
                                 step.type === 'reasoning' ? 'bg-purple-500/20' :
                                 step.type === 'compression' ? 'bg-purple-500/10' :
                                 step.type === 'validation' ? 'bg-blue-500/10' :
                                 step.type === 'consistency' ? 'bg-amber-500/20' :
                                 step.type === 'user' ? 'bg-blue-500/20' :
-                                'bg-primary/20'
+                                'bg-brand/20'
                               )}>
                                 <StepIcon type={step.type} />
                               </div>
@@ -654,8 +656,8 @@ export function HarnessPage() {
                             </div>
                             <Card
                               className={cn(
-                                'flex-1 transition-all',
-                                isToolStep && 'cursor-pointer hover:border-primary/50'
+                                'flex-1 transition-colors',
+                                isToolStep && 'cursor-pointer hover:border-brand/50'
                               )}
                               onClick={() => isToolStep && toggleStep(step.id)}
                             >
@@ -666,18 +668,18 @@ export function HarnessPage() {
                                       variant="secondary"
                                       className={cn(
                                         'capitalize',
-                                        step.type === 'tool_call' && 'bg-orange-500/20 text-orange-400',
-                                        step.type === 'tool_result' && 'bg-green-500/20 text-green-400',
-                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-400',
-                                        step.type === 'compression' && 'bg-purple-500/10 text-purple-300',
-                                        step.type === 'validation' && 'bg-blue-500/10 text-blue-300',
-                                        step.type === 'consistency' && 'bg-amber-500/20 text-amber-400',
+                                        step.type === 'tool_call' && 'bg-orange-500/20 text-orange-600 dark:text-orange-400',
+                                        step.type === 'tool_result' && 'bg-success/20 text-success',
+                                        step.type === 'reasoning' && 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
+                                        step.type === 'compression' && 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
+                                        step.type === 'validation' && 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+                                        step.type === 'consistency' && 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
                                       )}
                                     >
                                       {step.type.replace('_', ' ')}
                                     </Badge>
                                     {step.toolName && (
-                                      <code className="text-sm font-mono text-primary">{step.toolName}()</code>
+                                      <code className="text-sm font-mono text-brand">{step.toolName}()</code>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -835,10 +837,10 @@ export function HarnessPage() {
           )}
 
           {activeTab === 'prompts' && (
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-4 sm:p-6">
               <Card className="max-w-2xl mx-auto mt-8">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
                     <Message1Line className="h-5 w-5" />
                     Prompt Management — on the roadmap
                   </CardTitle>
@@ -851,7 +853,7 @@ export function HarnessPage() {
                     gateway logs the rendered <code className="text-xs bg-muted px-1 py-0.5 rounded">input</code>{' '}
                     on every request so you can inspect what was
                     actually sent under{' '}
-                    <a href="/dev-logs" className="text-primary hover:underline">
+                    <a href="/dev-logs" className="text-brand hover:underline">
                       Dev Logs
                     </a>.
                   </p>
@@ -862,7 +864,7 @@ export function HarnessPage() {
                       href="https://github.com/UmaiTech/aura-llm-gateway/issues"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                     >
                       GitHub
                     </a>.
@@ -873,7 +875,7 @@ export function HarnessPage() {
           )}
 
           {activeTab === 'tools' && (
-            <div className="flex-1 p-6 space-y-4">
+            <div className="flex-1 p-4 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <Input
                   placeholder="Search tools..."
@@ -906,10 +908,10 @@ export function HarnessPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b text-left text-sm text-muted-foreground">
-                          <th className="p-4 font-medium">Tool</th>
-                          <th className="p-4 font-medium text-right">Calls</th>
-                          <th className="p-4 font-medium text-right">Usage %</th>
-                          <th className="p-4 font-medium">Distribution</th>
+                          <th className="p-4 eyebrow">Tool</th>
+                          <th className="p-4 eyebrow text-right">Calls</th>
+                          <th className="p-4 eyebrow text-right">Usage %</th>
+                          <th className="p-4 eyebrow">Distribution</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -934,7 +936,7 @@ export function HarnessPage() {
                             <td className="p-4">
                               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-primary rounded-full transition-all"
+                                  className="h-full bg-brand rounded-full transition-colors"
                                   style={{ width: `${tool.percentage}%` }}
                                 />
                               </div>
@@ -972,12 +974,12 @@ export function HarnessPage() {
             const avgPerTrace =
               tracesWithTool.length > 0 ? totalCalls / tracesWithTool.length : 0
             return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <Card className="shadow-panel w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <ToolLine className="h-5 w-5 text-orange-400" />
+                        <ToolLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                         <CardTitle className="font-mono">{selectedTool}()</CardTitle>
                       </div>
                       <Button
@@ -992,17 +994,17 @@ export function HarnessPage() {
                   <CardContent className="overflow-y-auto space-y-4">
                     <div className="grid grid-cols-3 gap-4">
                       <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold tabular-nums">{totalCalls}</p>
+                        <p className="font-display text-2xl font-medium tracking-tight tabular-nums">{totalCalls}</p>
                         <p className="text-xs text-muted-foreground">Total Calls</p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold tabular-nums">
+                        <p className="font-display text-2xl font-medium tracking-tight tabular-nums">
                           {tracesWithTool.length}
                         </p>
                         <p className="text-xs text-muted-foreground">Traces Using</p>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold tabular-nums">
+                        <p className="font-display text-2xl font-medium tracking-tight tabular-nums">
                           {avgPerTrace.toFixed(1)}
                         </p>
                         <p className="text-xs text-muted-foreground">Avg Calls / Trace</p>
@@ -1020,7 +1022,7 @@ export function HarnessPage() {
                         invocations.slice(0, 20).map((inv, i) => (
                           <div
                             key={`${inv.traceId}-${i}`}
-                            className="border border-border/40 rounded-md p-3 space-y-2 cursor-pointer hover:border-primary/40"
+                            className="border border-border/40 rounded-md p-3 space-y-2 cursor-pointer hover:border-brand/40"
                             onClick={() => {
                               // Jump to the trace this invocation came from.
                               const t = traces.find((x) => x.id === inv.traceId)
@@ -1067,10 +1069,10 @@ export function HarnessPage() {
           })()}
 
           {activeTab === 'guardrails' && (
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-4 sm:p-6">
               <Card className="max-w-2xl mx-auto mt-8">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
                     <ShieldLine className="h-5 w-5" />
                     Guardrails — on the roadmap
                   </CardTitle>
@@ -1084,7 +1086,7 @@ export function HarnessPage() {
                     the auto router&apos;s{' '}
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">routing.max_cost_usd</code>{' '}
                     budget, and per-key rate and daily message limits under{' '}
-                    <a href="/keys" className="text-primary hover:underline">
+                    <a href="/keys" className="text-brand hover:underline">
                       API Keys
                     </a>.
                   </p>
@@ -1095,7 +1097,7 @@ export function HarnessPage() {
                       href="https://github.com/UmaiTech/aura-llm-gateway/issues"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                     >
                       GitHub
                     </a>.
