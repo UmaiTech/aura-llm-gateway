@@ -98,7 +98,12 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-aura-border">
       <div className="mx-auto flex max-w-content flex-col gap-3 px-4 py-6 text-xs text-aura-dim sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <span>Aura LLM Gateway · open source · by Umai Technologies</span>
+        <span>
+          Made with love in Stockholm by{' '}
+          <a href="https://umai-tech.com" target="_blank" rel="noopener noreferrer" className="hover:text-aura-text transition-colors">
+            Umai Technologies
+          </a>
+        </span>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
           <a href={LINKS.docs} className="hover:text-aura-text transition-colors">Docs</a>
           <a href={LINKS.pricing} className="hover:text-aura-text transition-colors">LLM pricing</a>
