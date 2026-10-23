@@ -6,7 +6,14 @@ import App from './App'
 import { DocsPage } from './pages/DocsPage'
 import { RoadmapPage } from './pages/RoadmapPage'
 import { PricingPage } from './pages/PricingPage'
+import { reloadForStaleChunk } from './lib/staleChunk'
 import './index.css'
+
+// Vite fires this when a lazy chunk's preload fails, e.g. after a deploy
+// replaced the hashed assets this tab was built against.
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForStaleChunk()) event.preventDefault()
+})
 
 const hostname =
   typeof window !== 'undefined' ? window.location.hostname : ''
