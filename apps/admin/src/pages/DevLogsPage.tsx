@@ -637,7 +637,7 @@ export function DevLogsPage() {
                       key={log.id}
                       className={cn(
                         'log-row border rounded-lg overflow-hidden transition-colors',
-                        expandedId === log.id ? 'border-primary/50 bg-muted/30' : 'border-border hover:border-border/80'
+                        expandedId === log.id ? 'border-brand/50 bg-muted/30' : 'border-border hover:border-border/80'
                       )}
                     >
                       {/* Collapsed Header */}

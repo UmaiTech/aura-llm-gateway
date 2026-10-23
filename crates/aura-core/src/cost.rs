@@ -44,6 +44,18 @@ impl ModelPricing {
     }
 
     /// Calculate cost for given token counts
+    ///
+    /// Token convention (shared by every provider adapter):
+    /// `input_tokens` is the **whole** prompt, and `cached_tokens` is the
+    /// subset of it that was read from the provider's prompt cache. The
+    /// uncached remainder (`input_tokens - cached_tokens`) bills at the full
+    /// input rate; the cached subset bills at `cached_input_per_million`, or
+    /// at the full input rate when the model has no cached price.
+    ///
+    /// Anthropic/Bedrock cache *writes* are counted inside `input_tokens`
+    /// and bill at 1x here. The providers charge 1.25x for 5-minute writes,
+    /// so the write premium is not modelled (a slight under-estimate on the
+    /// first request of a cached prefix).
     pub fn calculate_cost(
         &self,
         input_tokens: u32,
@@ -51,15 +63,17 @@ impl ModelPricing {
         cached_tokens: Option<u32>,
         reasoning_tokens: Option<u32>,
     ) -> f64 {
-        let input_cost = (input_tokens as f64 / 1_000_000.0) * self.input_per_million;
+        // Clamp so a provider over-reporting cache reads can't go negative.
+        let cached = cached_tokens.unwrap_or(0).min(input_tokens);
+        let uncached = input_tokens - cached;
+
+        let input_cost = (uncached as f64 / 1_000_000.0) * self.input_per_million;
         let output_cost = (output_tokens as f64 / 1_000_000.0) * self.output_per_million;
 
-        let cached_cost = cached_tokens
-            .and_then(|tokens| {
-                self.cached_input_per_million
-                    .map(|rate| (tokens as f64 / 1_000_000.0) * rate)
-            })
-            .unwrap_or(0.0);
+        let cached_rate = self
+            .cached_input_per_million
+            .unwrap_or(self.input_per_million);
+        let cached_cost = (cached as f64 / 1_000_000.0) * cached_rate;
 
         let reasoning_cost = reasoning_tokens
             .and_then(|tokens| {
@@ -927,9 +941,29 @@ mod tests {
     #[test]
     fn test_model_pricing_with_cached() {
         let pricing = ModelPricing::new(2.50, 10.00).with_cached(1.25);
+        // 1M prompt tokens, 500K of them read from cache:
+        // 500K uncached * 2.50 + 500K cached * 1.25 + 1M output * 10.00
+        // = 1.25 + 0.625 + 10.00 = 11.875
         let cost = pricing.calculate_cost(1_000_000, 1_000_000, Some(500_000), None);
-        // 2.50 + 10.00 + 0.625 = 13.125
-        assert!((cost - 13.125).abs() < 0.001);
+        assert!((cost - 11.875).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_model_pricing_cached_without_cached_rate_bills_full_price() {
+        // No cached price: cached tokens bill at the input rate, never free
+        // and never double-counted.
+        let pricing = ModelPricing::new(2.50, 10.00);
+        let cost = pricing.calculate_cost(1_000_000, 0, Some(400_000), None);
+        assert!((cost - 2.50).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_model_pricing_cached_clamped_to_input() {
+        // A cached count larger than the prompt can't produce a negative
+        // uncached remainder.
+        let pricing = ModelPricing::new(2.00, 0.0).with_cached(0.20);
+        let cost = pricing.calculate_cost(1_000_000, 0, Some(5_000_000), None);
+        assert!((cost - 0.20).abs() < 0.001);
     }
 
     #[test]

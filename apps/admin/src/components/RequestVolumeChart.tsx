@@ -117,7 +117,7 @@ export function RequestVolumeChart({ points, granularity, className }: RequestVo
                     {/* Every non-empty bucket is at least 2px so it is never invisible. */}
                     <span
                       className={cn(
-                        'block w-full rounded-t-[2px] bg-primary transition-opacity',
+                        'block w-full rounded-t-[2px] bg-brand transition-opacity',
                         errPx > 0 && 'rounded-t-[2px]',
                         active !== null && !isActive && 'opacity-50'
                       )}
@@ -148,7 +148,7 @@ export function RequestVolumeChart({ points, granularity, className }: RequestVo
 
       <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-sm bg-primary" /> Successful
+          <span className="h-2 w-2 rounded-sm bg-brand" /> Successful
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-sm bg-destructive" /> Errored

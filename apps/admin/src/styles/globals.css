@@ -1,3 +1,6 @@
+@import '@aura/ui/tokens.css';
+@import '@aura/ui/ui.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,76 +8,81 @@
 /*
  * Admin theme tokens.
  *
- * Values come from the Aura design pack v3
- * (docs/design/aura-pack-v3/handoff/design-tokens.json on
- * claude/aura-redesign-v3), so the admin, landing and playground
- * share one palette:
+ * The source of truth is packages/aura-ui/src/tokens.css (the v3 design
+ * pack). These shadcn-style variables mirror it as bare HSL triplets
+ * because the Tailwind config wraps them in hsl(), which keeps existing
+ * `bg-card`, `text-muted-foreground`, `bg-brand/10` classes working.
+ * `packages/aura-ui/src/app-themes.test.ts` fails if they drift.
  *
- *   pack token   -> admin token
- *   bg           -> --background
- *   surface      -> --card, --popover
- *   surface2     -> --muted, --secondary
- *   hover        -> --accent
- *   text / muted -> --foreground / --muted-foreground
- *   border       -> --border, --input
- *   accent       -> --primary, --ring  (links, active nav, focus, charts)
- *   action       -> --action           (primary buttons, toggles)
+ *   token          -> admin variable
+ *   bg             -> --background
+ *   surface        -> --card, --popover
+ *   surface-2      -> --muted, --secondary
+ *   hover          -> --accent
+ *   text / muted   -> --foreground / --muted-foreground
+ *   border         -> --border, --input
+ *   action         -> --primary, --action (filled buttons, toggles)
+ *   accent         -> --brand, --ring (links, active nav, focus, charts:
+ *                     the lighter violet stays readable on dark surfaces)
  *   green/amber/red -> --success / --warning / --destructive
- *   shadow       -> --shadow-panel     (raised surfaces only)
  *
- * Tokens stay as bare HSL triplets so existing `bg-card`,
- * `text-muted-foreground`, `bg-primary/10` etc. keep working. Every
- * text colour here clears WCAG AA (4.5:1) on --card and --background
- * in its theme.
+ * Non-colour tokens (shadow, radii, fonts) are referenced directly from
+ * the `--aura-*` variables so there is no second copy to drift. Every
+ * text colour here clears WCAG AA on --card and --background.
  */
 @layer base {
   :root {
-    --background: 228 45.5% 97.8%;      /* #f7f8fc */
-    --foreground: 226 27% 12.4%;        /* #171b28 */
+    --background: 228 45% 98%;
+    --foreground: 226 27% 12%;
 
-    --card: 0 0% 100%;                  /* #ffffff */
-    --card-foreground: 226 27% 12.4%;
+    --card: 0 0% 100%;
+    --card-foreground: 226 27% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 226 27% 12.4%;
+    --popover-foreground: 226 27% 12%;
 
-    --primary: 263 70% 50.4%;           /* #6d28d9 accent */
+    --primary: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --action: 263 70% 50.4%;            /* #6d28d9 */
+    /* Same value as --primary; kept as its own name for the Button
+       `action` intent and toggles. */
+    --action: 263 70% 50%;
     --action-foreground: 0 0% 100%;
 
-    --secondary: 225 36.4% 95.7%;       /* #f0f2f8 surface2 */
-    --secondary-foreground: 226 27% 12.4%;
+    --brand: 263 70% 50%;
 
-    --muted: 225 36.4% 95.7%;
-    --muted-foreground: 219 16.7% 37.6%; /* #505b70 */
+    --secondary: 225 36% 96%;
+    --secondary-foreground: 226 27% 12%;
 
-    --dim: 219 13.9% 47.8%;             /* #69758b — non-text only */
+    --muted: 225 36% 96%;
+    --muted-foreground: 219 17% 38%;
 
-    --accent: 234 29.4% 93.3%;          /* #e9eaf3 hover */
-    --accent-foreground: 226 27% 12.4%;
+    /* Non-text only (fails AA as text on surface-2). */
+    --dim: 219 14% 48%;
 
-    --destructive: 348 57.3% 46.9%;     /* #bc334f */
+    --accent: 234 29% 93%;
+    --accent-foreground: 226 27% 12%;
+
+    --destructive: 348 57% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 161 87.7% 25.5%;         /* #087a55 */
+    --success: 161 88% 25%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 39 100% 29.2%;           /* #956000 */
+    --warning: 39 100% 29%;
     --warning-foreground: 0 0% 100%;
 
+    /* No pack equivalent: informational status (pending, shadow). */
     --info: 212 75% 40%;
     --info-foreground: 0 0% 100%;
 
-    --border: 220 27.3% 87.1%;          /* #d5dbe7 */
-    --input: 220 27.3% 87.1%;
-    --ring: 263 70% 50.4%;
+    --border: 220 27% 87%;
+    --input: 220 27% 87%;
+    --ring: 263 70% 50%;
 
-    --shadow-panel: 0 24px 70px #17243818;
-
-    --radius-control: 7px;
-    --radius-panel: 12px;
+    --shadow-panel: var(--aura-shadow);
+    --radius-control: var(--aura-radius-control);
+    --radius-panel: var(--aura-radius-panel);
     /* Legacy alias (tailwind `rounded-lg`). */
     --radius: var(--radius-panel);
 
@@ -84,56 +92,53 @@
     --motion-fast: 120ms;
     --motion-base: 200ms;
     --motion-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
-
-    color-scheme: light;
   }
 
   .dark {
-    --background: 227 29% 6.1%;         /* #0b0d14 */
-    --foreground: 220 37.5% 96.9%;      /* #f4f6fa */
+    --background: 227 29% 6%;
+    --foreground: 220 37% 97%;
 
-    --card: 223 29.2% 9.4%;             /* #11151f */
-    --card-foreground: 220 37.5% 96.9%;
+    --card: 223 29% 9%;
+    --card-foreground: 220 37% 97%;
 
-    --popover: 223 29.2% 9.4%;
-    --popover-foreground: 220 37.5% 96.9%;
+    --popover: 223 29% 9%;
+    --popover-foreground: 220 37% 97%;
 
-    --primary: 254 100% 80.2%;          /* #b29aff accent */
-    --primary-foreground: 227 29% 6.1%;
+    --primary: 260 71% 56%;
+    --primary-foreground: 0 0% 100%;
 
-    --action: 260 71.3% 56.3%;          /* #7540df */
+    --action: 260 71% 56%;
     --action-foreground: 0 0% 100%;
 
-    --secondary: 223 27.3% 12.9%;       /* #181d2a surface2 */
-    --secondary-foreground: 220 37.5% 96.9%;
+    --brand: 254 100% 80%;
 
-    --muted: 223 27.3% 12.9%;
-    --muted-foreground: 218 16.6% 70.4%; /* #a7b0c0 */
+    --secondary: 223 27% 13%;
+    --secondary-foreground: 220 37% 97%;
 
-    --dim: 219 13% 53.1%;               /* #788397 — non-text only */
+    --muted: 223 27% 13%;
+    --muted-foreground: 218 17% 70%;
 
-    --accent: 226 26.6% 15.5%;          /* #1d2232 hover */
-    --accent-foreground: 220 37.5% 96.9%;
+    --dim: 219 13% 53%;
 
-    --destructive: 352 82.7% 79.6%;     /* #f6a0ac */
-    --destructive-foreground: 227 29% 6.1%;
+    --accent: 226 27% 15%;
+    --accent-foreground: 220 37% 97%;
 
-    --success: 157 59.7% 68.8%;         /* #80dfba */
-    --success-foreground: 227 29% 6.1%;
+    /* The pack's red. Used as text and as a filled button with dark text. */
+    --destructive: 352 83% 80%;
+    --destructive-foreground: 227 29% 6%;
 
-    --warning: 41 81.2% 70.8%;          /* #f1ca78 */
-    --warning-foreground: 227 29% 6.1%;
+    --success: 157 60% 69%;
+    --success-foreground: 227 29% 6%;
+
+    --warning: 41 81% 71%;
+    --warning-foreground: 227 29% 6%;
 
     --info: 212 85% 72%;
-    --info-foreground: 227 29% 6.1%;
+    --info-foreground: 227 29% 6%;
 
-    --border: 222 24.1% 21.2%;          /* #293143 */
-    --input: 222 24.1% 21.2%;
-    --ring: 254 100% 80.2%;
-
-    --shadow-panel: 0 24px 70px #0005;
-
-    color-scheme: dark;
+    --border: 222 24% 21%;
+    --input: 222 24% 21%;
+    --ring: 254 100% 80%;
   }
 }
 
@@ -163,7 +168,7 @@
   }
 
   ::selection {
-    @apply bg-primary/25 text-foreground;
+    @apply bg-brand/25 text-foreground;
   }
 
   /* Native form controls get the same frame as <Input>, so the
@@ -267,7 +272,7 @@
   }
 
   .table-row.selected {
-    @apply bg-primary/5;
+    @apply bg-brand/5;
   }
 
   /* Badge variants (legacy class API) */

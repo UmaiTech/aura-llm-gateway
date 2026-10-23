@@ -1,10 +1,11 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { WelcomeScreen } from './WelcomeScreen'
 import { RateLimitNotice } from './RateLimitNotice'
 import { RATE_LIMIT_SENTINEL } from '../hooks/useAgent'
 import { useQuotaStore } from '../stores/quotaStore'
+import { useChatStore } from '../stores/chatStore'
 import type { Message, Model, RoutingStrategy, ValidationStrategy, ConsistencyStrategy, CompressionStrategy, Tone, Formality, Verbosity, AutoRoutingSettings } from '../lib/types'
 
 interface ChatContainerProps {
@@ -76,6 +77,33 @@ export function ChatContainer({
     }
   }, [messages])
 
+  const errorNotice =
+    error && error.startsWith(RATE_LIMIT_SENTINEL) ? (
+      <RateLimitNotice message={error.slice(RATE_LIMIT_SENTINEL.length)} />
+    ) : error ? (
+      <div role="alert" className="flex items-center gap-2 p-4 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
+        <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p className="text-sm">{error}</p>
+      </div>
+    ) : null
+
+  // After a landing sample link: the first auto-routed answer that
+  // completes opens its routing inspector.
+  const inspectAfter = useChatStore((s) => s.inspectRoutingAfter)
+  const clearAutoInspect = useCallback(() => useChatStore.getState().setInspectRoutingAfter(null), [])
+  const autoInspectId =
+    inspectAfter === null
+      ? null
+      : (messages.find(
+          (m) =>
+            m.role === 'assistant' &&
+            !m.isStreaming &&
+            m.aura?.routing &&
+            new Date(m.createdAt).getTime() >= inspectAfter,
+        )?.id ?? null)
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Messages area */}
@@ -84,7 +112,10 @@ export function ChatContainer({
         className="flex-1 overflow-y-auto"
       >
         {messages.length === 0 ? (
-          <WelcomeScreen model={model} onSendMessage={onSendMessage} />
+          <>
+            {error && <div className="max-w-3xl mx-auto px-4 pt-6">{errorNotice}</div>}
+            <WelcomeScreen model={model} onSendMessage={onSendMessage} />
+          </>
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
             {messages.map((message) => (
@@ -92,20 +123,11 @@ export function ChatContainer({
                 key={message.id}
                 message={message}
                 isStreaming={message.isStreaming}
+                autoInspect={message.id === autoInspectId}
+                onAutoInspected={clearAutoInspect}
               />
             ))}
-            {error && error.startsWith(RATE_LIMIT_SENTINEL) ? (
-              <RateLimitNotice
-                message={error.slice(RATE_LIMIT_SENTINEL.length)}
-              />
-            ) : error ? (
-              <div className="flex items-center gap-2 p-4 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
-                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-sm">{error}</p>
-              </div>
-            ) : null}
+            {errorNotice}
             <div ref={messagesEndRef} />
           </div>
         )}

@@ -564,10 +564,13 @@ impl GeminiProvider {
 
         // Build usage from usageMetadata
         let usage = response.usage_metadata.as_ref().map(|u| {
+            // promptTokenCount already includes cachedContentTokenCount
+            // (implicit caching is automatic on Gemini 2.5+).
             Usage::new(
                 u.prompt_token_count.unwrap_or(0),
                 u.candidates_token_count.unwrap_or(0),
             )
+            .with_cache_hits(u.cached_content_token_count.unwrap_or(0))
         });
 
         // Generate response ID
@@ -737,6 +740,7 @@ struct GeminiStreamTransformer {
     output_item_added: bool,
     content_part_added: bool,
     input_tokens: u32,
+    cached_tokens: u32,
     output_tokens: u32,
 }
 
@@ -759,6 +763,7 @@ impl GeminiStreamTransformer {
             output_item_added: false,
             content_part_added: false,
             input_tokens: 0,
+            cached_tokens: 0,
             output_tokens: 0,
         }
     }
@@ -850,7 +855,8 @@ impl GeminiStreamTransformer {
                                 }
 
                                 let usage =
-                                    Usage::new(transformer.input_tokens, transformer.output_tokens);
+                                    Usage::new(transformer.input_tokens, transformer.output_tokens)
+                                        .with_cache_hits(transformer.cached_tokens);
                                 let response = Response::builder(
                                     transformer.response_id.clone(),
                                     transformer.model.clone(),
@@ -887,6 +893,9 @@ impl GeminiStreamTransformer {
             if let Some(input) = usage.prompt_token_count {
                 self.input_tokens = input;
             }
+            if let Some(cached) = usage.cached_content_token_count {
+                self.cached_tokens = cached;
+            }
             if let Some(output) = usage.candidates_token_count {
                 self.output_tokens = output;
             }
@@ -915,7 +924,8 @@ impl GeminiStreamTransformer {
                     )));
                 }
 
-                let usage = Usage::new(self.input_tokens, self.output_tokens);
+                let usage = Usage::new(self.input_tokens, self.output_tokens)
+                    .with_cache_hits(self.cached_tokens);
                 let response = Response::builder(self.response_id.clone(), self.model.clone())
                     .outputs(output)
                     .usage(usage)
@@ -1125,7 +1135,11 @@ struct GeminiCandidate {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GeminiUsageMetadata {
+    /// Whole prompt, including `cached_content_token_count`
     prompt_token_count: Option<u32>,
+    /// Prompt tokens served from the (implicit or explicit) context cache
+    #[serde(default)]
+    cached_content_token_count: Option<u32>,
     candidates_token_count: Option<u32>,
     #[allow(dead_code)]
     total_token_count: Option<u32>,
@@ -1392,5 +1406,46 @@ mod tests {
             2,
             "two parallel calls should batch into one model content with two functionCall parts"
         );
+    }
+    #[test]
+    fn test_usage_reports_implicit_cache_hits() {
+        let provider = GeminiProvider::new("test-key");
+        let response: GeminiResponse = serde_json::from_value(serde_json::json!({
+            "candidates": [{
+                "content": {"role": "model", "parts": [{"text": "hi"}]},
+                "finishReason": "STOP"
+            }],
+            "usageMetadata": {
+                "promptTokenCount": 5000,
+                "candidatesTokenCount": 12,
+                "totalTokenCount": 5012,
+                "cachedContentTokenCount": 4096
+            }
+        }))
+        .unwrap();
+
+        let usage = provider
+            .transform_response(response, "gemini-3.8-flash")
+            .usage
+            .unwrap();
+        assert_eq!(usage.input_tokens, 5000);
+        assert_eq!(usage.cached_tokens, Some(4096));
+    }
+
+    #[test]
+    fn test_stream_usage_reports_cache_hits() {
+        let mut transformer = GeminiStreamTransformer::new("gemini-3.8-flash".into());
+        let event = transformer
+            .process_sse_data(
+                r#"{"candidates":[{"content":{"role":"model","parts":[{"text":"hi"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":3000,"candidatesTokenCount":4,"cachedContentTokenCount":2048}}"#,
+            )
+            .expect("event")
+            .expect("ok");
+        let StreamEvent::ResponseCompleted { response } = event else {
+            panic!("expected response.completed, got {event:?}");
+        };
+        let usage = response.usage.unwrap();
+        assert_eq!(usage.input_tokens, 3000);
+        assert_eq!(usage.cached_tokens, Some(2048));
     }
 }

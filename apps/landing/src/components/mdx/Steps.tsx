@@ -35,23 +35,23 @@ export function Steps({ children }: StepsProps) {
             <div
               className={clsx(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold',
-                'bg-aura-500/20 text-aura-400 border border-aura-500/30'
+                'bg-aura-accent/10 text-aura-accent border border-aura-accent/30'
               )}
             >
               {index + 1}
             </div>
             {/* Connector line */}
             {index < steps.length - 1 && (
-              <div className="w-0.5 flex-1 bg-gray-800 my-2" />
+              <div className="w-px flex-1 bg-aura-border my-2" />
             )}
           </div>
 
           {/* Content */}
-          <div className="flex-1 pb-8">
-            <h4 className="text-lg font-semibold text-white mb-2">
+          <div className="min-w-0 flex-1 pb-8">
+            <h4 className="text-base font-semibold text-aura-text mb-2">
               {step.props.title}
             </h4>
-            <div className="text-gray-300 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            <div className="text-aura-muted [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
               {step.props.children}
             </div>
           </div>

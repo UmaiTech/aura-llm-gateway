@@ -348,11 +348,13 @@ fn attach_fanout_metadata(
     // the real spend.
     let mut total_input = 0u32;
     let mut total_output = 0u32;
+    let mut total_cached = 0u32;
     let mut total_cost: f64 = 0.0;
     let mut any_cost = false;
     for u in &all_usage {
         total_input = total_input.saturating_add(u.input_tokens);
         total_output = total_output.saturating_add(u.output_tokens);
+        total_cached = total_cached.saturating_add(u.cached_tokens.unwrap_or(0));
         if let Some(c) = u.cost_usd {
             total_cost += c;
             any_cost = true;
@@ -364,7 +366,8 @@ fn attach_fanout_metadata(
         output_tokens: total_output,
         total_tokens: total_input.saturating_add(total_output),
         reasoning_tokens: None,
-        cached_tokens: None,
+        // Prompt-cache hits across candidates (subset of total_input)
+        cached_tokens: (total_cached > 0).then_some(total_cached),
         cost_usd: if any_cost { Some(total_cost) } else { None },
     });
 

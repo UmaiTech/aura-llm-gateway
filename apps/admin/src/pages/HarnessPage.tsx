@@ -256,7 +256,7 @@ function StepIcon({ type }: { type: TraceStep['type'] }) {
     case 'tool_result':
       return <Package2Line className="h-4 w-4 text-success" />
     case 'assistant':
-      return <Sparkles2Line className="h-4 w-4 text-primary" />
+      return <Sparkles2Line className="h-4 w-4 text-brand" />
   }
 }
 
@@ -398,7 +398,7 @@ export function HarnessPage() {
                   : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
               )}
             >
-              <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-primary')} />
+              <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-brand')} />
               {tab.name}
             </button>
           ))}
@@ -486,8 +486,8 @@ export function HarnessPage() {
                       key={trace.id}
                       onClick={() => setSelectedTrace(trace)}
                       className={cn(
-                        'cursor-pointer transition-colors hover:border-primary/50',
-                        selectedTrace?.id === trace.id && 'ring-2 ring-primary'
+                        'cursor-pointer transition-colors hover:border-brand/50',
+                        selectedTrace?.id === trace.id && 'ring-2 ring-brand'
                       )}
                     >
                       <CardContent className="p-4">
@@ -646,7 +646,7 @@ export function HarnessPage() {
                                 step.type === 'validation' ? 'bg-blue-500/10' :
                                 step.type === 'consistency' ? 'bg-amber-500/20' :
                                 step.type === 'user' ? 'bg-blue-500/20' :
-                                'bg-primary/20'
+                                'bg-brand/20'
                               )}>
                                 <StepIcon type={step.type} />
                               </div>
@@ -657,7 +657,7 @@ export function HarnessPage() {
                             <Card
                               className={cn(
                                 'flex-1 transition-colors',
-                                isToolStep && 'cursor-pointer hover:border-primary/50'
+                                isToolStep && 'cursor-pointer hover:border-brand/50'
                               )}
                               onClick={() => isToolStep && toggleStep(step.id)}
                             >
@@ -679,7 +679,7 @@ export function HarnessPage() {
                                       {step.type.replace('_', ' ')}
                                     </Badge>
                                     {step.toolName && (
-                                      <code className="text-sm font-mono text-primary">{step.toolName}()</code>
+                                      <code className="text-sm font-mono text-brand">{step.toolName}()</code>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -853,7 +853,7 @@ export function HarnessPage() {
                     gateway logs the rendered <code className="text-xs bg-muted px-1 py-0.5 rounded">input</code>{' '}
                     on every request so you can inspect what was
                     actually sent under{' '}
-                    <a href="/dev-logs" className="text-primary hover:underline">
+                    <a href="/dev-logs" className="text-brand hover:underline">
                       Dev Logs
                     </a>.
                   </p>
@@ -864,7 +864,7 @@ export function HarnessPage() {
                       href="https://github.com/UmaiTech/aura-llm-gateway/issues"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                     >
                       GitHub
                     </a>.
@@ -936,7 +936,7 @@ export function HarnessPage() {
                             <td className="p-4">
                               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-primary rounded-full transition-colors"
+                                  className="h-full bg-brand rounded-full transition-colors"
                                   style={{ width: `${tool.percentage}%` }}
                                 />
                               </div>
@@ -1022,7 +1022,7 @@ export function HarnessPage() {
                         invocations.slice(0, 20).map((inv, i) => (
                           <div
                             key={`${inv.traceId}-${i}`}
-                            className="border border-border/40 rounded-md p-3 space-y-2 cursor-pointer hover:border-primary/40"
+                            className="border border-border/40 rounded-md p-3 space-y-2 cursor-pointer hover:border-brand/40"
                             onClick={() => {
                               // Jump to the trace this invocation came from.
                               const t = traces.find((x) => x.id === inv.traceId)
@@ -1086,7 +1086,7 @@ export function HarnessPage() {
                     the auto router&apos;s{' '}
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">routing.max_cost_usd</code>{' '}
                     budget, and per-key rate and daily message limits under{' '}
-                    <a href="/keys" className="text-primary hover:underline">
+                    <a href="/keys" className="text-brand hover:underline">
                       API Keys
                     </a>.
                   </p>
@@ -1097,7 +1097,7 @@ export function HarnessPage() {
                       href="https://github.com/UmaiTech/aura-llm-gateway/issues"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                     >
                       GitHub
                     </a>.

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, Columns, LogOut, Menu, Wrench } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { BrandMark, Wordmark } from '@aura/ui/brand/Brand.tsx'
 import { useSession, signOut } from '../lib/auth-client'
 import { useChatStore } from '../stores/chatStore'
 import { AgentToolsDialog } from './AgentToolsDialog'
@@ -46,8 +47,8 @@ export function Header({
 
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="Aura" className="h-8 w-8 logo-pulse" />
-          <span className="font-semibold text-lg hidden sm:inline">Aura</span>
+          <BrandMark size={30} title="Aura" className="sm:hidden" />
+          <Wordmark size={30} className="hidden sm:block text-foreground" />
         </div>
       </div>
 

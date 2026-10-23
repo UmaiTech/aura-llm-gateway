@@ -5,6 +5,7 @@
 
 mod anthropic;
 mod bedrock;
+mod cache;
 mod error;
 mod fireworks;
 mod gemini;

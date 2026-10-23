@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BrandMark } from '@/components/layout'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
 import { useAuthStore } from '@/stores'
+import { Wordmark } from '@aura/ui/brand/Brand.tsx'
 import { Key2Line, EyeLine, EyeCloseLine } from '@mingcute/react'
 
 export function LoginPage() {
@@ -44,13 +44,10 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
-        {/* Wordmark — type-led, same lockup as the sidebar and landing nav */}
-        <div className="mb-8 flex items-center gap-3">
-          <BrandMark className="h-9 w-9" />
-          <div>
-            <h1 className="font-display text-2xl font-medium leading-none tracking-tight">Aura</h1>
-            <p className="eyebrow mt-1.5 text-[10px]">LLM Gateway · Admin</p>
-          </div>
+        {/* Shared wordmark (packages/aura-ui), left-aligned like the sidebar lockup */}
+        <div className="mb-8">
+          <Wordmark size={40} className="text-foreground" />
+          <p className="eyebrow mt-3 text-[10px]">LLM Gateway · Admin</p>
         </div>
 
         <Card>

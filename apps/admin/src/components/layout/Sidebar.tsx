@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { BrandMark } from '@aura/ui/brand/Brand.tsx'
 import { useSettingsStore } from '@/stores'
-import { BrandMark } from './BrandMark'
 import {
   Home1Line,
   ChartBarLine,
@@ -139,7 +139,7 @@ export function Sidebar() {
         {/* Wordmark */}
         <div className={cn('flex h-14 flex-shrink-0 items-center border-b px-4', collapsed ? 'justify-center px-0' : 'justify-between')}>
           <NavLink to="/" className="flex items-center gap-2.5 focus-ring rounded-md">
-            <BrandMark className="h-8 w-8" />
+            <BrandMark size={32} title={collapsed ? 'Aura' : undefined} />
             {!collapsed && (
               <span className="flex items-baseline gap-1.5">
                 <span className="font-display text-[17px] font-medium tracking-tight">Aura</span>
@@ -185,9 +185,9 @@ export function Sidebar() {
                         title={collapsed ? item.name : undefined}
                       >
                         {isActive && (
-                          <span aria-hidden className="absolute -left-3 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                          <span aria-hidden className="absolute -left-3 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-brand" />
                         )}
-                        <item.icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                        <item.icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-brand')} />
                         {!collapsed && <span className="truncate">{item.name}</span>}
                       </NavLink>
                     </li>

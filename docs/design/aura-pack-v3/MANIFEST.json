@@ -1,0 +1,7 @@
+{
+  "version": "v3",
+  "reviewed_aura_commit": "ca6d517d7a2204b7cae289ef578b7dc80a42f551",
+  "prototype_commit": "ea865e9b3e11b6de56676bfa0378285bbd972269",
+  "changes": "Admin and playground product showcases on landing",
+  "simulation": true
+}

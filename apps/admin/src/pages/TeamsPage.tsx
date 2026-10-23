@@ -153,7 +153,7 @@ export function TeamsPage() {
   }
 
   const getUsageColor = (current: number, limit: number | null) => {
-    if (!limit) return 'bg-primary'
+    if (!limit) return 'bg-brand'
     const percent = (current / limit) * 100
     if (percent >= 100) return 'bg-destructive'
     if (percent >= 80) return 'bg-warning'

@@ -304,7 +304,7 @@ export function SettingsPage() {
                     : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
                 )}
               >
-                <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-primary')} />
+                <tab.icon className={cn('h-4 w-4', activeTab === tab.id && 'text-brand')} />
                 {tab.name}
               </button>
             ))}
@@ -593,7 +593,7 @@ export function SettingsPage() {
                       <Field
                         label="LLM classifier model"
                         overridden={draft.routing?.llm_classifier_model !== undefined}
-                        hint="Used when the classifier is llm."
+                        hint="Used when the classifier is llm. Each classified request sends an excerpt of its user text to this model (an extra model call)."
                       >
                         <Input
                           value={draft.routing?.llm_classifier_model ?? ''}
@@ -878,7 +878,7 @@ export function SettingsPage() {
                   </p>
                   <p>
                     Live usage of each feature is on the{' '}
-                    <a href="/features" className="text-primary hover:underline">
+                    <a href="/features" className="text-brand hover:underline">
                       Features
                     </a>{' '}
                     page. Reference:{' '}
@@ -886,7 +886,7 @@ export function SettingsPage() {
                       href="https://docs.aura-llm.dev"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                     >
                       docs.aura-llm.dev
                     </a>
@@ -914,8 +914,8 @@ export function SettingsPage() {
                         className={cn(
                           'flex-1 flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors',
                           theme === option.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
+                            ? 'border-brand bg-brand/5'
+                            : 'border-border hover:border-brand/50'
                         )}
                       >
                         <option.icon className="h-6 w-6" />

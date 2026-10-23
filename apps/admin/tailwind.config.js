@@ -42,6 +42,8 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Aura accent for selected and link text (design token `accent`).
+        brand: 'hsl(var(--brand) / <alpha-value>)',
         // Aura brand colors
         aura: {
           50: '#f5f3ff',
@@ -82,12 +84,11 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'IBM Plex Sans', 'system-ui', '-apple-system', 'sans-serif'],
-        // System mono stack from the design pack (design-tokens.json `mono`).
-        mono: ['SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', 'ui-monospace', 'monospace'],
-        // Display serif for page titles (Dashboard, Organizations,
-        // etc.). See docs/design-audit/REDESIGN.md for the rationale.
-        display: ['Fraunces', 'Georgia', 'serif'],
+        // Font stacks come from packages/aura-ui/src/tokens.css so every
+        // app uses the same faces.
+        sans: ['var(--aura-font-sans)'],
+        mono: ['var(--aura-font-mono)'],
+        display: ['var(--aura-font-display)'],
       },
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],

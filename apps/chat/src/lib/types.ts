@@ -8,13 +8,15 @@ export interface Message {
   usage?: MessageUsage
   aura?: AuraMetadata  // Aura gateway metadata
   responseId?: string  // API response ID for conversation threading
+  model?: string  // Model that answered (response `model`); differs from the request for auto aliases
   rawResponse?: unknown  // Full raw API response for debugging
 }
 
 export interface MessageUsage {
-  inputTokens: number
+  inputTokens: number  // Whole prompt, including cached tokens
   outputTokens: number
   totalTokens: number
+  cachedTokens?: number  // Prompt tokens served from the provider's prompt cache
   cost?: number  // Cost in USD (based on model pricing)
 }
 
@@ -232,6 +234,8 @@ export interface Model {
   name: string
   provider: 'aura' | 'openai' | 'anthropic' | 'google'
   description?: string
+  /** Auto aliases only: the routing mode the alias selects. */
+  mode?: 'cost' | 'balanced' | 'quality' | string
   /**
    * Access tier for this model on the hosted playground.
    *  - 'free': included in the playground's free quota (5 rpm, 50K tokens/mo)
@@ -356,6 +360,7 @@ export interface Usage {
   input_tokens: number
   output_tokens: number
   total_tokens: number
+  cached_tokens?: number
 }
 
 export interface ResponseError {

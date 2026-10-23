@@ -369,7 +369,7 @@ export function DashboardPage() {
                           </span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${stat.percentage}%` }} />
+                          <div className="h-full rounded-full bg-brand" style={{ width: `${stat.percentage}%` }} />
                         </div>
                       </div>
                     ))

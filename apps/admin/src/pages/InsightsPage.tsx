@@ -124,15 +124,15 @@ export function InsightsPage() {
       case 0:
         return 'bg-muted'
       case 1:
-        return 'bg-primary/20'
+        return 'bg-brand/20'
       case 2:
-        return 'bg-primary/40'
+        return 'bg-brand/40'
       case 3:
-        return 'bg-primary/60'
+        return 'bg-brand/60'
       case 4:
-        return 'bg-primary/80'
+        return 'bg-brand/80'
       case 5:
-        return 'bg-primary'
+        return 'bg-brand'
       default:
         return 'bg-muted'
     }
@@ -259,11 +259,11 @@ export function InsightsPage() {
                                 <div className="font-medium mb-1">{label.full}</div>
                                 <div className="space-y-0.5 text-muted-foreground">
                                   <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded bg-primary" />
+                                    <span className="w-2 h-2 rounded bg-brand" />
                                     <span>Input: {formatNumber(point.input_tokens)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded bg-primary/40" />
+                                    <span className="w-2 h-2 rounded bg-brand/40" />
                                     <span>Output: {formatNumber(point.output_tokens)}</span>
                                   </div>
                                   <div className="border-t border-border mt-1 pt-1 font-medium text-foreground">
@@ -279,15 +279,15 @@ export function InsightsPage() {
                           )}>
                             <div
                               className={cn(
-                                'flex-1 bg-primary rounded-t transition-colors duration-300',
-                                isHovered && 'bg-primary/80'
+                                'flex-1 bg-brand rounded-t transition-colors duration-300',
+                                isHovered && 'bg-brand/80'
                               )}
                               style={{ height: `${inputHeight}%` }}
                             />
                             <div
                               className={cn(
-                                'flex-1 bg-primary/40 rounded-t transition-colors duration-300',
-                                isHovered && 'bg-primary/60'
+                                'flex-1 bg-brand/40 rounded-t transition-colors duration-300',
+                                isHovered && 'bg-brand/60'
                               )}
                               style={{ height: `${outputHeight}%` }}
                             />
@@ -299,10 +299,10 @@ export function InsightsPage() {
                   </div>
                   <div className="flex items-center justify-center gap-6 mt-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded bg-primary" /> Input
+                      <span className="w-3 h-3 rounded bg-brand" /> Input
                     </span>
                     <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded bg-primary/40" /> Output
+                      <span className="w-3 h-3 rounded bg-brand/40" /> Output
                     </span>
                   </div>
                 </>
@@ -342,7 +342,7 @@ export function InsightsPage() {
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-primary rounded-full transition-colors duration-1000"
+                          className="h-full bg-brand rounded-full transition-colors duration-1000"
                           style={{ width: `${displayWidth}%` }}
                         />
                       </div>

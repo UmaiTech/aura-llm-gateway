@@ -12,19 +12,21 @@ export function Expandable({ title, children, defaultOpen = false }: ExpandableP
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
-    <div className="my-4 rounded-lg border border-gray-800 overflow-hidden">
+    <div className="my-4 rounded-panel border border-aura-border overflow-hidden">
       <button
+        type="button"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
         className={clsx(
           'w-full flex items-center justify-between px-4 py-3 text-left',
-          'bg-gray-900/50 hover:bg-gray-800/50 transition-colors',
-          'text-white font-medium'
+          'bg-aura-surface hover:bg-aura-hover transition-colors',
+          'text-aura-text font-medium'
         )}
       >
         <span>{title}</span>
         <ChevronDown
           className={clsx(
-            'h-5 w-5 text-gray-400 transition-transform duration-200',
+            'h-5 w-5 text-aura-dim transition-transform duration-200',
             isOpen && 'rotate-180'
           )}
         />
@@ -35,7 +37,7 @@ export function Expandable({ title, children, defaultOpen = false }: ExpandableP
           isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
-        <div className="p-4 border-t border-gray-800 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+        <div className="p-4 border-t border-aura-border [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
           {children}
         </div>
       </div>

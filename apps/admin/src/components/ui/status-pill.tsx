@@ -44,7 +44,7 @@ const toneClass: Record<StatusTone, string> = {
   warning: 'text-warning border-warning/30 bg-warning/[0.08]',
   destructive: 'text-destructive border-destructive/25 bg-destructive/[0.07]',
   info: 'text-info border-info/25 bg-info/[0.07]',
-  accent: 'text-primary border-primary/25 bg-primary/[0.07]',
+  accent: 'text-brand border-brand/25 bg-brand/[0.07]',
   neutral: 'text-muted-foreground border-border bg-muted/60',
 }
 
@@ -53,7 +53,7 @@ const dotClass: Record<StatusTone, string> = {
   warning: 'bg-warning',
   destructive: 'bg-destructive',
   info: 'bg-info',
-  accent: 'bg-primary',
+  accent: 'bg-brand',
   neutral: 'bg-muted-foreground/50',
 }
 

@@ -151,8 +151,23 @@ export function OrganizationDetailPage() {
     }
   }
 
+  // Inline validation: never save bounds the gateway would reinterpret, or
+  // silently drop a budget it can't use.
+  const TIER_ORDER = ['simple', 'medium', 'complex', 'reasoning']
+  const tierBoundsError =
+    routingMinTier !== 'inherit' &&
+    routingMaxTier !== 'inherit' &&
+    TIER_ORDER.indexOf(routingMinTier) > TIER_ORDER.indexOf(routingMaxTier)
+      ? 'Minimum tier is above the maximum tier.'
+      : null
+  const maxCostValue = Number(routingMaxCost)
+  const maxCostError =
+    routingMaxCost.trim() !== '' && (!Number.isFinite(maxCostValue) || maxCostValue <= 0)
+      ? 'Enter an amount above 0, or leave empty to inherit.'
+      : null
+
   const handleSaveRouting = async () => {
-    if (!id) return
+    if (!id || tierBoundsError || maxCostError) return
     setIsSavingRouting(true)
     setRoutingError(null)
     const list = (raw: string) =>
@@ -408,7 +423,7 @@ export function OrganizationDetailPage() {
                   <p className="text-xs text-muted-foreground text-center pt-2">
                     Showing 10 of {endUsers.length} end users.{' '}
                     <button
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                       onClick={() => navigate('/end-users')}
                     >
                       View all
@@ -459,9 +474,9 @@ export function OrganizationDetailPage() {
                 onClick={handleToggleCapture}
                 className={cn(
                   'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent',
-                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                   'disabled:cursor-not-allowed disabled:opacity-50',
-                  capturePayloads ? 'bg-primary' : 'bg-muted',
+                  capturePayloads ? 'bg-brand' : 'bg-muted',
                 )}
               >
                 <span
@@ -479,7 +494,9 @@ export function OrganizationDetailPage() {
                 <p className="text-sm font-medium">Auto routing override</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Per-organization settings for <code className="font-mono bg-muted px-1 py-0.5 rounded text-2xs">model: "auto"</code>.
-                  "Inherit" keeps the gateway default. Request-level <code className="font-mono">routing</code> options still win.
+                  "Inherit" keeps the gateway default. Request-level <code className="font-mono">routing</code> preferences
+                  (mode, classifier) take precedence; tier bounds and allow/deny lists are limits that requests can only
+                  narrow, never loosen.
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -536,6 +553,12 @@ export function OrganizationDetailPage() {
                     <option value="llm">LLM</option>
                     <option value="learned">Learned model</option>
                   </select>
+                  {routingClassifier === 'llm' && (
+                    <span className="block text-xs text-warning">
+                      Sends an excerpt of each request's user text to the gateway's classifier model (an extra model
+                      call per request).
+                    </span>
+                  )}
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs text-muted-foreground">Minimum tier</span>
@@ -557,6 +580,8 @@ export function OrganizationDetailPage() {
                     className="w-full rounded-md border border-border bg-card pl-2 pr-8 py-1.5 text-sm"
                     value={routingMaxTier}
                     onChange={(e) => setRoutingMaxTier(e.target.value)}
+                    aria-invalid={tierBoundsError !== null}
+                    aria-describedby={tierBoundsError ? 'org-tier-bounds-error' : undefined}
                   >
                     <option value="inherit">Inherit</option>
                     <option value="simple">Simple</option>
@@ -564,9 +589,14 @@ export function OrganizationDetailPage() {
                     <option value="complex">Complex</option>
                     <option value="reasoning">Reasoning</option>
                   </select>
+                  {tierBoundsError && (
+                    <span id="org-tier-bounds-error" role="alert" className="block text-xs text-destructive">
+                      {tierBoundsError}
+                    </span>
+                  )}
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Max cost per request (USD)</span>
+                  <span className="text-xs text-muted-foreground">Max predicted cost per request (USD)</span>
                   <input
                     type="number"
                     min={0}
@@ -575,7 +605,17 @@ export function OrganizationDetailPage() {
                     className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
                     value={routingMaxCost}
                     onChange={(e) => setRoutingMaxCost(e.target.value)}
+                    aria-invalid={maxCostError !== null}
+                    aria-describedby="org-max-cost-help"
                   />
+                  {maxCostError && (
+                    <span role="alert" className="block text-xs text-destructive">
+                      {maxCostError}
+                    </span>
+                  )}
+                  <span id="org-max-cost-help" className="block text-xs text-muted-foreground">
+                    A selection constraint on predicted cost, not a hard spend cap.
+                  </span>
                 </label>
                 <label className="space-y-1 md:col-span-3 lg:col-span-1">
                   <span className="text-xs text-muted-foreground">Allow (one pattern per line)</span>
@@ -597,7 +637,11 @@ export function OrganizationDetailPage() {
                 </label>
               </div>
               <div className="flex items-center gap-3">
-                <Button size="sm" onClick={handleSaveRouting} disabled={isSavingRouting}>
+                <Button
+                  size="sm"
+                  onClick={handleSaveRouting}
+                  disabled={isSavingRouting || tierBoundsError !== null || maxCostError !== null}
+                >
                   {isSavingRouting ? 'Saving…' : 'Save routing override'}
                 </Button>
                 {routingSavedAt && !routingError && (

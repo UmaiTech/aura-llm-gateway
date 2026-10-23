@@ -35,6 +35,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument, warn};
 
+use super::cache::{openai_compatible_usage, PromptTokensDetails};
 use super::{EventStream, Provider, ProviderError};
 
 /// Mistral AI API base URL
@@ -309,9 +310,7 @@ impl MistralProvider {
             ),
         };
 
-        let usage = response
-            .usage
-            .map(|u| Usage::new(u.prompt_tokens, u.completion_tokens));
+        let usage = response.usage.map(|u| u.to_usage());
 
         let mut builder = Response::builder(format!("resp_mis_{}", response.id), model)
             .created_at(response.created)
@@ -784,6 +783,19 @@ struct MistralUsage {
     completion_tokens: u32,
     #[allow(dead_code)]
     total_tokens: u32,
+    /// Cached prompt tokens (subset of `prompt_tokens`), when reported
+    #[serde(default)]
+    prompt_tokens_details: Option<PromptTokensDetails>,
+}
+
+impl MistralUsage {
+    fn to_usage(&self) -> Usage {
+        openai_compatible_usage(
+            self.prompt_tokens,
+            self.completion_tokens,
+            self.prompt_tokens_details.as_ref(),
+        )
+    }
 }
 
 // Streaming types
@@ -941,6 +953,7 @@ mod tests {
                 prompt_tokens: 10,
                 completion_tokens: 5,
                 total_tokens: 15,
+                prompt_tokens_details: None,
             }),
         };
 
@@ -975,5 +988,19 @@ mod tests {
             response.incomplete_reason,
             Some(IncompleteReason::MaxTokens)
         ));
+    }
+    #[test]
+    fn test_usage_parses_cached_prompt_tokens() {
+        let usage: MistralUsage = serde_json::from_value(serde_json::json!({
+            "prompt_tokens": 1200,
+            "completion_tokens": 7,
+            "total_tokens": 1207,
+            "prompt_tokens_details": {"cached_tokens": 1024}
+        }))
+        .unwrap();
+        let usage = usage.to_usage();
+        // prompt_tokens already includes the cached subset
+        assert_eq!(usage.input_tokens, 1200);
+        assert_eq!(usage.cached_tokens, Some(1024));
     }
 }

@@ -45,7 +45,7 @@ export const TableRow = React.forwardRef<
     className={cn(
       'border-b border-border/60 transition-colors',
       interactive && 'cursor-pointer hover:bg-muted/50',
-      selected && 'bg-primary/[0.06]',
+      selected && 'bg-brand/[0.06]',
       className
     )}
     {...props}

@@ -19,7 +19,7 @@ const buttonVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/70',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
+        link: 'text-brand underline-offset-4 hover:underline',
         // Legacy name kept for compat; renders as the primary button.
         gradient:
           'bg-action text-action-foreground hover:bg-action/90',
