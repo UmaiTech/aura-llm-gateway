@@ -336,6 +336,10 @@ pub struct RecentLog {
     pub request_body: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_body: Option<serde_json::Value>,
+    /// Router training status; absent when the request was not auto-routed
+    /// (no routing decision, so no trainer reads it).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub router_training: Option<crate::routes::router_training::RouterTraining>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -1503,7 +1507,7 @@ async fn get_recent_logs(
         )
     })?;
 
-    let logs: Vec<RecentLog> = rows
+    let mut logs: Vec<RecentLog> = rows
         .iter()
         .map(|row| {
             // Parse tools_used from JSONB array
@@ -1573,10 +1577,30 @@ async fn get_recent_logs(
                 tool_calls_data,
                 request_body: row.try_get("request_body").ok().flatten(),
                 response_body: row.try_get("response_body").ok().flatten(),
+                router_training: None,
                 created_at: row.get("created_at"),
             }
         })
         .collect();
+
+    // Router training status is best-effort: a failure here (e.g. the
+    // routing tables not migrated yet) must not hide the logs.
+    let response_ids: Vec<String> = logs.iter().map(|l| l.response_id.clone()).collect();
+    match crate::routes::router_training::fetch_training_rows(pool, &response_ids).await {
+        Ok(training) => {
+            for log in &mut logs {
+                if let Some(row) = training.get(&log.response_id) {
+                    let completed_with_output =
+                        log.status == "completed" && log.output_tokens.is_some();
+                    log.router_training = Some(crate::routes::router_training::classify(
+                        row,
+                        completed_with_output,
+                    ));
+                }
+            }
+        }
+        Err(e) => tracing::warn!(error = %e, "failed to load router training status for logs"),
+    }
 
     Ok(Json(logs))
 }

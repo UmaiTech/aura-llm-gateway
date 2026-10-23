@@ -242,7 +242,26 @@ export interface RecentLog {
   // Both fields are omitted (not null) in the API response when capture is off.
   request_body?: Record<string, unknown> | null
   response_body?: Record<string, unknown> | null
+  // Router training status; omitted when the request was not auto-routed.
+  router_training?: RouterTraining
   created_at: string
+}
+
+/**
+ * Whether a request is part of the auto-router training data (what
+ * scripts/router/train.py and train_cost.py read). The gateway does not
+ * record which rows a given training run consumed.
+ */
+export interface RouterTraining {
+  status: 'training' | 'holdout' | 'not_used'
+  /** tier_gold = judged gold pair, tier_outcome = next-turn reward, cost_model = output-length model */
+  used_by: Array<'tier_gold' | 'tier_outcome' | 'cost_model'>
+  /** Routing lab / x-aura-synthetic: kept out of gold sampling and outcome rewards */
+  synthetic: boolean
+  tier?: string
+  gold_split?: string
+  gold_label?: string
+  reward?: number
 }
 
 export interface ToolCallData {

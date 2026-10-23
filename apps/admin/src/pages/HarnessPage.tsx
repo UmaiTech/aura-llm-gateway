@@ -23,6 +23,13 @@ import {
   InformationLine,
 } from '@mingcute/react'
 import { getRecentLogs, getToolUsage, type RecentLog, type ToolUsageStats } from '@/lib/api'
+import type { RouterTraining } from '@/lib/api'
+import {
+  extractAssistantText,
+  extractReasoningText,
+  extractUserText,
+  isTruncatedPayload,
+} from '@/lib/tracePayload'
 
 type Tab = 'traces' | 'prompts' | 'tools' | 'guardrails'
 
@@ -38,6 +45,9 @@ interface TraceStep {
     | 'tool_result'
     | 'assistant'
   content: string
+  // True when `content` is the captured user input / model output rather
+  // than a placeholder. Rendered as wrapped text instead of muted copy.
+  captured?: boolean
   toolName?: string
   input?: object
   output?: object
@@ -69,17 +79,50 @@ interface Trace {
   // Payload capture — undefined when capture was off for this request
   requestBody?: Record<string, unknown> | null
   responseBody?: Record<string, unknown> | null
+  // Undefined when the request was not auto-routed
+  routerTraining?: RouterTraining
+}
+
+const TRAINING_SOURCE_LABELS: Record<RouterTraining['used_by'][number], string> = {
+  tier_gold: 'Tier classifier (judged gold pair)',
+  tier_outcome: 'Tier classifier (next-turn reward)',
+  cost_model: 'Cost model (output length)',
+}
+
+function trainingBadge(t: RouterTraining | undefined): { label: string; className: string } {
+  if (t?.status === 'training') {
+    return { label: 'Training data', className: 'bg-brand/10 text-brand border-brand/30' }
+  }
+  if (t?.status === 'holdout') {
+    return { label: 'Holdout', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' }
+  }
+  return { label: 'Not used', className: 'bg-muted text-muted-foreground border-border' }
 }
 
 // Convert RecentLog to Trace format
 function logToTrace(log: RecentLog): Trace {
   const steps: TraceStep[] = []
 
-  // Simulate a user message step
+  // Message content only exists in the captured payloads; request_logs
+  // stores counts and metadata, not text.
+  const captureOn = log.request_body != null || log.response_body != null
+  const placeholder = (what: string, body: unknown) =>
+    body == null
+      ? captureOn
+        ? `${what} (not captured for this request)`
+        : `${what} (content not stored: payload capture was off)`
+      : isTruncatedPayload(body)
+        ? `${what} (payload too large to capture)`
+        : `${what} (no text in captured payload)`
+  const userText = extractUserText(log.request_body)
+  const assistantText = extractAssistantText(log.response_body)
+  const reasoningText = extractReasoningText(log.response_body)
+
   steps.push({
     id: `${log.id}-user`,
     type: 'user',
-    content: 'User request (content not stored)',
+    content: userText ?? placeholder('User request', log.request_body),
+    captured: userText != null,
   })
 
   // Strategy events: compression / validation / consistency. These run
@@ -152,12 +195,13 @@ function logToTrace(log: RecentLog): Trace {
   }
 
   // If there's reasoning
-  if (log.has_reasoning && log.reasoning_tokens && log.reasoning_tokens > 0) {
+  if (reasoningText || (log.has_reasoning && log.reasoning_tokens && log.reasoning_tokens > 0)) {
     steps.push({
       id: `${log.id}-reasoning`,
       type: 'reasoning',
-      content: 'Model reasoning (content not stored)',
-      tokens: log.reasoning_tokens,
+      content: reasoningText ?? placeholder('Model reasoning', log.response_body),
+      captured: reasoningText != null,
+      tokens: log.reasoning_tokens ?? undefined,
     })
   }
 
@@ -206,9 +250,12 @@ function logToTrace(log: RecentLog): Trace {
   steps.push({
     id: `${log.id}-assistant`,
     type: 'assistant',
-    content: log.has_tool_calls
-      ? `Response after ${log.tool_calls_count} tool call${log.tool_calls_count > 1 ? 's' : ''}`
-      : 'Assistant response (content not stored)',
+    content:
+      assistantText ??
+      (log.has_tool_calls
+        ? `Response after ${log.tool_calls_count} tool call${log.tool_calls_count > 1 ? 's' : ''}`
+        : placeholder('Assistant response', log.response_body)),
+    captured: assistantText != null,
     latency: log.latency_ms ?? undefined,
     tokens: log.output_tokens ?? undefined,
   })
@@ -230,6 +277,7 @@ function logToTrace(log: RecentLog): Trace {
     toolsUsed: log.tools_used ?? [],
     requestBody: log.request_body,
     responseBody: log.response_body,
+    routerTraining: log.router_training,
   }
 }
 
@@ -502,6 +550,15 @@ export function HarnessPage() {
                                 {trace.toolCallsCount}
                               </Badge>
                             )}
+                            {trace.routerTraining?.status === 'training' && (
+                              <Badge
+                                variant="outline"
+                                className={cn('text-xs', trainingBadge(trace.routerTraining).className)}
+                                title="Part of the auto-router training data"
+                              >
+                                <BrainLine className="h-3 w-3" />
+                              </Badge>
+                            )}
                             <StatusPill status={trace.status} />
                           </div>
                         </div>
@@ -597,6 +654,60 @@ export function HarnessPage() {
                             <p className="font-medium">{new Date(selectedTrace.createdAt).toLocaleString()}</p>
                           </div>
                         </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Router training */}
+                    <Card>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            <BrainLine className="h-4 w-4 text-muted-foreground" />
+                            Router training
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={cn('text-xs', trainingBadge(selectedTrace.routerTraining).className)}
+                          >
+                            {trainingBadge(selectedTrace.routerTraining).label}
+                          </Badge>
+                        </div>
+                        {selectedTrace.routerTraining ? (
+                          <>
+                            {selectedTrace.routerTraining.used_by.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {selectedTrace.routerTraining.used_by.map((u) => (
+                                  <span key={u} className="text-2xs font-mono px-2 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                                    {TRAINING_SOURCE_LABELS[u]}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {[
+                                selectedTrace.routerTraining.tier && `Routed to the ${selectedTrace.routerTraining.tier} tier.`,
+                                selectedTrace.routerTraining.gold_label &&
+                                  `Gold pair label: ${selectedTrace.routerTraining.gold_label} (${selectedTrace.routerTraining.gold_split ?? 'train'} split).`,
+                                typeof selectedTrace.routerTraining.reward === 'number' &&
+                                  `Outcome reward ${selectedTrace.routerTraining.reward.toFixed(2)}.`,
+                                selectedTrace.routerTraining.synthetic &&
+                                  'Synthetic request (routing lab or x-aura-synthetic): never sampled for gold pairs or outcome rewards.',
+                                selectedTrace.routerTraining.status === 'holdout' &&
+                                  'Holdout rows are used to evaluate the tier classifier, not to train it.',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Not auto-routed, so no router trainer reads this request.
+                          </p>
+                        )}
+                        <p className="text-2xs text-muted-foreground">
+                          Shows whether the request is in the data the router trainers read. Trainers also apply a
+                          --days window, and the gateway does not record which rows a given model was trained on.
+                        </p>
                       </CardContent>
                     </Card>
 
@@ -711,7 +822,13 @@ export function HarnessPage() {
                                   </div>
                                 </div>
 
-                                <p className="text-sm text-muted-foreground">{step.content}</p>
+                                {step.captured ? (
+                                  <p className="text-sm whitespace-pre-wrap break-words max-h-96 overflow-auto">
+                                    {step.content}
+                                  </p>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">{step.content}</p>
+                                )}
 
                                 {/* Meta chips for strategy steps. Filter out
                                     undefined/null/empty values so we don't
