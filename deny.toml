@@ -7,27 +7,18 @@ db-path = "~/.cargo/advisory-db"
 # The url(s) of the advisory databases to use
 db-urls = ["https://github.com/rustsec/advisory-db"]
 
-# Ignore advisories for specific IDs. All transitive deps pinned by upstream
-# constraints we can't bump (mainly the AWS SDK's aws-lc-rs/rustls 0.21).
-# See .cargo/audit.toml for the full rationale per ID. Revisit on dep bumps.
+# Ignore advisories for specific IDs. Each entry is a transitive dependency
+# with no patched version we can reach. See .cargo/audit.toml for the full
+# rationale per ID. audit.toml also ignores RUSTSEC-2023-0071, which only
+# cargo-audit sees (it scans unused lockfile entries). Revisit on dep bumps:
+# cargo-deny warns (advisory-not-detected) once an entry no longer matches.
 ignore = [
-    # RSA timing attack - not applicable as we don't use MySQL
-    # Only affects sqlx-mysql which we explicitly disable with default-features = false
-    "RUSTSEC-2023-0071",
-    # aws-lc-sys 0.37.x — pinned by aws-lc-rs 1.15 (AWS SDK / rustls 0.23).
-    "RUSTSEC-2026-0044",
-    "RUSTSEC-2026-0045",
-    "RUSTSEC-2026-0046",
-    "RUSTSEC-2026-0047",
-    "RUSTSEC-2026-0048",
-    # rustls-webpki 0.101.7 — legacy rustls 0.21 inside the AWS SDK only.
-    "RUSTSEC-2026-0098",
-    "RUSTSEC-2026-0099",
-    "RUSTSEC-2026-0104",
-    # paste — unmaintained (informational), pinned by utoipa-axum.
-    "RUSTSEC-2024-0436",
     # rand 0.8.5 — unsound informational, pinned by sqlx-postgres.
     "RUSTSEC-2026-0097",
+    # unsafe-libyaml — unmaintained (informational, no patched release),
+    # via serde_yaml. Parses operator-supplied config only. Review by
+    # 2027-01-31; fix is migrating off serde_yaml.
+    { id = "RUSTSEC-2024-0449", reason = "unmaintained, no patched release; parses operator config only; review 2027-01-31" },
 ]
 
 [licenses]
