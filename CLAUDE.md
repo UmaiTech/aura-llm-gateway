@@ -314,25 +314,36 @@ The public roadmap at `aura-llm.dev/roadmap` is the source of truth for what the
 
 **Rule**: any user-facing change (new feature, new provider, new endpoint, breaking change, deprecations) that ships to production MUST be reflected on the roadmap in the same PR that ships it. Internal refactors, dependency bumps, CI tweaks, and bugfixes that don't change observable behavior do not need a roadmap entry.
 
-**File**: `apps/landing/src/pages/RoadmapPage.tsx`. The `releases` array is a chronological list of `Release` objects.
+**Files**: data lives in `apps/landing/src/lib/roadmap.ts`; `apps/landing/src/pages/RoadmapPage.tsx` only renders it. `apps/landing/src/lib/roadmap.test.ts` (run by `npm test` in `apps/landing`) checks the data against `CHANGELOG.md` and fails the build when they disagree.
 
-**When you ship a new feature on an existing in-progress version** (e.g. v0.11 is `phase: 'active'` and you just merged a new provider into it):
+**Data model**: `ROADMAP` is a list of `RoadmapItem { id, title, status, releasedVersion?, releasedAt?, evidenceLinks, area, description, proposal?, issueRefs? }`. Statuses:
 
-1. Find the active release in the `releases` array.
-2. Add a `ReleaseItem` to its `items` list with a 1-line `label` and optional `note` for the detail.
-3. Keep labels short (3-7 words). Notes are for the "what does this actually mean" disambiguation.
+- `released` — in a published version. Needs `releasedVersion` (e.g. `'0.21.0'`), `releasedAt` (the date of that version's `## [x.y.z] - yyyy-mm-dd` CHANGELOG heading) and at least one evidence link (PR via `pr(n)`, `changelogLink(version, date)`, or the release). Use the `released('0.21.0', {...})` helper so the date comes from `RELEASES`.
+- `merged-unreleased` — merged to main, not in a tagged release yet. Evidence is the PR or the CHANGELOG `Unreleased` section. Never give it a version or date.
+- `in-progress` — only when an open PR or branch exists. Wanting it is not enough.
+- `planned` — the maintainers intend to build it. No dates, versions or deadlines.
+- `considering` — under evaluation. Set `proposal: true` for suggestions that came from a review rather than the maintainers. No dates.
 
-**When you cut a new minor version** (e.g. v0.11.0 → v0.12.0):
+Releases before v0.14 live in `LEGACY_MILESTONES` and render in a collapsed archive; don't add to it except to correct history.
 
-1. Promote the current active row to `phase: 'shipped'` and set `when` to the calendar date (`Mar 2026` format).
-2. Add a new row above it with `phase: 'active'`, the new version string, a working title, and the first known items.
-3. Update the file-level docstring comment (top of `RoadmapPage.tsx`) — the `Latest shipped` and `In progress` lines.
+**When you ship a user-facing feature to main**: add a `merged-unreleased` item with the PR as evidence, at the top of the `ROADMAP` list.
+
+**When you cut a release** (e.g. v0.21.0):
+
+1. Add the version to the top of `RELEASES` with its CHANGELOG date and `tagged: true` once the `v0.21.0` tag exists.
+2. Turn its `merged-unreleased` items into `released('0.21.0', {...})` items (keep the PR evidence).
+3. Update `RECONCILED` (date and main commit you checked against) and the `Latest shipped` / `In progress` lines in the docstring at the top of `RoadmapPage.tsx`.
+4. Run `npm test` in `apps/landing`: it checks that the newest release on the page is the newest CHANGELOG release.
 
 **When you write a new release note in `CHANGELOG.md`**: cross-reference the roadmap. Anything material in the changelog should also appear (in shorter form) in the roadmap. The changelog is the granular log; the roadmap is the editorial summary.
 
-**Issue references**: if the work closes a GitHub issue worth highlighting, add it to the release's `issueRefs` array (e.g. `['#155', '#161']`). Don't enumerate every issue — pick the user-facing ones.
+**Issue references**: if the work closes a GitHub issue worth highlighting, add it to the item's `issueRefs` array (e.g. `['#155', '#161']`). Don't enumerate every issue — pick the user-facing ones.
 
-**Tone**: write for a smart non-engineer evaluating the project. "Tool roundtrip context replay" is right; "PR #164 implementation" is wrong. The roadmap is marketing surface as much as engineering record.
+**Tone**: write for a smart non-engineer evaluating the project. "Tool roundtrip context replay" is right; "PR #164 implementation" is wrong. Titles are short (3-7 words); the `description` says what it means in one or two sentences. The roadmap is marketing surface as much as engineering record, so never promise dates, SLAs or uptime for anything not yet released.
+
+### Docs with a canonical source
+
+`docs/api/auto-routing.md` is the canonical auto-routing reference; `apps/landing/src/content/api/auto-routing.md` is the shorter public guide built from it (mapping in `CANONICAL_SOURCES`, `apps/landing/src/lib/docsNav.ts`). `docsSources.test.ts` fails when a section present in both differs or the guide uses an identifier the reference lacks: change the canonical file first, then carry the change into the guide. Entry-path cards and sidebar links on the docs site are checked by `docsNav.test.ts` (every link and `#anchor` must resolve to a content file and heading).
 
 ### Auto-generated CHANGELOG is incomplete — review it on every release PR
 

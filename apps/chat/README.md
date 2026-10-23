@@ -2,7 +2,7 @@
 
 A modern chat interface for testing the Aura LLM Gateway. Built with React, TypeScript, and Tailwind CSS.
 
-![Aura Chat](../../assets/logo.svg)
+![Aura Chat](../../assets/brand/aura-mark-violet.svg)
 
 ## Features
 

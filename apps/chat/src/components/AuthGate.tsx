@@ -26,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useSession, signIn } from '../lib/auth-client'
+import { Wordmark } from '@aura/ui/brand/Brand.tsx'
 
 interface AuthGateProps {
   children: ReactNode
@@ -140,8 +141,7 @@ function SignInScreen() {
           arriving from the marketing site recognizes where they are. */}
       <header className="flex items-center justify-between px-6 sm:px-10 py-4">
         <div className="flex items-center gap-2.5">
-          <img src="/playground/logo.svg" alt="Aura" className="h-8 w-8" />
-          <span className="font-semibold text-lg">Aura</span>
+          <Wordmark size={32} className="text-gray-100" />
         </div>
         <a
           href="https://aura-llm.dev"

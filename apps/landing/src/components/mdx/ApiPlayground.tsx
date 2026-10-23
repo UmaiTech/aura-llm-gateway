@@ -100,22 +100,22 @@ export function ApiPlayground({
   }
 
   return (
-    <div className="my-6 rounded-lg border border-gray-800 overflow-hidden bg-gray-900/30">
+    <div className="my-6 max-w-full rounded-panel border border-aura-border overflow-hidden bg-aura-surface">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border-b border-gray-800">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-aura-surface-2 border-b border-aura-border">
+        <div className="flex min-w-0 items-center gap-3">
           <span
             className={clsx(
               'px-2 py-0.5 rounded text-xs font-semibold',
-              method === 'GET' && 'bg-green-500/20 text-green-400',
-              method === 'POST' && 'bg-blue-500/20 text-blue-400',
-              method === 'PUT' && 'bg-yellow-500/20 text-yellow-400',
-              method === 'DELETE' && 'bg-red-500/20 text-red-400'
+              method === 'GET' && 'bg-aura-green/15 text-aura-green',
+              method === 'POST' && 'bg-aura-accent/15 text-aura-accent',
+              method === 'PUT' && 'bg-aura-amber/15 text-aura-amber',
+              method === 'DELETE' && 'bg-aura-red/15 text-aura-red'
             )}
           >
             {method}
           </span>
-          <code className="text-sm text-gray-300 font-mono">{endpoint}</code>
+          <code className="min-w-0 text-sm text-aura-text font-mono [overflow-wrap:anywhere]">{endpoint}</code>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -123,8 +123,8 @@ export function ApiPlayground({
             className={clsx(
               'flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors',
               copied
-                ? 'text-green-400 bg-green-500/10'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                ? 'text-aura-green bg-aura-green/10'
+                : 'text-aura-muted hover:text-aura-text hover:bg-aura-hover'
             )}
           >
             {copied ? (
@@ -145,8 +145,8 @@ export function ApiPlayground({
             className={clsx(
               'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors',
               loading
-                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                : 'bg-aura-500 hover:bg-aura-600 text-white'
+                ? 'bg-aura-hover text-aura-dim cursor-not-allowed'
+                : 'bg-aura-action hover:brightness-110 text-white'
             )}
           >
             {loading ? (
@@ -167,7 +167,7 @@ export function ApiPlayground({
       {/* Headers toggle */}
       <button
         onClick={() => setShowHeaders(!showHeaders)}
-        className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors border-b border-gray-800"
+        className="w-full flex items-center justify-between px-4 py-2 text-sm text-aura-muted hover:text-aura-text hover:bg-aura-hover transition-colors border-b border-aura-border"
       >
         <span>Headers</span>
         <ChevronDown
@@ -180,11 +180,12 @@ export function ApiPlayground({
 
       {/* Headers editor */}
       {showHeaders && (
-        <div className="border-b border-gray-800">
+        <div className="border-b border-aura-border">
           <textarea
+            aria-label="Request headers"
             value={headers}
             onChange={(e) => setHeaders(e.target.value)}
-            className="w-full bg-[#0f172a] text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none"
+            className="w-full bg-[#0f172a] text-slate-200 font-mono text-sm p-4 resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400"
             rows={4}
             spellCheck={false}
           />
@@ -192,14 +193,15 @@ export function ApiPlayground({
       )}
 
       {/* Request body */}
-      <div className="border-b border-gray-800">
-        <div className="px-4 py-2 text-xs text-gray-500 bg-gray-900/30">
+      <div className="border-b border-aura-border">
+        <div className="px-4 py-2 text-xs text-aura-dim bg-aura-surface-2">
           Request Body
         </div>
         <textarea
+          aria-label="Request body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          className="w-full bg-[#0f172a] text-gray-300 font-mono text-sm p-4 resize-none focus:outline-none min-h-[200px]"
+          className="w-full bg-[#0f172a] text-slate-200 font-mono text-sm p-4 resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400 min-h-[200px]"
           spellCheck={false}
         />
       </div>
@@ -209,14 +211,14 @@ export function ApiPlayground({
         <div>
           <div
             className={clsx(
-              'px-4 py-2 text-xs bg-gray-900/30',
-              error ? 'text-red-400' : 'text-gray-500'
+              'px-4 py-2 text-xs bg-aura-surface-2',
+              error ? 'text-aura-red' : 'text-aura-dim'
             )}
           >
             {error ? 'Error' : 'Response'}
           </div>
           {error ? (
-            <div className="p-4 text-red-400 text-sm">{error}</div>
+            <div className="p-4 text-aura-red text-sm">{error}</div>
           ) : (
             <SyntaxHighlighter
               language="json"

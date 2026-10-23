@@ -11,10 +11,17 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Shared tokens, brand marks and routing inspector (packages/aura-ui),
+      // consumed as source.
+      '@aura/ui': path.resolve(__dirname, '../../packages/aura-ui/src'),
     },
+    // Shared source sits outside this app; resolve its React imports to
+    // this app's single copy.
+    dedupe: ['react', 'react-dom'],
   },
   server: {
     port: 3001,
+    fs: { allow: [path.resolve(__dirname, '../..')] },
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
