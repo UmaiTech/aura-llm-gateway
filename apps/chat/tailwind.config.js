@@ -38,6 +38,9 @@ export default {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
         },
+        // Semantic status colours from the design tokens (tokens.css).
+        warning: 'rgb(var(--aura-rgb-amber) / <alpha-value>)',
+        success: 'rgb(var(--aura-rgb-green) / <alpha-value>)',
         // Aura brand colors (CSS variables + fallback static colors)
         aura: {
           50: '#f5f3ff',

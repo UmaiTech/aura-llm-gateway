@@ -3,16 +3,7 @@
 // so the routing views evolve without touching the shared client.
 
 import { fetchApi } from './api'
-
-export type RoutingTier = 'simple' | 'medium' | 'complex' | 'reasoning'
-
-export const ROUTING_TIERS: RoutingTier[] = ['simple', 'medium', 'complex', 'reasoning']
-
-export interface TierBoundaries {
-  simple_medium: number
-  medium_complex: number
-  complex_reasoning: number
-}
+import type { StoredRoutingDecision } from '@aura/ui/routing/decision.ts'
 
 /** One row of GET /admin/routing/decisions. */
 export interface RoutingDecisionRow {
@@ -110,23 +101,6 @@ export const DECISION_FILTER_KEYS: (keyof RoutingDecisionFilters)[] = [
   'max_cost',
 ]
 
-export interface RoutingCandidate {
-  model: string
-  provider?: string | null
-  tier: string
-  cost_per_million?: number | null
-  predicted_cost_usd?: number | null
-  eligible: boolean
-}
-
-export interface RoutingEscalation {
-  from_model: string
-  from_tier: string
-  to_model: string
-  to_tier: string
-  error_code: string
-}
-
 export interface RoutingDecisionOutcome {
   status: string | null
   actual_model: string | null
@@ -145,39 +119,12 @@ export interface RoutingDecisionOutcome {
   outcome_computed_at: string | null
 }
 
-/** GET /admin/routing/decisions/{response_id} */
-export interface RoutingDecisionDetail {
-  id: string
-  response_id: string
-  provider_response_id: string | null
-  organization_id: string | null
-  api_key_id: string | null
-  conversation_id: string | null
-  requested_model: string
-  mode: string
-  classifier: string
-  score: number
-  raw_score: number
-  classified_tier: string
-  tier: string
-  selected_model: string
-  selected_provider: string | null
-  reason: string
-  shadow: boolean
-  features: Record<string, unknown>
-  signals: Record<string, number>
-  hard_filters: string[]
-  candidates: RoutingCandidate[]
-  requested_blended_per_million: number | null
-  selected_blended_per_million: number | null
-  decision_latency_us: number
-  escalations: RoutingEscalation[] | null
-  synthetic: boolean
-  created_at: string
-  boundaries: TierBoundaries | null
-  outcome: RoutingDecisionOutcome | null
-  boundaries_in_force: TierBoundaries
-  boundaries_source: 'recorded' | 'config' | 'default'
+/**
+ * GET /admin/routing/decisions/{response_id}: the shared stored-decision
+ * shape (what the inspector reads) plus the full outcome.
+ */
+export type RoutingDecisionDetail = Omit<StoredRoutingDecision, 'outcome'> & {
+  outcome?: RoutingDecisionOutcome | null
 }
 
 export interface RoutingTimelinePoint {
@@ -258,12 +205,6 @@ export async function listRoutingDecisions(
   if (cursor) params.set('cursor', cursor)
   params.set('limit', String(limit))
   return fetchApi<RoutingDecisionPage>(`/admin/routing/decisions?${params.toString()}`)
-}
-
-export async function getRoutingDecision(responseId: string): Promise<RoutingDecisionDetail> {
-  return fetchApi<RoutingDecisionDetail>(
-    `/admin/routing/decisions/${encodeURIComponent(responseId)}`,
-  )
 }
 
 export async function getRoutingTimeline(period: string): Promise<RoutingTimeline> {

@@ -217,9 +217,9 @@ function TimelinePanels({ timeline }: { timeline: RoutingTimeline }) {
         />
       </div>
       <div className="space-y-2">
-        <div className="text-sm font-medium">Estimated shadow savings</div>
+        <div className="text-sm font-medium">Est. savings if applied (counterfactual)</div>
         <div className="text-xs text-muted-foreground tabular-nums">
-          {formatCurrency(savings)} if pinned-model traffic had used auto
+          {formatCurrency(savings)} if shadow-scored traffic had used auto · an estimate, not realised spend
         </div>
         <BarChart
           points={pts}

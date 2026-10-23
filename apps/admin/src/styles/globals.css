@@ -1,42 +1,55 @@
+@import '@aura/ui/tokens.css';
+@import '@aura/ui/ui.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * shadcn-style theme variables, mapped onto the Aura design tokens
+ * (packages/aura-ui/src/tokens.css, from the v3 design pack). HSL triplets
+ * because the Tailwind config wraps them in hsl(); values are the token
+ * hex colours converted. `--primary` is the action violet used for filled
+ * buttons; `--brand` is the accent for selected/link text, which needs the
+ * lighter shade to stay readable on dark surfaces.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --background: 228 45% 98%;
+    --foreground: 226 27% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 226 27% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
+    --popover-foreground: 226 27% 12%;
 
-    --primary: 250 95% 63%;
+    --primary: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
+    --brand: 263 70% 50%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --secondary: 225 36% 96%;
+    --secondary-foreground: 226 27% 12%;
 
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --muted: 225 36% 96%;
+    --muted-foreground: 219 17% 38%;
 
-    --destructive: 0 72% 51%;
+    --accent: 234 29% 93%;
+    --accent-foreground: 226 27% 12%;
+
+    --destructive: 348 57% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 161 88% 25%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 39 100% 29%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 250 95% 63%;
+    --border: 220 27% 87%;
+    --input: 220 27% 87%;
+    --ring: 263 70% 50%;
 
     --radius: 0.75rem;
 
@@ -45,39 +58,41 @@
   }
 
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
+    --background: 227 29% 6%;
+    --foreground: 220 37% 97%;
 
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
+    --card: 223 29% 9%;
+    --card-foreground: 220 37% 97%;
 
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 223 27% 13%;
+    --popover-foreground: 220 37% 97%;
 
-    --primary: 250 95% 63%;
+    --primary: 260 71% 56%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 6% 10%;
-    --secondary-foreground: 0 0% 98%;
+    --brand: 254 100% 80%;
 
-    --muted: 240 6% 10%;
-    --muted-foreground: 240 5% 65%;
+    --secondary: 223 27% 13%;
+    --secondary-foreground: 220 37% 97%;
 
-    --accent: 240 6% 10%;
-    --accent-foreground: 0 0% 98%;
+    --muted: 223 27% 13%;
+    --muted-foreground: 218 17% 70%;
 
-    --destructive: 0 62% 50%;
+    --accent: 226 27% 15%;
+    --accent-foreground: 220 37% 97%;
+
+    --destructive: 352 70% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 70% 45%;
-    --success-foreground: 0 0% 100%;
+    --success: 157 60% 69%;
+    --success-foreground: 227 29% 6%;
 
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 41 81% 71%;
+    --warning-foreground: 227 29% 6%;
 
-    --border: 240 6% 15%;
-    --input: 240 6% 15%;
-    --ring: 250 95% 63%;
+    --border: 222 24% 21%;
+    --input: 222 24% 21%;
+    --ring: 254 100% 80%;
   }
 }
 
@@ -145,11 +160,11 @@
   }
 
   .sidebar-item.active {
-    @apply bg-primary/10 text-primary;
+    @apply bg-brand/10 text-brand;
   }
 
   .sidebar-item.active::before {
-    @apply absolute left-0 h-6 w-1 rounded-r-full bg-primary;
+    @apply absolute left-0 h-6 w-1 rounded-r-full bg-brand;
     content: '';
   }
 

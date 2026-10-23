@@ -6,12 +6,12 @@ import { cn, formatDuration } from '@/lib/utils'
 import { ArrowLeftLine, Loading3Line, Refresh1Line, SearchLine } from '@mingcute/react'
 import {
   DECISION_FILTER_KEYS,
-  ROUTING_TIERS,
   listRoutingDecisions,
   type RoutingDecisionFilters,
   type RoutingDecisionRow,
 } from '@/lib/routing'
-import { DecisionDrawer } from '@/components/routing/DecisionDrawer'
+import { TIERS } from '@aura/ui/routing/decision.ts'
+import { RoutingDecisionDrawer } from '@/components/routing/RoutingDecisionDrawer'
 import {
   OUTCOME_LABELS,
   TIER_TONE,
@@ -258,13 +258,13 @@ export function RoutingDecisionsPage() {
                 label="Final tier"
                 value={filters.tier}
                 onChange={(v) => setFilter('tier', v)}
-                options={[anyOpt, ...ROUTING_TIERS.map((t): [string, string] => [t, t])]}
+                options={[anyOpt, ...TIERS.map((t): [string, string] => [t, t])]}
               />
               <Select
                 label="Classified tier"
                 value={filters.classified_tier}
                 onChange={(v) => setFilter('classified_tier', v)}
-                options={[anyOpt, ...ROUTING_TIERS.map((t): [string, string] => [t, t])]}
+                options={[anyOpt, ...TIERS.map((t): [string, string] => [t, t])]}
               />
               <Select
                 label="Classified ≠ final"
@@ -564,7 +564,7 @@ export function RoutingDecisionsPage() {
         )}
       </div>
 
-      {responseId && <DecisionDrawer responseId={responseId} onClose={closeDecision} />}
+      <RoutingDecisionDrawer responseId={responseId ?? null} onClose={closeDecision} />
     </div>
   )
 }

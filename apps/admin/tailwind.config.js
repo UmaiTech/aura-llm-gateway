@@ -42,6 +42,8 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Aura accent for selected and link text (design token `accent`).
+        brand: 'hsl(var(--brand) / <alpha-value>)',
         // Aura brand colors
         aura: {
           50: '#f5f3ff',
