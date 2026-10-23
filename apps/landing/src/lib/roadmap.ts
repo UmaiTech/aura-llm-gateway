@@ -108,7 +108,15 @@ function released(
 
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
-  // (none: everything merged so far shipped in v0.21.1)
+  {
+    id: 'trace-content-router-training',
+    title: 'Trace content and router training status',
+    status: 'merged-unreleased',
+    area: 'admin',
+    description:
+      'With payload capture on, the admin trace view now shows the actual user input, reasoning and answer in each step instead of a "content not stored" note. Each trace also says whether the request is part of the auto-router training data, held out for evaluation, or not used.',
+    evidenceLinks: [pr(261)],
+  },
 
   // ── Released ─────────────────────────────────────────────────────────
   released('0.21.1', {
