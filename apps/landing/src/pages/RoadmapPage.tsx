@@ -29,10 +29,11 @@ import {
  * (released / merged-unreleased / in-progress / planned / considering);
  * roadmap.test.ts checks them against CHANGELOG.md. This page only renders.
  *
- * Latest shipped: v0.20.0 (2026-10-22)
- * In progress: nothing tagged in-progress; merged-unreleased work on main
- *   (prompt caching #243, GitHub stars #242, the landing/docs/roadmap/
- *   pricing redesign) ships in the next release.
+ * Latest shipped: v0.21.0 (2026-10-23)
+ * In progress: nothing tagged in-progress; merged-unreleased holds the
+ *   streaming fixes (#235). v0.21.0 shipped prompt caching, the v3
+ *   redesign, the admin design refresh, the routing decisions explorer
+ *   and the routing lab.
  */
 
 const FILTERS: { id: StatusFilter; label: string }[] = [

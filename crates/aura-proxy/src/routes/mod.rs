@@ -13,7 +13,9 @@ pub mod openapi;
 pub mod organizations;
 pub mod rate_limit;
 pub mod responses;
+pub mod routing_decisions;
 pub mod routing_gold;
+pub mod routing_lab;
 pub mod routing_rollup;
 pub mod routing_synthetic;
 

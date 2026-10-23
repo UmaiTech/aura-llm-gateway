@@ -75,8 +75,8 @@ export function Hero() {
             Try the playground
             <ArrowRight className="h-4 w-4" aria-hidden />
           </a>
-          <a href={LINKS.admin} className="btn-secondary">
-            Explore the admin app
+          <a href={LINKS.adminLocal} className="btn-secondary">
+            Run the admin app locally
             <LayoutGrid className="h-4 w-4" aria-hidden />
           </a>
         </div>

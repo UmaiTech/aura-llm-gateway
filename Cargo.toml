@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.20.0"
+version = "0.21.0"
 edition = "2021"
 authors = ["Umai Tech <team@umai.tech>"]
 license = "MIT"
@@ -78,13 +78,13 @@ metrics-exporter-prometheus = "0.16"
 regex = "1.10"
 
 # OpenAPI Documentation
-utoipa = { version = "5.3", features = ["axum_extras", "chrono", "uuid"] }
-utoipa-axum = "0.2"
-utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.3"
+utoipa-swagger-ui = { version = "10.0.2", features = ["axum"] }
 
 # AWS Bedrock
-aws-config = { version = "1.5", default-features = false, features = ["rustls", "behavior-version-latest"] }
-aws-sdk-bedrockruntime = { version = "1.60", default-features = false, features = ["rt-tokio", "rustls", "behavior-version-latest"] }
+aws-config = { version = "1.5", default-features = false, features = ["default-https-client", "behavior-version-latest"] }
+aws-sdk-bedrockruntime = { version = "1.60", default-features = false, features = ["rt-tokio", "default-https-client", "behavior-version-latest"] }
 aws-credential-types = { version = "1.2", features = ["hardcoded-credentials"] }
 
 # Development tools

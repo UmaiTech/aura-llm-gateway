@@ -54,9 +54,9 @@ export const REPO = 'https://github.com/UmaiTech/aura-llm-gateway'
 
 /** When this file was last checked against CHANGELOG.md, tags and merged PRs. */
 export const RECONCILED = {
-  date: '2026-10-22',
+  date: '2026-10-23',
   /** main commit the release history was reconciled against. */
-  revision: 'ca6d517',
+  revision: '9bd32ab',
 } as const
 
 export const pr = (n: number): EvidenceLink => ({ label: `#${n}`, href: `${REPO}/pull/${n}` })
@@ -71,7 +71,8 @@ export const changelogLink = (version: string, date: string): EvidenceLink => ({
   href: `${REPO}/blob/main/CHANGELOG.md#${changelogAnchor(version, date)}`,
 })
 
-const UNRELEASED: EvidenceLink = { label: 'CHANGELOG · Unreleased', href: `${REPO}/blob/main/CHANGELOG.md#unreleased` }
+/** Evidence for merged-unreleased items that have no single PR. */
+export const UNRELEASED: EvidenceLink = { label: 'CHANGELOG · Unreleased', href: `${REPO}/blob/main/CHANGELOG.md#unreleased` }
 
 /** Published versions shown in the release list, newest first. */
 export interface Release {
@@ -82,6 +83,7 @@ export interface Release {
 }
 
 export const RELEASES: Release[] = [
+  { version: '0.21.0', date: '2026-10-23', tagged: true },
   { version: '0.20.0', date: '2026-10-22', tagged: true },
   { version: '0.19.0', date: '2026-10-22', tagged: true },
   { version: '0.18.0', date: '2026-09-09', tagged: true },
@@ -106,59 +108,6 @@ function released(
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
   {
-    id: 'landing-redesign',
-    title: 'Product-led landing page',
-    status: 'merged-unreleased',
-    area: 'site',
-    description:
-      'aura-llm.dev now leads with the admin app and the playground, includes an interactive walkthrough of the auto router, and comes in light and dark themes.',
-    evidenceLinks: [UNRELEASED],
-  },
-  {
-    id: 'brand-identity',
-    title: 'New brand identity',
-    status: 'merged-unreleased',
-    area: 'site',
-    description: 'A new mark, wordmark and favicon family, used across the landing page, playground and admin app.',
-    evidenceLinks: [UNRELEASED],
-  },
-  {
-    id: 'routing-inspector-shared',
-    title: 'Routing inspector in playground and admin',
-    status: 'merged-unreleased',
-    area: 'routing',
-    description:
-      'One shared inspector shows the model that actually answered, whether a decision was applied or only shadowed, the tiers, the constraints in force and every candidate considered.',
-    evidenceLinks: [UNRELEASED],
-  },
-  {
-    id: 'docs-entry-roadmap',
-    title: 'Docs entry paths and reconciled roadmap',
-    status: 'merged-unreleased',
-    area: 'docs',
-    description:
-      'The docs open with Start, Route, Operate and Reference paths into the existing guides. This roadmap is now checked against the changelog, separates merged work from releases and links every shipped item to evidence.',
-    evidenceLinks: [UNRELEASED],
-  },
-  {
-    id: 'pricing-estimator',
-    title: 'Pricing estimator and model comparison',
-    status: 'merged-unreleased',
-    area: 'pricing',
-    description:
-      'Estimate the cost of a workload, compare up to three models side by side and filter by capability on the public pricing page, with all existing currencies kept.',
-    evidenceLinks: [UNRELEASED],
-  },
-  {
-    id: 'prompt-caching',
-    title: 'Provider prompt caching, billed correctly',
-    status: 'merged-unreleased',
-    area: 'gateway',
-    description:
-      'The stable part of each prompt is marked cacheable for Anthropic and Bedrock and sent with a stable cache key to OpenAI. Cache hits from supported providers are reported as cached tokens, billed at the cached rate, counted in metrics and shown in the playground.',
-    evidenceLinks: [pr(243)],
-  },
-  {
     id: 'streaming-fixes',
     title: 'Streaming fixes for Gemini and long answers',
     status: 'merged-unreleased',
@@ -167,16 +116,86 @@ export const ROADMAP: RoadmapItem[] = [
       'Streamed Gemini answers no longer lose words, text cut mid-character by the network is no longer dropped by any provider, long code answers no longer stall the playground, and every routing decision now echoes the options it applied.',
     evidenceLinks: [pr(235)],
   },
-  {
+
+  // ── Released ─────────────────────────────────────────────────────────
+  released('0.21.0', {
+    id: 'routing-decisions-explorer',
+    title: 'Routing decisions explorer and router health',
+    area: 'admin',
+    description:
+      'The admin app lists every auto-routing decision with filters for time, tier, mode, model, outcome, cost and flags, and opens any one in the shared routing inspector with what happened next. The Routing page adds router health: reward and counterfactual-savings trends, learned arm statistics, model activation and gold-label coverage.',
+    evidenceLinks: [pr(246)],
+  }),
+  released('0.21.0', {
+    id: 'admin-design-refresh',
+    title: 'Admin app design refresh',
+    area: 'admin',
+    description:
+      'The admin app now uses the shared Aura look in light and dark mode, works on phones, and explains failed requests with a retry instead of showing empty pages. The request-volume chart now reads correctly at low traffic.',
+    evidenceLinks: [pr(247)],
+  }),
+  released('0.21.0', {
+    id: 'landing-redesign',
+    title: 'Product-led landing page',
+    area: 'site',
+    description:
+      'aura-llm.dev now leads with the admin app and the playground, includes an interactive walkthrough of the auto router, and comes in light and dark themes.',
+    evidenceLinks: [pr(248)],
+  }),
+  released('0.21.0', {
+    id: 'brand-identity',
+    title: 'New brand identity',
+    area: 'site',
+    description: 'A new mark, wordmark and favicon family, used across the landing page, playground and admin app.',
+    evidenceLinks: [pr(248)],
+  }),
+  released('0.21.0', {
+    id: 'routing-inspector-shared',
+    title: 'Routing inspector in playground and admin',
+    area: 'routing',
+    description:
+      'One shared inspector shows the model that actually answered, whether a decision was applied or only shadowed, the tiers, the constraints in force and every candidate considered.',
+    evidenceLinks: [pr(248)],
+  }),
+  released('0.21.0', {
+    id: 'docs-entry-roadmap',
+    title: 'Docs entry paths and reconciled roadmap',
+    area: 'docs',
+    description:
+      'The docs open with Start, Route, Operate and Reference paths into the existing guides. This roadmap is now checked against the changelog, separates merged work from releases and links every shipped item to evidence.',
+    evidenceLinks: [pr(248)],
+  }),
+  released('0.21.0', {
+    id: 'pricing-estimator',
+    title: 'Pricing estimator and model comparison',
+    area: 'pricing',
+    description:
+      'Estimate the cost of a workload, compare up to three models side by side and filter by capability on the public pricing page, with all existing currencies kept.',
+    evidenceLinks: [pr(248)],
+  }),
+  released('0.21.0', {
+    id: 'prompt-caching',
+    title: 'Provider prompt caching, billed correctly',
+    area: 'gateway',
+    description:
+      'The stable part of each prompt is marked cacheable for Anthropic and Bedrock and sent with a stable cache key to OpenAI. Cache hits from supported providers are reported as cached tokens, billed at the cached rate, counted in metrics and shown in the playground.',
+    evidenceLinks: [pr(243)],
+  }),
+  released('0.21.0', {
+    id: 'routing-lab',
+    title: 'Routing lab in the admin app',
+    area: 'admin',
+    description:
+      'Battle-test the auto router before trusting it: run preset or pasted prompt suites through auto, auto:cost and auto:quality next to a pinned model, free as a dry run or live with a spend guard, and compare tiers, candidates, predicted and actual cost, latency and answers. Live runs are admin-only, audited and kept out of routing statistics.',
+    evidenceLinks: [pr(244)],
+  }),
+  released('0.21.0', {
     id: 'github-stars',
     title: 'GitHub star count on the landing page',
-    status: 'merged-unreleased',
     area: 'site',
     description: 'The landing page shows the repository’s live star count, served from an hourly edge-cached endpoint.',
     evidenceLinks: [pr(242)],
-  },
-
-  // ── Released ─────────────────────────────────────────────────────────
+  }),
   released('0.20.0', {
     id: 'live-settings',
     title: 'Live gateway settings in the admin app',

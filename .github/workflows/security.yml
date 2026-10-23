@@ -5,6 +5,19 @@ on:
     # Run security audit every Monday at 9:00 AM UTC
     - cron: '0 9 * * 1'
   workflow_dispatch:
+  # Catch advisory regressions before the weekly run, on any change to the
+  # dependency graph or to the audit configuration itself.
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
+      - 'deny.toml'
+      - '.cargo/audit.toml'
+      - '.github/workflows/security.yml'
+
+# Read-only token: findings fail the job instead of opening issues.
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,10 +30,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Run cargo audit
-        uses: rustsec/audit-check@v2
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          tool: cargo-audit
+
+      # Ignores live in .cargo/audit.toml.
+      - name: Run cargo audit
+        run: cargo audit
 
   deny:
     name: Cargo Deny
@@ -34,6 +51,8 @@ jobs:
 
   outdated:
     name: Outdated Dependencies
+    # Informational only; skip on PRs to keep their checks fast.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

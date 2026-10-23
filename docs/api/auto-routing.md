@@ -343,7 +343,9 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | Endpoint | Description |
 |----------|-------------|
 | `GET /admin/stats/routing/auto?period=24h\|7d\|all` | Summary (applied / shadow decisions, applied cost, estimated savings, decision latency, success rate), per-tier and per-model breakdowns, and the 25 most recent decisions with outcomes. |
-| `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`). |
+| `GET /admin/routing/decisions` | Decisions joined with outcomes, newest first. Filters: `period` (`1h`/`24h`/`7d`/`30d`/`90d`/`all`) or `from`/`to` (RFC 3339), `mode`, `tier`, `classified_tier`, `tier_changed`, `model`, `shadow`, `synthetic` (`exclude` default / `include` / `only`), `escalated`, `sticky`, `status` (`pending` = no request log), `outcome` (signal or `unscored`), `feedback`, `min_reward`/`max_reward`, `organization_id`, `api_key_id`, `min_cost`/`max_cost`. `limit` (≤ 200, default 50) and `cursor` (the previous page's `next_cursor`). |
+| `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`), plus `outcome` (status, cost, latency, feedback, next-turn signal, reward) and `boundaries_in_force` / `boundaries_source` (`recorded` with the decision, else the current `config`). |
+| `GET /admin/stats/routing/auto/timeline?period=24h\|7d\|30d\|90d` | Live traffic per hour (24h) or day: applied / shadow / escalated counts, applied cost, estimated shadow savings, mean reward and signal counts. |
 | `POST /admin/routing/rollup` | Score pending decisions now and refresh arm statistics; returns counts per signal. |
 | `GET /admin/routing/arms` | Learned Beta(α, β) per (tier, model) used by `within_tier: thompson`. |
 | `GET /admin/routing/gold?limit=` | Gold-label summary (cheap sufficed / strong better / ties / failed) and recent pairs. |
@@ -353,11 +355,23 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | `POST /admin/routing/models/reload` | Re-read the active classifier and cost model from the database or weights files. |
 | `POST /admin/routing/models/deactivate?kind=` | Unload and deactivate models (all kinds, or one). |
 | `POST /admin/routing/score` | Dry-run the router on a request body; returns the decision, dispatches nothing. |
+| `POST /admin/routing/lab/run` | Run one request live on the admin path (no tenant limits, synthetic by default); see [Routing lab](#routing-lab). |
 | `GET /admin/routing/feature-profile?days=30` | Per-tier quantiles of the feature vector and request-shape shares of recent live decisions. No text; calibrates `synth.py`. |
 | `POST /admin/routing/judge` | Grade two answers to one request with the gold judge (`{"user_text", "answer_a", "answer_b", "judge_model"?}`). |
 | `POST /admin/routing/gold/synthetic` | Upsert a batch of synthetic gold rows (`{"batch_id", "rows": [...]}`, keyed by `prompt_hash`); rejected rows are reported per index. |
 
-The admin app's Routing page renders the same data as an "Auto router" section.
+The admin app's Routing page renders the same data as an "Auto router" section followed by router health panels (trends, arms, learned models, gold labels); `/routing/decisions` in the admin app is a filterable decisions explorer with a drawer per decision.
+
+### Routing lab
+
+The admin app's **Routing Lab** page (`/routing/lab`) battle-tests the router: it runs a batch of prompts (preset suites for simple, medium, complex, reasoning, tool-call, image and long-context requests, or pasted ones) through `auto`, `auto:cost`, `auto:quality` and optionally a pinned model, and shows per prompt the tier, score, signals, candidates, selected model, predicted vs actual cost, latency and the answer.
+
+- **Dry run** uses `POST /admin/routing/score`: heuristic classifier, nothing dispatched, no cost.
+- **Live run** uses `POST /admin/routing/lab/run` (`{"request": <responses body>, "synthetic": true, "label": "..."}`), which sends one request through the full `/v1/responses` pipeline (classifier, escalation, breaker, request logging) and returns `{ok, status, model, routing, output_text, input_tokens, output_tokens, cost_usd, latency_ms, response, error}`. Provider and routing errors come back in the body with `ok: false`, so a batch keeps going.
+
+The lab path skips tenant limits, and only the admin can use it. It sits under `/admin`, so only `AURA_ADMIN_KEY` is accepted and tenant API keys get `401`. Because the request carries no tenant context, per-key rate limits and quotas don't apply, and neither does any organization `routing.auto` override (tier clamps, allow / deny lists, `max_cost_usd`). Only the request's own `routing` options apply. The response cache is bypassed and `stream` is forced off. With `synthetic` on (the default), decisions are recorded with `synthetic = true`, like `x-aura-synthetic`, and stay out of routing stats, rewards, arm statistics and gold sampling. Every run logs on the `aura_proxy::audit` tracing target and lands in `request_logs` with `user = "aura-routing-lab"` unless the body sets one.
+
+Live runs spend real provider money. Before a live batch, the page estimates its cost from a free dry run, using the cost model's prediction or list price × (estimated input + `max_output_tokens`). It asks for confirmation when the estimate exceeds a threshold, or when some runs can't be priced. During the batch it shows the running spend and stops dispatching once a hard cap is reached.
 
 ### Outcome signals and rewards
 

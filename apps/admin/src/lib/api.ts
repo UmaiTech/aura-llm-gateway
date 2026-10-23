@@ -24,6 +24,9 @@ import type {
   ProviderSummary,
   GatewaySettingsOverrides,
   GatewaySettingsResponse,
+  LabResponsesRequest,
+  LabRunResult,
+  RoutingDecision,
 } from './types'
 import { useAuthStore } from '@/stores'
 import type { StoredRoutingDecision } from '@aura/ui/routing/decision.ts'
@@ -34,7 +37,9 @@ class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public details?: unknown
+    public details?: unknown,
+    /** Path that was requested, e.g. `/admin/settings`. */
+    public endpoint?: string
   ) {
     super(message)
     this.name = 'ApiError'
@@ -49,24 +54,38 @@ function getAuthHeaders(): Record<string, string> {
   return {}
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+export async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...options?.headers,
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+        ...options?.headers,
+      },
+    })
+  } catch (err) {
+    // fetch only rejects on network failure (gateway down, DNS,
+    // CORS). Status 0 lets the UI say "can't reach the gateway"
+    // instead of echoing the browser's "Failed to fetch".
+    throw new ApiError(
+      err instanceof Error ? err.message : 'Network request failed',
+      0,
+      err,
+      endpoint
+    )
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }))
     throw new ApiError(
       error.error || `API error: ${response.status}`,
       response.status,
-      error
+      error,
+      endpoint
     )
   }
 
@@ -191,6 +210,28 @@ export async function updateGatewaySettings(
   })
 }
 
+// Routing lab. Dry runs score a request with the auto router and
+// dispatch nothing; live runs go through the full /v1/responses pipeline
+// on the admin path (no tenant rate limits, org overrides or budgets) and
+// really call the provider.
+export async function scoreRoutingRequest(request: LabResponsesRequest): Promise<RoutingDecision> {
+  return fetchApi<RoutingDecision>('/admin/routing/score', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+export async function runRoutingLab(payload: {
+  request: LabResponsesRequest
+  synthetic: boolean
+  label?: string
+}): Promise<LabRunResult> {
+  return fetchApi<LabRunResult>('/admin/routing/lab/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 // Routing rule CRUD methods removed (#175 / A6) — the backend handlers
 // were mock-only and the RoutingPage now shows read-only stats from
 // /admin/stats/routing. Restore these when a routing_rules table exists.
@@ -227,7 +268,7 @@ export async function checkApiHealth(): Promise<boolean> {
 }
 
 // Export types for convenience
-export type { ApiError }
+export { ApiError, API_BASE_URL }
 export * from './types'
 
 // ---------------------------------------------------------------------------

@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, ErrorState, SkeletonPage, Stat, StatGrid } from '@/components/ui'
 import {
   SearchLine,
   User2Line,
   ForbidCircleLine,
   CheckLine,
   CloseLine,
-  ChartBarLine,
-  CoinLine,
   Refresh1Line,
 } from '@mingcute/react'
 import {
@@ -33,7 +31,7 @@ export function EndUsersPage() {
   const [users, setUsers] = useState<EndUserSummary[]>([])
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newUser, setNewUser] = useState({
     organization_id: '',
@@ -175,7 +173,7 @@ export function EndUsersPage() {
       setUsers(usersData)
       setOrganizations(orgsData)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch users')
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -238,10 +236,10 @@ export function EndUsersPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="End Users" description="Track and manage your customers' usage" />
-        <div className="flex-1 flex items-center justify-center">
-          <Refresh1Line className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={4} rows={8} />
         </div>
       </div>
     )
@@ -249,18 +247,17 @@ export function EndUsersPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="End Users" description="Track and manage your customers' usage" />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error}</p>
-          <Button onClick={fetchUsers}>Retry</Button>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="end users" onRetry={fetchUsers} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="End Users"
         description="Track and manage your customers' usage"
@@ -279,10 +276,10 @@ export function EndUsersPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Filters */}
-        <div className="flex gap-4 flex-wrap">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="relative w-full sm:w-auto sm:min-w-[16rem] sm:max-w-md sm:flex-1">
             <SearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by ID, name, or email..."
@@ -294,7 +291,7 @@ export function EndUsersPage() {
           <select
             value={orgFilter}
             onChange={(e) => setOrgFilter(e.target.value)}
-            className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+            className="pl-3 pr-8 py-2 bg-card border border-border rounded-md text-sm"
           >
             <option value="all">All Organizations</option>
             {orgNamesForFilter.map((org) => (
@@ -306,7 +303,7 @@ export function EndUsersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'blocked')}
-            className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+            className="pl-3 pr-8 py-2 bg-card border border-border rounded-md text-sm"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -315,60 +312,12 @@ export function EndUsersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totalUsers}</p>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-500/20 rounded-lg">
-                  <ForbidCircleLine className="w-5 h-5 text-red-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{blockedUsers}</p>
-                  <p className="text-sm text-muted-foreground">Blocked</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totalRequests.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Total Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatCurrency(totalCost)}</p>
-                  <p className="text-sm text-muted-foreground">Total Cost</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Total Users" value={totalUsers} />
+          <Stat label="Blocked" value={blockedUsers} />
+          <Stat label="Total Requests" value={totalRequests.toLocaleString()} />
+          <Stat label="Total Cost" value={formatCurrency(totalCost)} />
+        </StatGrid>
 
         {/* Users Table */}
         <Card>
@@ -380,14 +329,14 @@ export function EndUsersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Organization</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Requests</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Tokens</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Cost</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Last Seen</th>
-                    <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                    <th className="text-left py-3 px-4 eyebrow">User</th>
+                    <th className="text-left py-3 px-4 eyebrow">Organization</th>
+                    <th className="text-right py-3 px-4 eyebrow">Requests</th>
+                    <th className="text-right py-3 px-4 eyebrow">Tokens</th>
+                    <th className="text-right py-3 px-4 eyebrow">Cost</th>
+                    <th className="text-right py-3 px-4 eyebrow">Last Seen</th>
+                    <th className="text-center py-3 px-4 eyebrow">Status</th>
+                    <th className="text-right py-3 px-4 eyebrow">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -414,11 +363,11 @@ export function EndUsersPage() {
                       </td>
                       <td className="py-3 px-4 text-center">
                         {user.is_blocked ? (
-                          <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                          <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
                             Blocked
                           </Badge>
                         ) : (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                          <Badge className="bg-success/20 text-success border-success/30 text-xs">
                             Active
                           </Badge>
                         )}
@@ -433,9 +382,9 @@ export function EndUsersPage() {
                           }}
                         >
                           {user.is_blocked ? (
-                            <CheckLine className="w-4 h-4 text-green-400" />
+                            <CheckLine className="w-4 h-4 text-success" />
                           ) : (
-                            <ForbidCircleLine className="w-4 h-4 text-red-400" />
+                            <ForbidCircleLine className="w-4 h-4 text-destructive" />
                           )}
                         </Button>
                       </td>
@@ -458,8 +407,8 @@ export function EndUsersPage() {
 
       {/* User Detail Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="shadow-panel w-full max-w-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>User Details</CardTitle>
@@ -471,7 +420,7 @@ export function EndUsersPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="p-4 bg-violet-500/20 rounded-full">
-                  <User2Line className="w-8 h-8 text-violet-400" />
+                  <User2Line className="w-8 h-8 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold">{selectedUser.name || 'Anonymous User'}</h3>
@@ -490,9 +439,9 @@ export function EndUsersPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
                   {selectedUser.is_blocked ? (
-                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Blocked</Badge>
+                    <Badge className="bg-destructive/20 text-destructive border-destructive/30">Blocked</Badge>
                   ) : (
-                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                    <Badge className="bg-success/20 text-success border-success/30">Active</Badge>
                   )}
                 </div>
               </div>
@@ -573,10 +522,10 @@ export function EndUsersPage() {
                     className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                   {metadataError && (
-                    <p className="text-xs text-red-400 mt-1">{metadataError}</p>
+                    <p className="text-xs text-destructive mt-1">{metadataError}</p>
                   )}
                   {editSuccess && (
-                    <p className="text-xs text-green-400 mt-1">Saved.</p>
+                    <p className="text-xs text-success mt-1">Saved.</p>
                   )}
                 </div>
                 <div className="flex justify-end">
@@ -597,7 +546,7 @@ export function EndUsersPage() {
                   onClick={() => handleDelete(selectedUser)}
                   title="Permanently delete this user"
                 >
-                  <DeleteLine className="w-4 h-4 mr-2 text-red-400" />
+                  <DeleteLine className="w-4 h-4 mr-2 text-destructive" />
                   Delete
                 </Button>
                 <Button
@@ -628,8 +577,8 @@ export function EndUsersPage() {
           first /v1/responses request that includes `user: "..."`, so
           this admin path is for manually pre-provisioning. */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="shadow-panel w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Create End User</CardTitle>
@@ -640,14 +589,14 @@ export function EndUsersPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formError && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                   {formError}
                 </div>
               )}
               <div>
                 <label className="text-sm font-medium mb-1 block">Organization</label>
                 <select
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                  className="w-full pl-3 pr-8 py-2 bg-card border border-border rounded-md"
                   value={newUser.organization_id}
                   onChange={(e) => setNewUser({ ...newUser, organization_id: e.target.value })}
                 >

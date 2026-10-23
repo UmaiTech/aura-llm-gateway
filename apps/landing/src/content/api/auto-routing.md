@@ -175,7 +175,9 @@ Models are trained with the scripts in `scripts/router/`, pushed through the adm
 | Endpoint | Description |
 |----------|-------------|
 | `GET /admin/stats/routing/auto?period=24h` | Applied and shadow decisions, cost, estimated savings, per-tier and per-model breakdowns, recent decisions. |
-| `GET /admin/routing/decisions/{response_id}` | One decision by request or response id. |
+| `GET /admin/routing/decisions` | Decisions with outcomes, newest first; filter by time, mode, tier, model, applied/shadow, synthetic, escalated, outcome, reward, org/key and cost; cursor-paginated. |
+| `GET /admin/routing/decisions/{response_id}` | One decision by request or response id, with its outcome and tier boundaries. |
+| `GET /admin/stats/routing/auto/timeline?period=` | Applied / shadow volume, mean reward and shadow savings per hour or day. |
 | `POST /admin/routing/score` | Dry-run the router on a request body without dispatching. |
 | `GET /admin/routing/arms` | Learned per (tier, model) statistics. |
 | `GET` / `POST /admin/routing/models` | Stored classifiers and cost models; upload, activate, reload, deactivate. |

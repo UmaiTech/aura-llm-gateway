@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, ErrorState, SkeletonPage, StatusPill } from '@/components/ui'
 import { formatRelativeTime, copyToClipboard, formatNumber } from '@/lib/utils'
 import { animateStaggered } from '@/lib/animations'
 import {
   AddLine,
-  Key2Line,
   CopyLine,
   DeleteLine,
   CheckLine,
@@ -27,7 +26,7 @@ export function KeysPage() {
   const [keys, setKeys] = useState<ApiKeySummary[]>([])
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [search, setSearch] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
@@ -50,7 +49,7 @@ export function KeysPage() {
       setKeys(keysData)
       setOrganizations(orgsData)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch API keys')
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -137,18 +136,8 @@ export function KeysPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="success">Active</Badge>
-      case 'inactive':
-        return <Badge variant="muted">Inactive</Badge>
-      case 'revoked':
-        return <Badge variant="destructive">Revoked</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
-  }
+  const getStatusBadge = (status: string) => <StatusPill status={status} />
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -165,10 +154,10 @@ export function KeysPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="API Keys" description="Manage your gateway API keys" />
-        <div className="flex-1 flex items-center justify-center">
-          <Refresh1Line className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={0} rows={8} />
         </div>
       </div>
     )
@@ -176,18 +165,17 @@ export function KeysPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="API Keys" description="Manage your gateway API keys" />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error}</p>
-          <Button onClick={fetchKeys}>Retry</Button>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="API keys" onRetry={fetchKeys} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="API Keys"
         description="Manage your gateway API keys"
@@ -206,7 +194,7 @@ export function KeysPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Search */}
         <div className="flex items-center gap-4">
           <Input
@@ -225,15 +213,15 @@ export function KeysPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="p-4 font-medium">Name</th>
-                    <th className="p-4 font-medium">Key</th>
-                    <th className="p-4 font-medium">Status</th>
-                    <th className="p-4 font-medium text-right">Requests</th>
-                    <th className="p-4 font-medium text-right">Tokens</th>
-                    <th className="p-4 font-medium text-right">Cost</th>
-                    <th className="p-4 font-medium">Last Used</th>
-                    <th className="p-4 font-medium text-right">Rate Limit</th>
-                    <th className="p-4 font-medium"></th>
+                    <th className="p-4 eyebrow">Name</th>
+                    <th className="p-4 eyebrow">Key</th>
+                    <th className="p-4 eyebrow">Status</th>
+                    <th className="p-4 eyebrow text-right">Requests</th>
+                    <th className="p-4 eyebrow text-right">Tokens</th>
+                    <th className="p-4 eyebrow text-right">Cost</th>
+                    <th className="p-4 eyebrow">Last Used</th>
+                    <th className="p-4 eyebrow text-right">Rate Limit</th>
+                    <th className="p-4 eyebrow"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,9 +238,6 @@ export function KeysPage() {
                       <tr key={key.id} className="key-row border-b border-border/50 hover:bg-muted/50 transition-colors">
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="rounded-lg bg-primary/10 p-2">
-                              <Key2Line className="h-4 w-4 text-primary" />
-                            </div>
                             <div>
                               <p className="font-medium">{key.name}</p>
                               <p className="text-xs text-muted-foreground">
@@ -336,12 +321,12 @@ export function KeysPage() {
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
-                          className={`h-full transition-all ${
+                          className={`h-full transition-colors ${
                             (key.usage_percentage || 0) > 90
-                              ? 'bg-red-500'
+                              ? 'bg-destructive'
                               : (key.usage_percentage || 0) > 75
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500'
+                              ? 'bg-warning'
+                              : 'bg-success'
                           }`}
                           style={{ width: `${Math.min(key.usage_percentage || 0, 100)}%` }}
                         />
@@ -355,8 +340,8 @@ export function KeysPage() {
 
         {/* Create Key Dialog */}
         {showCreateDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <Card className="w-full max-w-md animate-scale-in">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="shadow-panel w-full max-w-md animate-scale-in">
               <CardHeader>
                 <CardTitle>Create API Key</CardTitle>
               </CardHeader>
@@ -390,14 +375,14 @@ export function KeysPage() {
                 ) : (
                   <>
                     {formError && (
-                      <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                      <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                         {formError}
                       </div>
                     )}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Organization</label>
                       <select
-                        className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                        className="w-full pl-3 pr-8 py-2 bg-card border border-border rounded-md"
                         value={newKeyOrgId}
                         onChange={(e) => setNewKeyOrgId(e.target.value)}
                       >

@@ -337,6 +337,21 @@ sqlx migrate run
 ./target/release/aura-proxy
 ```
 
+
+## Run the admin app locally
+
+The admin app runs on your machine against your own gateway for now. A hosted version is coming soon.
+
+It needs Node.js 20+ and a running gateway with `AURA_ADMIN_KEY` set.
+
+```bash
+cd apps/admin
+npm install
+npm run dev
+```
+
+Open http://localhost:3001/app/ and sign in with your `AURA_ADMIN_KEY`. The app talks to the gateway at `http://localhost:8080`; set `VITE_API_BASE_URL` in `apps/admin/.env` to point it somewhere else.
+
 ## Configuration
 
 ### Environment Variables
