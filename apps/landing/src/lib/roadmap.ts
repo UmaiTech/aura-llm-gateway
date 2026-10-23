@@ -56,7 +56,7 @@ export const REPO = 'https://github.com/UmaiTech/aura-llm-gateway'
 export const RECONCILED = {
   date: '2026-10-23',
   /** main commit the release history was reconciled against. */
-  revision: '81334f2',
+  revision: 'a6472af',
 } as const
 
 export const pr = (n: number): EvidenceLink => ({ label: `#${n}`, href: `${REPO}/pull/${n}` })
@@ -83,7 +83,8 @@ export interface Release {
 }
 
 export const RELEASES: Release[] = [
-  { version: '0.21.1', date: '2026-10-23', tagged: false },
+  { version: '0.21.2', date: '2026-10-23', tagged: false },
+  { version: '0.21.1', date: '2026-10-23', tagged: true },
   { version: '0.21.0', date: '2026-10-23', tagged: true },
   { version: '0.20.0', date: '2026-10-22', tagged: true },
   { version: '0.19.0', date: '2026-10-22', tagged: true },
@@ -92,7 +93,7 @@ export const RELEASES: Release[] = [
   { version: '0.16.0', date: '2026-06-30', tagged: true },
   { version: '0.15.0', date: '2026-05-26', tagged: true },
   { version: '0.14.2', date: '2026-05-25', tagged: true },
-  { version: '0.14.0', date: '2026-05-25', tagged: false },
+  { version: '0.14.0', date: '2026-05-25', tagged: true },
 ]
 
 export const releaseLink = (r: Release): EvidenceLink =>
@@ -108,7 +109,7 @@ function released(
 
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
-  // (none: everything merged so far shipped in v0.21.1)
+  // (none: everything merged so far shipped in v0.21.2)
 
   // ── Released ─────────────────────────────────────────────────────────
   released('0.21.1', {
