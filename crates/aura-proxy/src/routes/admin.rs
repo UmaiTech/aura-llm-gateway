@@ -64,6 +64,11 @@ pub fn router() -> Router<AppState> {
             post(crate::routes::routing_synthetic::judge_answers),
         )
         .route("/admin/routing/score", post(score_routing_request))
+        // Routing lab: live runs on the admin path (no tenant limits)
+        .route(
+            "/admin/routing/lab/run",
+            post(crate::routes::routing_lab::run_lab_request),
+        )
         .route(
             "/admin/routing/models",
             get(list_router_models).post(upload_router_model),

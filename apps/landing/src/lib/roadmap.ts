@@ -177,6 +177,15 @@ export const ROADMAP: RoadmapItem[] = [
     evidenceLinks: [pr(243)],
   },
   {
+    id: 'routing-lab',
+    title: 'Routing lab in the admin app',
+    status: 'merged-unreleased',
+    area: 'admin',
+    description:
+      'Battle-test the auto router before trusting it: run preset or pasted prompt suites through auto, auto:cost and auto:quality next to a pinned model, free as a dry run or live with a spend guard, and compare tiers, candidates, predicted and actual cost, latency and answers. Live runs are admin-only, audited and kept out of routing statistics.',
+    evidenceLinks: [pr(244)],
+  },
+  {
     id: 'github-stars',
     title: 'GitHub star count on the landing page',
     status: 'merged-unreleased',

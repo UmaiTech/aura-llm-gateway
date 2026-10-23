@@ -15,6 +15,7 @@ import {
   TeamsPage,
   EndUsersPage,
   RoutingPage,
+  RoutingLabPage,
   RoutingDecisionsPage,
   FeaturesPage,
 } from '@/pages'
@@ -61,6 +62,7 @@ function App() {
         <Route path="/keys" element={<KeysPage />} />
         <Route path="/providers" element={<ProvidersPage />} />
         <Route path="/routing" element={<RoutingPage />} />
+        <Route path="/routing/lab" element={<RoutingLabPage />} />
         <Route path="/routing/decisions" element={<RoutingDecisionsPage />} />
         <Route path="/routing/decisions/:responseId" element={<RoutingDecisionsPage />} />
         <Route path="/features" element={<FeaturesPage />} />
