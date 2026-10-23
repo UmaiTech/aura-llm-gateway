@@ -88,9 +88,20 @@ const externalLinks = [
   },
 ]
 
-function isActivePath(pathname: string, href: string) {
+function matchesPath(pathname: string, href: string) {
   if (href === '/') return pathname === '/'
   return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+const navHrefs = navigation.flatMap((group) => group.items.map((item) => item.href))
+
+// Nested routes highlight their parent item, unless a more specific nav
+// item matches (e.g. /routing/lab is Routing Lab, not Routing).
+function isActivePath(pathname: string, href: string) {
+  if (!matchesPath(pathname, href)) return false
+  return !navHrefs.some(
+    (other) => other.length > href.length && matchesPath(pathname, other)
+  )
 }
 
 /**
