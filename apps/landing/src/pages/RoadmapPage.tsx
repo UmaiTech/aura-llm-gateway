@@ -31,8 +31,9 @@ import {
  *
  * Latest shipped: v0.20.0 (2026-10-22)
  * In progress: nothing tagged in-progress; merged-unreleased work on main
- *   (prompt caching #243, GitHub stars #242, the landing/docs/roadmap/
- *   pricing redesign) ships in the next release.
+ *   (prompt caching #243, GitHub stars #242, the routing decisions
+ *   explorer #246, the landing/docs/roadmap/pricing redesign) ships in the
+ *   next release.
  */
 
 const FILTERS: { id: StatusFilter; label: string }[] = [

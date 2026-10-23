@@ -37,8 +37,16 @@ pub fn router() -> Router<AppState> {
         .route("/admin/stats/routing", get(get_routing_stats))
         .route("/admin/stats/routing/auto", get(get_auto_routing_stats))
         .route(
+            "/admin/stats/routing/auto/timeline",
+            get(super::routing_decisions::get_routing_timeline),
+        )
+        .route(
+            "/admin/routing/decisions",
+            get(super::routing_decisions::list_routing_decisions),
+        )
+        .route(
             "/admin/routing/decisions/{response_id}",
-            get(get_routing_decision),
+            get(super::routing_decisions::get_routing_decision),
         )
         .route("/admin/routing/rollup", post(run_routing_rollup))
         .route("/admin/routing/arms", get(get_routing_arms))
@@ -1335,32 +1343,6 @@ async fn get_routing_arms(
                 Json(serde_json::json!({"error": format!("Database error: {}", e)})),
             )
         })
-}
-
-/// One auto-router decision, by gateway request id (`aura_...`) or
-/// provider response id (`resp_...`).
-async fn get_routing_decision(
-    State(state): State<AppState>,
-    Path(response_id): Path<String>,
-) -> Result<Json<aura_db::RoutingDecision>, (StatusCode, Json<serde_json::Value>)> {
-    let pool = match state.db_pool() {
-        Some(p) => p,
-        None => return Err(db_unavailable()),
-    };
-    match aura_db::RoutingDecisionRepo::find_by_response_id(pool, &response_id).await {
-        Ok(Some(d)) => Ok(Json(d)),
-        Ok(None) => Err((
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "No routing decision for this response"})),
-        )),
-        Err(e) => {
-            tracing::error!("Failed to fetch routing decision: {}", e);
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Database error: {}", e)})),
-            ))
-        }
-    }
 }
 
 async fn get_routing_stats(

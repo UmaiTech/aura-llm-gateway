@@ -342,7 +342,9 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | Endpoint | Description |
 |----------|-------------|
 | `GET /admin/stats/routing/auto?period=24h\|7d\|all` | Summary (applied / shadow decisions, applied cost, estimated savings, decision latency, success rate), per-tier and per-model breakdowns, and the 25 most recent decisions with outcomes. |
-| `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`). |
+| `GET /admin/routing/decisions` | Decisions joined with outcomes, newest first. Filters: `period` (`1h`/`24h`/`7d`/`30d`/`90d`/`all`) or `from`/`to` (RFC 3339), `mode`, `tier`, `classified_tier`, `tier_changed`, `model`, `shadow`, `synthetic` (`exclude` default / `include` / `only`), `escalated`, `sticky`, `status` (`pending` = no request log), `outcome` (signal or `unscored`), `feedback`, `min_reward`/`max_reward`, `organization_id`, `api_key_id`, `min_cost`/`max_cost`. `limit` (≤ 200, default 50) and `cursor` (the previous page's `next_cursor`). |
+| `GET /admin/routing/decisions/{response_id}` | One decision by gateway request id (`aura_…`) or provider response id (`resp_…`), plus `outcome` (status, cost, latency, feedback, next-turn signal, reward) and `boundaries_in_force` / `boundaries_source` (`recorded` with the decision, else the current `config`). |
+| `GET /admin/stats/routing/auto/timeline?period=24h\|7d\|30d\|90d` | Live traffic per hour (24h) or day: applied / shadow / escalated counts, applied cost, estimated shadow savings, mean reward and signal counts. |
 | `POST /admin/routing/rollup` | Score pending decisions now and refresh arm statistics; returns counts per signal. |
 | `GET /admin/routing/arms` | Learned Beta(α, β) per (tier, model) used by `within_tier: thompson`. |
 | `GET /admin/routing/gold?limit=` | Gold-label summary (cheap sufficed / strong better / ties / failed) and recent pairs. |
@@ -357,7 +359,7 @@ Admin endpoints (bearer `AURA_ADMIN_KEY`):
 | `POST /admin/routing/judge` | Grade two answers to one request with the gold judge (`{"user_text", "answer_a", "answer_b", "judge_model"?}`). |
 | `POST /admin/routing/gold/synthetic` | Upsert a batch of synthetic gold rows (`{"batch_id", "rows": [...]}`, keyed by `prompt_hash`); rejected rows are reported per index. |
 
-The admin app's Routing page renders the same data as an "Auto router" section.
+The admin app's Routing page renders the same data as an "Auto router" section followed by router health panels (trends, arms, learned models, gold labels); `/routing/decisions` in the admin app is a filterable decisions explorer with a drawer per decision.
 
 ### Routing lab
 
