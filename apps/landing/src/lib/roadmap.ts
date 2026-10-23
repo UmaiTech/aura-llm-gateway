@@ -106,6 +106,15 @@ function released(
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
   {
+    id: 'routing-decisions-explorer',
+    title: 'Routing decisions explorer and router health',
+    status: 'merged-unreleased',
+    area: 'admin',
+    description:
+      'The admin app lists every auto-routing decision with filters for time, tier, mode, model, outcome, cost and flags, and opens any one in the shared routing inspector with what happened next. The Routing page adds router health: reward and counterfactual-savings trends, learned arm statistics, model activation and gold-label coverage.',
+    evidenceLinks: [pr(246)],
+  },
+  {
     id: 'landing-redesign',
     title: 'Product-led landing page',
     status: 'merged-unreleased',
@@ -157,15 +166,6 @@ export const ROADMAP: RoadmapItem[] = [
     description:
       'The stable part of each prompt is marked cacheable for Anthropic and Bedrock and sent with a stable cache key to OpenAI. Cache hits from supported providers are reported as cached tokens, billed at the cached rate, counted in metrics and shown in the playground.',
     evidenceLinks: [pr(243)],
-  },
-  {
-    id: 'routing-decisions-explorer',
-    title: 'Routing decisions explorer and router health',
-    status: 'merged-unreleased',
-    area: 'admin',
-    description:
-      'The admin app lists every auto-routing decision with filters for time, tier, mode, model, outcome, cost and flags, and opens any one in the shared routing inspector with what happened next. The Routing page adds router health: reward and counterfactual-savings trends, learned arm statistics, model activation and gold-label coverage.',
-    evidenceLinks: [pr(246)],
   },
   {
     id: 'github-stars',
