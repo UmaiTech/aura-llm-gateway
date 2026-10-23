@@ -29,11 +29,9 @@ import {
  * (released / merged-unreleased / in-progress / planned / considering);
  * roadmap.test.ts checks them against CHANGELOG.md. This page only renders.
  *
- * Latest shipped: v0.21.0 (2026-10-23)
- * In progress: nothing tagged in-progress; merged-unreleased holds the
- *   streaming fixes (#235). v0.21.0 shipped prompt caching, the v3
- *   redesign, the admin design refresh, the routing decisions explorer
- *   and the routing lab.
+ * Latest shipped: v0.21.1 (2026-10-23)
+ * In progress: nothing tagged in-progress and nothing merged-unreleased;
+ *   v0.21.1 shipped the streaming fixes and the local-only admin notice.
  */
 
 const FILTERS: { id: StatusFilter; label: string }[] = [
