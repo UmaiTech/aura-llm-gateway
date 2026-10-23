@@ -56,7 +56,7 @@ export const REPO = 'https://github.com/UmaiTech/aura-llm-gateway'
 export const RECONCILED = {
   date: '2026-10-23',
   /** main commit the release history was reconciled against. */
-  revision: '9bd32ab',
+  revision: '81334f2',
 } as const
 
 export const pr = (n: number): EvidenceLink => ({ label: `#${n}`, href: `${REPO}/pull/${n}` })
@@ -83,6 +83,7 @@ export interface Release {
 }
 
 export const RELEASES: Release[] = [
+  { version: '0.21.1', date: '2026-10-23', tagged: false },
   { version: '0.21.0', date: '2026-10-23', tagged: true },
   { version: '0.20.0', date: '2026-10-22', tagged: true },
   { version: '0.19.0', date: '2026-10-22', tagged: true },
@@ -107,17 +108,25 @@ function released(
 
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
-  {
+  // (none: everything merged so far shipped in v0.21.1)
+
+  // ── Released ─────────────────────────────────────────────────────────
+  released('0.21.1', {
     id: 'streaming-fixes',
     title: 'Streaming fixes for Gemini and long answers',
-    status: 'merged-unreleased',
     area: 'gateway',
     description:
       'Streamed Gemini answers no longer lose words, text cut mid-character by the network is no longer dropped by any provider, long code answers no longer stall the playground, and every routing decision now echoes the options it applied.',
     evidenceLinks: [pr(235)],
-  },
-
-  // ── Released ─────────────────────────────────────────────────────────
+  }),
+  released('0.21.1', {
+    id: 'admin-local-only',
+    title: 'Admin app runs locally for now',
+    area: 'admin',
+    description:
+      'The site and the admin sign-in now say the admin app runs locally against your own gateway, with a short setup guide; a hosted version is coming soon. The routing page and routing lab link to each other and to individual decisions.',
+    evidenceLinks: [pr(252)],
+  }),
   released('0.21.0', {
     id: 'routing-decisions-explorer',
     title: 'Routing decisions explorer and router health',
