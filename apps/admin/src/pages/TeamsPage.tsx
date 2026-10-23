@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge, Stat, StatGrid, ErrorState, SkeletonPage } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
   AddLine,
@@ -13,7 +13,6 @@ import {
   CheckLine,
   CloseLine,
   AiLine,
-  Loading3Line,
   Refresh1Line,
   Building4Line,
 } from '@mingcute/react'
@@ -43,6 +42,7 @@ export function TeamsPage() {
   const [formSlug, setFormSlug] = useState('')
   const [formDescription, setFormDescription] = useState('')
   const [formTokenLimit, setFormTokenLimit] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -110,12 +110,17 @@ export function TeamsPage() {
 
   const fetchData = async () => {
     try {
+      // Teams are the page's content, so a failure there is fatal; the
+      // org list only feeds the create form, so it degrades to empty.
       const [teamsData, orgsData] = await Promise.all([
-        getTeams().catch(() => []),
+        getTeams(),
         getOrganizations().catch(() => []),
       ])
       setTeams(teamsData)
       setOrganizations(orgsData)
+      setError(null)
+    } catch (err) {
+      setError(err)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -148,11 +153,11 @@ export function TeamsPage() {
   }
 
   const getUsageColor = (current: number, limit: number | null) => {
-    if (!limit) return 'bg-primary'
+    if (!limit) return 'bg-brand'
     const percent = (current / limit) * 100
-    if (percent >= 100) return 'bg-red-500'
-    if (percent >= 80) return 'bg-yellow-500'
-    return 'bg-green-500'
+    if (percent >= 100) return 'bg-destructive'
+    if (percent >= 80) return 'bg-warning'
+    return 'bg-success'
   }
 
   const isOverLimit = (current: number, limit: number | null) => {
@@ -175,20 +180,28 @@ export function TeamsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Teams" description="Manage teams and their token budgets" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading teams...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={4} rows={5} />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col">
+        <Header title="Teams" description="Manage teams and their token budgets" />
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="teams" onRetry={handleRefresh} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Teams"
         description="Manage teams and their token budgets"
@@ -210,10 +223,10 @@ export function TeamsPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Filters */}
-        <div className="flex gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="relative w-full sm:w-auto sm:min-w-[16rem] sm:max-w-md sm:flex-1">
             <SearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search teams..."
@@ -225,7 +238,7 @@ export function TeamsPage() {
           <select
             value={orgFilter}
             onChange={(e) => setOrgFilter(e.target.value)}
-            className="px-3 py-2 bg-background border border-border rounded-md text-sm"
+            className="pl-3 pr-8 py-2 bg-card border border-border rounded-md text-sm"
           >
             <option value="all">All Organizations</option>
             {orgNames.map((org) => (
@@ -237,60 +250,12 @@ export function TeamsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <Group2Line className="w-5 h-5 text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.teams}</p>
-                  <p className="text-sm text-muted-foreground">Total Teams</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <User2Line className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.members}</p>
-                  <p className="text-sm text-muted-foreground">Total Members</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <FolderLine className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.projects}</p>
-                  <p className="text-sm text-muted-foreground">Total Projects</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-500/20 rounded-lg">
-                  <AiLine className="w-5 h-5 text-red-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totals.overLimit}</p>
-                  <p className="text-sm text-muted-foreground">Over Limit</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Total Teams" value={totals.teams} />
+          <Stat label="Total Members" value={totals.members} />
+          <Stat label="Total Projects" value={totals.projects} />
+          <Stat label="Over Limit" value={totals.overLimit} />
+        </StatGrid>
 
         {/* Teams List */}
         <Card>
@@ -319,14 +284,14 @@ export function TeamsPage() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-500/20 rounded-lg">
-                            <Group2Line className="w-5 h-5 text-blue-400" />
+                          <div className="p-2 rounded-md border bg-muted text-muted-foreground">
+                            <Group2Line className="w-5 h-5" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold">{team.name}</h3>
                               {overLimit && (
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                                <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
                                   Over Limit
                                 </Badge>
                               )}
@@ -345,7 +310,7 @@ export function TeamsPage() {
                             <EditLine className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(team)}>
-                            <DeleteLine className="w-4 h-4 text-red-400" />
+                            <DeleteLine className="w-4 h-4 text-destructive" />
                           </Button>
                         </div>
                       </div>
@@ -369,7 +334,7 @@ export function TeamsPage() {
                       <div>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-muted-foreground">Token Usage</span>
-                          <span className={cn(overLimit && 'text-red-400')}>
+                          <span className={cn(overLimit && 'text-destructive')}>
                             {formatTokens(team.current_month_tokens)} /{' '}
                             {team.monthly_token_limit ? formatTokens(team.monthly_token_limit) : 'Unlimited'}
                           </span>
@@ -377,7 +342,7 @@ export function TeamsPage() {
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <div
                             className={cn(
-                              'h-full transition-all',
+                              'h-full transition-colors',
                               getUsageColor(team.current_month_tokens, team.monthly_token_limit)
                             )}
                             style={{
@@ -401,8 +366,8 @@ export function TeamsPage() {
 
       {/* Create Team Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="shadow-panel w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Create Team</CardTitle>
@@ -413,14 +378,14 @@ export function TeamsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {formError && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
                   {formError}
                 </div>
               )}
               <div>
                 <label className="text-sm font-medium mb-1 block">Organization</label>
                 <select
-                  className="w-full px-3 py-2 bg-background border border-border rounded-md"
+                  className="w-full pl-3 pr-8 py-2 bg-card border border-border rounded-md"
                   value={formOrgId}
                   onChange={(e) => setFormOrgId(e.target.value)}
                 >
@@ -481,8 +446,8 @@ export function TeamsPage() {
 
       {/* Edit Team Modal */}
       {editingTeam && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="shadow-panel w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Edit Team</CardTitle>

@@ -12,7 +12,7 @@ export function PlaceholderPage({ title, description }: PlaceholderPageProps) {
     <div className="flex flex-col">
       <Header title={title} description={description} />
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-4 sm:p-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="rounded-full bg-muted p-4 mb-4">

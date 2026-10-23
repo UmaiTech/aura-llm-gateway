@@ -1,17 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, ErrorState, SkeletonPage, Stat, StatGrid, StatusPill } from '@/components/ui'
 import { formatDuration } from '@/lib/utils'
 import {
   ServerLine,
   AddLine,
-  CheckLine,
-  AlertLine,
   Refresh1Line,
   Settings1Line,
-  TimeLine,
-  ChartBarLine,
-  CoinLine,
 } from '@mingcute/react'
 import { getProviders } from '@/lib/api'
 import type { ProviderSummary } from '@/lib/types'
@@ -19,7 +14,7 @@ import type { ProviderSummary } from '@/lib/types'
 export function ProvidersPage() {
   const [providers, setProviders] = useState<ProviderSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
 
   const fetchProviders = async () => {
@@ -29,7 +24,7 @@ export function ProvidersPage() {
       const data = await getProviders()
       setProviders(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch providers')
+      setError(err)
     } finally {
       setLoading(false)
     }
@@ -39,33 +34,8 @@ export function ProvidersPage() {
     fetchProviders()
   }, [])
 
-  const getStatusBadge = (status: ProviderSummary['health_status'], isEnabled: boolean) => {
-    if (!isEnabled) {
-      return <Badge variant="secondary" className="gap-1">Disabled</Badge>
-    }
-    switch (status) {
-      case 'healthy':
-        return <Badge variant="success" className="gap-1"><CheckLine className="h-3 w-3" /> Healthy</Badge>
-      case 'degraded':
-        return <Badge variant="warning" className="gap-1"><AlertLine className="h-3 w-3" /> Degraded</Badge>
-      case 'inactive':
-        return <Badge variant="secondary" className="gap-1"><TimeLine className="h-3 w-3" /> Inactive</Badge>
-      case 'no_data':
-        return <Badge variant="secondary" className="gap-1">No Data</Badge>
-      case 'disabled':
-        return <Badge variant="secondary" className="gap-1">Disabled</Badge>
-      default:
-        return <Badge variant="secondary" className="gap-1">{status}</Badge>
-    }
-  }
-
-  const getProviderColor = (name: string) => {
-    const normalizedName = name.toLowerCase()
-    if (normalizedName.includes('openai')) return 'bg-emerald-500/10 text-emerald-500'
-    if (normalizedName.includes('anthropic')) return 'bg-orange-500/10 text-orange-500'
-    if (normalizedName.includes('google')) return 'bg-blue-500/10 text-blue-500'
-    return 'bg-violet-500/10 text-violet-500'
-  }
+  const getStatusBadge = (status: ProviderSummary['health_status'], isEnabled: boolean) =>
+    isEnabled ? <StatusPill status={status} /> : <StatusPill status="disabled" />
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -98,10 +68,10 @@ export function ProvidersPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Providers" description="Configure and monitor LLM providers" />
-        <div className="flex-1 flex items-center justify-center">
-          <Refresh1Line className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={4} rows={4} />
         </div>
       </div>
     )
@@ -109,18 +79,17 @@ export function ProvidersPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Providers" description="Configure and monitor LLM providers" />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <p className="text-red-400">{error}</p>
-          <Button onClick={fetchProviders}>Retry</Button>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="providers" onRetry={fetchProviders} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Providers"
         description="Configure and monitor LLM providers"
@@ -138,62 +107,14 @@ export function ProvidersPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <ServerLine className="w-5 h-5 text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{enabledCount}/{providers.length}</p>
-                  <p className="text-sm text-muted-foreground">Active Providers</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{totalRequests24h.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Requests (24h)</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatCurrency(totalCost24h)}</p>
-                  <p className="text-sm text-muted-foreground">Cost (24h)</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <TimeLine className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{formatDuration(avgLatency)}</p>
-                  <p className="text-sm text-muted-foreground">Avg Latency</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Active Providers" value={<>{enabledCount}/{providers.length}</>} />
+          <Stat label="Requests (24h)" value={totalRequests24h.toLocaleString()} />
+          <Stat label="Cost (24h)" value={formatCurrency(totalCost24h)} />
+          <Stat label="Avg Latency" value={formatDuration(avgLatency)} />
+        </StatGrid>
 
         {/* Provider Cards */}
         <div className="grid gap-6">
@@ -206,15 +127,15 @@ export function ProvidersPage() {
           ) : (
             providers.map((provider) => (
               <Card key={provider.provider_name}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getProviderColor(provider.provider_name)}`}>
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="flex min-w-0 items-start gap-4">
+                      <div className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground sm:flex">
                         <ServerLine className="h-5 w-5" />
                       </div>
                       <div>
                         <div className="flex items-center gap-3 mb-1">
-                          <h3 className="font-semibold">{provider.display_name || provider.provider_name}</h3>
+                          <h3 className="font-medium">{provider.display_name || provider.provider_name}</h3>
                           {getStatusBadge(provider.health_status, provider.is_enabled)}
                         </div>
                         <p className="text-sm text-muted-foreground mb-3">
@@ -222,10 +143,10 @@ export function ProvidersPage() {
                         </p>
 
                         {/* 24h Stats Row */}
-                        <div className="flex gap-6 text-sm">
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                           <div>
                             <span className="text-muted-foreground">Success Rate:</span>{' '}
-                            <span className={`font-mono ${provider.success_rate >= 99 ? 'text-green-400' : provider.success_rate >= 95 ? 'text-yellow-400' : 'text-red-400'}`}>
+                            <span className={`font-mono ${provider.success_rate >= 99 ? 'text-success' : provider.success_rate >= 95 ? 'text-warning' : 'text-destructive'}`}>
                               {provider.success_rate.toFixed(1)}%
                             </span>
                           </div>
@@ -242,7 +163,7 @@ export function ProvidersPage() {
                     </div>
 
                     {/* Stats */}
-                    <div className="text-right space-y-1">
+                    <div className="space-y-1 border-t pt-3 md:border-t-0 md:pt-0 md:text-right">
                       <div className="text-sm">
                         <span className="text-muted-foreground">Avg Latency:</span>{' '}
                         <span className="font-mono">{formatDuration(provider.avg_latency_ms)}</span>
@@ -267,7 +188,7 @@ export function ProvidersPage() {
                       <div className="text-xs text-muted-foreground">
                         Last request: {formatRelativeTime(provider.last_request_at)}
                       </div>
-                      <div className="flex gap-2 mt-4 justify-end">
+                      <div className="mt-4 flex gap-2 md:justify-end">
                         <Button variant="outline" size="sm" className="gap-2">
                           <Refresh1Line className="h-4 w-4" />
                           Test
@@ -287,15 +208,15 @@ export function ProvidersPage() {
 
         {/* Add Provider Dialog */}
         {showAddDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <Card className="w-full max-w-md animate-scale-in">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="shadow-panel w-full max-w-md animate-scale-in">
               <CardHeader>
                 <CardTitle>Add Provider</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Provider Type</label>
-                  <select className="w-full bg-muted border-0 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring">
+                  <select className="w-full bg-card pl-3 pr-8 py-2 text-sm focus:ring-2 focus:ring-ring">
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
                     <option value="google">Google AI</option>

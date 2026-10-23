@@ -3,16 +3,10 @@ import { Link } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { RoutingDecisionDrawer } from '@/components/routing/RoutingDecisionDrawer'
 import type { RoutingOutcome } from '@/lib/types'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ErrorState, SkeletonPage, Stat, StatGrid, Callout, SegmentedControl } from '@/components/ui'
 import { formatNumber, formatCurrency, formatDuration, cn } from '@/lib/utils'
 import {
-  DirectionsLine,
-  ChartBarLine,
-  CoinLine,
-  TimeLine,
-  Loading3Line,
   Refresh1Line,
-  InformationLine,
   ArrowRightLine,
 } from '@mingcute/react'
 import {
@@ -77,13 +71,19 @@ const strategyDescriptions: Record<string, string> = {
   reasoning_depth: 'Route by required reasoning depth',
 }
 
+const AUTO_PERIODS: { value: TimeRange; label: string }[] = [
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: 'all', label: 'All' },
+]
+
 export function RoutingPage() {
   const [stats, setStats] = useState<RoutingStats[]>([])
   const [auto, setAuto] = useState<AutoRoutingStats | null>(null)
   const [autoPeriod, setAutoPeriod] = useState<TimeRange>('24h')
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [inspecting, setInspecting] = useState<RoutingOutcome | null>(null)
 
   const fetchData = async () => {
@@ -103,7 +103,7 @@ export function RoutingPage() {
       // — that's misleading. Surface the actual error and let the
       // user retry.
       setStats([])
-      setError(err instanceof Error ? err.message : 'Failed to load routing stats')
+      setError(err)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -133,13 +133,10 @@ export function RoutingPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Routing" description="Observed routing strategy usage" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loading3Line className="h-5 w-5 animate-spin" />
-            <span>Loading routing stats...</span>
-          </div>
+        <div className="flex-1 p-4 sm:p-6">
+          <SkeletonPage stats={4} rows={6} />
         </div>
       </div>
     )
@@ -150,28 +147,17 @@ export function RoutingPage() {
   // identical to "no traffic yet", which made the page silently broken.
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col">
         <Header title="Routing" description="Observed routing strategy usage" />
-        <div className="flex-1 flex items-center justify-center p-6">
-          <Card className="max-w-md w-full border-destructive/30 bg-destructive/5">
-            <CardContent className="p-6 space-y-3">
-              <div className="text-sm font-medium text-destructive">
-                Failed to load routing stats
-              </div>
-              <div className="text-sm text-muted-foreground">{error}</div>
-              <Button onClick={handleRefresh} disabled={isRefreshing} size="sm">
-                <Refresh1Line className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
+        <div className="flex-1 p-4 sm:p-6">
+          <ErrorState variant="page" error={error} what="routing stats" onRetry={handleRefresh} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Routing"
         description="Observed routing strategy usage"
@@ -183,109 +169,46 @@ export function RoutingPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
         {/* Heads-up that this is observation only, not configuration. */}
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-4 flex items-start gap-3">
-            <InformationLine className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-muted-foreground">
-              Routing strategies are configured in <code className="text-foreground">aura.yaml</code> on the
-              gateway. This page surfaces observed per-strategy usage from{' '}
-              <code className="text-foreground">v_routing_stats</code>. Admin-time rule editing is tracked in
-              issue #175.
-            </div>
-          </CardContent>
-        </Card>
+        <Callout tone="note" label="Read-only">
+          Routing strategies are configured in <code>aura.yaml</code> on the gateway. This page surfaces
+          observed per-strategy usage from <code>v_routing_stats</code>. Admin-time rule editing is tracked in
+          issue #175.
+        </Callout>
 
         {/* Aggregate stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-500/20 rounded-lg">
-                  <DirectionsLine className="w-5 h-5 text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">{stats.length}</p>
-                  <p className="text-sm text-muted-foreground">Strategies Used</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <ChartBarLine className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {formatNumber(totalRequests)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <CoinLine className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {formatCurrency(totalCost)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Total Cost</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <TimeLine className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {formatDuration(weightedAvgLatency)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Weighted Avg Latency</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <Stat label="Strategies Used" value={stats.length} />
+          <Stat label="Requests" value={formatNumber(totalRequests)} />
+          <Stat label="Total Cost" value={formatCurrency(totalCost)} />
+          <Stat label="Weighted Avg Latency" value={formatDuration(weightedAvgLatency)} />
+        </StatGrid>
 
         {/* Auto router (model: "auto") */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base font-medium">Auto router</CardTitle>
+              <CardTitle>Auto router</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 Complexity-based model selection for <code className="text-foreground">model: "auto"</code>.
                 Shadow rows are pinned-model requests scored for comparison only.
               </p>
             </div>
-            <div className="flex items-center gap-1">
-              <Link to="/routing/decisions" className="mr-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link to="/routing/decisions">
                 <Button size="sm" variant="outline">
                   Explore decisions
                   <ArrowRightLine className="h-4 w-4 ml-2" />
                 </Button>
               </Link>
-              {(['24h', '7d', 'all'] as TimeRange[]).map((p) => (
-                <Button
-                  key={p}
-                  size="sm"
-                  variant={autoPeriod === p ? 'secondary' : 'ghost'}
-                  onClick={() => setAutoPeriod(p)}
-                >
-                  {p}
-                </Button>
-              ))}
+              <SegmentedControl
+                size="sm"
+                aria-label="Auto router period"
+                options={AUTO_PERIODS}
+                value={autoPeriod}
+                onChange={setAutoPeriod}
+              />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -342,22 +265,22 @@ export function RoutingPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-xs text-muted-foreground border-b border-border/40">
-                        <th className="text-left py-2 pr-3 font-medium">Tier</th>
-                        <th className="text-left py-2 pr-3 font-medium">Kind</th>
-                        <th className="text-right py-2 pr-3 font-medium">Decisions</th>
-                        <th className="text-right py-2 pr-3 font-medium">Avg score</th>
-                        <th className="text-right py-2 pr-3 font-medium">Completed</th>
-                        <th className="text-right py-2 pr-3 font-medium">Avg latency</th>
-                        <th className="text-right py-2 pr-3 font-medium">Cost</th>
-                        <th className="text-right py-2 pr-3 font-medium" title="Shadow rows only: counterfactual estimate">Est. savings (counterfactual)</th>
-                        <th className="text-right py-2 pr-3 font-medium">Feedback</th>
-                        <th className="text-right py-2 pr-3 font-medium" title="Mean reward from outcome signals (move on / retry / correction / escalation), −1 to +1">
+                        <th className="text-left py-2 pr-3 eyebrow">Tier</th>
+                        <th className="text-left py-2 pr-3 eyebrow">Kind</th>
+                        <th className="text-right py-2 pr-3 eyebrow">Decisions</th>
+                        <th className="text-right py-2 pr-3 eyebrow">Avg score</th>
+                        <th className="text-right py-2 pr-3 eyebrow">Completed</th>
+                        <th className="text-right py-2 pr-3 eyebrow">Avg latency</th>
+                        <th className="text-right py-2 pr-3 eyebrow">Cost</th>
+                        <th className="text-right py-2 pr-3 eyebrow" title="Shadow rows only: counterfactual estimate">Est. savings (counterfactual)</th>
+                        <th className="text-right py-2 pr-3 eyebrow">Feedback</th>
+                        <th className="text-right py-2 pr-3 eyebrow" title="Mean reward from outcome signals (move on / retry / correction / escalation), −1 to +1">
                           Reward
                         </th>
-                        <th className="text-right py-2 pr-3 font-medium" title="move on / retry / correction / escalation">
+                        <th className="text-right py-2 pr-3 eyebrow" title="move on / retry / correction / escalation">
                           Signals
                         </th>
-                        <th className="text-left py-2 font-medium">Top model</th>
+                        <th className="text-left py-2 eyebrow">Top model</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -416,7 +339,7 @@ export function RoutingPage() {
                               className={cn(
                                 'py-2 pr-3 text-right tabular-nums',
                                 t.avg_reward != null && t.avg_reward < 0 && 'text-destructive/80',
-                                t.avg_reward != null && t.avg_reward > 0.5 && 'text-emerald-400',
+                                t.avg_reward != null && t.avg_reward > 0.5 && 'text-emerald-600 dark:text-emerald-400',
                               )}
                             >
                               {t.avg_reward != null ? `${t.avg_reward >= 0 ? '+' : ''}${t.avg_reward.toFixed(2)}` : '—'}
@@ -475,7 +398,7 @@ export function RoutingPage() {
                           {d.status && (
                             <span
                               className={cn(
-                                d.status === 'completed' ? 'text-emerald-400' : 'text-destructive/80',
+                                d.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive/80',
                               )}
                             >
                               {d.status}
@@ -512,7 +435,7 @@ export function RoutingPage() {
         {/* Per-strategy breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">Per-Strategy Activity</CardTitle>
+            <CardTitle>Per-Strategy Activity</CardTitle>
           </CardHeader>
           <CardContent>
             {stats.length === 0 ? (

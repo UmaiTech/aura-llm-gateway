@@ -115,6 +115,15 @@ export const ROADMAP: RoadmapItem[] = [
     evidenceLinks: [pr(246)],
   },
   {
+    id: 'admin-design-refresh',
+    title: 'Admin app design refresh',
+    status: 'merged-unreleased',
+    area: 'admin',
+    description:
+      'The admin app now uses the shared Aura look in light and dark mode, works on phones, and explains failed requests with a retry instead of showing empty pages. The request-volume chart now reads correctly at low traffic.',
+    evidenceLinks: [pr(247)],
+  },
+  {
     id: 'landing-redesign',
     title: 'Product-led landing page',
     status: 'merged-unreleased',

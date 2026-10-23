@@ -15,19 +15,19 @@ import { ExternalLinkLine, FlashLine, ShieldLine, Refresh1Line } from '@mingcute
  */
 export function PlaygroundPage() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <Header
         title="Playground"
         description="Test the gateway with a real chat interface"
       />
 
-      <div className="flex-1 overflow-auto p-6">
-        <Card className="max-w-2xl mx-auto mt-12">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+        <Card className="mx-auto max-w-2xl sm:mt-10">
           <CardHeader>
             <CardTitle>Open the playground</CardTitle>
             <CardDescription>
               The Aura playground is hosted at{' '}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">
+              <code className="rounded-sm bg-muted px-1 py-px text-xs text-foreground">
                 playground.aura-llm.dev
               </code>{' '}
               and runs real LLM requests through the gateway with
@@ -37,7 +37,7 @@ export function PlaygroundPage() {
           <CardContent className="space-y-6">
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-3">
-                <FlashLine className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                <FlashLine className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                 <div>
                   <div className="font-medium">Real provider routing</div>
                   <div className="text-muted-foreground">
@@ -47,7 +47,7 @@ export function PlaygroundPage() {
                 </div>
               </li>
               <li className="flex items-start gap-3">
-                <ShieldLine className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                <ShieldLine className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                 <div>
                   <div className="font-medium">
                     Sessions tied to the Playground (Demo) org
@@ -60,7 +60,7 @@ export function PlaygroundPage() {
                 </div>
               </li>
               <li className="flex items-start gap-3">
-                <Refresh1Line className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                <Refresh1Line className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                 <div>
                   <div className="font-medium">Streaming + agent mode</div>
                   <div className="text-muted-foreground">
@@ -78,7 +78,7 @@ export function PlaygroundPage() {
                 rel="noopener noreferrer"
                 className="flex-1"
               >
-                <Button variant="gradient" className="w-full gap-2">
+                <Button className="w-full gap-2">
                   Open playground
                   <ExternalLinkLine className="h-4 w-4" />
                 </Button>

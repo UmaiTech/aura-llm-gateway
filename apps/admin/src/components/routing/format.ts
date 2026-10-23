@@ -5,12 +5,12 @@ export { formatMicros, formatUsd } from '@aura/ui/routing/decision.ts'
 
 export const TIER_ORDER = ['simple', 'medium', 'complex', 'reasoning']
 
-/** Chip classes per tier (same tones RoutingPage has always used). */
+/** Chip classes per tier (AA contrast in both themes, as RoutingPage uses). */
 export const TIER_TONE: Record<string, string> = {
-  simple: 'bg-emerald-500/20 text-emerald-300',
-  medium: 'bg-blue-500/20 text-blue-300',
-  complex: 'bg-violet-500/20 text-violet-300',
-  reasoning: 'bg-pink-500/20 text-pink-300',
+  simple: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+  medium: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+  complex: 'bg-violet-500/20 text-violet-700 dark:text-violet-300',
+  reasoning: 'bg-pink-500/20 text-pink-700 dark:text-pink-300',
 }
 
 export function formatReward(v: number | null | undefined): string {
