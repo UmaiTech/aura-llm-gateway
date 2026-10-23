@@ -15,6 +15,7 @@ import {
   TeamsPage,
   EndUsersPage,
   RoutingPage,
+  RoutingDecisionsPage,
   FeaturesPage,
 } from '@/pages'
 import { useAuthStore } from '@/stores'
@@ -60,6 +61,8 @@ function App() {
         <Route path="/keys" element={<KeysPage />} />
         <Route path="/providers" element={<ProvidersPage />} />
         <Route path="/routing" element={<RoutingPage />} />
+        <Route path="/routing/decisions" element={<RoutingDecisionsPage />} />
+        <Route path="/routing/decisions/:responseId" element={<RoutingDecisionsPage />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>

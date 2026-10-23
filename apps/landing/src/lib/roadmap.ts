@@ -106,6 +106,15 @@ function released(
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
   {
+    id: 'routing-decisions-explorer',
+    title: 'Routing decisions explorer and router health',
+    status: 'merged-unreleased',
+    area: 'admin',
+    description:
+      'The admin app lists every auto-routing decision with filters for time, tier, mode, model, outcome, cost and flags, and opens any one in the shared routing inspector with what happened next. The Routing page adds router health: reward and counterfactual-savings trends, learned arm statistics, model activation and gold-label coverage.',
+    evidenceLinks: [pr(246)],
+  },
+  {
     id: 'admin-design-refresh',
     title: 'Admin app design refresh',
     status: 'merged-unreleased',

@@ -51,7 +51,7 @@ function getAuthHeaders(): Record<string, string> {
   return {}
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+export async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
   let response: Response
