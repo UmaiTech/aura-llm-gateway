@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Header } from '@/components/layout'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { runRoutingLab, scoreRoutingRequest } from '@/lib/api'
@@ -12,7 +13,7 @@ import type {
 import { cn } from '@/lib/utils'
 import { RoutingInspector } from '@aura/ui/routing/RoutingInspector.tsx'
 import { fromResponseDecision } from '@aura/ui/routing/decision.ts'
-import { CheckLine, DownloadLine, FlashLine, ShieldLine } from '@mingcute/react'
+import { ArrowRightLine, CheckLine, DownloadLine, FlashLine, ShieldLine } from '@mingcute/react'
 
 /**
  * Routing lab — battle-test the auto router from the admin app.
@@ -794,10 +795,18 @@ export function RoutingLabPage() {
         {/* Detail */}
         {selectedCell && selPromptObj && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
               <CardTitle className="text-base">
                 <span className="font-mono">{selLane}</span> · {selPromptObj.label}
               </CardTitle>
+              {typeof selectedCell.live?.response?.id === 'string' && (
+                <Link to={`/routing/decisions/${encodeURIComponent(selectedCell.live.response.id)}`}>
+                  <Button size="sm" variant="outline">
+                    Open decision
+                    <ArrowRightLine className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedCell.live && (

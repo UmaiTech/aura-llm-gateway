@@ -69,15 +69,14 @@ export function AdminShowcase() {
           { icon: <ListChecks className="h-4 w-4" aria-hidden />, text: 'Keep gateway settings and organization policy in reach.' },
         ]}
       >
-        <a href={LINKS.admin} className="btn-primary">
-          Explore the admin app
+        <a href={LINKS.adminLocal} className="btn-primary">
+          Run the admin app locally
           <ArrowRight className="h-4 w-4" aria-hidden />
         </a>
-        <a href={LINKS.adminRequestLogs} className="inline-flex items-center gap-1.5 text-sm text-aura-accent hover:underline">
-          Go straight to request logs
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </a>
-        <p className="text-xs text-aura-dim">The admin app signs in with your gateway's admin key.</p>
+        <p className="text-xs text-aura-dim">
+          The admin app runs locally against your own gateway for now, and signs in with its admin key. A hosted
+          version is coming soon.
+        </p>
       </SectionCopy>
 
       <PreviewFrame

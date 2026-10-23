@@ -164,8 +164,8 @@ export function ClosingCta() {
           Try a sample request
           <ArrowRight className="h-4 w-4" aria-hidden />
         </a>
-        <a href={LINKS.admin} className="btn-secondary">
-          Explore the admin app
+        <a href={LINKS.adminLocal} className="btn-secondary">
+          Run the admin app locally
         </a>
         <a href={LINKS.selfHost} className="btn-secondary">
           <Server className="h-4 w-4" aria-hidden />

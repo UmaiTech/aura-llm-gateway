@@ -4,8 +4,8 @@
  */
 export const LINKS = {
   playground: 'https://playground.aura-llm.dev/chat',
-  admin: 'https://app.aura-llm.dev/',
-  adminRequestLogs: 'https://app.aura-llm.dev/dev-logs',
+  // The admin app is local-only until the hosted version ships.
+  adminLocal: '/docs/deployment#run-the-admin-app-locally',
   docs: '/docs',
   quickstart: '/docs/quickstart',
   autoRoutingDocs: '/docs/api/auto-routing',
