@@ -15,8 +15,9 @@ export interface ModelPricing {
 // Hardcoded reference prices — fallback only. Kept current-ish by hand; the
 // live values from /api/pricing take precedence once loaded.
 export const FALLBACK_PRICING: Record<string, ModelPricing> = {
-  // OpenAI — 2026 lineup (refreshed 2026-10-15). Sol is promo-priced
+  // OpenAI — 2026 lineup (refreshed 2026-11-15). Sol is promo-priced
   // through 2026-11-21; 'gpt-5.6' is OpenAI's alias for Sol.
+  'gpt-6.1-terra': { inputPerMillion: 1.00, outputPerMillion: 5.00 },
   'gpt-6.1-sol': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'gpt-6-sol': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'gpt-6-luna': { inputPerMillion: 0.10, outputPerMillion: 0.50 },
@@ -38,7 +39,8 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   'gpt-4-turbo': { inputPerMillion: 10.00, outputPerMillion: 30.00 },
   'gpt-3.5-turbo': { inputPerMillion: 0.50, outputPerMillion: 1.50 },
 
-  // Anthropic — 2026 lineup (refreshed 2026-10-01)
+  // Anthropic — 2026 lineup (refreshed 2026-11-15)
+  'claude-fable-5-2': { inputPerMillion: 8.00, outputPerMillion: 40.00 },
   'claude-fable-5-1': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
   'claude-fable-5': { inputPerMillion: 10.00, outputPerMillion: 50.00 },
   'claude-opus-5-5': { inputPerMillion: 4.00, outputPerMillion: 20.00 },
@@ -64,6 +66,8 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // 3.6/3.7/3.8 Flash are Google's introductory price through 2026-12-31
   // ($1.50 / $7.50 standard from 2027-01-01).
   // Gemini 4 Argon: introductory price through 2026-11-30 ($4 / $20 from 2026-12-01).
+  // Gemini 4 Hydrogen (GA 2026-11-12): no scheduled price change reported.
+  'gemini-4-hydrogen': { inputPerMillion: 1.50, outputPerMillion: 7.50 },
   'gemini-4-argon': { inputPerMillion: 2.00, outputPerMillion: 10.00 },
   'gemini-3.8-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
   'gemini-3.7-flash': { inputPerMillion: 0.75, outputPerMillion: 3.75 },
@@ -80,6 +84,7 @@ export const FALLBACK_PRICING: Record<string, ModelPricing> = {
   // Fireworks AI — serverless open-weight catalog (captured 2026-06-28).
   // Model IDs are namespaced as accounts/fireworks/models/<slug>; kept in
   // sync with cost.rs seed prices. Live values from /api/pricing win.
+  'accounts/fireworks/models/deepseek-v4p1-flash-1017': { inputPerMillion: 0.30, outputPerMillion: 1.20 },
   'accounts/fireworks/models/glm-5p2': { inputPerMillion: 1.40, outputPerMillion: 4.40 },
   'accounts/fireworks/models/kimi-k2p6': { inputPerMillion: 1.20, outputPerMillion: 4.50 },
   'accounts/fireworks/models/deepseek-v4-pro': { inputPerMillion: 2.10, outputPerMillion: 4.40 },

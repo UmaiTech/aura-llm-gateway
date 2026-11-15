@@ -43,6 +43,8 @@ const MISTRAL_API_BASE: &str = "https://api.mistral.ai/v1";
 
 /// Supported Mistral models
 const SUPPORTED_MODELS: &[&str] = &[
+    // Mistral Large 4 (GA 2026-11-05; added in the 2026-11-15 refresh)
+    "mistral-large-4",
     "mistral-large-latest",
     "mistral-large-2411",
     "mistral-medium-latest",
@@ -907,6 +909,7 @@ mod tests {
     #[test]
     fn test_supports_model() {
         let provider = MistralProvider::new("test-key");
+        assert!(provider.supports_model("mistral-large-4"));
         assert!(provider.supports_model("mistral-large-latest"));
         assert!(provider.supports_model("codestral-latest"));
         assert!(provider.supports_model("ministral-8b-latest"));

@@ -5,11 +5,12 @@ description: "Mistral AI models through Aura Gateway"
 
 # Mistral Provider
 
-Aura supports Mistral AI's full model lineup including Mistral Large 2, the Codestral coding model, and the lightweight Ministral edge models. Mistral exposes an OpenAI-compatible API, so streaming and tool calling work transparently.
+Aura supports Mistral AI's full model lineup including Mistral Large 4, Mistral Large 2, the Codestral coding model, and the lightweight Ministral edge models. Mistral exposes an OpenAI-compatible API, so streaming and tool calling work transparently.
 
 ## Supported Models
 
 ### Flagship
+- **mistral-large-4** — Mistral's newest flagship (GA 2026-11-05): ~1T-parameter multimodal MoE, 1M context
 - **mistral-large-latest** — Top-tier reasoning, multilingual, 128K context
 - **mistral-large-2411** — Pinned Large snapshot
 
@@ -38,10 +39,11 @@ Aura supports Mistral AI's full model lineup including Mistral Large 2, the Code
 
 ## Pricing
 
-*Prices per 1M tokens (USD), as of 2026*
+*Prices per 1M tokens (USD), as of 2026 (Mistral Large 4 as of 2026-11-15; cached input $0.07)*
 
 | Model | Input | Output |
 |---|---|---|
+| mistral-large-4 | $0.70 | $2.10 |
 | mistral-large-latest | $2.00 | $6.00 |
 | mistral-medium-latest | $0.40 | $2.00 |
 | mistral-small-latest | $0.20 | $0.60 |

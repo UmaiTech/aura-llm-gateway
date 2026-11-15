@@ -24,6 +24,7 @@ export const KnownModels = {
   AUTO_QUALITY: 'auto:quality',
 
   // OpenAI (newest line first)
+  GPT_6_1_TERRA: 'gpt-6.1-terra',
   GPT_6_1_SOL: 'gpt-6.1-sol',
   GPT_6_SOL: 'gpt-6-sol',
   GPT_6_LUNA: 'gpt-6-luna',
@@ -39,6 +40,7 @@ export const KnownModels = {
   GPT_4O_MINI: 'gpt-4o-mini',
 
   // Anthropic (Claude 5-generation ids carry no date suffix)
+  CLAUDE_FABLE_5_2: 'claude-fable-5-2',
   CLAUDE_FABLE_5_1: 'claude-fable-5-1',
   CLAUDE_OPUS_5_5: 'claude-opus-5-5',
   CLAUDE_SONNET_5_5: 'claude-sonnet-5-5',
@@ -51,6 +53,7 @@ export const KnownModels = {
   CLAUDE_HAIKU_4_5: 'claude-haiku-4-5-20251001',
 
   // Google
+  GEMINI_4_HYDROGEN: 'gemini-4-hydrogen',
   GEMINI_4_ARGON: 'gemini-4-argon',
   GEMINI_3_8_FLASH: 'gemini-3.8-flash',
   GEMINI_3_7_FLASH: 'gemini-3.7-flash',
@@ -61,6 +64,7 @@ export const KnownModels = {
 
   // Fireworks AI — serverless open-weight catalog (see gateway issue #209).
   // IDs are namespaced as accounts/fireworks/models/<slug>.
+  FIREWORKS_DEEPSEEK_V4P1_FLASH: 'accounts/fireworks/models/deepseek-v4p1-flash-1017',
   FIREWORKS_GLM_5P2: 'accounts/fireworks/models/glm-5p2',
   FIREWORKS_KIMI_K2P6: 'accounts/fireworks/models/kimi-k2p6',
   FIREWORKS_DEEPSEEK_V4_PRO: 'accounts/fireworks/models/deepseek-v4-pro',

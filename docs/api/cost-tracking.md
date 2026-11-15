@@ -98,12 +98,13 @@ analytics.track('tool_usage', { tools: toolsUsed });
 
 Aura includes up-to-date pricing for all supported models. Prices are per 1 million tokens in USD.
 
-*Last updated: October 2026 (catalog refresh 2026-10-15)*
+*Last updated: November 2026 (catalog refresh 2026-11-15)*
 
 ### OpenAI Models
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| gpt-6.1-terra | $1.00 | $5.00 | $0.05 |
 | gpt-6.1-sol | $2.00 | $10.00 | $0.10 |
 | gpt-6-sol | $2.00 | $10.00 | $0.20 |
 | gpt-6-luna | $0.10 | $0.50 | $0.01 |
@@ -128,6 +129,7 @@ Aura includes up-to-date pricing for all supported models. Prices are per 1 mill
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| claude-fable-5-2 | $8.00 | $40.00 | $0.20 |
 | claude-fable-5-1 | $10.00 | $50.00 | $0.25 |
 | claude-fable-5 | $10.00 | $50.00 | $1.00 |
 | claude-opus-5-5 | $4.00 | $20.00 | $0.20 |
@@ -150,6 +152,7 @@ Gemini 4 Argon is introductory pricing through 2026-11-30 ($4.00 / $20.00 from 2
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| gemini-4-hydrogen | $1.50 | $7.50 | $0.075 |
 | gemini-4-argon | $2.00 | $10.00 | $0.10 |
 | gemini-3.8-flash | $0.75 | $3.75 | $0.075 |
 | gemini-3.7-flash | $0.75 | $3.75 | $0.075 |

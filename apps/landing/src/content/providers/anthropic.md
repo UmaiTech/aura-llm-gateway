@@ -5,20 +5,21 @@ description: "Claude models and capabilities through Aura Gateway"
 
 # Anthropic Provider
 
-Aura provides comprehensive support for Anthropic's Claude models, including Claude Fable 5.1, the Claude 5.5 line (Opus 5.5, Sonnet 5.5, Haiku 5.5), the Claude 5 generation (Opus 5, Sonnet 5) and the Claude 4.x line, with 1M-token context windows and adaptive reasoning. Catalog last refreshed 2026-10-15.
+Aura provides comprehensive support for Anthropic's Claude models, including Claude Fable 5.2 and 5.1, the Claude 5.5 line (Opus 5.5, Sonnet 5.5, Haiku 5.5), the Claude 5 generation (Opus 5, Sonnet 5) and the Claude 4.x line, with 1M-token context windows and adaptive reasoning. Catalog last refreshed 2026-11-15.
 
 ## Supported Models
 
 Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opus-5-2026MMDD`).
 
-### Claude 5.5 Series (Latest — September/October 2026)
+### Claude 5.5 Series (September/October 2026)
 - **claude-opus-5-5** - Current Opus (released 2026-09-22); Opus 5-level work at a lower price, 1M context
 - **claude-sonnet-5-5** - Current Sonnet (released 2026-09-28); faster, lower-cost complement to Opus 5.5
 - **claude-haiku-5-5** - Current Haiku (released 2026-10-07); cheapest and fastest small model, 1M context
 
-### Claude Fable 5.x (September 2026)
-- **claude-fable-5-1** - Anthropic's most capable widely available model (released 2026-09-01); demanding reasoning, long-running agents, document-heavy work
-- **claude-fable-5** - Previous Fable release, same tier and price
+### Claude Fable 5.x (Latest — November 2026)
+- **claude-fable-5-2** - Anthropic's most capable widely available model (released 2026-11-09); demanding reasoning and long-running agents, at a lower price than Fable 5.1
+- **claude-fable-5-1** - Previous Fable (released 2026-09-01), still served
+- **claude-fable-5** - Earlier Fable release, same tier and price as 5.1
 
 ### Claude 5.5 Series (Latest)
 - **claude-opus-5-5** - Current Opus; thinking is always on, effort defaults to `medium`
@@ -52,10 +53,11 @@ Claude 5-generation ids carry no date suffix (`claude-opus-5`, never `claude-opu
 
 ## Pricing
 
-*Prices per 1M tokens (USD), Anthropic first-party rates as of 2026-10-15. Haiku 5.5 is $0.10 / $0.50 for prompts up to 100K tokens and $0.50 / $2.50 above that; the table shows the standard tier.*
+*Prices per 1M tokens (USD), Anthropic first-party rates as of 2026-11-15. Haiku 5.5 is $0.10 / $0.50 for prompts up to 100K tokens and $0.50 / $2.50 above that; the table shows the standard tier.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| **claude-fable-5-2** | $8.00 | $40.00 | $0.20 |
 | **claude-fable-5-1** | $10.00 | $50.00 | $0.25 |
 | **claude-fable-5** | $10.00 | $50.00 | $1.00 |
 | **claude-opus-5-5** | $4.00 | $20.00 | $0.20 |

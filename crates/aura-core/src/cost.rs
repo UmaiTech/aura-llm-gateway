@@ -124,8 +124,16 @@ impl CostCalculator {
         let mut pricing = HashMap::new();
 
         // =================================================================
-        // OpenAI pricing (as of October 2026)
+        // OpenAI pricing (as of November 2026)
         // =================================================================
+
+        // GPT-6.1 Terra (2026-10-26): half the GPT-6.1 Sol price, cache reads
+        // $0.05; prompts over 272K input tokens bill at a surcharge (not
+        // modelled here).
+        pricing.insert(
+            "gpt-6.1-terra".to_string(),
+            ModelPricing::new(1.00, 5.00).with_cached(0.05),
+        );
 
         // GPT-6.x (September 2026). Sol and Luna were launched at half the
         // GPT-5.6 prices; GPT-6.1 Sol bills cache reads at $0.10 and
@@ -309,11 +317,16 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Anthropic pricing (as of October 2026)
+        // Anthropic pricing (as of November 2026)
         // =================================================================
 
-        // Claude Fable 5.x (2026 — top tier). Fable 5.1 (2026-09-01) bills
+        // Claude Fable 5.x (2026 — top tier). Fable 5.2 (2026-11-09) is
+        // $8 / $40 with cache reads at $0.20/MTok. Fable 5.1 (2026-09-01) bills
         // cache reads at $0.25/MTok; Fable 5 at the usual 10% of input.
+        pricing.insert(
+            "claude-fable-5-2".to_string(),
+            ModelPricing::new(8.00, 40.00).with_cached(0.20),
+        );
         pricing.insert(
             "claude-fable-5-1".to_string(),
             ModelPricing::new(10.00, 50.00).with_cached(0.25),
@@ -463,6 +476,13 @@ impl CostCalculator {
         // and updating $/MTok from https://ai.google.dev/pricing.
         // =================================================================
 
+        // Gemini 4 Hydrogen (GA 2026-11-12; prices as of November 2026).
+        // Flash-tier; cache reads $0.075. No scheduled price change reported.
+        pricing.insert(
+            "gemini-4-hydrogen".to_string(),
+            ModelPricing::new(1.50, 7.50).with_cached(0.075),
+        );
+
         // Gemini 4 Argon (GA 2026-10-13). Introductory price through
         // 2026-11-30; the standard rate from 2026-12-01 is $4.00 / $20.00.
         pricing.insert(
@@ -566,9 +586,15 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Mistral AI pricing (as of May 2026)
+        // Mistral AI pricing (as of May 2026; Large 4 as of November 2026)
         // Source: https://mistral.ai/technology/#pricing
         // =================================================================
+
+        // Mistral Large 4 (GA 2026-11-05), from its docs.mistral.ai model page.
+        pricing.insert(
+            "mistral-large-4".to_string(),
+            ModelPricing::new(0.70, 2.10).with_cached(0.07),
+        );
 
         pricing.insert(
             "mistral-large-latest".to_string(),
@@ -605,9 +631,27 @@ impl CostCalculator {
         );
 
         // =================================================================
-        // Together AI serverless chat pricing (captured 2026-05-21)
+        // Together AI serverless chat pricing (captured 2026-05-21; new rows
+        // as of November 2026 from https://docs.together.ai/docs/changelog)
         // Source: https://docs.together.ai/docs/serverless/models
         // =================================================================
+
+        // Kimi K3.1 Pro (2026-11-05), DeepSeek V4.1 Flash 1017 (2026-10-18),
+        // MiniMax M3.1 Flash (2026-10-22). Together publishes a cache-read
+        // rate only for MiniMax M3.1 Flash ($0.015); the other two assume the
+        // usual 10% of input.
+        pricing.insert(
+            "moonshotai/Kimi-K3.1-Pro".to_string(),
+            ModelPricing::new(2.00, 10.00).with_cached(0.20),
+        );
+        pricing.insert(
+            "deepseek-ai/DeepSeek-V4.1-Flash-1017".to_string(),
+            ModelPricing::new(0.30, 1.20).with_cached(0.03),
+        );
+        pricing.insert(
+            "MiniMaxAI/MiniMax-M3.1-Flash".to_string(),
+            ModelPricing::new(0.15, 0.60).with_cached(0.015),
+        );
 
         pricing.insert(
             "meta-llama/Llama-3.3-70B-Instruct-Turbo".to_string(),
@@ -686,6 +730,14 @@ impl CostCalculator {
         // Source: https://fireworks.ai/pricing (issue #209)
         // Model IDs are namespaced as accounts/fireworks/models/<slug>.
         // =================================================================
+
+        // DeepSeek V4.1 Flash 1017 (2026-10-19; as of November 2026). The
+        // `-us` router and `-ultrafast` variants are priced higher and are
+        // not in SUPPORTED_MODELS.
+        pricing.insert(
+            "accounts/fireworks/models/deepseek-v4p1-flash-1017".to_string(),
+            ModelPricing::new(0.30, 1.20).with_cached(0.006),
+        );
 
         pricing.insert(
             "accounts/fireworks/models/glm-5p2".to_string(),
@@ -1049,6 +1101,34 @@ mod tests {
         // gpt-6-luna: (1000/1M * 0.10) + (500/1M * 0.50) = 0.0001 + 0.00025
         let cost = calculator.calculate_cost("gpt-6-luna", 1000, 500, None, None);
         assert!((cost.unwrap() - 0.00035).abs() < 0.00001);
+    }
+
+    #[test]
+    fn test_cost_calculator_november_2026_models() {
+        // Every id added in the 2026-11-15 catalog refresh must have a
+        // seed price so cost tracking never silently reports $0 for them.
+        let calculator = CostCalculator::new();
+        for model in [
+            "gpt-6.1-terra",
+            "claude-fable-5-2",
+            "gemini-4-hydrogen",
+            "mistral-large-4",
+            "moonshotai/Kimi-K3.1-Pro",
+            "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+            "MiniMaxAI/MiniMax-M3.1-Flash",
+            "accounts/fireworks/models/deepseek-v4p1-flash-1017",
+        ] {
+            assert!(
+                calculator.get_pricing(model).is_some(),
+                "missing seed pricing for {model}"
+            );
+        }
+        // claude-fable-5-2: (1000/1M * 8.00) + (500/1M * 40.00) = 0.008 + 0.02
+        let cost = calculator.calculate_cost("claude-fable-5-2", 1000, 500, None, None);
+        assert!((cost.unwrap() - 0.028).abs() < 0.00001);
+        // gpt-6.1-terra: (1000/1M * 1.00) + (500/1M * 5.00) = 0.001 + 0.0025
+        let cost = calculator.calculate_cost("gpt-6.1-terra", 1000, 500, None, None);
+        assert!((cost.unwrap() - 0.0035).abs() < 0.00001);
     }
 
     #[test]

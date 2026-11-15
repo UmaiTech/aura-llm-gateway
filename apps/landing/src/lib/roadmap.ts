@@ -109,7 +109,15 @@ function released(
 
 export const ROADMAP: RoadmapItem[] = [
   // ── Merged to main, not in a release yet ──────────────────────────────
-  // (none: everything merged so far shipped in v0.21.2)
+  {
+    id: 'catalog-nov-2026',
+    title: 'November 2026 model catalog refresh',
+    status: 'merged-unreleased',
+    area: 'models',
+    description:
+      'New models from OpenAI, Anthropic, Google, Mistral, Together AI and Fireworks AI, routable through the gateway with seed pricing, SDK constants and playground entries.',
+    evidenceLinks: [pr(262)],
+  },
 
   // ── Released ─────────────────────────────────────────────────────────
   released('0.21.1', {

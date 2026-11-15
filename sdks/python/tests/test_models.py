@@ -20,6 +20,13 @@ def test_fireworks_catalog_exposed() -> None:
     assert KnownModels.CLAUDE_HAIKU_5_5 == "claude-haiku-5-5"
     assert KnownModels.GEMINI_3_7_FLASH == "gemini-3.7-flash"
     assert KnownModels.GEMINI_4_ARGON == "gemini-4-argon"
+    assert KnownModels.GPT_6_1_TERRA == "gpt-6.1-terra"
+    assert KnownModels.CLAUDE_FABLE_5_2 == "claude-fable-5-2"
+    assert KnownModels.GEMINI_4_HYDROGEN == "gemini-4-hydrogen"
+    assert (
+        KnownModels.FIREWORKS_DEEPSEEK_V4P1_FLASH
+        == "accounts/fireworks/models/deepseek-v4p1-flash-1017"
+    )
     assert KnownModels.GEMINI_3_8_FLASH == "gemini-3.8-flash"
     assert KnownModels.FIREWORKS_GPT_OSS_20B == "accounts/fireworks/models/gpt-oss-20b"
 

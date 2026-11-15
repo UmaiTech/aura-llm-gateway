@@ -257,7 +257,7 @@ export const AGENT_SYSTEM_PROMPTS = {
 // so the playground is a useful demo without burning the free quota in
 // two requests. Frontier models (Fable/Opus/Sonnet 5, Opus/Sonnet 4.6+,
 // GPT-6/5.6/5.4+, Gemini 3.x Flash/Pro, Mistral Large) are beta-gated.
-// Catalog last refreshed 2026-09-07.
+// Catalog last refreshed 2026-11-15.
 import type { Model } from './types'
 
 export const AVAILABLE_MODELS: Model[] = [
@@ -275,6 +275,7 @@ export const AVAILABLE_MODELS: Model[] = [
   { id: 'auto:quality', name: 'Auto · quality', provider: 'aura', tier: 'free', mode: 'quality', description: 'Shifts the score toward stronger tiers for borderline requests' },
 
   // OpenAI — frontier locked, mini/nano/Luna free
+  { id: 'gpt-6.1-terra', name: 'GPT-6.1 Terra', provider: 'openai', tier: 'beta' },
   { id: 'gpt-6.1-sol', name: 'GPT-6.1 Sol', provider: 'openai', tier: 'beta' },
   { id: 'gpt-6-sol', name: 'GPT-6 Sol', provider: 'openai', tier: 'beta' },
   { id: 'gpt-6-luna', name: 'GPT-6 Luna', provider: 'openai', tier: 'free' },
@@ -301,6 +302,7 @@ export const AVAILABLE_MODELS: Model[] = [
   // gateway still lists it in SUPPORTED_MODELS for backwards-compat
   // but the upstream call fails. Haiku 4.5 is the current cheap
   // Anthropic model.
+  { id: 'claude-fable-5-2', name: 'Claude Fable 5.2', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', provider: 'anthropic', tier: 'beta' },
   { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic', tier: 'beta' },
@@ -326,6 +328,7 @@ export const AVAILABLE_MODELS: Model[] = [
   // the canonical list at any time.
   // 3.8 / 3.7 / 3.6 Flash and 3.5 Flash-Lite added 2026-09-07 from Google's
   // model docs (GA 2026-09-02 / 08-13 / 07-21).
+  { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', provider: 'google', tier: 'beta' },
   { id: 'gemini-4-argon', name: 'Gemini 4 Argon', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', tier: 'beta' },
   { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', tier: 'beta' },
