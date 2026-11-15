@@ -22,9 +22,14 @@ use uuid;
 
 const TOGETHER_API_BASE: &str = "https://api.together.xyz/v1";
 
-// Captured from https://docs.together.ai/docs/serverless/models on 2026-05-21.
+// Captured from https://docs.together.ai/docs/serverless/models on 2026-05-21;
+// 2026-11-15 refresh added Kimi K3.1 Pro, DeepSeek V4.1 Flash 1017 and
+// MiniMax M3.1 Flash from the Together changelog.
 // Keep this curated chat-model subset in sync with CostCalculator pricing.
 const SUPPORTED_MODELS: &[&str] = &[
+    "moonshotai/Kimi-K3.1-Pro",
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+    "MiniMaxAI/MiniMax-M3.1-Flash",
     "meta-llama/Llama-3.3-70B-Instruct-Turbo",
     "meta-llama/Meta-Llama-3-8B-Instruct-Lite",
     "deepseek-ai/DeepSeek-V4-Pro",
@@ -1036,6 +1041,9 @@ mod tests {
         let provider = TogetherProvider::new("test-key");
         assert!(provider.supports_model("meta-llama/Llama-3.3-70B-Instruct-Turbo"));
         assert!(provider.supports_model("deepseek-ai/DeepSeek-V4-Pro"));
+        assert!(provider.supports_model("moonshotai/Kimi-K3.1-Pro"));
+        assert!(provider.supports_model("deepseek-ai/DeepSeek-V4.1-Flash-1017"));
+        assert!(provider.supports_model("MiniMaxAI/MiniMax-M3.1-Flash"));
         assert!(!provider.supports_model("gpt-4o"));
     }
 

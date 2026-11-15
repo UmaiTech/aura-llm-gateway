@@ -5,11 +5,12 @@ description: "Gemini models and capabilities through Aura Gateway"
 
 # Google Provider
 
-Aura provides full support for Google's Gemini models, offering industry-leading multimodal capabilities with massive context windows and competitive pricing. Catalog last refreshed 2026-10-15; ids match what Google's `models.list` endpoint serves (the bare `gemini-3-pro` / `gemini-3-flash` ids do not exist upstream).
+Aura provides full support for Google's Gemini models, offering industry-leading multimodal capabilities with massive context windows and competitive pricing. Catalog last refreshed 2026-11-15; ids match what Google's `models.list` endpoint serves (the bare `gemini-3-pro` / `gemini-3-flash` ids do not exist upstream).
 
 ## Supported Models
 
 ### Gemini 4 (Latest)
+- **gemini-4-hydrogen** - Flash-tier Gemini 4 model for fast, low-cost coding and agent work (GA 2026-11-12; 1M context). Google marks it a short-term release with a minimum 45-day retirement notice
 - **gemini-4-argon** - Google's most capable model for complex coding, agentic, math and science work (GA 2026-10-13)
 
 ### Gemini 3.x Flash
@@ -51,10 +52,11 @@ Gemini 1.5 models have been retired by Google and are no longer routable.
 
 ## Pricing
 
-*Prices per 1M tokens (USD), as published 2026-10-15. Gemini 4 Argon is introductory pricing through 2026-11-30; the standard rate from 2026-12-01 is $4.00 / $20.00. Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
+*Prices per 1M tokens (USD), as published 2026-11-15. Gemini 4 Hydrogen has no scheduled price change. Gemini 4 Argon is introductory pricing through 2026-11-30; the standard rate from 2026-12-01 is $4.00 / $20.00. Gemini 3.6 / 3.7 / 3.8 Flash are Google's introductory rate through 2026-12-31; the standard rate from 2027-01-01 is $1.50 / $7.50.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| **gemini-4-hydrogen** | $1.50 | $7.50 | $0.075 |
 | **gemini-4-argon** | $2.00 | $10.00 | $0.10 |
 | **gemini-3.8-flash** | $0.75 | $3.75 | $0.075 |
 | **gemini-3.7-flash** | $0.75 | $3.75 | $0.075 |

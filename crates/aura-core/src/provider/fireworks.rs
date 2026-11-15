@@ -26,10 +26,12 @@ use uuid;
 const FIREWORKS_API_BASE: &str = "https://api.fireworks.ai/inference/v1";
 
 // Curated chat-model subset from the Fireworks serverless catalog
-// (https://fireworks.ai/models), captured 2026-06-28. Fireworks model IDs are
+// (https://fireworks.ai/models), captured 2026-06-28; DeepSeek V4.1 Flash
+// 1017 added 2026-11-15 from the Fireworks changelog. Fireworks model IDs are
 // namespaced as `accounts/fireworks/models/<slug>`. Keep in sync with
 // CostCalculator pricing.
 const SUPPORTED_MODELS: &[&str] = &[
+    "accounts/fireworks/models/deepseek-v4p1-flash-1017",
     "accounts/fireworks/models/glm-5p2",
     "accounts/fireworks/models/kimi-k2p6",
     "accounts/fireworks/models/deepseek-v4-pro",
@@ -1011,6 +1013,7 @@ mod tests {
         let provider = FireworksProvider::new("test-key");
         assert!(provider.supports_model("accounts/fireworks/models/glm-5p2"));
         assert!(provider.supports_model("accounts/fireworks/models/kimi-k2p6"));
+        assert!(provider.supports_model("accounts/fireworks/models/deepseek-v4p1-flash-1017"));
         assert!(!provider.supports_model("gpt-4o"));
     }
 

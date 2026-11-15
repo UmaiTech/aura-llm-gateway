@@ -12,7 +12,10 @@ Aura supports [Together AI](https://together.ai), which hosts a large catalogue 
 The provider's `SUPPORTED_MODELS` list mirrors Together's curated serverless catalogue. A few highlights:
 
 ### Large open-weight models
-- **meta-llama/Llama-3.3-70B-Instruct-Turbo** — Meta's 70B Llama 3.3 with serving-side acceleration
+- **moonshotai/Kimi-K3.1-Pro** — Moonshot's newest long-context model, 1M context (added 2026-11-15; $2.00 / $10.00 per 1M tokens)
+- **deepseek-ai/DeepSeek-V4.1-Flash-1017** — Fast, low-cost DeepSeek V4.1, 1M context (added 2026-11-15; $0.30 / $1.20)
+- **MiniMaxAI/MiniMax-M3.1-Flash** — MiniMax's cheap 1M-context model (added 2026-11-15; $0.15 / $0.60)
+- **meta-llama/Llama-3.3-70B-Instruct-Turbo** — Meta's 70B Llama 3.3 with serving-side acceleration. *Legacy: removed from Together's serverless tier on 2026-10-22 (dedicated endpoints only).*
 - **deepseek-ai/DeepSeek-V4-Pro** — DeepSeek's flagship reasoning model
 - **Qwen/Qwen3.5-397B-A17B** — Alibaba's MoE model, 397B total / 17B active
 - **moonshotai/Kimi-K2.6** — Moonshot's long-context model

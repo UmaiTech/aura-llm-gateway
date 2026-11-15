@@ -5,11 +5,12 @@ description: "OpenAI models and capabilities through Aura Gateway"
 
 # OpenAI Provider
 
-Aura provides first-class support for OpenAI's latest models including GPT-6.1 Sol, GPT-6 Sol / Luna, GPT-6 Astra, the GPT-5.6 Sol / Terra / Luna tiers, the GPT-5.5 and GPT-5.4 families, o-series reasoning models, and legacy GPT-4o models. Catalog last refreshed 2026-09-07.
+Aura provides first-class support for OpenAI's latest models including GPT-6.1 Terra and Sol, GPT-6 Sol / Luna, GPT-6 Astra, the GPT-5.6 Sol / Terra / Luna tiers, the GPT-5.5 and GPT-5.4 families, o-series reasoning models, and legacy GPT-4o models. Catalog last refreshed 2026-11-15.
 
 ## Supported Models
 
-### GPT-6 (Latest — September 2026)
+### GPT-6 (Latest — September/October 2026)
+- **gpt-6.1-terra** - Fast, low-cost GPT-6.1 tier with vision and computer use at half the GPT-6.1 Sol price (released 2026-10-26; 1.05M context)
 - **gpt-6.1-sol** - Coding, computer use and professional work at near-Astra capability for a fifth of the price (released 2026-09-29; 1.05M context)
 - **gpt-6-sol** - GPT-6 flagship tier at half the GPT-5.6 Sol price (2026-09-22)
 - **gpt-6-luna** - Cheapest GPT-6 tier for classification, extraction and routing (2026-09-22)
@@ -26,13 +27,16 @@ Aura provides first-class support for OpenAI's latest models including GPT-6.1 S
 
 ### GPT-5 Series (older 2026 line)
 - **gpt-5.2**, **gpt-5**, **gpt-5-mini**
+- *Legacy: OpenAI shuts down gpt-5 and gpt-5-mini on 2026-12-11.*
 
 ### Legacy (kept for backward compatibility)
 - **gpt-4o**, **gpt-4o-mini**, **gpt-4-turbo**, **gpt-4**, **gpt-3.5-turbo**
 - GPT-4.5 was retired by OpenAI on 2026-06-27 and is no longer routable.
+- As of 2026-11-15, OpenAI's `/v1/models` no longer lists gpt-4, gpt-4-turbo or gpt-3.5-turbo; gpt-4o and gpt-4o-mini shut down on 2027-01-14.
 
 ### Reasoning Models (o-series)
 - **o1**, **o1-mini**, **o1-preview**, **o3-mini**
+- *Legacy: as of 2026-11-15 OpenAI's `/v1/models` no longer lists these ids.*
 
 ## Model Capabilities
 
@@ -49,10 +53,11 @@ Aura provides first-class support for OpenAI's latest models including GPT-6.1 S
 
 ## Pricing
 
-*Prices per 1M tokens (USD), as published 2026-10-01. GPT-6.1 Sol prompts over 272K input tokens are billed at a surcharge. GPT-5.6 Sol is promotional pricing through 2026-11-21.*
+*Prices per 1M tokens (USD), as published 2026-11-15. GPT-6.1 Terra and Sol prompts over 272K input tokens are billed at a surcharge. GPT-5.6 Sol is promotional pricing through 2026-11-21.*
 
 | Model | Input | Output | Cached Input |
 |-------|-------|--------|--------------|
+| **gpt-6.1-terra** | $1.00 | $5.00 | $0.05 |
 | **gpt-6.1-sol** | $2.00 | $10.00 | $0.10 |
 | **gpt-6-sol** | $2.00 | $10.00 | $0.20 |
 | **gpt-6-luna** | $0.10 | $0.50 | $0.01 |
